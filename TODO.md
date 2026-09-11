@@ -93,7 +93,17 @@ Completion evidence (2026-08-29):
       canonical rule table.
 - [ ] Preserve source text and extraction metadata through draft approval.
 - [ ] Transition alphanumeric and Property Set checks to `ifcopenshell.ids` validation.
+      Partial progress (2026-09-11): `app/services/ids_validation_service.py`
+      now executes a ruleset's IDS-exportable rows against a project's IFC
+      model for real via `ifctester.ids` (`Ids.validate()`), wired as the
+      Tier 2 signal for CDE Gate 1 promotion
+      (`app/api/cde_integration.py::promote_gate1`). The existing
+      `property_check` engine path is untouched — this is IDS running
+      alongside it as a gate check, not yet a replacement of those checks.
 - [ ] Map IDS validation results into the shared issue and BCF model.
+      `IDSValidationResult`/`IDSSpecificationResult` above give per-specification
+      pass/fail and failed-entity counts, but nothing yet turns a failed
+      specification into an `Issue`/BCF topic.
 - [ ] Validate imported/exported IDS documents with the buildingSMART IDS schema.
 - [x] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing now that
       the single LLM extraction path (`LlamaIndexRuleGenerator`) covers the one
@@ -349,6 +359,46 @@ treatment rulesets already had.
 - [ ] Not verified end-to-end in a real signed-in browser session this pass,
       same caveat as above — covered by `svelte-check`/`eslint` clean and the
       full pytest suite passing.
+
+Owner: unassigned.
+
+### ISO 19650-5 Security-Minded Information Management (Not Started)
+
+Found during an ISO 19650 requirements gap review (`docs/ISO19650/BIMGuard-ISO19650-Requirements.md`):
+today's authorization is coarse org/project/group RBAC (`MembershipService`,
+Priority 9 above); none of the ISO 19650-5 security-governance controls the
+requirements doc describes exist yet. Scoped here for a future dedicated
+pass rather than bundled into the CDE/IDS/naming fixes above, since it's the
+largest single item and deserves its own design review.
+
+- [ ] No Attribute-Based Access Control (ABAC) or per-entity security
+      clearance model. Grep for "ABAC"/"clearance"/"security_level" across
+      `app/` and `supabase/migrations/` returns nothing beyond unrelated
+      physical "clearance distance" domain terms; authorization today is
+      entirely coarse org/project/group RBAC.
+- [ ] No security classification taxonomy or tagging (Public / Commercial
+      Sensitive / Infrastructure Restricted / High Security Restricted) at
+      container, IFC element, or zone granularity. `suitability_code`/
+      `cde_state` are workflow-state classification, not security-sensitivity
+      classification.
+- [ ] No dynamic IFC redaction by clearance on view or download.
+      `app/api/models.py`'s `download_model` and the primary
+      `GET /api/projects/{project_id}/ifc` route serve the full file once
+      project membership passes — access is all-or-nothing, with no
+      filtering of `IfcProduct` entities, geometry, or property sets
+      (e.g. `Pset_SecurityProperties`) by viewer clearance.
+- [ ] No hash-chained, tamper-evident audit ledger. Only CDE-transition
+      lineage logging (`model_enhancement_lineage`, via
+      `SupabaseModelLineageRepository.record_cde_transition`) and ordinary
+      content-integrity SHA-256 hashing (for dedup/caching) exist; no record
+      chains its hash to the previous record's hash, and no ledger covers
+      uploads/downloads/views generally.
+- [ ] Real Postgres RLS policies. 35+ migrations `ENABLE ROW LEVEL SECURITY`
+      but pair it with `REVOKE ALL FROM anon, authenticated` and grant only
+      to `service_role` — zero `CREATE POLICY` statements exist anywhere
+      (confirmed via `list_migrations`/file grep). RLS today is a PostgREST
+      anonymous-deny backstop, not the row-level security the ISO 19650-5
+      requirements assume.
 
 Owner: unassigned.
 

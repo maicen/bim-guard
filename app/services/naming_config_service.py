@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.logging_config import get_logger
@@ -478,6 +479,65 @@ class NamingConfigService:
             lambda match: values.get(match.group(1), match.group(0)),
             self.applied_format(convention, separator),
         )
+
+    def build_pattern(self, config: dict[str, Any]) -> re.Pattern[str]:
+        """Compile a project's active convention into a validation regex.
+
+        The inverse of ``render_name``: each ``{token}`` becomes a named
+        capture group matching everything up to the next separator, and the
+        format's literal text (separators, fixed strings such as ``_vs_``) is
+        matched verbatim. Used to validate an actual container name against
+        the convention a project chose, rather than only ever generating a
+        sample one for preview.
+        """
+        convention = self.resolve_convention(config)
+        separator = str(config.get("separator") or convention.get("separator") or "_")
+        fmt = self.applied_format(convention, separator)
+        sep_class = re.escape(separator) if separator else "_"
+
+        parts: list[str] = []
+        pos = 0
+        seen: set[str] = set()
+        for match in _TOKEN_RE.finditer(fmt):
+            literal = fmt[pos : match.start()]
+            if literal:
+                parts.append(re.escape(literal))
+            token = match.group(1)
+            # A format can repeat a token (e.g. two disciplines in a
+            # cross-discipline clash name); only the first occurrence keeps
+            # its name so the compiled pattern stays valid.
+            group_name = token if token not in seen else f"{token}_{len(seen)}"
+            seen.add(token)
+            parts.append(f"(?P<{group_name}>[^{sep_class}]+)")
+            pos = match.end()
+        tail = fmt[pos:]
+        if tail:
+            parts.append(re.escape(tail))
+
+        return re.compile("^" + "".join(parts) + "$", re.IGNORECASE)
+
+    def validate_name(
+        self, config: dict[str, Any], filename: str
+    ) -> tuple[bool, dict[str, str], list[str]]:
+        """Validate a container filename against a project's naming configuration.
+
+        Returns:
+            ``(is_valid, fields, errors)`` -- ``fields`` holds the named token
+            values the pattern extracted when it matched.
+        """
+        stem = Path(filename).stem
+        pattern = self.build_pattern(config)
+        match = pattern.match(stem)
+        if not match:
+            return (
+                False,
+                {},
+                [
+                    f"Filename '{filename}' does not match the project's configured "
+                    f"naming convention ({config.get('active_convention', DEFAULT_CONVENTION)})."
+                ],
+            )
+        return True, match.groupdict(), []
 
     @staticmethod
     def applied_format(convention: dict[str, Any], separator: str) -> str:

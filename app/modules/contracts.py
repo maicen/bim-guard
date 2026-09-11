@@ -125,6 +125,23 @@ class CDEState(str, Enum):
     ARCHIVED = "ARCHIVED"
 
 
+class ExchangeDisposition(str, Enum):
+    """ISO 19650-4 formal information exchange disposition.
+
+    Combines the four-tier verification/validation pipeline (Tier 1
+    syntactic, Tier 2 IDS/schema, Tier 3 semantic/bSDD, Tier 4 engineering
+    compliance) into one authoritative verdict:
+    - REJECTED: a Tier 1 parsing failure or a critical Tier 2 IDS failure.
+    - ACCEPTED_WITH_COMMENTS: Tier 1/2 pass, but Tier 3 or Tier 4 raised
+      non-critical warnings that must be tracked before the next milestone.
+    - ACCEPTED: every tier passed without exception.
+    """
+
+    REJECTED = "REJECTED"
+    ACCEPTED_WITH_COMMENTS = "ACCEPTED_WITH_COMMENTS"
+    ACCEPTED = "ACCEPTED"
+
+
 #: ISO 19650 container naming keeps the project code segment short --
 #: 2-6 uppercase/lowercase alphanumeric characters, no separators (the
 #: hyphen is the field delimiter itself; see iso_validator.py).
@@ -458,6 +475,10 @@ class DocumentUpdateRequest(BaseModel):
     suitability_code: Optional[str] = Field(None, description="ISO 19650 Suitability Code")
     revision_code: Optional[str] = Field(None, description="ISO 19650 Revision Code")
     cde_state: Optional[CDEState] = Field(None, description="CDE State")
+    approved_by: Optional[str] = Field(
+        None,
+        description="Lead Appointed Party approver name, required by CDEStateMachine to authorize a SHARED to PUBLISHED transition",
+    )
 
 
 class DocumentResponse(IsoGovernanceFieldsRequired):
@@ -2662,11 +2683,22 @@ class CDETokenResponse(BaseModel):
 
 class CDEPromoteRequest(BaseModel):
     """Request payload for CDE gate transition."""
+
+    project_id: int
     actor: Optional[str] = "Lead Appointed Party"
+    ruleset_id: Optional[str] = Field(
+        None,
+        description="Ruleset to run Tier 2 (buildingSMART IDS 1.0) verification against before promotion. "
+        "When omitted, Tier 2 is treated as not applicable rather than failed.",
+    )
 
 
 class CDEPromoteResponse(BaseModel):
     """Response payload after CDE gate transition."""
+
     success: bool
     cde_state: str
     message: str
+    disposition: Optional[ExchangeDisposition] = Field(
+        None, description="ISO 19650-4 combined exchange disposition evaluated for this promotion"
+    )

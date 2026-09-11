@@ -392,6 +392,8 @@ export interface DocumentUpdatePayload {
   suitability_code?: string;
   revision_code?: string;
   cde_state?: CDEState;
+  /** Lead Appointed Party approver name, required to authorize SHARED -> PUBLISHED. */
+  approved_by?: string;
 }
 
 export interface GoogleDriveImportPayload {

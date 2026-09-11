@@ -21,7 +21,7 @@ import json
 from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response, status, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
 from app.api.dependencies import get_documents_service, get_models_service, get_projects_service
 from app.api.projects import get_authorized_project
@@ -29,6 +29,8 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEAuthConfigResponse,
     CDEDocumentItem,
+    CDEPromoteRequest,
+    CDEPromoteResponse,
     CDESyncRequest,
     CDESyncResponse,
     CDETokenResponse,
@@ -36,13 +38,14 @@ from app.modules.contracts import (
     CDEVersionItem,
     CDEVersionsResponse,
     CDEWebhookPayload,
-    CDEPromoteRequest,
-    CDEPromoteResponse,
 )
+from app.services.cde_state_machine import CDEStateMachine
 from app.services.documents_service import DocumentService
+from app.services.exchange_disposition import DispositionInput, compute_disposition
+from app.services.ids_validation_service import IDSValidationService
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
-from app.services.cde_state_machine import CDEStateMachine
+from app.services.report_artifacts import ReportArtifactService
 
 logger = get_logger(__name__)
 
@@ -362,7 +365,7 @@ def promote_gate1(
 ) -> CDEPromoteResponse:
     """Promote a project's CDE state from WIP to SHARED if there are no critical errors."""
     state_machine = CDEStateMachine(projects_service=projects_service)
-    
+
     project = projects_service.get_project(payload.project_id)
     if not project:
         raise HTTPException(
@@ -370,20 +373,52 @@ def promote_gate1(
             detail=f"Project {payload.project_id} not found."
         )
 
-    # In a full implementation, this would query the issues table for critical errors.
+    # Real Tier-1/Tier-4 signal: the project's most recently persisted audit
+    # report's issue count. This counts every open finding rather than only
+    # critical-severity ones -- report_artifacts does not currently persist a
+    # severity breakdown -- but it replaces the previous hardcoded 0, which
+    # let every project promote regardless of outstanding findings.
+    latest_report = ReportArtifactService().latest_bcf(payload.project_id)
+    critical_issues_count = int(latest_report.get("issue_count") or 0) if latest_report else 0
+
+    # Real Tier-2 signal: buildingSMART IDS 1.0 execution against the
+    # project's IFC model, when a ruleset was supplied. With no ruleset,
+    # Tier 2 is not applicable to this promotion rather than treated as failed.
+    ids_check_passed = True
+    ids_result: Any = None
+    if payload.ruleset_id:
+        ids_result = IDSValidationService().validate_project(payload.project_id, payload.ruleset_id)
+        ids_check_passed = ids_result.passed
+        if not ids_result.passed:
+            logger.info(
+                "Gate 1 IDS check failed project_id=%d ruleset_id=%s error=%s failed_specs=%s",
+                payload.project_id,
+                payload.ruleset_id,
+                ids_result.error,
+                [spec.name for spec in ids_result.failed_specifications],
+            )
+
+    disposition = compute_disposition(
+        DispositionInput(
+            tier2_result=ids_result,
+            tier4_critical_count=critical_issues_count,
+        )
+    )
+
     # The state machine transition throws a ValueError on failure.
     try:
         updated_project = state_machine.transition_project(
             project_id=payload.project_id,
             target_state="SHARED",
             actor=payload.actor or "Lead Appointed Party",
-            critical_issues_count=0,
-            ids_check_passed=True,
+            critical_issues_count=critical_issues_count,
+            ids_check_passed=ids_check_passed,
         )
         return CDEPromoteResponse(
             success=True,
             cde_state=updated_project.get("cde_state", "SHARED"),
-            message="Successfully promoted to SHARED state."
+            message="Successfully promoted to SHARED state.",
+            disposition=disposition,
         )
     except ValueError as e:
         raise HTTPException(

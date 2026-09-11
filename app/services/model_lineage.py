@@ -108,7 +108,17 @@ class SupabaseModelLineageRepository:
         actor: str,
         metrics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Record an immutable CDE state transition log entry for audit compliance."""
+        """Record an immutable CDE state transition log entry for audit compliance.
+
+        `model_enhancement_lineage.version` has a `> 0` CHECK and a unique
+        `(project_id, version)` index, and `source_sha256` is either NULL or
+        a 64-hex-char digest -- this previously wrote `version=0` and a
+        literal `"cde_transition_audit"` string, violating both constraints
+        on every call, so no CDE transition was ever actually logged. Reuses
+        the same atomic version allocator enhancement records use so a CDE
+        audit row can't collide with a real enhancement version, and leaves
+        `source_sha256` NULL (a CDE transition has no source payload to hash).
+        """
         summary = {
             "event_type": "CDE_STATE_TRANSITION",
             "from_state": from_state,
@@ -116,14 +126,15 @@ class SupabaseModelLineageRepository:
             "actor": actor,
             "metrics": metrics or {},
         }
+        version = self.allocate_next_version(project_id)
         return self._lineage.insert(
             {
                 "project_id": project_id,
                 "source_reference": f"CDE:{from_state}",
-                "source_sha256": "cde_transition_audit",
+                "source_sha256": None,
                 "source_version": 0,
                 "output_reference": f"CDE:{to_state}",
-                "version": 0,
+                "version": version,
                 "summary": summary,
                 "created_at": now_iso_utc(),
             }

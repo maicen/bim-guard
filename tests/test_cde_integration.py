@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.report_artifacts import ReportArtifactService
 
 client = TestClient(app)
 
@@ -103,6 +104,48 @@ def test_opencde_documents_sync(cde_test_project):
     data = response.json()
     assert data["success"] is True
     assert data["synced_documents_count"] == 2
+
+
+def test_gate1_promote_succeeds_with_no_outstanding_issues(cde_test_project):
+    proj_id = cde_test_project("Gate1 Clean Project", "GB", "Piping")
+
+    response = client.post("/api/cde/gate1/promote", json={"project_id": proj_id})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["cde_state"] == "SHARED"
+    assert data["disposition"] == "ACCEPTED"
+
+
+def test_gate1_promote_blocked_by_persisted_critical_issues(cde_test_project):
+    """Gate 1 must reflect real findings, not the previous hardcoded pass.
+
+    Regression test for the bug where `promote_gate1` always passed
+    `critical_issues_count=0` regardless of actual compliance results.
+    """
+    proj_id = cde_test_project("Gate1 Blocked Project", "GB", "Piping")
+
+    report_service = ReportArtifactService()
+    artifact = report_service.persist_bcf(
+        proj_id,
+        [
+            {
+                "guid": "issue-1",
+                "element_guid": "elem-1",
+                "rule_id": "GC-001.01",
+                "title": "Dissimilar metal coupling",
+                "priority": "critical",
+            }
+        ],
+    )
+    assert artifact is not None
+
+    try:
+        response = client.post("/api/cde/gate1/promote", json={"project_id": proj_id})
+        assert response.status_code == 400
+        assert "critical compliance issues" in response.json()["detail"]
+    finally:
+        report_service.delete_bcf(artifact["id"])
 
 
 def test_opencde_webhook_event():

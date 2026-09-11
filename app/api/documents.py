@@ -28,6 +28,7 @@ from app.api.dependencies import (
 from app.auth import get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    CDEState,
     DocumentDetailResponse,
     DocumentElementBbox,
     DocumentElementBboxesResponse,
@@ -49,6 +50,7 @@ from app.modules.contracts import (
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.section_tree import build_section_tree
 from app.services.cache import cache_service
+from app.services.cde_state_machine import CDEStateMachine
 from app.services.document_access_service import DocumentAccessService
 from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
@@ -495,6 +497,22 @@ def update_document(
     filename = payload.filename if payload.filename is not None else existing.get("filename", "")
     doc_type = payload.doc_type if payload.doc_type is not None else existing.get("doc_type", "Specification")
 
+    target_cde_state = payload.cde_state.value if hasattr(payload.cde_state, "value") else payload.cde_state
+    current_cde_state = existing.get("cde_state") or CDEState.WIP.value
+    if target_cde_state is not None and target_cde_state != current_cde_state:
+        # Route every document CDE state change through the same gate logic
+        # projects use, instead of writing cde_state directly -- otherwise a
+        # document could jump straight to PUBLISHED with no gate check.
+        result = CDEStateMachine.evaluate_transition(
+            current_cde_state,
+            target_cde_state,
+            filename=filename.strip(),
+            approved_by=payload.approved_by or "",
+            is_approved=bool(payload.approved_by),
+        )
+        if not result.allowed:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.reason)
+
     service.update_document(
         document_id,
         filename=filename.strip(),
@@ -503,7 +521,7 @@ def update_document(
         originator=payload.originator,
         suitability_code=payload.suitability_code,
         revision_code=payload.revision_code,
-        cde_state=payload.cde_state.value if hasattr(payload.cde_state, "value") else payload.cde_state,
+        cde_state=target_cde_state,
     )
     updated = service.get_document(document_id) or existing
     text = service.get_document_text(updated)

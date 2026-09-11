@@ -14,8 +14,29 @@ from typing import Any, NamedTuple
 from app.modules.contracts import CDEState
 from app.modules.document_parsing.iso_validator import ISO19650Validator
 from app.services.model_lineage import SupabaseModelLineageRepository
+from app.services.naming_config_service import NamingConfigService
 from app.services.projects_service import ProjectsService
-from app.utils import now_iso_utc
+from app.utils import invalidate_cache, now_iso_utc
+
+
+def _validate_container_filename(filename: str, *, project_id: int | None, naming_config: NamingConfigService) -> tuple[bool, list[str]]:
+    """Validate a container filename, preferring a project's configured naming convention.
+
+    Falls back to the default ISO 19650 7-field regex (`ISO19650Validator`)
+    when the project has no saved `project_naming_config` row, or when
+    `project_id` is unknown -- e.g. a bare filename check with no project
+    context. This is what actually makes a project's naming-config-API
+    choice the one Gate 1 enforces, instead of Gate 1 always enforcing the
+    default scheme regardless of what a project configured.
+    """
+    if project_id is not None:
+        config = naming_config.get_for_project(project_id)
+        if config.get("is_configured"):
+            is_valid, _fields, errors = naming_config.validate_name(config, filename)
+            return is_valid, errors
+
+    result = ISO19650Validator.validate_filename(filename)
+    return result.is_valid, result.errors
 
 
 class TransitionResult(NamedTuple):
@@ -32,9 +53,11 @@ class CDEStateMachine:
         *,
         projects_service: ProjectsService | None = None,
         lineage_repo: SupabaseModelLineageRepository | None = None,
+        naming_config_service: NamingConfigService | None = None,
     ) -> None:
         self._projects = projects_service if projects_service is not None else ProjectsService()
         self._lineage = lineage_repo if lineage_repo is not None else SupabaseModelLineageRepository()
+        self._naming_config = naming_config_service if naming_config_service is not None else NamingConfigService()
 
     @staticmethod
     def evaluate_transition(
@@ -42,12 +65,20 @@ class CDEStateMachine:
         target_state: str | CDEState,
         *,
         filename: str = "",
+        project_id: int | None = None,
+        naming_config_service: NamingConfigService | None = None,
         critical_issues_count: int = 0,
         ids_check_passed: bool = True,
         is_approved: bool = False,
         approved_by: str = "",
     ) -> TransitionResult:
-        """Evaluate whether a requested CDE state transition satisfies ISO 19650 gateway rules."""
+        """Evaluate whether a requested CDE state transition satisfies ISO 19650 gateway rules.
+
+        `project_id` lets the WIP -> SHARED filename check enforce a
+        project's own configured naming convention (`project_naming_config`)
+        when one has been set up, instead of always enforcing the default
+        7-field scheme regardless of what the project chose.
+        """
         cur = CDEState(current_state) if isinstance(current_state, str) else current_state
         tgt = CDEState(target_state) if isinstance(target_state, str) else target_state
 
@@ -57,11 +88,15 @@ class CDEStateMachine:
         # WIP -> SHARED Gateway
         if cur == CDEState.WIP and tgt == CDEState.SHARED:
             if filename:
-                val = ISO19650Validator.validate_filename(filename)
-                if not val.is_valid:
+                is_valid, errors = _validate_container_filename(
+                    filename,
+                    project_id=project_id,
+                    naming_config=naming_config_service or NamingConfigService(),
+                )
+                if not is_valid:
                     return TransitionResult(
                         allowed=False,
-                        reason=f"ISO 19650 container naming validation failed: {'; '.join(val.errors)}",
+                        reason=f"ISO 19650 container naming validation failed: {'; '.join(errors)}",
                         target_state=tgt,
                     )
             if critical_issues_count > 0:
@@ -126,6 +161,8 @@ class CDEStateMachine:
             current_state,
             target_state,
             filename=filename,
+            project_id=project_id,
+            naming_config_service=self._naming_config,
             critical_issues_count=critical_issues_count,
             ids_check_passed=ids_check_passed,
             approved_by=approved_by or project.get("cde_approved_by", ""),
@@ -141,8 +178,16 @@ class CDEStateMachine:
             updates["cde_approved_by"] = approved_by
             updates["cde_approved_at"] = now_iso_utc()
 
-        # Update projects table
+        # Update projects table. This writes through the raw adapter rather
+        # than ProjectsService.update_project(), so it must invalidate the
+        # service-level @cache_db_query cache on get_project() itself --
+        # the adapter-level cache invalidation .update() already does is a
+        # separate cache keyed differently (bimguard:projects:item:... vs
+        # adapter:projects:get:...) and does not cover it. Without this, the
+        # get_project() call below can return the pre-transition row.
         self._projects._projects.update(updates=updates, pk_values=project_id)
+        invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
+        invalidate_cache("bimguard:projects:list")
 
         # Audit Log CDE State Transition
         self._lineage.record_cde_transition(
