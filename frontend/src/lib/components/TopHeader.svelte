@@ -8,6 +8,14 @@
   import ResourcesMenu from "./ResourcesMenu.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
+  import {
+    Breadcrumb,
+    BreadcrumbList,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+  } from "./breadcrumb";
   import type { Project } from "../types";
 
   interface Props {
@@ -74,8 +82,7 @@
 <header
   class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/60 px-4 md:px-6"
 >
-  <!-- Breadcrumb -->
-  <div class="flex min-w-0 items-center gap-2 text-sm">
+  <div class="flex min-w-0 items-center gap-2">
     <button
       type="button"
       onclick={onOpenMobileNav}
@@ -85,35 +92,41 @@
     >
       <Menu class="h-5 w-5" />
     </button>
-    {#if isProjectView && selectedProject}
-      <button
-        type="button"
-        onclick={onExitProject}
-        class="hidden font-medium text-slate-500 transition-colors hover:text-slate-300 sm:inline"
-        title="Back to Organization"
-      >
-        Organization
-      </button>
-      <span class="hidden text-slate-600 sm:inline">/</span>
-      <!-- Project identity (short name + ISO 19650 code) appears exactly
-           once here -- it replaced the old header project switcher and must
-           not also repeat as a separate badge. -->
-      <span
-        class="truncate font-semibold text-slate-100"
-        title={selectedProject.name}
-      >
-        {selectedProject.short_name || selectedProject.name}
-        {#if selectedProject.project_code}
-          <span class="font-normal text-slate-500">· {selectedProject.project_code}</span>
+    <Breadcrumb class="min-w-0">
+      <BreadcrumbList>
+        {#if isProjectView && selectedProject}
+          <BreadcrumbItem class="hidden sm:inline-flex">
+            <BreadcrumbLink onclick={onExitProject} title="Back to Organization">
+              Organization
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator class="hidden sm:inline-flex" />
+          <!-- Project identity (short name + ISO 19650 code) appears exactly
+               once here -- it replaced the old header project switcher and must
+               not also repeat as a separate badge. -->
+          <BreadcrumbItem>
+            <BreadcrumbPage current={false} title={selectedProject.name} class="truncate font-semibold text-slate-100">
+              {selectedProject.short_name || selectedProject.name}
+              {#if selectedProject.project_code}
+                <span class="font-normal text-slate-500">· {selectedProject.project_code}</span>
+              {/if}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator class="hidden sm:inline-flex" />
+          <BreadcrumbItem class="hidden sm:inline-flex">
+            <BreadcrumbPage class="text-slate-400">{headerInfo.title}</BreadcrumbPage>
+          </BreadcrumbItem>
+        {:else}
+          <BreadcrumbItem class="hidden sm:inline-flex">
+            <BreadcrumbPage current={false} class="font-medium text-slate-500">{headerInfo.section}</BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator class="hidden sm:inline-flex" />
+          <BreadcrumbItem>
+            <BreadcrumbPage class="truncate font-semibold text-slate-100">{headerInfo.title}</BreadcrumbPage>
+          </BreadcrumbItem>
         {/if}
-      </span>
-      <span class="hidden text-slate-600 sm:inline">·</span>
-      <span class="hidden text-slate-400 sm:inline">{headerInfo.title}</span>
-    {:else}
-      <span class="hidden font-medium text-slate-500 sm:inline">{headerInfo.section}</span>
-      <span class="hidden text-slate-600 sm:inline">/</span>
-      <span class="truncate font-semibold text-slate-100">{headerInfo.title}</span>
-    {/if}
+      </BreadcrumbList>
+    </Breadcrumb>
   </div>
 
   <!-- Actions & Status -->
