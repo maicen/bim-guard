@@ -23,6 +23,20 @@ function createEmitter() {
     };
 }
 
+function getThemeConfig() {
+    const isLight = typeof document !== "undefined" && document.documentElement.classList.contains("light");
+    return {
+        isLight,
+        // Match --color-surface-canvas: #020617 (dark) / #f8fafc (light)
+        canvasHex: isLight ? 0xf8fafc : 0x020617,
+        // Grid lines matching --border-default / --border-subtle
+        gridColor: isLight ? 0xcbd5e1 : 0x334155,
+        gridSecondaryColor: isLight ? 0xe2e8f0 : 0x1e293b,
+        // Error highlighting matching --color-critical
+        errorHex: isLight ? 0xbe123c : 0xf43f5e,
+    };
+}
+
 // The BCF viewpoints the corrosion engine generates carry the failing
 // element's GUID in their selection (see bcf_generator._viewpoint_xml), but
 // Viewpoint.go() only moves the camera and applies visibility — it never
@@ -35,8 +49,9 @@ function installErrorHighlighting(components, world) {
     components.get(OBC.Raycasters).get(world);
     const highlighter = components.get(OBF.Highlighter);
     highlighter.setup({ world, selectEnabled: false, autoHighlightOnClick: false });
+    const initialTheme = getThemeConfig();
     highlighter.styles.set(ERROR_HIGHLIGHT_STYLE, {
-        color: new THREE.Color("red"),
+        color: new THREE.Color(initialTheme.errorHex),
         opacity: 1,
         transparent: false,
         renderedFaces: 0,
@@ -127,6 +142,7 @@ function installErrorHighlighting(components, world) {
     return {
         highlightTopics,
         hider,
+        highlighter,
         isolate: {
             toggle: toggleIsolate,
             reset: resetIsolate,
@@ -863,14 +879,52 @@ export async function initViewer(mounts) {
     world.camera = new OBC.OrthoPerspectiveCamera(components);
 
     world.scene.setup();
-    world.scene.three.background = null;
     world.camera.controls.setLookAt(74, 16, 0.2, 30, -4, 27);
     components.init();
 
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    const { highlightTopics, hider, isolate } = installErrorHighlighting(components, world);
+    const { highlightTopics, hider, isolate, highlighter } = installErrorHighlighting(components, world);
+
+    function applyTheme() {
+        const theme = getThemeConfig();
+        if (world.scene && world.scene.three) {
+            world.scene.three.background = new THREE.Color(theme.canvasHex);
+        }
+        for (const [, g] of grids.list) {
+            if (g && g.three) {
+                if (g.three.material) {
+                    if (Array.isArray(g.three.material)) {
+                        g.three.material.forEach((m) => {
+                            if (m && m.color) m.color.setHex(theme.gridColor);
+                        });
+                    } else if (g.three.material.color) {
+                        g.three.material.color.setHex(theme.gridColor);
+                    }
+                }
+            }
+        }
+        try {
+            const errorStyle = highlighter?.styles?.get(ERROR_HIGHLIGHT_STYLE);
+            if (errorStyle && errorStyle.color) {
+                errorStyle.color.setHex(theme.errorHex);
+            }
+        } catch {}
+    }
+
+    applyTheme();
+
+    let themeObserver = null;
+    if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
+        themeObserver = new MutationObserver(() => {
+            applyTheme();
+        });
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class", "data-theme"],
+        });
+    }
 
     const workspace = createTopicsWorkspace(components, world, viewport, highlightTopics);
     const sceneControls = createSceneControls(components, world, viewport, grids);
@@ -1079,8 +1133,10 @@ export async function initViewer(mounts) {
         views,
         layers,
         drawings,
+        setTheme: applyTheme,
         dispose: () => {
             try {
+                if (themeObserver) themeObserver.disconnect();
                 drawings.dispose();
                 components.dispose();
             } catch (e) {

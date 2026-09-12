@@ -5,6 +5,7 @@
   import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
+  import { resolvedTheme } from "../theme";
   import type { Model } from "../types";
   import CollapsiblePanel from "./CollapsiblePanel.svelte";
   import ViewerRibbon from "./viewer/ViewerRibbon.svelte";
@@ -182,18 +183,24 @@
       }
     }
   });
+
+  run(() => {
+    if (viewerAPI && viewerAPI.setTheme && $resolvedTheme) {
+      viewerAPI.setTheme($resolvedTheme);
+    }
+  });
 </script>
 
 <div
-  class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden"
+  class="bimguard-viewer-root bimguard-viewer-container relative flex flex-col overflow-hidden bg-surface-canvas"
 >
   <!-- Loading indicator: a slim strip, present only while actually loading so
        the viewport otherwise fills the whole card right up to the ribbon. -->
   {#if loading}
     <div
-      class="z-20 flex shrink-0 items-center gap-2 border-b border-blue-800/60 bg-blue-950/60 px-4 py-1.5 text-xs text-blue-300"
+      class="z-20 flex shrink-0 items-center gap-2 border-b border-accent/40 bg-accent/15 px-4 py-1.5 text-xs text-accent"
     >
-      <Loader2 class="h-3.5 w-3.5 animate-spin text-blue-400" />
+      <Loader2 class="h-3.5 w-3.5 animate-spin text-accent" />
       <span class="font-medium">{loadingMessage}</span>
     </div>
   {/if}
@@ -201,17 +208,17 @@
   <!-- Error Alert Banner -->
   {#if error}
     <div
-      class="z-20 flex shrink-0 items-center justify-between border-b border-red-800/60 bg-red-950/80 p-3.5 text-xs text-red-200"
+      class="z-20 flex shrink-0 items-center justify-between border-b border-critical-border bg-critical-bg p-3.5 text-xs text-critical"
     >
       <div class="flex items-center gap-2">
-        <AlertCircle class="h-4 w-4 shrink-0 text-red-400" />
+        <AlertCircle class="h-4 w-4 shrink-0 text-critical" />
         <span>{error}</span>
       </div>
       {#if projectId}
         <button
           type="button"
           onclick={() => loadProjectModel(projectId, fileId)}
-          class="flex items-center gap-1 rounded-lg bg-red-900/80 px-2.5 py-1 text-caption font-medium text-slate-50 transition-colors hover:bg-red-800"
+          class="flex items-center gap-1 rounded-lg bg-critical px-2.5 py-1 text-caption font-medium text-white transition-opacity hover:opacity-90"
         >
           <RefreshCw class="h-3 w-3" />
           <span>Retry</span>
@@ -246,7 +253,7 @@
       <div bind:this={detailsHost} class="min-h-0"></div>
     </CollapsiblePanel>
 
-    <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-slate-950"></div>
+    <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
 
     <CollapsiblePanel
       title="Layers"

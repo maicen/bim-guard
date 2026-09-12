@@ -143,14 +143,14 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
+      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>
   {/if}
 
   <div
-    class="flex min-h-0 min-w-0 flex-col overflow-hidden border-slate-800 bg-slate-900/60 {side ===
+    class="flex min-h-0 min-w-0 flex-col overflow-hidden border-border-default bg-surface-card {side ===
     'bottom'
       ? 'border-t'
       : side === 'right'
@@ -160,16 +160,16 @@
     style:height={side === "bottom" && showHandle ? `${size}px` : undefined}
   >
     <div
-      class="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-slate-800/80 bg-slate-950/60 px-2.5"
+      class="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border-subtle bg-surface-overlay px-2.5"
     >
       <button
         type="button"
         onclick={toggle}
-        class="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold tracking-wide text-slate-200 hover:text-slate-50"
+        class="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold tracking-wide text-fg-primary hover:text-accent"
         aria-expanded={!collapsed}
       >
         {#if Icon}
-          <Icon class="h-3.5 w-3.5 shrink-0 text-blue-400" />
+          <Icon class="h-3.5 w-3.5 shrink-0 text-accent" />
         {/if}
         {#if !collapsed}
           <span class="truncate">{title}</span>
@@ -182,19 +182,32 @@
         <button
           type="button"
           onclick={toggle}
-          class="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
-          aria-label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
-          title={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+          class="rounded p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
+          aria-label={collapsed ? `Expand ${title} panel` : `Collapse ${title} panel`}
         >
-          <Chevron class="h-3.5 w-3.5" />
+          {#if side === "bottom"}
+            {#if collapsed}
+              <ChevronUp class="h-3.5 w-3.5" />
+            {:else}
+              <ChevronDown class="h-3.5 w-3.5" />
+            {/if}
+          {:else if side === "right"}
+            {#if collapsed}
+              <ChevronLeft class="h-3.5 w-3.5" />
+            {:else}
+              <ChevronRight class="h-3.5 w-3.5" />
+            {/if}
+          {:else if collapsed}
+            <ChevronRight class="h-3.5 w-3.5" />
+          {:else}
+            <ChevronLeft class="h-3.5 w-3.5" />
+          {/if}
         </button>
       </div>
     </div>
 
-    <!-- Content stays mounted while collapsed (hidden via the `hidden` attribute,
-         not removed with {#if}) so any DOM refs a child hands to the IFC engine
-         (e.g. the Drawings panel's sheet-board host) stay valid regardless of
-         collapse state instead of being torn down and never recreated. -->
+    <!-- Content stays mounted while collapsed (hidden via the hidden attribute)
+         so DOM refs like sheetBoardHost stay valid -->
     <div class="min-h-0 flex-1 overflow-y-auto" hidden={collapsed}>
       {@render children?.()}
     </div>
@@ -210,7 +223,7 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
+      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>
@@ -226,7 +239,7 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative h-1 w-full shrink-0 cursor-row-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
+      class="group relative h-1 w-full shrink-0 cursor-row-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>

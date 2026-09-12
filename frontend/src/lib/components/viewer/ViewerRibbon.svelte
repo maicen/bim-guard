@@ -220,7 +220,7 @@
 </script>
 
 <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={200}>
-<div class="flex shrink-0 flex-col gap-2 border-b border-slate-800 bg-slate-900/60 px-3 py-2">
+<div class="flex shrink-0 flex-col gap-2 border-b border-border-default bg-surface-card px-3 py-2">
   <div class="flex flex-wrap items-center justify-between gap-2">
     <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id)} ariaLabel="Viewer ribbon" />
 
@@ -232,7 +232,7 @@
               <select
                 value={selectedFileId}
                 onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
-                class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-full max-w-[220px] appearance-none rounded-lg border border-border-default bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden"
               >
                 {#each ifcFiles as file (file.id)}
                   <option value={file.id}>
@@ -243,14 +243,14 @@
                 {/each}
               </select>
               <ChevronDown
-                class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
               />
             </div>
           {/snippet}
         </Tooltip>
       {:else if fileName}
         <span
-          class="max-w-[220px] truncate rounded-md border border-blue-800/40 bg-blue-950/60 px-2.5 py-1.5 text-xs font-medium text-blue-300"
+          class="max-w-[220px] truncate rounded-md border border-accent/40 bg-accent/15 px-2.5 py-1.5 text-xs font-medium text-accent"
           title={fileName}
         >
           Viewing: {fileName}
@@ -262,7 +262,7 @@
           <button
             type="button"
             onclick={() => fileInputEl?.click()}
-            class="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+            class="flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-overlay px-3 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
           >
             <UploadCloud class="h-3.5 w-3.5" />
             <span>Open Local IFC</span>
@@ -535,7 +535,7 @@
   .rbn-divider {
     width: 1px;
     height: 22px;
-    background: rgba(99, 102, 241, 0.2);
+    background: var(--color-border-default);
     margin: 0 4px;
   }
   .rbn-btn {
@@ -546,7 +546,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 8px;
-    color: rgb(148 163 184 / 0.9);
+    color: var(--color-fg-secondary);
     cursor: pointer;
     font-size: 11px;
     font-weight: 500;
@@ -554,34 +554,34 @@
     transition: all 0.15s ease;
   }
   .rbn-btn:hover:not(:disabled) {
-    background: rgba(99, 102, 241, 0.15);
-    border-color: rgba(99, 102, 241, 0.3);
-    color: #e2e8f0;
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-interactive);
+    color: var(--color-fg-primary);
   }
   .rbn-btn.active {
-    background: rgba(99, 102, 241, 0.25);
-    border-color: rgba(99, 102, 241, 0.6);
-    color: #a5b4fc;
+    background: rgb(var(--accent-rgb) / 0.15);
+    border-color: rgb(var(--accent-rgb) / 0.5);
+    color: var(--color-accent);
   }
   .rbn-btn.active.warning {
-    background: rgba(245, 158, 11, 0.2);
-    border-color: rgba(245, 158, 11, 0.5);
-    color: #fcd34d;
+    background: var(--color-warning-bg);
+    border-color: var(--color-warning-border);
+    color: var(--color-warning);
   }
   .rbn-btn.danger:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: #fca5a5;
+    background: var(--color-critical-bg);
+    border-color: var(--color-critical-border);
+    color: var(--color-critical);
   }
   .rbn-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
   }
   .rbn-select {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(99, 102, 241, 0.25);
+    background: var(--color-surface-card);
+    border: 1px solid var(--color-border-default);
     border-radius: 8px;
-    color: #e2e8f0;
+    color: var(--color-fg-primary);
     font-size: 11px;
     padding: 4px 6px;
     max-width: 140px;

@@ -39,14 +39,14 @@
 
 <div class="flex h-full flex-col text-xs">
   {#if drawings.length > 1}
-    <div class="flex shrink-0 flex-wrap gap-1 border-b border-slate-800 p-2">
+    <div class="flex shrink-0 flex-wrap gap-1 border-b border-border-default p-2">
       {#each drawings as drawing (drawing.id)}
         <button
           type="button"
           onclick={() => selectDrawing(drawing.id)}
-          class="rounded-lg px-2 py-1 {activeDrawingId === drawing.id
+          class="rounded-lg px-2 py-1 transition-colors {activeDrawingId === drawing.id
             ? 'bg-accent text-white'
-            : 'bg-slate-800/60 text-slate-400 hover:text-white'}"
+            : 'bg-surface-overlay text-fg-muted hover:text-fg-primary'}"
         >
           {drawing.label}
         </button>
@@ -55,14 +55,14 @@
   {/if}
 
   {#if activeLayers.length > 0}
-    <div class="shrink-0 space-y-0.5 border-b border-slate-800 p-2">
+    <div class="shrink-0 space-y-0.5 border-b border-border-default p-2">
       {#each activeLayers as layer (layer.name)}
         <div class="flex items-center gap-2 rounded-lg px-1 py-1">
           <input
             type="checkbox"
             checked={layer.visible}
             onchange={(e) => toggleLayer(layer.name, (e.target as HTMLInputElement).checked)}
-            class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-accent"
+            class="h-3.5 w-3.5 rounded border-border-default bg-surface-card text-accent focus:ring-accent"
           />
           <input
             type="color"
@@ -70,12 +70,12 @@
             onchange={(e) => setLayerColor(layer.name, (e.target as HTMLInputElement).value)}
             class="h-4 w-6 cursor-pointer rounded border-none bg-transparent p-0"
           />
-          <span class="truncate text-slate-300">{layer.name}</span>
+          <span class="truncate text-fg-secondary">{layer.name}</span>
         </div>
       {/each}
     </div>
   {:else if drawings.length === 0}
-    <p class="p-3 text-slate-500">
+    <p class="p-3 text-fg-muted">
       No drawings yet — open a plan, elevation, or section view and use "New drawing from current
       view" in the Drawings ribbon tab.
     </p>
