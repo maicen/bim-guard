@@ -28,6 +28,7 @@
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
+  import { Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
   import type {
     Project,
@@ -66,6 +67,14 @@
   let ruleFolders: RuleFolder[] = $state([]);
   let selectedFolder = $state(""); // '' = All
   let isFoldersLoading = $state(false);
+
+  let folderOptions = $derived([
+    { value: "", label: isFoldersLoading ? "Loading folders…" : "All Rules" },
+    ...ruleFolders.map((folder) => ({
+      value: folder.ruleset_id,
+      label: folder.display_name,
+    })),
+  ]);
 
   // Enhanced model gate
   let hasEnhancedModel: boolean | null = $state(null);
@@ -485,18 +494,12 @@
         <span class="text-xs font-bold text-fg-secondary">Ruleset</span>
       </div>
       <div class="relative flex-1 sm:max-w-xs">
-        <select
+        <Select
+          ariaLabel="Ruleset"
+          options={folderOptions}
           bind:value={selectedFolder}
           disabled={isFoldersLoading}
-          class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
-        >
-          <option value="">{isFoldersLoading ? "Loading folders…" : "All Rules"}</option>
-          {#each ruleFolders as folder (folder)}
-            <option value={folder.ruleset_id}>{folder.display_name}</option>
-          {/each}
-        </select>
-        <ChevronDown
-          class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+          triggerClass="w-full bg-surface-overlay border-border-interactive"
         />
       </div>
       {#if selectedFolder}
@@ -1384,24 +1387,26 @@
                   {@const isRuleOpen =
                     openRules[rKey] || rStatus === "FAIL" || rStatus === "MISSING_DATA"}
 
-                  <div class="overflow-hidden rounded-xl border border-border-subtle">
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
-                      onclick={() => toggleRule(rKey)}
+                  <CollapsibleRoot
+                    open={isRuleOpen}
+                    onOpenChange={() => toggleRule(rKey)}
+                    class="overflow-hidden rounded-xl border border-border-subtle"
+                  >
+                    <CollapsibleTrigger
+                      class="group flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
                     >
                       <div class="flex min-w-0 items-center gap-2">
-                        {#if isRuleOpen}<ChevronDown
-                            class="h-3.5 w-3.5 shrink-0 text-fg-muted"
-                          />{:else}<ChevronRight class="h-3.5 w-3.5 shrink-0 text-fg-muted" />{/if}
+                        <ChevronRight
+                          class="h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-200 group-data-[state=open]:rotate-90"
+                        />
                         <span class="truncate text-xs font-medium text-fg-secondary">{ruleLabel}</span>
                       </div>
                       <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
                         >{summaryTxt} · {ruleRequiredText(rule)}</span
                       >
-                    </button>
+                    </CollapsibleTrigger>
 
-                    {#if isRuleOpen}
+                    <CollapsibleContent>
                       {#if rule.property_name}
                         <div
                           class="flex items-center gap-1.5 border-t border-border-subtle px-3.5 py-1.5 text-micro text-fg-muted"
@@ -1419,8 +1424,8 @@
                           selectedProjectId &&
                           openViewerInNewTab(selectedProjectId, guid, result?.bcf_artifact_id || undefined)}
                       />
-                    {/if}
-                  </div>
+                    </CollapsibleContent>
+                  </CollapsibleRoot>
                 {/each}
               {/if}
             </div>
