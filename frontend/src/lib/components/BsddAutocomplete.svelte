@@ -123,16 +123,16 @@
       if (suggestions.length > 0) open = true;
     }}
     onblur={() => setTimeout(() => (open = false), 150)}
-    class={`w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden ${className}`}
+    class={`w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden ${className}`}
   />
   {#if loading}
-    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-nano text-slate-500">…</span>
+    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-nano text-fg-muted">…</span>
   {/if}
   {#if open}
     <ul
       id={listboxId}
       role="listbox"
-      class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 shadow-lg shadow-black/40"
+      class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-border-default bg-surface-card shadow-lg shadow-black/40"
     >
       {#each suggestions as item, i (itemKey(item))}
         <li role="presentation">
@@ -144,12 +144,12 @@
               e.preventDefault();
               pick(item);
             }}
-            class={`w-full px-3 py-1.5 text-left text-xs hover:bg-slate-800 ${
-              i === highlighted ? "bg-slate-800" : ""
+            class={`w-full px-3 py-1.5 text-left text-xs hover:bg-surface-hover ${
+              i === highlighted ? "bg-surface-overlay" : ""
             }`}
           >
-            <span class="font-medium text-slate-50">{labelFor(item)}</span>
-            <span class="ml-2 text-slate-500">{subLabelFor(item)}</span>
+            <span class="font-medium text-fg-primary">{labelFor(item)}</span>
+            <span class="ml-2 text-fg-muted">{subLabelFor(item)}</span>
           </button>
         </li>
       {/each}

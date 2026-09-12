@@ -32,5 +32,5 @@
   aria-label={ariaLabel}
   onchange={(event) => onchange?.(event)}
   {@attach trackIndeterminate}
-  class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent transition-all focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
+  class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent transition-all focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
 />

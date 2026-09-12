@@ -23,7 +23,7 @@
 </script>
 
 <th
-  class="{customClass} group cursor-pointer select-none text-caption font-semibold uppercase tracking-wider text-slate-400 transition-colors hover:text-slate-50"
+  class="{customClass} group cursor-pointer select-none text-caption font-semibold uppercase tracking-wider text-fg-muted transition-colors hover:text-fg-primary"
   onclick={() => onSort(column)}
   role="columnheader"
   aria-sort={sortField === column ? (sortAsc ? "ascending" : "descending") : "none"}
@@ -44,7 +44,7 @@
       {/if}
     {:else}
       <ArrowUpDown
-        class="h-3 w-3 shrink-0 text-slate-600 transition-colors group-hover:text-slate-400"
+        class="h-3 w-3 shrink-0 text-fg-muted transition-colors group-hover:text-fg-secondary"
       />
     {/if}
   </div>

@@ -39,7 +39,7 @@
         <Icon class="h-6 w-6 shrink-0 text-accent" />
       {/if}
       <h1
-        class="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl"
+        class="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl"
       >
         <span>{title}</span>
         {@render badge?.()}
@@ -47,7 +47,7 @@
     </div>
 
     {#if subtitle}
-      <p class="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400 sm:text-sm">
+      <p class="mt-1 max-w-3xl text-xs leading-relaxed text-fg-muted sm:text-sm">
         {subtitle}
       </p>
     {/if}

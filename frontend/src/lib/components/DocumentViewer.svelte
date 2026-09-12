@@ -1173,7 +1173,7 @@
       </div>
     {/if}
     {#if doclangXml}
-      <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2">
+      <div class="flex shrink-0 items-center justify-between border-b border-border-default bg-surface-canvas px-4 py-2">
         <div class="flex items-center gap-3">
           <div class="relative">
             <button
@@ -1181,7 +1181,7 @@
               onclick={(e) => (e.stopPropagation(), (viewsMenuOpen = !viewsMenuOpen))}
               aria-expanded={viewsMenuOpen}
               aria-haspopup="true"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-card px-2.5 py-1 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
             >
               <span>Views</span>
               <ChevronDown class="h-3 w-3" />
@@ -1190,18 +1190,18 @@
               <div
                 role="none"
                 onclick={(e) => e.stopPropagation()}
-                class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl"
+                class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-border-default bg-surface-card p-1.5 text-xs shadow-xl"
               >
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                  <span class="text-slate-200">Original Page</span>
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                  <span class="text-fg-secondary">Original Page</span>
                   <input type="checkbox" bind:checked={showOriginalPage} />
                 </label>
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                  <span class="text-slate-200">DocLang</span>
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                  <span class="text-fg-secondary">DocLang</span>
                   <input type="checkbox" bind:checked={showDoclangPane} />
                 </label>
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800">
-                  <span class="text-slate-200">Reading View</span>
+                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                  <span class="text-fg-secondary">Reading View</span>
                   <input type="checkbox" bind:checked={showReadingPane} />
                 </label>
               </div>
@@ -1214,7 +1214,7 @@
                 type="button"
                 onclick={() => goToPage(currentPage - 1)}
                 disabled={currentPage <= 1}
-                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
                 aria-label="Previous page"
               >
                 <ChevronLeft class="h-4 w-4" />
@@ -1225,15 +1225,15 @@
                 bind:value={pageInputValue}
                 onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
                 onblur={handlePageInputSubmit}
-                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-hidden"
+                class="w-12 rounded-lg border border-border-interactive bg-surface-canvas px-1.5 py-1 text-center text-xs text-fg-primary focus:border-accent focus:outline-hidden"
                 aria-label="Page number"
               />
-              <span class="text-xs text-slate-400">of {totalPageCount}</span>
+              <span class="text-xs text-fg-muted">of {totalPageCount}</span>
               <button
                 type="button"
                 onclick={() => goToPage(currentPage + 1)}
                 disabled={currentPage >= totalPageCount}
-                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
                 aria-label="Next page"
               >
                 <ChevronRight class="h-4 w-4" />
@@ -1258,18 +1258,18 @@
 
     {#snippet readingViewContent()}
       {#if documentBlocks.length === 0}
-        <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-          <FileCode class="mb-2 h-10 w-10 text-slate-600" />
-          <p class="text-sm font-semibold text-slate-300">No Renderable Content</p>
-          <p class="mt-1 max-w-md text-xs text-slate-500">
+        <div class="flex flex-col items-center justify-center py-16 text-center text-fg-muted">
+          <FileCode class="mb-2 h-10 w-10 text-fg-muted" />
+          <p class="text-sm font-semibold text-fg-secondary">No Renderable Content</p>
+          <p class="mt-1 max-w-md text-xs text-fg-muted">
             The document was parsed into DocLang XML, but no headings, paragraphs, lists, or tables could be extracted from it.
           </p>
         </div>
       {:else if readingBlocks.length === 0}
-        <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-          <FileCode class="mb-2 h-10 w-10 text-slate-600" />
-          <p class="text-sm font-semibold text-slate-300">Everything is hidden</p>
-          <p class="mt-1 max-w-md text-xs text-slate-500">
+        <div class="flex flex-col items-center justify-center py-16 text-center text-fg-muted">
+          <FileCode class="mb-2 h-10 w-10 text-fg-muted" />
+          <p class="text-sm font-semibold text-fg-secondary">Everything is hidden</p>
+          <p class="mt-1 max-w-md text-xs text-fg-muted">
             All of this document's content is furniture/background and currently hidden — turn on the Layers toggles above to show it.
           </p>
         </div>
@@ -1281,18 +1281,18 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="rounded-lg {block.layer !== 'body' ? 'border border-dashed border-slate-700/70 bg-slate-950/40 p-2' : ''} {block.elementId
+                      class="rounded-lg {block.layer !== 'body' ? 'border border-dashed border-border-default bg-surface-canvas/40 p-2' : ''} {block.elementId
                         ? 'cursor-pointer'
                         : ''} {block.elementId && block.elementId === selectedElementId
                         ? 'bg-accent/10 ring-1 ring-accent/50'
                         : ''}"
                     >
                       {#if block.layer !== "body"}
-                        <span class="mr-2 rounded bg-slate-800 px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-slate-500">{block.layer}</span>
+                        <span class="mr-2 rounded bg-surface-overlay px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-fg-muted">{block.layer}</span>
                       {/if}
                       <svelte:element
                         this={`h${block.level}`}
-                        class="inline font-semibold text-slate-100 {block.level === 1
+                        class="inline font-semibold text-fg-primary {block.level === 1
                           ? 'text-lg'
                           : block.level === 2
                             ? 'text-base'
@@ -1306,20 +1306,20 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="whitespace-pre-wrap rounded-lg text-sm leading-relaxed text-slate-300 {block.layer !== 'body'
-                        ? 'border border-dashed border-slate-700/70 bg-slate-950/40 p-2'
+                      class="whitespace-pre-wrap rounded-lg text-sm leading-relaxed text-fg-secondary {block.layer !== 'body'
+                        ? 'border border-dashed border-border-default bg-surface-canvas/40 p-2'
                         : ''} {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
                       block.elementId === selectedElementId
                         ? 'bg-accent/10 ring-1 ring-accent/50'
                         : ''}"
                     >
                       {#if block.layer !== "body"}
-                        <span class="mr-2 rounded bg-slate-800 px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-slate-500">{block.layer}</span>
+                        <span class="mr-2 rounded bg-surface-overlay px-1.5 py-0.5 align-middle text-[10px] uppercase tracking-wide text-fg-muted">{block.layer}</span>
                       {/if}
                       {block.text}
                     </p>
                   {:else if block.type === "list"}
-                    <ul class="list-disc space-y-1 pl-5 text-sm text-slate-300">
+                    <ul class="list-disc space-y-1 pl-5 text-sm text-fg-secondary">
                       {#each block.items as item, iIdx (iIdx)}
                         <li
                           data-element-id={item.elementId}
@@ -1343,29 +1343,29 @@
                         ? 'cursor-pointer'
                         : ''} {block.elementId && block.elementId === selectedElementId
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
-                        : 'border-slate-800 bg-slate-950/60'}"
+                        : 'border-border-default bg-surface-canvas/60'}"
                     >
-                      <div class="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-4 py-2.5">
-                        <span class="text-xs font-semibold text-slate-200">{block.title}</span>
-                        <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400">
+                      <div class="flex items-center justify-between border-b border-border-default bg-surface-card/60 px-4 py-2.5">
+                        <span class="text-xs font-semibold text-fg-secondary">{block.title}</span>
+                        <span class="rounded bg-surface-overlay px-2 py-0.5 font-mono text-[10px] text-fg-muted">
                           {block.rows.length} rows × {block.rows[0]?.length || 0} cols
                         </span>
                       </div>
                       <div class="overflow-x-auto p-3">
-                        <table class="w-full text-left text-xs text-slate-300">
+                        <table class="w-full text-left text-xs text-fg-secondary">
                           {#if block.rows.length > 0}
-                            <thead class="border-b border-slate-800 bg-slate-900/90 font-semibold uppercase text-caption text-slate-400">
+                            <thead class="border-b border-border-default bg-surface-card/90 font-semibold uppercase text-caption text-fg-muted">
                               <tr>
                                 {#each block.rows[0] as colHeader, colIdx (colIdx)}
                                   <th class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
                                 {/each}
                               </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-800/60 font-mono text-xs">
+                            <tbody class="divide-y divide-border-subtle font-mono text-xs">
                               {#each block.rows.slice(1) as row, rowIdx (rowIdx)}
-                                <tr class="hover:bg-slate-900/40">
+                                <tr class="hover:bg-surface-hover">
                                   {#each row as cell, cellIdx (cellIdx)}
-                                    <td class="px-3 py-2 text-slate-200">{cell}</td>
+                                    <td class="px-3 py-2 text-fg-secondary">{cell}</td>
                                   {/each}
                                 </tr>
                               {/each}
@@ -1382,7 +1382,7 @@
                       class="overflow-hidden rounded-xl border p-3 {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
                       block.elementId === selectedElementId
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
-                        : 'border-slate-800 bg-slate-950/60'}"
+                        : 'border-border-default bg-surface-canvas/60'}"
                     >
                       <img
                         src={block.src}
@@ -1392,7 +1392,7 @@
                         onerror={(e) => ((e.currentTarget as HTMLImageElement).classList.add("opacity-30"))}
                       />
                       {#if block.alt}
-                        <figcaption class="mt-2 text-center text-xs text-slate-400">{block.alt}</figcaption>
+                        <figcaption class="mt-2 text-center text-xs text-fg-muted">{block.alt}</figcaption>
                       {/if}
                     </figure>
                   {:else if block.type === "field-region"}
@@ -1403,17 +1403,17 @@
                       class="space-y-2 rounded-xl border p-3 {block.elementId ? 'cursor-pointer' : ''} {block.elementId &&
                       block.elementId === selectedElementId
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
-                        : 'border-slate-800 bg-slate-950/60'}"
+                        : 'border-border-default bg-surface-canvas/60'}"
                     >
                       {#each block.entries as entry, eIdx (eIdx)}
                         {#if entry.kind === "heading"}
-                          <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.text}</div>
+                          <div class="text-xs font-semibold uppercase tracking-wide text-fg-muted">{entry.text}</div>
                         {:else}
                           <div class="flex flex-wrap gap-x-2 gap-y-0.5 text-sm">
                             {#if entry.key}
-                              <span class="font-medium text-slate-300">{entry.key}</span>
+                              <span class="font-medium text-fg-secondary">{entry.key}</span>
                             {/if}
-                            <span class="text-slate-400">{entry.values.join("; ")}</span>
+                            <span class="text-fg-muted">{entry.values.join("; ")}</span>
                           </div>
                         {/if}
                       {/each}
@@ -1423,11 +1423,11 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="overflow-x-auto rounded-lg border p-3 font-mono text-sm text-slate-300 {block.elementId
+                      class="overflow-x-auto rounded-lg border p-3 font-mono text-sm text-fg-secondary {block.elementId
                         ? 'cursor-pointer'
                         : ''} {block.elementId && block.elementId === selectedElementId
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
-                        : 'border-slate-800 bg-slate-950/60'}"
+                        : 'border-border-default bg-surface-canvas/60'}"
                     >
                       {block.latex}
                     </div>
@@ -1436,25 +1436,25 @@
                       data-element-id={block.elementId}
                       onclick={() => block.elementId && selectElement(block.elementId)}
                       role="presentation"
-                      class="overflow-x-auto rounded-lg border p-3 font-mono text-xs text-slate-300 {block.elementId
+                      class="overflow-x-auto rounded-lg border p-3 font-mono text-xs text-fg-secondary {block.elementId
                         ? 'cursor-pointer'
                         : ''} {block.elementId && block.elementId === selectedElementId
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
-                        : 'border-slate-800 bg-slate-950/60'}"
+                        : 'border-border-default bg-surface-canvas/60'}"
                     ><code>{block.code}</code></pre>
                   {:else if block.type === "page-break"}
                     <div class="flex items-center gap-3 py-1" role="separator" aria-label="Page {block.pageNumber}">
-                      <div class="h-px flex-1 bg-slate-800"></div>
-                      <span class="shrink-0 text-caption font-semibold uppercase tracking-widest text-slate-600"
+                      <div class="h-px flex-1 bg-surface-overlay"></div>
+                      <span class="shrink-0 text-caption font-semibold uppercase tracking-widest text-fg-muted"
                         >Page {block.pageNumber}</span
                       >
-                      <div class="h-px flex-1 bg-slate-800"></div>
+                      <div class="h-px flex-1 bg-surface-overlay"></div>
                     </div>
                   {/if}
                 {/each}
           {#if visibleBlockCount < readingBlocks.length}
             <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
-              <span class="text-caption text-slate-500">Loading more…</span>
+              <span class="text-caption text-fg-muted">Loading more…</span>
             </div>
           {/if}
         </div>
@@ -1465,14 +1465,14 @@
       {#if isPdf}
       <div class="flex flex-1 flex-col overflow-hidden">
         <div
-          class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-3 py-2"
+          class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border-default bg-surface-canvas px-3 py-2"
         >
           <div class="flex items-center gap-1">
             <button
               type="button"
               onclick={zoomOut}
               disabled={scale <= MIN_SCALE}
-              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+              class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
               aria-label="Zoom out"
             >
               <ZoomOut class="h-4 w-4" />
@@ -1480,7 +1480,7 @@
             <button
               type="button"
               onclick={zoomReset}
-              class="min-w-14 rounded-lg px-1.5 py-1 text-center text-xs text-slate-300 hover:bg-slate-800"
+              class="min-w-14 rounded-lg px-1.5 py-1 text-center text-xs text-fg-secondary hover:bg-surface-hover"
               title="Reset zoom"
             >
               {Math.round((scale / DEFAULT_SCALE) * 100)}%
@@ -1489,7 +1489,7 @@
               type="button"
               onclick={zoomIn}
               disabled={scale >= MAX_SCALE}
-              class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+              class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
               aria-label="Zoom in"
             >
               <ZoomIn class="h-4 w-4" />
@@ -1497,7 +1497,7 @@
             <button
               type="button"
               onclick={zoomReset}
-              class="ml-0.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              class="ml-0.5 rounded-lg p-1.5 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
               aria-label="Reset zoom and layout"
               title="Reset"
             >
@@ -1506,14 +1506,14 @@
           </div>
 
           {#if elementBboxes.length > 0}
-            <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-0.5">
+            <div class="flex items-center gap-1 rounded-lg border border-border-default bg-surface-card p-0.5">
               <button
                 type="button"
                 onclick={() => (showBboxOverlay = !showBboxOverlay)}
                 title="Toggle per-element bounding boxes"
                 class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {showBboxOverlay
                   ? 'bg-accent text-white'
-                  : 'text-slate-400 hover:text-slate-200'}"
+                  : 'text-fg-muted hover:text-fg-primary'}"
               >
                 Boxes
               </button>
@@ -1523,7 +1523,7 @@
                 title="Toggle reading-order arrows"
                 class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors {showReadingOrderArrows
                   ? 'bg-accent text-white'
-                  : 'text-slate-400 hover:text-slate-200'}"
+                  : 'text-fg-muted hover:text-fg-primary'}"
               >
                 Reading order
               </button>
@@ -1533,7 +1533,7 @@
                   onclick={(e) => (e.stopPropagation(), (overlaySettingsOpen = !overlaySettingsOpen))}
                   title="Overlay settings"
                   aria-expanded={overlaySettingsOpen}
-                  class="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                  class="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
                 >
                   <Settings2 class="h-3.5 w-3.5" />
                 </button>
@@ -1541,32 +1541,32 @@
                   <div
                     role="none"
                     onclick={(e) => e.stopPropagation()}
-                    class="absolute right-0 top-full z-40 mt-2 w-64 space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs shadow-xl"
+                    class="absolute right-0 top-full z-40 mt-2 w-64 space-y-3 rounded-xl border border-border-default bg-surface-card p-3 text-xs shadow-xl"
                   >
                     <label class="flex items-center justify-between gap-2">
-                      <span class="font-medium text-slate-200">Badges</span>
+                      <span class="font-medium text-fg-secondary">Badges</span>
                       <input type="checkbox" bind:checked={showElementBadges} />
                     </label>
-                    <div class="border-t border-slate-800 pt-2">
-                      <p class="mb-2 font-medium text-slate-200">Reading-order arrow style</p>
+                    <div class="border-t border-border-default pt-2">
+                      <p class="mb-2 font-medium text-fg-secondary">Reading-order arrow style</p>
                       <div class="space-y-2">
                         <label class="flex items-center justify-between gap-2">
-                          <span class="text-slate-400">Color</span>
-                          <input type="color" bind:value={arrowColor} class="h-6 w-10 rounded border border-slate-700 bg-slate-950" />
+                          <span class="text-fg-muted">Color</span>
+                          <input type="color" bind:value={arrowColor} class="h-6 w-10 rounded border border-border-interactive bg-surface-canvas" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
-                          <span class="text-slate-400">Thickness</span>
+                          <span class="text-fg-muted">Thickness</span>
                           <input type="range" min="0.5" max="6" step="0.5" bind:value={arrowWidth} class="w-28" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
-                          <span class="text-slate-400">Head size</span>
+                          <span class="text-fg-muted">Head size</span>
                           <input type="range" min="3" max="14" step="1" bind:value={arrowHead} class="w-28" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
-                          <span class="text-slate-400">Line</span>
+                          <span class="text-fg-muted">Line</span>
                           <select
                             bind:value={arrowLineStyle}
-                            class="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-slate-200"
+                            class="rounded border border-border-interactive bg-surface-canvas px-1.5 py-0.5 text-fg-secondary"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
@@ -1587,7 +1587,7 @@
                 type="button"
                 onclick={() => goToPage(currentPage - 1)}
                 disabled={currentPage <= 1}
-                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
                 aria-label="Previous page"
               >
                 <ChevronLeft class="h-4 w-4" />
@@ -1598,15 +1598,15 @@
                 bind:value={pageInputValue}
                 onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
                 onblur={handlePageInputSubmit}
-                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-hidden"
+                class="w-12 rounded-lg border border-border-interactive bg-surface-canvas px-1.5 py-1 text-center text-xs text-fg-primary focus:border-accent focus:outline-hidden"
                 aria-label="Page number"
               />
-              <span class="text-xs text-slate-400">of {pageCount}</span>
+              <span class="text-xs text-fg-muted">of {pageCount}</span>
               <button
                 type="button"
                 onclick={() => goToPage(currentPage + 1)}
                 disabled={currentPage >= pageCount}
-                class="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-30"
+                class="rounded-lg p-1.5 text-fg-secondary hover:bg-surface-hover disabled:opacity-30"
                 aria-label="Next page"
               >
                 <ChevronRight class="h-4 w-4" />
@@ -1624,7 +1624,7 @@
           onpointermove={onPanPointerMove}
           onpointerup={onPanPointerUp}
           onpointercancel={onPanPointerUp}
-          class="relative flex flex-1 items-start justify-center overflow-auto bg-slate-950/60 p-4 {isPanning
+          class="relative flex flex-1 items-start justify-center overflow-auto bg-surface-canvas/60 p-4 {isPanning
             ? 'cursor-grabbing select-none'
             : 'cursor-grab'}"
         >
@@ -1653,7 +1653,7 @@
                 class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
                 style="left: {activeBboxRect.left}px; top: {activeBboxRect.top}px; width: {activeBboxRect.width}px; height: {activeBboxRect.height}px;"
               >
-                <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow-sm">
+                <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-black shadow-sm">
                   Source Clause
                 </span>
               </div>
@@ -1671,10 +1671,10 @@
         {/if}
         <div
           bind:this={textPanelEl}
-          class="flex-1 overflow-y-auto whitespace-pre-wrap bg-slate-950/60 p-6 font-mono text-xs leading-relaxed text-slate-300"
+          class="flex-1 overflow-y-auto whitespace-pre-wrap bg-surface-canvas/60 p-6 font-mono text-xs leading-relaxed text-fg-secondary"
         >
           {#if highlightSplit}
-            {highlightSplit.before}<mark class="rounded-sm bg-amber-400/60 text-slate-950">{highlightSplit.match}</mark
+            {highlightSplit.before}<mark class="rounded-sm bg-amber-400/60 text-black">{highlightSplit.match}</mark
             >{highlightSplit.after}
           {:else}
             {plainText || "No extracted text found."}
@@ -1692,18 +1692,18 @@
     {#if doclangXml}
       <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
         {#if showOriginalPage}
-          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-slate-800">
-            <div class="flex shrink-0 items-center border-b border-slate-800 bg-slate-950 px-3 py-1.5">
-              <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">Original Page</span>
+          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-border-default">
+            <div class="flex shrink-0 items-center border-b border-border-default bg-surface-canvas px-3 py-1.5">
+              <span class="text-caption font-semibold uppercase tracking-wide text-fg-muted">Original Page</span>
             </div>
             {@render originalPageContent()}
           </div>
         {/if}
         {#if showDoclangPane}
-          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-slate-800">
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-1.5">
+          <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden border-r border-border-default">
+            <div class="flex shrink-0 items-center justify-between border-b border-border-default bg-surface-canvas px-3 py-1.5">
               <div class="flex items-center gap-2">
-                <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">DocLang</span>
+                <span class="text-caption font-semibold uppercase tracking-wide text-fg-muted">DocLang</span>
                 {#if parsedTables.length > 0}
                   <span class="rounded-full bg-cyan-950 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300">
                     {parsedTables.length} {parsedTables.length === 1 ? "table" : "tables"}
@@ -1713,7 +1713,7 @@
               <button
                 type="button"
                 onclick={copyXmlToClipboard}
-                class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700 hover:text-white"
+                class="inline-flex items-center gap-1 rounded-lg bg-surface-overlay px-2 py-1 text-[11px] text-fg-secondary hover:bg-surface-hover hover:text-white"
               >
                 {#if copiedXml}
                   <Check class="h-3 w-3 text-emerald-400" />
@@ -1731,8 +1731,8 @@
         {/if}
         {#if showReadingPane}
           <div class="flex min-w-[320px] flex-1 flex-col overflow-hidden">
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-1.5">
-              <span class="text-caption font-semibold uppercase tracking-wide text-slate-500">Reading View</span>
+            <div class="flex shrink-0 items-center justify-between border-b border-border-default bg-surface-canvas px-3 py-1.5">
+              <span class="text-caption font-semibold uppercase tracking-wide text-fg-muted">Reading View</span>
               {#if documentBlocks.some((b) => "layer" in b && b.layer !== "body")}
                 <div class="relative">
                   <button
@@ -1740,7 +1740,7 @@
                     onclick={(e) => (e.stopPropagation(), (layersMenuOpen = !layersMenuOpen))}
                     aria-expanded={layersMenuOpen}
                     aria-haspopup="true"
-                    class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700 hover:text-white"
+                    class="inline-flex items-center gap-1 rounded-lg bg-surface-overlay px-2 py-1 text-[11px] text-fg-secondary hover:bg-surface-hover hover:text-white"
                   >
                     <span>Layers</span>
                     <ChevronDown class="h-3 w-3" />
@@ -1749,14 +1749,14 @@
                     <div
                       role="none"
                       onclick={(e) => e.stopPropagation()}
-                      class="absolute right-0 top-full z-40 mt-2 w-44 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-2 text-xs shadow-xl"
+                      class="absolute right-0 top-full z-40 mt-2 w-44 space-y-1 rounded-xl border border-border-default bg-surface-card p-2 text-xs shadow-xl"
                     >
-                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-slate-800">
-                        <span class="text-slate-200">Furniture</span>
+                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
+                        <span class="text-fg-secondary">Furniture</span>
                         <input type="checkbox" bind:checked={showReadingFurniture} />
                       </label>
-                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-slate-800">
-                        <span class="text-slate-200">Background</span>
+                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
+                        <span class="text-fg-secondary">Background</span>
                         <input type="checkbox" bind:checked={showReadingBackground} />
                       </label>
                     </div>

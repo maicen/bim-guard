@@ -33,13 +33,13 @@
     {required}
     bind:value
     {placeholder}
-    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 pr-9 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden {className}"
+    class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 pr-9 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden {className}"
   />
   <button
     type="button"
     onclick={() => (revealed = !revealed)}
     tabindex="-1"
-    class="absolute inset-y-0 right-2 flex items-center text-slate-500 transition-colors hover:text-slate-300"
+    class="absolute inset-y-0 right-2 flex items-center text-fg-muted transition-colors hover:text-fg-primary"
     aria-label={revealed ? "Hide secret" : "Show secret"}
   >
     {#if revealed}

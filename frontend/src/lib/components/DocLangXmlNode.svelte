@@ -105,13 +105,13 @@
 
 {#snippet attrSpans()}
   {#each elementAttrs as attr (attr.name)}
-    <span class="text-slate-500"> {attr.name}=</span><span class="text-cyan-300/90">"{attr.value}"</span>
+    <span class="text-fg-muted"> {attr.name}=</span><span class="text-cyan-300/90">"{attr.value}"</span>
   {/each}
 {/snippet}
 
 <div
   bind:this={lineEl}
-  class="markup-line flex cursor-pointer items-baseline rounded px-1 leading-relaxed hover:bg-slate-800/50 {isSelected
+  class="markup-line flex cursor-pointer items-baseline rounded px-1 leading-relaxed hover:bg-surface-hover {isSelected
     ? 'bg-accent/15 ring-1 ring-accent/50'
     : ''}"
   style="padding-left: {depth * 1.1}rem"
@@ -125,7 +125,7 @@
       use:cursorTooltip={{ text: isCollapsed ? "Expand" : "Collapse" }}
       aria-expanded={!isCollapsed}
       aria-label={isCollapsed ? "Expand element" : "Collapse element"}
-      class="mr-1 inline-flex h-4 w-3 shrink-0 items-center justify-center text-slate-500 hover:text-slate-200"
+      class="mr-1 inline-flex h-4 w-3 shrink-0 items-center justify-center text-fg-muted hover:text-fg-primary"
     >
       <span class="inline-block text-[9px] transition-transform {isCollapsed ? '' : 'rotate-90'}">▶</span>
     </button>
@@ -136,20 +136,20 @@
   <span class="font-mono text-xs">
     {#if isLeaf}
       {#if leafText}
-        <span class="text-slate-600">&lt;</span><span class="text-violet-300">{tag}</span
-        >{@render attrSpans()}<span class="text-slate-600">&gt;</span><span class="text-slate-200"
+        <span class="text-fg-muted">&lt;</span><span class="text-violet-300">{tag}</span
+        >{@render attrSpans()}<span class="text-fg-muted">&gt;</span><span class="text-fg-secondary"
           >{leafText}</span
-        ><span class="text-slate-600">&lt;/</span><span class="text-violet-300">{tag}</span
-        ><span class="text-slate-600">&gt;</span>
+        ><span class="text-fg-muted">&lt;/</span><span class="text-violet-300">{tag}</span
+        ><span class="text-fg-muted">&gt;</span>
       {:else}
-        <span class="text-slate-600">&lt;</span><span class="text-violet-300">{tag}</span
-        >{@render attrSpans()}<span class="text-slate-600">/&gt;</span>
+        <span class="text-fg-muted">&lt;</span><span class="text-violet-300">{tag}</span
+        >{@render attrSpans()}<span class="text-fg-muted">/&gt;</span>
       {/if}
     {:else}
-      <span class="text-slate-600">&lt;</span><span class="text-violet-300">{tag}</span
-      >{@render attrSpans()}<span class="text-slate-600">&gt;</span>
+      <span class="text-fg-muted">&lt;</span><span class="text-violet-300">{tag}</span
+      >{@render attrSpans()}<span class="text-fg-muted">&gt;</span>
       {#if isCollapsed}
-        <span class="text-slate-600 italic">…&lt;/{tag}&gt;</span>
+        <span class="text-fg-muted italic">…&lt;/{tag}&gt;</span>
       {/if}
     {/if}
   </span>
@@ -159,7 +159,7 @@
   {#each children as child, idx (idx)}
     <Self element={child} depth={depth + 1} {collapsed} {selectedElementId} {onSelect} {autoCollapseDepth} />
   {/each}
-  <div class="markup-line flex items-baseline rounded px-1 text-xs text-slate-600" style="padding-left: {depth * 1.1}rem">
+  <div class="markup-line flex items-baseline rounded px-1 text-xs text-fg-muted" style="padding-left: {depth * 1.1}rem">
     <span class="mr-1 inline-block w-3 shrink-0"></span>
     <span class="font-mono">&lt;/{tag}&gt;</span>
   </div>

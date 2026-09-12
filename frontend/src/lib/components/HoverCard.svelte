@@ -206,7 +206,7 @@
         onmouseenter={cancelClose}
         onmouseleave={scheduleClose}
         class={cn(
-          "z-60 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-800 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-popover-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "z-60 max-w-[calc(100vw-1rem)] rounded-xl border border-border-default bg-surface-card/95 shadow-2xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-popover-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           width,
           contentClass,
         )}
@@ -215,7 +215,7 @@
           <Popover.Arrow
             width={8}
             height={8}
-            class="rotate-45 border-slate-800 bg-slate-900 data-[side=top]:border-b data-[side=top]:border-r data-[side=bottom]:border-l data-[side=bottom]:border-t data-[side=left]:border-r data-[side=left]:border-t data-[side=right]:border-b data-[side=right]:border-l"
+            class="rotate-45 border-border-default bg-surface-card data-[side=top]:border-b data-[side=top]:border-r data-[side=bottom]:border-l data-[side=bottom]:border-t data-[side=left]:border-r data-[side=left]:border-t data-[side=right]:border-b data-[side=right]:border-l"
           />
         {/if}
 

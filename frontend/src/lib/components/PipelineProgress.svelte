@@ -200,25 +200,25 @@
 
   <!-- Engine Execution Matrix -->
   {#if currentStatus && Object.keys(currentStatus.engines || {}).length > 0}
-    <div class="space-y-3 border-t border-slate-800/80 pt-2">
+    <div class="space-y-3 border-t border-border-default pt-2">
       <div class="flex items-center justify-between">
-        <h4 class="text-caption font-semibold uppercase tracking-wider text-slate-400">
+        <h4 class="text-caption font-semibold uppercase tracking-wider text-fg-muted">
           Engine Execution Matrix
         </h4>
-        <span class="font-mono text-micro text-slate-500">Phase 6–9 Pipeline Engines</span>
+        <span class="font-mono text-micro text-fg-muted">Phase 6–9 Pipeline Engines</span>
       </div>
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         {#each Object.entries(currentStatus.engines) as [code, engine] (code)}
           <div
-            class="flex flex-col justify-between gap-2.5 rounded-xl border border-slate-800 bg-slate-950/50 p-3.5 transition-colors hover:border-slate-700"
+            class="flex flex-col justify-between gap-2.5 rounded-xl border border-border-default bg-surface-canvas/50 p-3.5 transition-colors hover:border-border-interactive"
           >
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
                 <span
-                  class="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 font-mono text-xs font-bold text-slate-50"
+                  class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 font-mono text-xs font-bold text-fg-primary"
                   >{code}</span
                 >
-                <span class="text-xs font-semibold text-slate-200">{engine.label || code}</span>
+                <span class="text-xs font-semibold text-fg-secondary">{engine.label || code}</span>
               </div>
               <span
                 class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider {getStatusBadge(
@@ -231,17 +231,17 @@
 
             <!-- Engine metrics & Stage -->
             <div
-              class="flex items-center justify-between border-t border-slate-900 pt-1 text-caption text-slate-400"
+              class="flex items-center justify-between border-t border-border-default pt-1 text-caption text-fg-muted"
             >
               <div class="flex items-center gap-2">
                 {#if engine.stage_name}
-                  <span>Stage: <strong class="text-slate-300">{engine.stage_name}</strong></span>
+                  <span>Stage: <strong class="text-fg-secondary">{engine.stage_name}</strong></span>
                 {:else}
-                  <span class="text-slate-500">Idle / Ready</span>
+                  <span class="text-fg-muted">Idle / Ready</span>
                 {/if}
               </div>
               {#if engine.metrics && Object.keys(engine.metrics).length > 0}
-                <div class="flex items-center gap-2 font-mono text-micro text-slate-400">
+                <div class="flex items-center gap-2 font-mono text-micro text-fg-muted">
                   {#if engine.metrics.elements_total}
                     <span>{engine.metrics.elements_total} elements</span>
                   {/if}

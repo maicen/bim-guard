@@ -12,7 +12,7 @@
   let {
     current = true,
     title,
-    class: className = "font-semibold text-slate-100",
+    class: className = "font-semibold text-fg-primary",
     children,
   }: Props = $props();
 </script>

@@ -24,7 +24,7 @@
   inside the Architectural view itself.
 -->
 <div
-  class="flex w-fit shrink-0 items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/40 p-1"
+  class="flex w-fit shrink-0 items-center gap-1 rounded-xl border border-border-interactive bg-surface-overlay p-1"
   role="tablist"
   aria-label="Analysis domain"
 >
@@ -41,7 +41,7 @@
           : tab.id === 'seismic'
             ? 'bg-purple-600 text-white shadow-xs'
             : 'bg-blue-600 text-white shadow-xs'
-        : 'text-slate-400 hover:text-white'}"
+        : 'text-fg-muted hover:text-white'}"
     >
       <tab.icon class="h-3.5 w-3.5" />
       {tab.label}

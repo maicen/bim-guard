@@ -69,12 +69,12 @@
         {side}
         {align}
         {sideOffset}
-        class="z-70 max-w-[240px] rounded-lg border border-slate-800 bg-slate-900/95 px-2.5 py-1.5 text-micro font-medium leading-snug text-slate-200 shadow-xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-tooltip-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        class="z-70 max-w-[240px] rounded-lg border border-border-default bg-surface-card/95 px-2.5 py-1.5 text-micro font-medium leading-snug text-fg-secondary shadow-xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-tooltip-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
       >
         <TooltipPrimitive.Arrow
           width={7}
           height={7}
-          class="rotate-45 border-slate-800 bg-slate-900 data-[side=top]:border-b data-[side=top]:border-r data-[side=bottom]:border-l data-[side=bottom]:border-t data-[side=left]:border-r data-[side=left]:border-t data-[side=right]:border-b data-[side=right]:border-l"
+          class="rotate-45 border-border-default bg-surface-card data-[side=top]:border-b data-[side=top]:border-r data-[side=bottom]:border-l data-[side=bottom]:border-t data-[side=left]:border-r data-[side=left]:border-t data-[side=right]:border-b data-[side=right]:border-l"
         />
         {text}
       </TooltipPrimitive.Content>

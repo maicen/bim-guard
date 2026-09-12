@@ -39,7 +39,7 @@
     </div>
   {/key}
 {:else}
-  <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-    <p class="text-sm font-semibold text-slate-300">No DocLang XML to display</p>
+  <div class="flex flex-col items-center justify-center py-16 text-center text-fg-muted">
+    <p class="text-sm font-semibold text-fg-secondary">No DocLang XML to display</p>
   </div>
 {/if}

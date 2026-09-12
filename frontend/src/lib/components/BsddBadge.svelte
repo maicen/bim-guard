@@ -105,32 +105,32 @@
     {/snippet}
 
     {#if status === "loading" || status === "idle"}
-      <p class="text-slate-500">Fetching the bSDD definition…</p>
+      <p class="text-fg-muted">Fetching the bSDD definition…</p>
     {:else if status === "error"}
-      <p class="text-slate-500">bSDD is unreachable right now.</p>
+      <p class="text-fg-muted">bSDD is unreachable right now.</p>
     {:else if status === "empty"}
-      <p class="text-slate-500">
+      <p class="text-fg-muted">
         No bSDD definition found for {isClass ? "this class" : "this property name"}.
       </p>
     {:else if classDetail}
       <div class="space-y-2">
         <p>{classDetail.definition || classDetail.description || "No definition available."}</p>
         {#if classDetail.definition && classDetail.description}
-          <p class="text-micro italic text-slate-500">Note: {classDetail.description}</p>
+          <p class="text-micro italic text-fg-muted">Note: {classDetail.description}</p>
         {/if}
         {#if classDetail.parent_class_code}
-          <p class="text-micro text-slate-500">
-            Extends <span class="font-mono text-slate-300">{classDetail.parent_class_code}</span>
+          <p class="text-micro text-fg-muted">
+            Extends <span class="font-mono text-fg-secondary">{classDetail.parent_class_code}</span>
           </p>
         {/if}
         {#if classDetail.related_ifc_entities?.length}
-          <p class="text-micro text-slate-500">
+          <p class="text-micro text-fg-muted">
             Related IFC entities:
-            <span class="font-mono text-slate-300">{classDetail.related_ifc_entities.join(", ")}</span>
+            <span class="font-mono text-fg-secondary">{classDetail.related_ifc_entities.join(", ")}</span>
           </p>
         {/if}
         {#if classDetail.properties?.length}
-          <p class="text-micro text-slate-500">
+          <p class="text-micro text-fg-muted">
             {classDetail.properties.length} standardized {classDetail.properties.length === 1
               ? "property"
               : "properties"} in bSDD
@@ -141,33 +141,33 @@
       <div class="space-y-2">
         <p>{propDetail.definition || propDetail.description || "No definition available."}</p>
         {#if propDetail.definition && propDetail.description}
-          <p class="text-micro italic text-slate-500">Note: {propDetail.description}</p>
+          <p class="text-micro italic text-fg-muted">Note: {propDetail.description}</p>
         {/if}
         <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
           {#if propDetail.data_type}
-            <dt class="uppercase tracking-wider text-slate-500">Type</dt>
-            <dd class="font-mono text-slate-200">{propDetail.data_type}</dd>
+            <dt class="uppercase tracking-wider text-fg-muted">Type</dt>
+            <dd class="font-mono text-fg-secondary">{propDetail.data_type}</dd>
           {/if}
           {#if propDetail.units}
-            <dt class="uppercase tracking-wider text-slate-500">Units</dt>
-            <dd class="font-mono text-slate-200">{propDetail.units}</dd>
+            <dt class="uppercase tracking-wider text-fg-muted">Units</dt>
+            <dd class="font-mono text-fg-secondary">{propDetail.units}</dd>
           {/if}
           {#if propDetail.property_set}
-            <dt class="uppercase tracking-wider text-slate-500">Pset</dt>
-            <dd class="font-mono text-slate-200">{propDetail.property_set}</dd>
+            <dt class="uppercase tracking-wider text-fg-muted">Pset</dt>
+            <dd class="font-mono text-fg-secondary">{propDetail.property_set}</dd>
           {/if}
         </dl>
         {#if propDetail.allowed_values?.length}
           <div class="flex flex-wrap gap-1 pt-0.5">
             {#each propDetail.allowed_values.slice(0, 8) as val (val)}
               <span
-                class="rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-mono text-nano text-slate-300"
+                class="rounded border border-border-default bg-surface-overlay px-1.5 py-0.5 font-mono text-nano text-fg-secondary"
               >
                 {val}
               </span>
             {/each}
             {#if propDetail.allowed_values.length > 8}
-              <span class="text-nano text-slate-500"
+              <span class="text-nano text-fg-muted"
                 >+{propDetail.allowed_values.length - 8} more</span
               >
             {/if}

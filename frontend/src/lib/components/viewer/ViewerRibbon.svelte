@@ -479,7 +479,7 @@
           </button>
         {/snippet}
       </Tooltip>
-      <span class="ml-2 text-xs text-slate-500">{layers.length} categories</span>
+      <span class="ml-2 text-xs text-fg-muted">{layers.length} categories</span>
     {:else if activeTab === "drawings"}
       <Tooltip text={hasOpenView ? "Create a technical drawing from the open plan/elevation/section view" : "Open a plan/elevation/section view first"}>
         {#snippet trigger()}
@@ -505,7 +505,7 @@
           </button>
         {/snippet}
       </Tooltip>
-      <span class="ml-2 text-xs text-slate-500">{drawingCount} drawing(s)</span>
+      <span class="ml-2 text-xs text-fg-muted">{drawingCount} drawing(s)</span>
     {:else if activeTab === "bcf"}
       <Tooltip text="Create a new BCF topic">
         {#snippet trigger()}

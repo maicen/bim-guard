@@ -83,7 +83,7 @@
       {side}
       {sideOffset}
       class={cn(
-        "z-40 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+        "z-40 space-y-1 rounded-xl border border-border-default bg-surface-card p-1.5 text-xs shadow-xl outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         width,
         contentClass,
       )}

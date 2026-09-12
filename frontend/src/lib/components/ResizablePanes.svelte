@@ -152,7 +152,7 @@
     onkeydown={onDividerKeydown}
     class="group relative shrink-0 touch-none select-none {direction === 'horizontal'
       ? 'w-1 cursor-col-resize'
-      : 'h-1 cursor-row-resize'} bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
+      : 'h-1 cursor-row-resize'} bg-surface-overlay transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
       ? 'bg-accent'
       : ''}"
   ></div>

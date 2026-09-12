@@ -14,6 +14,6 @@
   {#if children}
     {@render children()}
   {:else}
-    <ChevronRight class="h-3.5 w-3.5 text-slate-600" />
+    <ChevronRight class="h-3.5 w-3.5 text-fg-muted" />
   {/if}
 </li>

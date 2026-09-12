@@ -50,7 +50,7 @@
 
 <div>
   <label
-    class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-900"
+    class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-fg-secondary hover:bg-surface-hover"
     style:padding-left="{0.5 + depth * 1.25}rem"
   >
     {#if node.children.length > 0}
@@ -60,7 +60,7 @@
           event.preventDefault();
           userExpanded = !isExpanded;
         }}
-        class="shrink-0 text-slate-500 hover:text-slate-300"
+        class="shrink-0 text-fg-muted hover:text-fg-primary"
         aria-label={isExpanded ? "Collapse section" : "Expand section"}
       >
         {#if isExpanded}
@@ -78,7 +78,7 @@
       onchange={toggle}
       ariaLabel={`Select section ${node.section_number || node.id}`}
     />
-    <span class="font-mono text-slate-500">{node.section_number || "—"}</span>
+    <span class="font-mono text-fg-muted">{node.section_number || "—"}</span>
     <span class="flex-1 truncate">{node.section_name || "Untitled section"}</span>
     {#if node.node_type === "table"}
       <span
@@ -90,9 +90,9 @@
       </span>
     {/if}
     {#if node.page_number}
-      <span class="shrink-0 rounded border border-slate-800 px-1 text-slate-500">p. {node.page_number}</span>
+      <span class="shrink-0 rounded border border-border-default px-1 text-fg-muted">p. {node.page_number}</span>
     {/if}
-    <span class="shrink-0 text-slate-600">{node.char_count.toLocaleString()} chars</span>
+    <span class="shrink-0 text-fg-muted">{node.char_count.toLocaleString()} chars</span>
     {#if onViewSource && (node.page_number || node.bbox)}
       <button
         type="button"
@@ -100,7 +100,7 @@
           event.preventDefault();
           onViewSource?.(node);
         }}
-        class="shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+        class="shrink-0 rounded p-0.5 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         title="View this section in the document"
       >
         <Eye class="h-3.5 w-3.5" />

@@ -50,10 +50,10 @@
               ? `/${item.id}?org=${authState.activeOrganizationId}`
               : `/${item.id}`}
             use:link
-            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors data-highlighted:bg-slate-800 data-highlighted:text-slate-50 {activeView ===
+            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors data-highlighted:bg-surface-hover data-highlighted:text-fg-primary {activeView ===
             item.id
               ? 'bg-accent text-white'
-              : 'text-slate-300'}"
+              : 'text-fg-secondary'}"
           >
             <item.icon class="h-3.5 w-3.5" />
             {item.label}
@@ -62,7 +62,7 @@
       </Menu.Item>
     {/each}
 
-    <Menu.Separator class="my-1 border-t border-slate-800" />
+    <Menu.Separator class="my-1 border-t border-border-default" />
 
     <Menu.Item>
       {#snippet child({ props })}
@@ -71,7 +71,7 @@
           href="/api/docs"
           target="_blank"
           rel="noopener noreferrer"
-          class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors data-highlighted:bg-slate-800 data-highlighted:text-slate-50"
+          class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-fg-secondary transition-colors data-highlighted:bg-surface-hover data-highlighted:text-fg-primary"
           title="Open Swagger OpenAPI Documentation"
         >
           <span class="flex items-center gap-2">

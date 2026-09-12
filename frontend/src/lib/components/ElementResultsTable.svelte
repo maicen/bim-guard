@@ -96,31 +96,31 @@
   });
 </script>
 
-<div class="border-t border-slate-800/60">
-  <div class="flex items-center gap-2 border-b border-slate-800/60 px-3.5 py-2">
-    <Search class="h-3.5 w-3.5 shrink-0 text-slate-500" />
+<div class="border-t border-border-subtle">
+  <div class="flex items-center gap-2 border-b border-border-subtle px-3.5 py-2">
+    <Search class="h-3.5 w-3.5 shrink-0 text-fg-muted" />
     <input
       type="text"
       bind:value={search}
       placeholder="Filter by element, floor, room, or GUID…"
-      class="w-full bg-transparent text-xs text-slate-200 placeholder:text-slate-600 focus:outline-hidden"
+      class="w-full bg-transparent text-xs text-fg-secondary placeholder:text-fg-muted focus:outline-hidden"
     />
   </div>
   <div class="max-h-64 overflow-auto">
     <table class="w-full text-xs">
       <thead>
-        <tr class="bg-slate-800/80">
+        <tr class="bg-surface-overlay">
           <SortHeader column="element" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Element</SortHeader
           >
           <SortHeader column="location" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Floor / Room</SortHeader
           >
-          <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">GUID</th>
+          <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">GUID</th>
           <SortHeader column="actual" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Actual</SortHeader
           >
-          <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Required</th>
+          <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Required</th>
           <SortHeader column="status" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Status</SortHeader
           >
@@ -128,7 +128,7 @@
       </thead>
       <tbody>
         {#each paged as el (el.guid)}
-          <tr class="border-b border-slate-800/40 last:border-0 {rowBg(el)}">
+          <tr class="border-b border-border-subtle last:border-0 {rowBg(el)}">
             <td class="px-3 py-2">
               <span class="inline-flex items-center gap-1">
                 {#if el.data_quality_warnings?.length}
@@ -136,20 +136,20 @@
                     <AlertTriangle class="h-3 w-3 shrink-0 text-amber-400" />
                   </span>
                 {/if}
-                <span class="font-mono text-xs text-slate-50">{(el.element_name || "—").slice(0, 32)}</span>
+                <span class="font-mono text-xs text-fg-primary">{(el.element_name || "—").slice(0, 32)}</span>
               </span>
             </td>
             <td class="px-3 py-2">
-              <span class="block text-xs text-slate-300">{el.storey || "—"}</span>
+              <span class="block text-xs text-fg-secondary">{el.storey || "—"}</span>
               {#if el.space && el.space !== "—"}
-                <span class="block text-xs text-slate-500">{el.space}</span>
+                <span class="block text-xs text-fg-muted">{el.space}</span>
               {/if}
             </td>
             <td class="px-3 py-2"
-              ><span class="font-mono text-xs text-slate-500">{(el.guid || "").slice(0, 14)}</span></td
+              ><span class="font-mono text-xs text-fg-muted">{(el.guid || "").slice(0, 14)}</span></td
             >
-            <td class="px-3 py-2 font-mono text-xs text-slate-300 {statusClass(el)}">{actualText(el)}</td>
-            <td class="px-3 py-2 text-xs text-slate-500">{requiredText}</td>
+            <td class="px-3 py-2 font-mono text-xs text-fg-secondary {statusClass(el)}">{actualText(el)}</td>
+            <td class="px-3 py-2 text-xs text-fg-muted">{requiredText}</td>
             <td class="px-3 py-2 text-xs {statusClass(el)}">
               {statusLabel(el)}
               {#if el.status === "FAIL" && el.guid && onViewIn3d}
@@ -166,7 +166,7 @@
           </tr>
         {:else}
           <tr>
-            <td colspan="6" class="px-3 py-6 text-center text-xs italic text-slate-500">
+            <td colspan="6" class="px-3 py-6 text-center text-xs italic text-fg-muted">
               No elements match "{search}".
             </td>
           </tr>

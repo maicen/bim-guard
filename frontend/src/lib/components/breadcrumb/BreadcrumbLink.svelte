@@ -16,7 +16,7 @@
   <a
     {href}
     {title}
-    class="font-medium text-slate-500 transition-colors hover:text-slate-300 {className}"
+    class="font-medium text-fg-muted transition-colors hover:text-fg-primary {className}"
   >
     {@render children()}
   </a>
@@ -25,7 +25,7 @@
     type="button"
     {onclick}
     {title}
-    class="font-medium text-slate-500 transition-colors hover:text-slate-300 {className}"
+    class="font-medium text-fg-muted transition-colors hover:text-fg-primary {className}"
   >
     {@render children()}
   </button>

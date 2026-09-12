@@ -46,12 +46,12 @@
 
 {#if depth === 0}
   <label class="relative block">
-    <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+    <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
     <input
       type="text"
       bind:value={query}
       placeholder="Filter sections by number or title…"
-      class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-lg border border-border-default bg-surface-canvas py-1.5 pl-8 pr-3 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
     />
   </label>
 {/if}
