@@ -93,7 +93,7 @@
   }
   const DEFAULT_OVERLAY_PREFS: OverlayPrefs = {
     showBadges: false,
-    arrowColor: "#94a3b8",
+    arrowColor: "var(--color-fg-muted, #94a3b8)",
     arrowWidth: 1.5,
     arrowHead: 6,
     arrowStyle: "dashed",

@@ -55,6 +55,17 @@
   --color-info-bg: rgb(var(--info-bg-rgb));
   --color-info-border: rgb(var(--info-border-rgb));
 
+  /* Document & NLP Entity Visualization Tokens */
+  --color-doc-heading: rgb(var(--doc-heading-rgb));
+  --color-doc-paragraph: rgb(var(--doc-paragraph-rgb));
+  --color-doc-list: rgb(var(--doc-list-rgb));
+  --color-doc-table: rgb(var(--doc-table-rgb));
+  --color-doc-picture: rgb(var(--doc-picture-rgb));
+
+  /* Surface Selection Tokens */
+  --color-surface-selected: rgb(var(--accent-rgb) / 0.12);
+  --color-surface-selected-hover: rgb(var(--accent-rgb) / 0.18);
+
   --color-slate-50: rgb(var(--slate-50-rgb));
   --color-slate-100: rgb(var(--slate-100-rgb));
   --color-slate-200: rgb(var(--slate-200-rgb));
@@ -172,6 +183,13 @@ html.dark {
   --info-bg-rgb: 30 27 75;              /* #1e1b4b indigo-950/70 */
   --info-border-rgb: 55 48 163;         /* #3730a3 indigo-800 */
 
+  /* Document & NLP Entity Visualization Tokens (Dark Mode) */
+  --doc-heading-rgb: 167 139 250;       /* #a78bfa violet-400 */
+  --doc-paragraph-rgb: 96 165 250;      /* #60a5fa blue-400 */
+  --doc-list-rgb: 251 146 60;           /* #fb923c orange-400 */
+  --doc-table-rgb: 74 222 128;          /* #4ade80 emerald-400 */
+  --doc-picture-rgb: 244 114 182;       /* #f472b6 pink-400 */
+
   /* Dark Theme Palette (Default) */
   --slate-950-rgb: 2 6 23;      /* #020617 - app background */
   --slate-900-rgb: 15 23 42;    /* #0f172a - cards & surfaces */
@@ -240,6 +258,13 @@ html:not(.dark) {
   --info-rgb: 67 56 202;               /* #4338ca indigo-700 */
   --info-bg-rgb: 224 231 255;          /* #e0e7ff indigo-100 */
   --info-border-rgb: 199 210 254;      /* #c7d2fe indigo-200 */
+
+  /* Document & NLP Entity Visualization Tokens (Light Mode: calibrated for white canvas) */
+  --doc-heading-rgb: 124 58 237;       /* #7c3aed violet-600 */
+  --doc-paragraph-rgb: 37 99 235;      /* #2563eb blue-600 */
+  --doc-list-rgb: 234 88 12;           /* #ea580c orange-600 */
+  --doc-table-rgb: 22 163 74;          /* #16a34a emerald-600 */
+  --doc-picture-rgb: 219 39 119;       /* #db2777 pink-600 */
 
   /* Light Theme Palette - Apple / Modern SaaS Light Palette */
   --slate-950-rgb: 248 250 252;  /* #f8fafc - app background (slate-50) */

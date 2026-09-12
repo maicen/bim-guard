@@ -44,7 +44,7 @@
     tooltipText?: (elementId: string) => string | null;
   }
 
-  const DEFAULT_ARROW_STYLE: ArrowStyle = { color: "#94a3b8", width: 1.5, head: 6, style: "dashed" };
+  const DEFAULT_ARROW_STYLE: ArrowStyle = { color: "var(--color-fg-muted, #94a3b8)", width: 1.5, head: 6, style: "dashed" };
 
   let {
     elements,
@@ -69,11 +69,11 @@
   }
 
   const KIND_COLOR: Record<DocumentElementKind, string> = {
-    heading: "#a78bfa",
-    paragraph: "#60a5fa",
-    list: "#fb923c",
-    table: "#4ade80",
-    picture: "#f472b6",
+    heading: "var(--color-doc-heading, #a78bfa)",
+    paragraph: "var(--color-doc-paragraph, #60a5fa)",
+    list: "var(--color-doc-list, #fb923c)",
+    table: "var(--color-doc-table, #4ade80)",
+    picture: "var(--color-doc-picture, #f472b6)",
   };
 
   interface OverlayBox {
@@ -224,12 +224,12 @@
         <defs>
           <pattern id="layer-hatch-{pageNumber}" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
             <rect width="6" height="6" fill="transparent" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#94a3b8" stroke-width="2" opacity="0.35" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--color-fg-muted, #94a3b8)" stroke-width="2" opacity="0.35" />
           </pattern>
         </defs>
       {/if}
       {#each boxes as box (box.elementId)}
-        {@const color = KIND_COLOR[box.kind] ?? "#94a3b8"}
+        {@const color = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
         {@const isSelected = box.elementId === selectedElementId}
         {@const isLayered = box.layer !== "body"}
         <rect
@@ -254,7 +254,7 @@
       {/each}
       {#if showBadges}
         {#each boxes as box (`badge-${box.elementId}`)}
-          {@const color = KIND_COLOR[box.kind] ?? "#94a3b8"}
+          {@const color = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
           <g class="pointer-events-none">
             <circle cx={box.left + 7} cy={box.top + 7} r="7" fill={color} opacity="0.92" />
             <text
@@ -264,7 +264,7 @@
               dominant-baseline="central"
               font-size="8"
               font-weight="700"
-              fill="#0f172a"
+              fill="var(--color-surface-canvas, #0f172a)"
             >
               {box.order + 1}
             </text>
