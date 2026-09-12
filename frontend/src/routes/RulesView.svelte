@@ -49,7 +49,6 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import RuleForm from "../lib/components/RuleForm.svelte";
-  import RulesetImportForm from "../lib/components/RulesetImportForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
@@ -57,7 +56,15 @@
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import Badge from "../lib/components/Badge.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
-  import { DropdownMenu as Menu } from "bits-ui";
+  import { DropdownMenu as Menu, Tabs } from "bits-ui";
+  import {
+    RuleDetailsModal,
+    RulesetFolderModal,
+    RuleBulkEditModal,
+    RulesetFolderBulkEditModal,
+    RuleSnapshotModal,
+    RulesetImportModal,
+  } from "../lib/components/rules";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -107,11 +114,6 @@
 
   // Save Snapshot modal state
   let isSaveSnapshotModalOpen = $state(false);
-  let saveSnapshotName = $state("");
-  let saveSnapshotNotes = $state("");
-  let saveSnapshotSourceMode: RuleSnapshotSourceMode = $state("manual");
-  let isSavingSnapshot = $state(false);
-  let saveSnapshotError = $state("");
 
   const cachedRules = rulesApi.getCachedList();
   const cachedFolders = rulesApi.getCachedFolders();
@@ -168,8 +170,6 @@
   let folderDescription = $state("");
   let folderMechanismScope = $state("");
   let folderCategory: RulesetCategory = $state("Arch");
-  let folderModalError = $state("");
-  let isSavingFolder = $state(false);
 
   // Folder Delete Modal State
   let isDeleteFolderModalOpen = $state(false);
@@ -178,22 +178,11 @@
 
   // Bulk Rule Modification State
   let isBulkEditRulesModalOpen = $state(false);
-  let bulkRuleRulesetId = $state("__keep__");
-  let bulkRuleCategory: RulesetCategory | "__keep__" = $state("__keep__");
-  let bulkRuleMechanism = $state("__keep__");
-  let bulkRuleSeverity = $state("__keep__");
-  let bulkRuleNeedsReview: "0" | "1" | "__keep__" = $state("__keep__");
-  let isBulkUpdatingRules = $state(false);
-  let bulkRulesModalError = $state("");
 
   // Bulk Folder Selection & Modification State
   let selectedFolderRulesetIds: string[] = $state([]);
   let isFolderSelectionMode = $state(false);
   let isBulkEditFoldersModalOpen = $state(false);
-  let bulkFolderCategory: RulesetCategory | "__keep__" = $state("__keep__");
-  let bulkFolderMechanismScope = $state("__keep__");
-  let isBulkUpdatingFolders = $state(false);
-  let bulkFoldersModalError = $state("");
   let isBulkDeleteFoldersModalOpen = $state(false);
   let isBulkDeletingFolders = false;
 
@@ -306,39 +295,26 @@
 
   function openBulkEditRulesModal() {
     if (!table.selectedCount) return;
-    bulkRuleRulesetId = "__keep__";
-    bulkRuleCategory = "__keep__";
-    bulkRuleMechanism = "__keep__";
-    bulkRuleSeverity = "__keep__";
-    bulkRuleNeedsReview = "__keep__";
-    bulkRulesModalError = "";
     isBulkEditRulesModalOpen = true;
   }
 
-  async function handleBulkUpdateRules() {
+  async function handleBulkUpdateRules(payload: {
+    ruleset_id?: string;
+    category?: string;
+    mechanism?: string;
+    severity?: string;
+    needs_review?: number;
+  }) {
     if (!table.selectedCount) return;
-    isBulkUpdatingRules = true;
-    bulkRulesModalError = "";
-    try {
-      const payload: any = { rule_ids: table.selectedIdList };
-      if (bulkRuleRulesetId !== "__keep__") payload.ruleset_id = bulkRuleRulesetId;
-      if (bulkRuleCategory !== "__keep__") payload.category = bulkRuleCategory;
-      if (bulkRuleMechanism !== "__keep__") payload.mechanism = bulkRuleMechanism;
-      if (bulkRuleSeverity !== "__keep__") payload.severity = bulkRuleSeverity;
-      if (bulkRuleNeedsReview !== "__keep__")
-        payload.needs_review = parseInt(bulkRuleNeedsReview, 10);
-
-      const res = await rulesApi.bulkUpdate(payload);
-      successMessage = `Successfully updated ${res.success_count} rule(s).`;
-      isBulkEditRulesModalOpen = false;
-      table.clearSelection();
-      await loadData(true);
-      setTimeout(() => (successMessage = ""), 4000);
-    } catch (err: any) {
-      bulkRulesModalError = err.message || "Failed to update rules in bulk.";
-    } finally {
-      isBulkUpdatingRules = false;
-    }
+    const res = await rulesApi.bulkUpdate({
+      rule_ids: table.selectedIdList,
+      ...payload,
+    });
+    successMessage = `Successfully updated ${res.success_count} rule(s).`;
+    isBulkEditRulesModalOpen = false;
+    table.clearSelection();
+    await loadData(true);
+    setTimeout(() => (successMessage = ""), 4000);
   }
 
   async function confirmBulkDelete() {
@@ -376,33 +352,23 @@
 
   function openBulkEditFoldersModal() {
     if (!selectedFolderRulesetIds.length) return;
-    bulkFolderCategory = "__keep__";
-    bulkFolderMechanismScope = "__keep__";
-    bulkFoldersModalError = "";
     isBulkEditFoldersModalOpen = true;
   }
 
-  async function handleBulkUpdateFolders() {
+  async function handleBulkUpdateFolders(payload: {
+    category?: string;
+    mechanism_scope?: string;
+  }) {
     if (!selectedFolderRulesetIds.length) return;
-    isBulkUpdatingFolders = true;
-    bulkFoldersModalError = "";
-    try {
-      const payload: any = { ruleset_ids: selectedFolderRulesetIds };
-      if (bulkFolderCategory !== "__keep__") payload.category = bulkFolderCategory;
-      if (bulkFolderMechanismScope !== "__keep__")
-        payload.mechanism_scope = bulkFolderMechanismScope;
-
-      const res = await rulesApi.bulkUpdateFolders(payload);
-      successMessage = `Successfully updated ${res.success_count} ruleset folder(s).`;
-      isBulkEditFoldersModalOpen = false;
-      selectedFolderRulesetIds = [];
-      await loadData(true);
-      setTimeout(() => (successMessage = ""), 4000);
-    } catch (err: any) {
-      bulkFoldersModalError = err.message || "Failed to update folders in bulk.";
-    } finally {
-      isBulkUpdatingFolders = false;
-    }
+    const res = await rulesApi.bulkUpdateFolders({
+      ruleset_ids: selectedFolderRulesetIds,
+      ...payload,
+    });
+    successMessage = `Successfully updated ${res.success_count} ruleset folder(s).`;
+    isBulkEditFoldersModalOpen = false;
+    selectedFolderRulesetIds = [];
+    await loadData(true);
+    setTimeout(() => (successMessage = ""), 4000);
   }
 
   async function confirmBulkDeleteFolders() {
@@ -468,37 +434,26 @@
 
   function openSaveSnapshotModal() {
     if (!selectedFolderId) return;
-    saveSnapshotName = selectedFolderId;
-    saveSnapshotNotes = "";
-    const folder = folders.find((f) => f.ruleset_id === selectedFolderId);
-    saveSnapshotSourceMode = "manual";
-    saveSnapshotError = "";
     isSaveSnapshotModalOpen = true;
   }
 
-  async function handleSaveSnapshot() {
-    if (!selectedFolderId || !saveSnapshotName.trim()) {
-      saveSnapshotError = "Please provide a snapshot name.";
-      return;
-    }
-    isSavingSnapshot = true;
-    saveSnapshotError = "";
-    try {
-      await rulesApi.createSnapshot({
-        ruleset_id: selectedFolderId,
-        name: saveSnapshotName.trim(),
-        notes: saveSnapshotNotes.trim(),
-        source_mode: saveSnapshotSourceMode,
-      });
-      successMessage = `Saved snapshot "${saveSnapshotName.trim()}".`;
-      isSaveSnapshotModalOpen = false;
-      snapshots = [];
-      await loadSnapshots();
-    } catch (err: any) {
-      saveSnapshotError = err.message || "Failed to save snapshot.";
-    } finally {
-      isSavingSnapshot = false;
-    }
+  async function handleSaveSnapshot(payload: {
+    name: string;
+    source_mode: RuleSnapshotSourceMode;
+    notes: string;
+  }) {
+    if (!selectedFolderId) return;
+    await rulesApi.createSnapshot({
+      ruleset_id: selectedFolderId,
+      name: payload.name,
+      notes: payload.notes,
+      source_mode: payload.source_mode,
+    });
+    successMessage = `Saved snapshot "${payload.name}".`;
+    isSaveSnapshotModalOpen = false;
+    snapshots = [];
+    await loadSnapshots();
+    setTimeout(() => (successMessage = ""), 4000);
   }
 
   function confirmDeleteSnapshot() {
@@ -583,7 +538,6 @@
           ? "SEISMIC"
           : "CODE";
     folderCategory = selectedCategory !== "all" ? selectedCategory : "Arch";
-    folderModalError = "";
     isFolderModalOpen = true;
   }
 
@@ -595,45 +549,32 @@
     folderDescription = folder.description || "";
     folderMechanismScope = folder.mechanism_scope || "CODE";
     folderCategory = (folder.category as RulesetCategory) || "Arch";
-    folderModalError = "";
     isFolderModalOpen = true;
   }
 
-  async function handleSaveFolder() {
-    if (!folderRulesetId.trim()) {
-      folderModalError = "Ruleset ID is required.";
-      return;
+  async function handleSaveFolder(payload: {
+    ruleset_id: string;
+    display_name: string;
+    category: RulesetCategory;
+    mechanism_scope: string;
+    description: string;
+  }) {
+    if (isEditingFolder) {
+      await rulesApi.updateFolder(payload.ruleset_id, {
+        display_name: payload.display_name || payload.ruleset_id,
+        description: payload.description,
+        mechanism_scope: payload.mechanism_scope,
+        category: payload.category,
+      });
+      successMessage = `Updated ruleset folder "${payload.display_name || payload.ruleset_id}"`;
+    } else {
+      await rulesApi.createFolder(payload);
+      selectedFolderId = payload.ruleset_id;
+      successMessage = `Created ruleset folder "${payload.display_name || payload.ruleset_id}"`;
     }
-    isSavingFolder = true;
-    folderModalError = "";
-    try {
-      if (isEditingFolder) {
-        await rulesApi.updateFolder(folderRulesetId, {
-          display_name: folderDisplayName.trim() || folderRulesetId.trim(),
-          description: folderDescription.trim(),
-          mechanism_scope: folderMechanismScope.trim(),
-          category: folderCategory,
-        });
-        successMessage = `Updated ruleset folder "${folderDisplayName || folderRulesetId}"`;
-      } else {
-        await rulesApi.createFolder({
-          ruleset_id: folderRulesetId.trim(),
-          display_name: folderDisplayName.trim() || folderRulesetId.trim(),
-          description: folderDescription.trim(),
-          mechanism_scope: folderMechanismScope.trim(),
-          category: folderCategory,
-        });
-        selectedFolderId = folderRulesetId.trim();
-        successMessage = `Created ruleset folder "${folderDisplayName || folderRulesetId}"`;
-      }
-      isFolderModalOpen = false;
-      await loadData(true);
-      setTimeout(() => (successMessage = ""), 4000);
-    } catch (err: any) {
-      folderModalError = err.message || "Failed to save ruleset folder.";
-    } finally {
-      isSavingFolder = false;
-    }
+    isFolderModalOpen = false;
+    await loadData(true);
+    setTimeout(() => (successMessage = ""), 4000);
   }
 
   function promptDeleteFolder(folder: RuleFolder, event?: MouseEvent) {
@@ -1734,153 +1675,12 @@
 />
 
 <!-- View Rule Details Modal -->
-{#if isViewModalOpen && ruleToView}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
-            <ListChecks class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="font-mono text-base font-bold text-fg-primary">
-              {ruleToView.rule_id || `Rule #${ruleToView.id}`}
-            </h2>
-            <p class="text-xs text-fg-muted">Rule Specification &amp; Conditions</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isViewModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- Body -->
-      <div class="space-y-4 overflow-y-auto p-6 text-xs">
-        <div>
-          <span class="mb-1 block font-semibold text-fg-muted">Description</span>
-          <div class="rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-fg-secondary">
-            {ruleToView.description || "No description provided."}
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-              >Category</span
-            >
-            <span class="font-mono font-semibold text-fg-primary"
-              >{ruleToView.category || "Arch"}</span
-            >
-          </div>
-
-          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-              >Mechanism</span
-            >
-            <span class="font-mono font-semibold text-fg-primary"
-              >{ruleToView.mechanism || "CODE"}</span
-            >
-          </div>
-
-          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-              >Severity</span
-            >
-            <span class="font-semibold text-amber-400">{ruleToView.severity}</span>
-          </div>
-
-          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-              >Ruleset / Folder</span
-            >
-            <span class="block truncate font-mono text-fg-secondary"
-              >{ruleToView.ruleset_id || "Global"}</span
-            >
-          </div>
-        </div>
-
-        <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/70 p-3.5">
-          <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-            >Target &amp; Condition</span
-          >
-          <div class="grid grid-cols-2 gap-2 font-mono text-caption">
-            <div>
-              <span class="text-fg-muted">Pset:</span>
-              <span class="text-fg-secondary">{ruleToView.property_set || "Pset_Compliance"}</span>
-            </div>
-            <div>
-              <span class="text-fg-muted">Property:</span>
-              <span class="text-fg-secondary">{ruleToView.property_name || "—"}</span>
-            </div>
-            <div>
-              <span class="text-fg-muted">Operator:</span>
-              <span class="text-cyan-300">{ruleToView.operator || "=="}</span>
-            </div>
-            <div>
-              <span class="text-fg-muted">Target Value:</span>
-              <span class="text-emerald-300"
-                >{ruleToView.check_value ||
-                  (ruleToView.value_min
-                    ? `[${ruleToView.value_min}..${ruleToView.value_max}]`
-                    : "—")}
-                {ruleToView.unit || ""}</span
-              >
-            </div>
-          </div>
-          {#if ruleToView.compare_property}
-            <div class="pt-1 font-mono text-caption text-amber-300">
-              Compare with: {ruleToView.compare_property}
-            </div>
-          {/if}
-        </div>
-
-        <div>
-          <span class="mb-1 block text-micro font-semibold uppercase tracking-wider text-fg-muted"
-            >Raw JSON Definition</span
-          >
-          <pre
-            class="max-h-40 overflow-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption text-fg-muted">{JSON.stringify(
-              ruleToView,
-              null,
-              2,
-            )}</pre>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-between border-t border-border-default bg-surface-canvas/60 px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => {
-            isViewModalOpen = false;
-            if (ruleToView) openEditModal(ruleToView);
-          }}
-          class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-3 py-1.5 text-xs text-fg-primary transition-colors hover:bg-surface-hover"
-        >
-          <Edit3 class="h-3.5 w-3.5" />
-          <span>Edit this Rule</span>
-        </button>
-
-        <button
-          type="button"
-          onclick={() => (isViewModalOpen = false)}
-          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RuleDetailsModal
+  isOpen={isViewModalOpen}
+  rule={ruleToView}
+  onClose={() => (isViewModalOpen = false)}
+  onEdit={(rule) => openEditModal(rule)}
+/>
 
 <ConfirmModal
   bind:isOpen={isBulkDeleteModalOpen}
@@ -1893,156 +1693,17 @@
 />
 
 <!-- Create / Edit Ruleset Folder Modal -->
-{#if isFolderModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            {#if isEditingFolder}
-              <Pencil class="h-5 w-5" />
-            {:else}
-              <Folder class="h-5 w-5" />
-            {/if}
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              {isEditingFolder ? `Edit Folder: ${folderRulesetId}` : "Create Ruleset Folder"}
-            </h2>
-            <p class="text-xs text-fg-muted">
-              {isEditingFolder
-                ? "Update folder name, category, and scope"
-                : "Organize compliance rules under a new domain ruleset"}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isFolderModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- Body Form -->
-      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
-        {#if folderModalError}
-          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-rose-300">
-            {folderModalError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="folder-ruleset-id" class="block font-semibold text-fg-secondary">
-            Ruleset Identifier (ID) <span class="text-rose-400">*</span>
-          </label>
-          <input
-            id="folder-ruleset-id"
-            type="text"
-            bind:value={folderRulesetId}
-            disabled={isEditingFolder}
-            placeholder="e.g. BUILDING-CODE-PART3 or GC-001"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          {#if !isEditingFolder}
-            <p class="text-caption text-fg-muted">
-              Unique ID used to link member rules (e.g. CODE-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
-            </p>
-          {/if}
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="folder-display-name" class="block font-semibold text-fg-secondary">
-            Display Name
-          </label>
-          <input
-            id="folder-display-name"
-            type="text"
-            bind:value={folderDisplayName}
-            placeholder="e.g. Building Code Part 3 - Fire Protection & Safety"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <label for="folder-category" class="block font-semibold text-fg-secondary">
-              Domain Category
-            </label>
-            <select
-              id="folder-category"
-              bind:value={folderCategory}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Arch">Arch (Architectural)</option>
-              <option value="Piping">Piping (Corrosion)</option>
-              <option value="seismic">Seismic (Clearance)</option>
-            </select>
-          </div>
-
-          <div class="space-y-1.5">
-            <label for="folder-mechanism-scope" class="block font-semibold text-fg-secondary">
-              Mechanism Scope
-            </label>
-            <select
-              id="folder-mechanism-scope"
-              bind:value={folderMechanismScope}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="CODE">CODE (Building Code)</option>
-              <option value="GC-001">GC-001 (Galvanic)</option>
-              <option value="CC-001">CC-001 (Crevice)</option>
-              <option value="MC-001">MC-001 (Microbiological)</option>
-              <option value="SEISMIC">SEISMIC (Clearance Detection)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="folder-desc" class="block font-semibold text-fg-secondary"> Description </label>
-          <textarea
-            id="folder-desc"
-            rows="3"
-            bind:value={folderDescription}
-            placeholder="Regulatory standard, scope notes, or compliance criteria..."
-            class="w-full resize-y rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-          ></textarea>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => (isFolderModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isSavingFolder || !folderRulesetId.trim()}
-          onclick={handleSaveFolder}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
-        >
-          <span
-            >{isSavingFolder
-              ? "Saving..."
-              : isEditingFolder
-                ? "Update Folder"
-                : "Create Folder"}</span
-          >
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RulesetFolderModal
+  isOpen={isFolderModalOpen}
+  isEditing={isEditingFolder}
+  rulesetId={folderRulesetId}
+  displayName={folderDisplayName}
+  category={folderCategory}
+  mechanismScope={folderMechanismScope}
+  description={folderDescription}
+  onClose={() => (isFolderModalOpen = false)}
+  onSave={handleSaveFolder}
+/>
 
 <!-- Delete Folder Confirmation Modal -->
 <ConfirmModal
@@ -2056,244 +1717,21 @@
 />
 
 <!-- Bulk Edit Rules Modal -->
-{#if isBulkEditRulesModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            <Pencil class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              Bulk Edit {table.selectedCount} Rules
-            </h2>
-            <p class="text-xs text-fg-muted">Apply batch changes to selected compliance rules</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isBulkEditRulesModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
-        {#if bulkRulesModalError}
-          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-rose-300">
-            {bulkRulesModalError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="bulk-rule-ruleset" class="block font-semibold text-fg-secondary">
-            Move to Ruleset Folder
-          </label>
-          <select
-            id="bulk-rule-ruleset"
-            bind:value={bulkRuleRulesetId}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="__keep__">— Keep current folder —</option>
-            {#each folders as f (f)}
-              <option value={f.ruleset_id}>{f.display_name} ({f.ruleset_id})</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <label for="bulk-rule-category" class="block font-semibold text-fg-secondary">
-              Domain Category
-            </label>
-            <select
-              id="bulk-rule-category"
-              bind:value={bulkRuleCategory}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="__keep__">— Keep current —</option>
-              <option value="Arch">Arch (Architectural)</option>
-              <option value="Piping">Piping (Corrosion)</option>
-              <option value="seismic">Seismic (Clearance)</option>
-            </select>
-          </div>
-
-          <div class="space-y-1.5">
-            <label for="bulk-rule-mechanism" class="block font-semibold text-fg-secondary">
-              Mechanism
-            </label>
-            <select
-              id="bulk-rule-mechanism"
-              bind:value={bulkRuleMechanism}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="__keep__">— Keep current —</option>
-              <option value="CODE">CODE (Building Code)</option>
-              <option value="GC-001">GC-001 (Galvanic)</option>
-              <option value="CC-001">CC-001 (Crevice)</option>
-              <option value="MC-001">MC-001 (Microbiological)</option>
-              <option value="SEISMIC">SEISMIC (Clearance)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <label for="bulk-rule-severity" class="block font-semibold text-fg-secondary">
-              Severity
-            </label>
-            <select
-              id="bulk-rule-severity"
-              bind:value={bulkRuleSeverity}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="__keep__">— Keep current —</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
-
-          <div class="space-y-1.5">
-            <label for="bulk-rule-review" class="block font-semibold text-fg-secondary">
-              Review Status
-            </label>
-            <select
-              id="bulk-rule-review"
-              bind:value={bulkRuleNeedsReview}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="__keep__">— Keep current —</option>
-              <option value="0">Mark as Approved (0)</option>
-              <option value="1">Mark as Needs Review (1)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => (isBulkEditRulesModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isBulkUpdatingRules}
-          onclick={handleBulkUpdateRules}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
-        >
-          <span>{isBulkUpdatingRules ? "Updating..." : `Update ${table.selectedCount} Rules`}</span>
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RuleBulkEditModal
+  isOpen={isBulkEditRulesModalOpen}
+  selectedCount={table.selectedCount}
+  {folders}
+  onClose={() => (isBulkEditRulesModalOpen = false)}
+  onUpdate={handleBulkUpdateRules}
+/>
 
 <!-- Bulk Edit Ruleset Folders Modal -->
-{#if isBulkEditFoldersModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            <Pencil class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              Bulk Edit {selectedFolderRulesetIds.length} Folders
-            </h2>
-            <p class="text-xs text-fg-muted">Apply batch changes to selected ruleset folders</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isBulkEditFoldersModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
-        {#if bulkFoldersModalError}
-          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-rose-300">
-            {bulkFoldersModalError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="bulk-folder-category" class="block font-semibold text-fg-secondary">
-            Domain Category
-          </label>
-          <select
-            id="bulk-folder-category"
-            bind:value={bulkFolderCategory}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="__keep__">— Keep current —</option>
-            <option value="Arch">Arch (Architectural)</option>
-            <option value="Piping">Piping (Corrosion)</option>
-            <option value="seismic">Seismic (Clearance)</option>
-          </select>
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="bulk-folder-mechanism-scope" class="block font-semibold text-fg-secondary">
-            Mechanism Scope
-          </label>
-          <select
-            id="bulk-folder-mechanism-scope"
-            bind:value={bulkFolderMechanismScope}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="__keep__">— Keep current —</option>
-            <option value="CODE">CODE (Building Code)</option>
-            <option value="GC-001">GC-001 (Galvanic)</option>
-            <option value="CC-001">CC-001 (Crevice)</option>
-            <option value="MC-001">MC-001 (Microbiological)</option>
-            <option value="SEISMIC">SEISMIC (Clearance Detection)</option>
-          </select>
-        </div>
-      </div>
-
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => (isBulkEditFoldersModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isBulkUpdatingFolders}
-          onclick={handleBulkUpdateFolders}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
-        >
-          <span
-            >{isBulkUpdatingFolders
-              ? "Updating..."
-              : `Update ${selectedFolderRulesetIds.length} Folders`}</span
-          >
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RulesetFolderBulkEditModal
+  isOpen={isBulkEditFoldersModalOpen}
+  selectedCount={selectedFolderRulesetIds.length}
+  onClose={() => (isBulkEditFoldersModalOpen = false)}
+  onUpdate={handleBulkUpdateFolders}
+/>
 
 <!-- Bulk Delete Folders Confirmation Modal -->
 <ConfirmModal
@@ -2307,139 +1745,20 @@
 />
 
 <!-- Import IDS Modal -->
-{#if isImportIdsModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div
-            class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2 text-emerald-400"
-          >
-            <Upload class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">Import Ruleset</h2>
-            <p class="text-xs text-fg-muted">
-              Parse a buildingSMART IDS (.ids/XML) or BIM-Guard JSON ruleset file into new rules
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isImportIdsModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6 text-xs">
-        <RulesetImportForm
-          defaultRulesetId={selectedFolderId || ""}
-          onCancel={() => (isImportIdsModalOpen = false)}
-          onImported={handleIdsImported}
-        />
-      </div>
-    </div>
-  </div>
-{/if}
+<RulesetImportModal
+  isOpen={isImportIdsModalOpen}
+  defaultRulesetId={selectedFolderId || ""}
+  onClose={() => (isImportIdsModalOpen = false)}
+  onImported={handleIdsImported}
+/>
 
 <!-- Save Snapshot Modal -->
-{#if isSaveSnapshotModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
-            <Camera class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">Save Rule Snapshot</h2>
-            <p class="text-xs text-fg-muted">
-              Freeze "{selectedFolderId}"'s current rules into a named, downloadable snapshot
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isSaveSnapshotModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
-        {#if saveSnapshotError}
-          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-rose-300">
-            {saveSnapshotError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="snapshot-name" class="block font-semibold text-fg-secondary">
-            Snapshot Name <span class="text-rose-400">*</span>
-          </label>
-          <input
-            id="snapshot-name"
-            type="text"
-            bind:value={saveSnapshotName}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="snapshot-mode" class="block font-semibold text-fg-secondary">Source Mode</label>
-          <select
-            id="snapshot-mode"
-            bind:value={saveSnapshotSourceMode}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="manual">Manual</option>
-            <option value="pdf">PDF Extraction</option>
-            <option value="ids">IDS Import</option>
-            <option value="mixed">Mixed</option>
-          </select>
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="snapshot-notes" class="block font-semibold text-fg-secondary">Notes</label>
-          <textarea
-            id="snapshot-notes"
-            rows="3"
-            bind:value={saveSnapshotNotes}
-            placeholder="Optional context for this configuration..."
-            class="w-full resize-y rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-          ></textarea>
-        </div>
-      </div>
-
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => (isSaveSnapshotModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isSavingSnapshot || !saveSnapshotName.trim()}
-          onclick={handleSaveSnapshot}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
-        >
-          <span>{isSavingSnapshot ? "Saving..." : "Save Snapshot"}</span>
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RuleSnapshotModal
+  isOpen={isSaveSnapshotModalOpen}
+  folderId={selectedFolderId || ""}
+  onClose={() => (isSaveSnapshotModalOpen = false)}
+  onSave={handleSaveSnapshot}
+/>
 
 <!-- Delete Snapshot Confirmation Modal -->
 <ConfirmModal
