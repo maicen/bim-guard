@@ -133,19 +133,19 @@
 {#if isOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <FolderArchive class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               {isEditing ? "Edit BCF Topic" : "Create Live BCF 2.1 Topic"}
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               buildingSMART BCF standard collaboration issue with ISO 19650 governance.
             </p>
           </div>
@@ -153,7 +153,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -172,7 +172,7 @@
 
         <!-- Title -->
         <div class="space-y-1.5">
-          <label for="topic-title" class="block text-xs font-semibold text-slate-300">
+          <label for="topic-title" class="block text-xs font-semibold text-fg-secondary">
             Topic Title <span class="text-rose-400">*</span>
           </label>
           <input
@@ -180,20 +180,20 @@
             type="text"
             bind:value={title}
             placeholder="e.g. Non-compliant Door Clear Width at Level 1"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <!-- Type -->
           <div class="space-y-1.5">
-            <label for="topic-type" class="block text-xs font-semibold text-slate-300">
+            <label for="topic-type" class="block text-xs font-semibold text-fg-secondary">
               Type
             </label>
             <select
               id="topic-type"
               bind:value={topicType}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Issue">Issue</option>
               <option value="Clash / Compliance">Clash / Compliance</option>
@@ -204,13 +204,13 @@
 
           <!-- Status -->
           <div class="space-y-1.5">
-            <label for="topic-status" class="block text-xs font-semibold text-slate-300">
+            <label for="topic-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
             <select
               id="topic-status"
               bind:value={topicStatus}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
@@ -221,13 +221,13 @@
 
           <!-- Priority -->
           <div class="space-y-1.5">
-            <label for="topic-priority" class="block text-xs font-semibold text-slate-300">
+            <label for="topic-priority" class="block text-xs font-semibold text-fg-secondary">
               Priority
             </label>
             <select
               id="topic-priority"
               bind:value={priority}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Critical">Critical</option>
               <option value="High">High</option>
@@ -239,7 +239,7 @@
 
         <!-- Description -->
         <div class="space-y-1.5">
-          <label for="topic-desc" class="block text-xs font-semibold text-slate-300">
+          <label for="topic-desc" class="block text-xs font-semibold text-fg-secondary">
             Description &amp; Findings Note
           </label>
           <textarea
@@ -247,14 +247,14 @@
             bind:value={description}
             rows="3"
             placeholder="Detailed description of the architectural or engineering non-compliance..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
         <!-- Assignee & Due Date -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1.5">
-            <label for="topic-assignee" class="block text-xs font-semibold text-slate-300">
+            <label for="topic-assignee" class="block text-xs font-semibold text-fg-secondary">
               Assigned To
             </label>
             <input
@@ -262,27 +262,27 @@
               type="text"
               bind:value={assignedTo}
               placeholder="e.g. Lead Architect / BIM Coordinator"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <div class="space-y-1.5">
-            <label for="topic-due" class="block text-xs font-semibold text-slate-300">
+            <label for="topic-due" class="block text-xs font-semibold text-fg-secondary">
               Due Date
             </label>
             <input
               id="topic-due"
               type="date"
               bind:value={dueDate}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
 
         <!-- ISO 19650 Governance Section -->
-        <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+        <div class="space-y-3 rounded-xl border border-border-default bg-surface-canvas/70 p-4">
           <div
-            class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-300"
+            class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-secondary"
           >
             <Shield class="h-3.5 w-3.5 text-blue-400" />
             <span>ISO 19650 CDE Governance</span>
@@ -290,13 +290,13 @@
 
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div class="space-y-1">
-              <label for="topic-cde" class="block text-caption font-semibold text-slate-400"
+              <label for="topic-cde" class="block text-caption font-semibold text-fg-muted"
                 >CDE State</label
               >
               <select
                 id="topic-cde"
                 bind:value={cdeState}
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
               >
                 {#each CDE_STATE_CHOICES as state (state)}
                   <option value={state}>{state}</option>
@@ -305,13 +305,13 @@
             </div>
 
             <div class="space-y-1">
-              <label for="topic-suitability" class="block text-caption font-semibold text-slate-400"
+              <label for="topic-suitability" class="block text-caption font-semibold text-fg-muted"
                 >Suitability</label
               >
               <select
                 id="topic-suitability"
                 bind:value={suitabilityCode}
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
               >
                 {#each SUITABILITY_CODES as code (code)}
                   <option value={code}>{code}</option>
@@ -320,7 +320,7 @@
             </div>
 
             <div class="space-y-1">
-              <label for="topic-revision" class="block text-caption font-semibold text-slate-400"
+              <label for="topic-revision" class="block text-caption font-semibold text-fg-muted"
                 >Revision Code</label
               >
               <input
@@ -328,7 +328,7 @@
                 type="text"
                 bind:value={revisionCode}
                 placeholder="P01.01"
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
               />
             </div>
           </div>
@@ -336,7 +336,7 @@
 
         <!-- Related Element GUIDs -->
         <div class="space-y-1.5">
-          <label for="topic-guids" class="block text-xs font-semibold text-slate-300">
+          <label for="topic-guids" class="block text-xs font-semibold text-fg-secondary">
             Linked Element GUIDs (comma separated)
           </label>
           <input
@@ -344,19 +344,19 @@
             type="text"
             bind:value={componentGuidsText}
             placeholder="e.g. 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d, 2b3c4d5e-..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 font-mono text-xs text-cyan-300 placeholder-slate-600 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 font-mono text-xs text-cyan-300 placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>
 
       <!-- Footer Actions -->
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>

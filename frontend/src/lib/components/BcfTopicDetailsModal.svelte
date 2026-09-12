@@ -120,32 +120,32 @@
 
     <!-- Topic Properties Grid -->
     <div
-      class="grid grid-cols-2 gap-2.5 rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-xs sm:grid-cols-4"
+      class="grid grid-cols-2 gap-2.5 rounded-xl border border-border-default bg-surface-canvas p-3.5 text-xs sm:grid-cols-4"
     >
       <div>
-        <span class="block text-micro font-semibold uppercase text-slate-500">Type</span>
-        <span class="font-medium text-slate-200">{topic.topic_type || "Issue"}</span>
+        <span class="block text-micro font-semibold uppercase text-fg-muted">Type</span>
+        <span class="font-medium text-fg-secondary">{topic.topic_type || "Issue"}</span>
       </div>
       <div>
-        <span class="block text-micro font-semibold uppercase text-slate-500">Priority</span>
+        <span class="block text-micro font-semibold uppercase text-fg-muted">Priority</span>
         <span class="font-medium text-amber-400">{topic.priority || "Normal"}</span>
       </div>
       <div>
-        <span class="block text-micro font-semibold uppercase text-slate-500">Assignee</span>
-        <span class="font-medium text-slate-200">{topic.assigned_to || "Unassigned"}</span>
+        <span class="block text-micro font-semibold uppercase text-fg-muted">Assignee</span>
+        <span class="font-medium text-fg-secondary">{topic.assigned_to || "Unassigned"}</span>
       </div>
       <div>
-        <span class="block text-micro font-semibold uppercase text-slate-500">Created</span>
-        <span class="text-slate-400">{formatDate(topic.creation_date)}</span>
+        <span class="block text-micro font-semibold uppercase text-fg-muted">Created</span>
+        <span class="text-fg-muted">{formatDate(topic.creation_date)}</span>
       </div>
     </div>
 
     <!-- Description -->
     {#if topic.description}
       <div class="space-y-1">
-        <span class="block text-xs font-semibold text-slate-300">Description &amp; Findings</span>
+        <span class="block text-xs font-semibold text-fg-secondary">Description &amp; Findings</span>
         <div
-          class="whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs leading-relaxed text-slate-200"
+          class="whitespace-pre-wrap rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs leading-relaxed text-fg-secondary"
         >
           {topic.description}
         </div>
@@ -153,14 +153,14 @@
     {/if}
 
     <!-- ISO 19650 Governance Container -->
-    <div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
+    <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/70 p-3.5">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
           <Shield class="h-3.5 w-3.5 text-blue-400" />
           <span>ISO 19650 Governance Tags</span>
         </div>
         {#if topic.project_code}
-          <span class="font-mono text-micro text-slate-400">Project: {topic.project_code}</span>
+          <span class="font-mono text-micro text-fg-muted">Project: {topic.project_code}</span>
         {/if}
       </div>
       <IsoGovernanceBadges
@@ -174,19 +174,19 @@
     <!-- Linked Component GUIDs -->
     {#if topic.component_guids && topic.component_guids.length > 0}
       <div class="space-y-1.5">
-        <span class="block text-xs font-semibold text-slate-300"
+        <span class="block text-xs font-semibold text-fg-secondary"
           >Linked IFC Elements ({topic.component_guids.length})</span
         >
         <div class="flex flex-wrap gap-1.5">
           {#each topic.component_guids as guid (guid)}
             <div
-              class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 font-mono text-caption text-cyan-300"
+              class="flex items-center gap-1 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 font-mono text-caption text-cyan-300"
             >
               <span>{guid}</span>
               <button
                 type="button"
                 onclick={() => copyToClipboard(guid)}
-                class="p-0.5 hover:text-slate-50"
+                class="p-0.5 hover:text-fg-primary"
                 title="Copy GUID"
               >
                 <Copy class="h-3 w-3" />
@@ -209,22 +209,22 @@
     <!-- Viewpoints & Snapshots -->
     {#if viewpoints.length > 0}
       <div class="space-y-2">
-        <span class="block flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+        <span class="block flex items-center gap-1.5 text-xs font-semibold text-fg-secondary">
           <Camera class="h-3.5 w-3.5 text-blue-400" />
           <span>3D Camera Viewpoints ({viewpoints.length})</span>
         </span>
         <div class="grid grid-cols-2 gap-2">
           {#each viewpoints as vp (vp)}
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs">
-              <div class="font-mono text-micro text-slate-400">Viewpoint #{vp.index}</div>
+            <div class="rounded-xl border border-border-default bg-surface-canvas p-2.5 text-xs">
+              <div class="font-mono text-micro text-fg-muted">Viewpoint #{vp.index}</div>
               {#if vp.snapshot_url}
                 <img
                   src={vp.snapshot_url}
                   alt="Viewpoint snapshot"
-                  class="mt-1 h-24 w-full rounded border border-slate-800 object-cover"
+                  class="mt-1 h-24 w-full rounded border border-border-default object-cover"
                 />
               {:else}
-                <div class="mt-1 text-caption text-slate-500">
+                <div class="mt-1 text-caption text-fg-muted">
                   3D Perspective Camera Vector Stored
                 </div>
               {/if}
@@ -235,9 +235,9 @@
     {/if}
 
     <!-- Comments Discussion Feed -->
-    <div class="space-y-3 border-t border-slate-800 pt-2">
+    <div class="space-y-3 border-t border-border-default pt-2">
       <div class="flex items-center justify-between">
-        <span class="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+        <span class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
           <MessageSquare class="h-3.5 w-3.5 text-blue-400" />
           <span>Discussion &amp; History ({comments.length})</span>
         </span>
@@ -245,19 +245,19 @@
 
       {#if comments.length === 0}
         <div
-          class="rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-center text-xs text-slate-500"
+          class="rounded-xl border border-border-default bg-surface-canvas/40 p-4 text-center text-xs text-fg-muted"
         >
           No comments posted yet.
         </div>
       {:else}
         <div class="max-h-48 space-y-2 overflow-y-auto pr-1">
           {#each comments as c (c)}
-            <div class="space-y-1 rounded-xl border border-slate-800/80 bg-slate-950 p-3 text-xs">
-              <div class="flex items-center justify-between text-micro text-slate-500">
-                <span class="font-semibold text-slate-300">{c.author || "Anonymous"}</span>
+            <div class="space-y-1 rounded-xl border border-border-default bg-surface-canvas p-3 text-xs">
+              <div class="flex items-center justify-between text-micro text-fg-muted">
+                <span class="font-semibold text-fg-secondary">{c.author || "Anonymous"}</span>
                 <span>{formatDate(c.date)}</span>
               </div>
-              <p class="whitespace-pre-wrap leading-relaxed text-slate-200">{c.comment}</p>
+              <p class="whitespace-pre-wrap leading-relaxed text-fg-secondary">{c.comment}</p>
             </div>
           {/each}
         </div>
@@ -270,7 +270,7 @@
           bind:value={newCommentText}
           placeholder="Post a coordination reply or update..."
           onkeydown={(e) => e.key === "Enter" && handleAddComment()}
-          class="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+          class="flex-1 rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
         />
         <button
           type="button"
@@ -288,7 +288,7 @@
       <button
         type="button"
         onclick={onClose}
-        class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+        class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
       >
         Close
       </button>

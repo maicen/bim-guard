@@ -73,13 +73,13 @@
 <aside
   id="app-sidebar"
   aria-label="Primary"
-  class="apple-blur fixed inset-y-0 z-50 flex h-screen w-64 select-none flex-col border-r border-slate-800 bg-slate-950/90 transition-[left] duration-300
+  class="apple-blur fixed inset-y-0 z-50 flex h-screen w-64 select-none flex-col border-r border-border-default bg-surface-canvas/90 transition-[left] duration-300
     md:sticky md:left-0 md:top-0 md:z-40 md:transition-all
     {mobileOpen ? 'left-0' : '-left-64'}
     {collapsed ? 'md:w-16' : 'md:w-64'}"
 >
   <!-- Brand Header -->
-  <div class="flex h-16 items-center justify-between border-b border-slate-800/80 px-3.5">
+  <div class="flex h-16 items-center justify-between border-b border-border-default px-3.5">
     {#if !collapsed}
       <div class="flex items-center gap-2.5 overflow-hidden">
         <div
@@ -88,10 +88,10 @@
           BG
         </div>
         <div class="flex flex-col truncate">
-          <span class="text-base font-bold leading-none tracking-tight text-slate-50"
+          <span class="text-base font-bold leading-none tracking-tight text-fg-primary"
             >BIM Guard</span
           >
-          <span class="mt-1 text-micro font-semibold uppercase tracking-widest text-slate-400"
+          <span class="mt-1 text-micro font-semibold uppercase tracking-widest text-fg-muted"
             >OpenBIM Compliance</span
           >
         </div>
@@ -107,7 +107,7 @@
     <button
       type="button"
       onclick={onCloseMobile}
-      class="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50 md:hidden"
+      class="shrink-0 rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden"
       aria-label="Close navigation"
     >
       <ChevronLeft class="h-5 w-5" />
@@ -116,7 +116,7 @@
     <button
       type="button"
       onclick={() => (collapsed = !collapsed)}
-      class="hidden shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50 md:block"
+      class="hidden shrink-0 rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:block"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {#if collapsed}
@@ -133,7 +133,7 @@
       <div class="space-y-1">
         {#if !collapsed}
           <div
-            class="rounded-lg bg-slate-800/60 px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-slate-400"
+            class="rounded-lg bg-surface-overlay px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-fg-muted"
           >
             {section.title}
           </div>
@@ -150,16 +150,16 @@
               : 'font-medium'} {isActive
               ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
               : item.highlight
-                ? 'text-accent hover:bg-slate-900/60'
-                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+                ? 'text-accent hover:bg-surface-hover'
+                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
             title={collapsed ? item.label : undefined}
           >
             <item.icon
               class="h-4 w-4 shrink-0 {isActive
-                ? 'text-slate-50'
+                ? 'text-fg-primary'
                 : item.highlight
                   ? 'text-accent'
-                  : 'text-slate-400 group-hover:text-slate-200'}"
+                  : 'text-fg-muted group-hover:text-fg-primary'}"
             />
             {#if !collapsed}
               <span class="truncate text-left">{item.label}</span>
@@ -178,13 +178,13 @@
               class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
               'new-project'
                 ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
-                : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
+                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
               title={collapsed ? "New Project" : undefined}
             >
               <Plus
                 class="h-4 w-4 shrink-0 {activeView === 'new-project'
-                  ? 'text-slate-50'
-                  : 'text-slate-400 group-hover:text-slate-200'}"
+                  ? 'text-fg-primary'
+                  : 'text-fg-muted group-hover:text-fg-primary'}"
               />
               {#if !collapsed}
                 <span class="truncate text-left">New Project</span>
@@ -197,7 +197,7 @@
   </div>
 
   <!-- Sidebar Footer: Settings -->
-  <div class="space-y-1 border-t border-slate-800/80 bg-slate-950/60 p-2">
+  <div class="space-y-1 border-t border-border-default bg-surface-canvas/60 p-2">
     <!-- Settings Link -->
     <a
       href={authState.activeOrganizationId
@@ -208,15 +208,15 @@
       class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
       'settings'
         ? 'bg-accent text-white'
-        : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'} {collapsed
+        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed
         ? 'justify-center'
         : ''}"
       title={collapsed ? "Settings" : undefined}
     >
       <Settings
         class="h-4 w-4 shrink-0 {activeView === 'settings'
-          ? 'text-slate-50'
-          : 'text-slate-400 group-hover:text-slate-200'}"
+          ? 'text-fg-primary'
+          : 'text-fg-muted group-hover:text-fg-primary'}"
       />
       {#if !collapsed}
         <span>Settings</span>

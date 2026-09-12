@@ -73,10 +73,10 @@
 >
   <div class="space-y-4">
     <label
-      class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-center transition-colors hover:border-slate-600"
+      class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-border-interactive"
     >
-      <UploadCloud class="h-5 w-5 text-slate-400" />
-      <span class="text-xs font-medium text-slate-300">Click to choose .ifc files</span>
+      <UploadCloud class="h-5 w-5 text-fg-muted" />
+      <span class="text-xs font-medium text-fg-secondary">Click to choose .ifc files</span>
       <input type="file" accept=".ifc" multiple class="hidden" onchange={handleFileInput} />
     </label>
 
@@ -84,7 +84,7 @@
       <div class="space-y-2">
         {#each selectedFiles as file, i (file.name + i)}
           <div
-            class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5"
+            class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-canvas/40 p-2.5"
           >
             <input
               type="radio"
@@ -93,10 +93,10 @@
               onchange={() => (primaryIndex = i)}
               title="Set as primary model"
             />
-            <span class="min-w-0 flex-1 truncate text-xs text-slate-200">{file.name}</span>
+            <span class="min-w-0 flex-1 truncate text-xs text-fg-secondary">{file.name}</span>
             <select
               bind:value={roles[i]}
-              class="rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-micro text-slate-300"
+              class="rounded-md border border-border-interactive bg-surface-card px-1.5 py-1 text-micro text-fg-secondary"
             >
               {#each IFC_FILE_ROLES as role (role)}
                 <option value={role}>{role}</option>
@@ -130,7 +130,7 @@
       type="button"
       onclick={handleClose}
       disabled={isSubmitting}
-      class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-100"
+      class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:text-fg-primary"
     >
       Cancel
     </button>

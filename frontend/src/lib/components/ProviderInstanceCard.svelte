@@ -52,14 +52,14 @@
   ExternalProvidersView.svelte so the two look and behave identically.
 -->
 <div
-  class="flex flex-col gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 transition-colors hover:border-slate-700 sm:flex-row sm:items-start sm:justify-between"
+  class="flex flex-col gap-2 rounded-xl border border-border-default bg-surface-canvas/80 p-3.5 transition-colors hover:border-border-interactive sm:flex-row sm:items-start sm:justify-between"
 >
   <div class="space-y-1">
     <div class="flex flex-wrap items-center gap-2">
       <Icon class="h-4 w-4 {accentClass}" />
-      <span class="text-sm font-semibold text-slate-50">{name}</span>
+      <span class="text-sm font-semibold text-fg-primary">{name}</span>
       <span
-        class="rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 text-micro font-semibold uppercase text-slate-400"
+        class="rounded-md border border-border-default bg-surface-card px-2 py-0.5 text-micro font-semibold uppercase text-fg-muted"
       >
         {kindLabel}
       </span>
@@ -72,16 +72,16 @@
       {/if}
       {#if !isEnabled}
         <span
-          class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold text-slate-400"
+          class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold text-fg-muted"
         >
           Disabled
         </span>
       {/if}
       {#if extraBadges}{@render extraBadges()}{/if}
     </div>
-    <div class="font-mono text-caption text-slate-500">{endpoint}</div>
+    <div class="font-mono text-caption text-fg-muted">{endpoint}</div>
     {#if detail}
-      <div class="flex flex-wrap items-center gap-2 text-caption text-slate-500">{detail}</div>
+      <div class="flex flex-wrap items-center gap-2 text-caption text-fg-muted">{detail}</div>
     {/if}
     {#if testResult}
       <div class="text-caption {testResult.ok ? 'text-emerald-400' : 'text-rose-400'}">
@@ -97,7 +97,7 @@
           type="button"
           onclick={onTest}
           disabled={testing}
-          class="flex items-center gap-1 rounded-lg border border-slate-800 px-2.5 py-1.5 text-caption font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
+          class="flex items-center gap-1 rounded-lg border border-border-default px-2.5 py-1.5 text-caption font-medium text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
           title="Test connectivity"
         >
           {#if testing}
@@ -112,7 +112,7 @@
         <button
           type="button"
           onclick={onSetDefault}
-          class="rounded-lg border border-slate-800 px-2.5 py-1.5 text-caption font-medium text-slate-300 transition-colors hover:bg-slate-800"
+          class="rounded-lg border border-border-default px-2.5 py-1.5 text-caption font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
           title="Make default"
         >
           Set Default
@@ -122,7 +122,7 @@
         <button
           type="button"
           onclick={onToggleEnabled}
-          class="rounded-lg border border-slate-800 px-2.5 py-1.5 text-caption font-medium text-slate-300 transition-colors hover:bg-slate-800"
+          class="rounded-lg border border-border-default px-2.5 py-1.5 text-caption font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
           title={isEnabled ? "Disable" : "Enable"}
         >
           {isEnabled ? "Disable" : "Enable"}
@@ -132,7 +132,7 @@
         <button
           type="button"
           onclick={onDelete}
-          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
           title="Remove instance"
         >
           <Trash2 class="h-4 w-4" />

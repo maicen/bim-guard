@@ -69,11 +69,11 @@
     e.preventDefault();
     onSubmit();
   }}
-  class="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4"
+  class="space-y-3 rounded-xl border border-border-default bg-surface-canvas p-4"
 >
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <div>
-      <label for="provider-instance-name" class="mb-1 block text-caption font-semibold text-slate-400">
+      <label for="provider-instance-name" class="mb-1 block text-caption font-semibold text-fg-muted">
         Name <span class="text-rose-400">*</span>
       </label>
       <input
@@ -82,30 +82,30 @@
         required
         bind:value={name}
         placeholder="local, hosted-1, hosted-2..."
-        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+        class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
       />
     </div>
     <div>
-      <label for="provider-instance-kind" class="mb-1 block text-caption font-semibold text-slate-400">
+      <label for="provider-instance-kind" class="mb-1 block text-caption font-semibold text-fg-muted">
         Kind
       </label>
       <select
         id="provider-instance-kind"
         bind:value={kind}
-        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+        class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
       >
         {#each kinds as kindOption (kindOption.kind)}
           <option value={kindOption.kind}>{kindOption.display_name}</option>
         {/each}
       </select>
       {#if selectedKindInfo?.description}
-        <p class="mt-1 text-caption text-slate-500">{selectedKindInfo.description}</p>
+        <p class="mt-1 text-caption text-fg-muted">{selectedKindInfo.description}</p>
       {/if}
     </div>
   </div>
 
   <div>
-    <label for="provider-instance-url" class="mb-1 block text-caption font-semibold text-slate-400">
+    <label for="provider-instance-url" class="mb-1 block text-caption font-semibold text-fg-muted">
       {urlLabel} {#if urlRequired}<span class="text-rose-400">*</span>{/if}
     </label>
     <input
@@ -114,13 +114,13 @@
       required={urlRequired}
       bind:value={url}
       placeholder={selectedKindInfo?.url_placeholder || "https://..."}
-      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
     />
   </div>
 
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <div>
-      <label for="provider-instance-key" class="mb-1 block text-caption font-semibold text-slate-400">
+      <label for="provider-instance-key" class="mb-1 block text-caption font-semibold text-fg-muted">
         API Key{selectedKindInfo?.requires_api_key ? "" : " (not required)"}
       </label>
       <SecretInput
@@ -133,7 +133,7 @@
   </div>
 
   <div>
-    <label for="provider-instance-notes" class="mb-1 block text-caption font-semibold text-slate-400"
+    <label for="provider-instance-notes" class="mb-1 block text-caption font-semibold text-fg-muted"
       >Notes (Optional)</label
     >
     <input
@@ -141,7 +141,7 @@
       type="text"
       bind:value={notes}
       placeholder="e.g. EU region hosted account"
-      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
     />
   </div>
 
@@ -162,8 +162,8 @@
       </div>
     </div>
   {:else if requireSuccessfulTest}
-    <div class="flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-900/40 px-3 py-2 text-caption text-slate-400">
-      <Info class="h-3.5 w-3.5 shrink-0 text-slate-500" />
+    <div class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-card/40 px-3 py-2 text-caption text-fg-muted">
+      <Info class="h-3.5 w-3.5 shrink-0 text-fg-muted" />
       <span>Test the connection to enable adding this provider.</span>
     </div>
   {/if}
@@ -175,7 +175,7 @@
           type="button"
           onclick={onTest}
           disabled={testing || submitting}
-          class="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white disabled:opacity-50"
+          class="flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-white disabled:opacity-50"
         >
           {#if testing}
             <Loader2 class="h-3.5 w-3.5 animate-spin text-accent" />
@@ -192,7 +192,7 @@
       <button
         type="button"
         onclick={onCancel}
-        class="rounded-xl border border-slate-800 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:text-slate-50"
+        class="rounded-xl border border-border-default px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg-primary"
       >
         Cancel
       </button>

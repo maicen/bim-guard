@@ -99,34 +99,34 @@
   maxWidth="max-w-lg"
 >
   {#if project}
-    <div class="space-y-4 text-xs text-slate-300">
-      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-        <div class="font-semibold text-slate-100">{project.name}</div>
-        <div class="text-micro text-slate-400 font-mono mt-0.5">
+    <div class="space-y-4 text-xs text-fg-secondary">
+      <div class="rounded-xl border border-border-default bg-surface-card/60 p-3.5">
+        <div class="font-semibold text-fg-primary">{project.name}</div>
+        <div class="text-micro text-fg-muted font-mono mt-0.5">
           ID #{project.id} &middot; {project.country || "Global"} &middot; {project.analysis_type || "Standard"}
         </div>
-        <div class="mt-2 text-micro text-slate-400">
+        <div class="mt-2 text-micro text-fg-muted">
           Select which internal organization groups have permission to view and analyze this project.
         </div>
       </div>
 
       <div>
-        <div class="mb-2 text-micro font-bold uppercase tracking-wider text-slate-400">
+        <div class="mb-2 text-micro font-bold uppercase tracking-wider text-fg-muted">
           User Groups ({groups.length})
         </div>
 
         {#if loadingGrants}
-          <div class="py-8 text-center text-slate-500">
+          <div class="py-8 text-center text-fg-muted">
             Loading group permissions…
           </div>
         {:else if groups.length === 0}
-          <div class="rounded-xl border border-dashed border-slate-800 p-6 text-center text-slate-500">
-            <Users class="mx-auto h-6 w-6 text-slate-600 mb-1" />
+          <div class="rounded-xl border border-dashed border-border-default p-6 text-center text-fg-muted">
+            <Users class="mx-auto h-6 w-6 text-fg-muted mb-1" />
             <p>No user groups exist yet in this organization.</p>
-            <p class="text-micro text-slate-500 mt-1">Create groups in Organization Settings &rarr; Groups.</p>
+            <p class="text-micro text-fg-muted mt-1">Create groups in Organization Settings &rarr; Groups.</p>
           </div>
         {:else}
-          <div class="max-h-60 overflow-y-auto space-y-1.5 rounded-xl border border-slate-800 bg-slate-950 p-2">
+          <div class="max-h-60 overflow-y-auto space-y-1.5 rounded-xl border border-border-default bg-surface-canvas p-2">
             {#each groups as group (group.id)}
               {@const isAssigned = assignedGroupIds.has(group.id)}
               <button

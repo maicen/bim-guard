@@ -117,22 +117,22 @@
 
 {#if isOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-surface-canvas/80 p-4 backdrop-blur-xs"
   >
     <div
-      class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
       <div
-        class="flex items-center justify-between border-b border-slate-800 bg-slate-950/50 px-6 py-4"
+        class="flex items-center justify-between border-b border-border-default bg-surface-canvas/50 px-6 py-4"
       >
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-accent/30 bg-accent/10 p-2 text-accent">
             <FolderGit2 class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-lg font-semibold text-slate-50">GitHub Project Storage Repositories</h2>
-            <p class="text-xs text-slate-400">
+            <h2 class="text-lg font-semibold text-fg-primary">GitHub Project Storage Repositories</h2>
+            <p class="text-xs text-fg-muted">
               Manage external GitHub repositories hosting OpenBIM IFC models.
             </p>
           </div>
@@ -140,7 +140,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -168,7 +168,7 @@
 
         <!-- Control Bar -->
         <div class="flex items-center justify-between">
-          <div class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <div class="text-xs font-semibold uppercase tracking-wider text-fg-secondary">
             Registered Repositories ({repos.length})
           </div>
           <button
@@ -185,14 +185,14 @@
         {#if showAddForm}
           <form
             onsubmit={preventDefault(handleAddRepo)}
-            class="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4"
+            class="space-y-3 rounded-xl border border-border-default bg-surface-canvas p-4"
           >
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
               Register New Repository
             </h3>
 
             <div>
-              <label for="repo-url" class="mb-1 block text-caption font-semibold text-slate-400">
+              <label for="repo-url" class="mb-1 block text-caption font-semibold text-fg-muted">
                 Repository URL <span class="text-rose-400">*</span>
               </label>
               <input
@@ -201,13 +201,13 @@
                 required
                 bind:value={newUrl}
                 placeholder="https://github.com/maicen/bimguard-test-models"
-                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
               />
             </div>
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label for="repo-name" class="mb-1 block text-caption font-semibold text-slate-400"
+                <label for="repo-name" class="mb-1 block text-caption font-semibold text-fg-muted"
                   >Display Name (Optional)</label
                 >
                 <input
@@ -215,26 +215,26 @@
                   type="text"
                   bind:value={newName}
                   placeholder="bimguard-test-models"
-                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
+                  class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
                 />
               </div>
               <div>
                 <label
                   for="repo-branch"
-                  class="mb-1 block text-caption font-semibold text-slate-400">Git Branch</label
+                  class="mb-1 block text-caption font-semibold text-fg-muted">Git Branch</label
                 >
                 <input
                   id="repo-branch"
                   type="text"
                   bind:value={newBranch}
                   placeholder="main"
-                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
+                  class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
             <div>
-              <label for="repo-desc" class="mb-1 block text-caption font-semibold text-slate-400"
+              <label for="repo-desc" class="mb-1 block text-caption font-semibold text-fg-muted"
                 >Description (Optional)</label
               >
               <input
@@ -242,7 +242,7 @@
                 type="text"
                 bind:value={newDescription}
                 placeholder="Repository containing OpenBIM test models..."
-                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
               />
             </div>
 
@@ -250,7 +250,7 @@
               <button
                 type="button"
                 onclick={() => (showAddForm = false)}
-                class="rounded-xl border border-slate-800 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:text-slate-50"
+                class="rounded-xl border border-border-default px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg-primary"
               >
                 Cancel
               </button>
@@ -273,14 +273,14 @@
         <!-- Repository List -->
         {#if isLoading}
           <div
-            class="flex items-center justify-center gap-2 p-8 text-center text-xs text-slate-500"
+            class="flex items-center justify-center gap-2 p-8 text-center text-xs text-fg-muted"
           >
             <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
             <span>Loading registered repositories...</span>
           </div>
         {:else if repos.length === 0}
           <div
-            class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500"
+            class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted"
           >
             No custom GitHub repositories registered yet.
           </div>
@@ -288,14 +288,14 @@
           <div class="space-y-2">
             {#each repos as repo (repo.id)}
               <div
-                class="flex items-start justify-between gap-3 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 transition-colors hover:border-slate-700"
+                class="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-canvas/80 p-3.5 transition-colors hover:border-border-interactive"
               >
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-slate-50">{repo.owner}/{repo.name}</span
+                    <span class="text-sm font-semibold text-fg-primary">{repo.owner}/{repo.name}</span
                     >
                     <span
-                      class="inline-flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 font-mono text-micro text-slate-400"
+                      class="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface-card px-2 py-0.5 font-mono text-micro text-fg-muted"
                     >
                       <GitBranch class="h-3 w-3 text-blue-400" />
                       {repo.branch}
@@ -309,9 +309,9 @@
                     {/if}
                   </div>
                   {#if repo.description}
-                    <p class="text-xs leading-relaxed text-slate-400">{repo.description}</p>
+                    <p class="text-xs leading-relaxed text-fg-muted">{repo.description}</p>
                   {/if}
-                  <div class="flex items-center gap-2 pt-0.5 text-caption text-slate-500">
+                  <div class="flex items-center gap-2 pt-0.5 text-caption text-fg-muted">
                     <a
                       href={repo.url}
                       target="_blank"
@@ -328,7 +328,7 @@
                   <button
                     type="button"
                     onclick={() => promptDeleteRepo(repo)}
-                    class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                    class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                     title="Remove repository"
                   >
                     <Trash2 class="h-4 w-4" />
@@ -342,12 +342,12 @@
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-end border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-end border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800"
+          class="rounded-xl border border-border-default bg-surface-card px-4 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>

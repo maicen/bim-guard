@@ -56,7 +56,7 @@
   >
     <div
       class={cn(
-        "flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-200 animate-in zoom-in-95",
+        "flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl duration-200 animate-in zoom-in-95",
         maxWidth,
       )}
     >
@@ -100,7 +100,7 @@
 
       {#if footer}
         <div
-          class="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/80 px-6 py-3.5"
+          class="flex shrink-0 items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/80 px-6 py-3.5"
         >
           {@render footer()}
         </div>

@@ -112,19 +112,19 @@
 {#if isOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <FolderSync class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               openCDE Foundation &amp; Documents Hub
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               buildingSMART OpenCDE RESTful model and document synchronization
             </p>
           </div>
@@ -132,20 +132,20 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
       </div>
 
       <!-- Body -->
-      <div class="space-y-5 overflow-y-auto p-6 text-xs text-slate-300">
+      <div class="space-y-5 overflow-y-auto p-6 text-xs text-fg-secondary">
         <!-- OpenCDE Foundation Status -->
-        <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
+        <div class="space-y-3 rounded-xl border border-border-default bg-surface-canvas p-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <Shield class="h-4 w-4 text-emerald-400" />
-              <span class="text-caption font-bold uppercase tracking-wider text-slate-50"
+              <span class="text-caption font-bold uppercase tracking-wider text-fg-primary"
                 >OpenCDE Foundation Discovery</span
               >
             </div>
@@ -162,8 +162,8 @@
 
           {#if cdeVersions}
             <div class="grid grid-cols-2 gap-2 text-caption">
-              <div class="rounded-lg border border-slate-800 bg-slate-900 p-2.5">
-                <span class="block text-micro font-semibold uppercase text-slate-500"
+              <div class="rounded-lg border border-border-default bg-surface-card p-2.5">
+                <span class="block text-micro font-semibold uppercase text-fg-muted"
                   >Supported APIs</span
                 >
                 <span class="font-mono font-semibold text-emerald-400">
@@ -172,8 +172,8 @@
                     : "Foundation, Documents, BCF"}
                 </span>
               </div>
-              <div class="rounded-lg border border-slate-800 bg-slate-900 p-2.5">
-                <span class="block text-micro font-semibold uppercase text-slate-500"
+              <div class="rounded-lg border border-border-default bg-surface-card p-2.5">
+                <span class="block text-micro font-semibold uppercase text-fg-muted"
                   >User Context</span
                 >
                 <span class="block truncate font-semibold text-blue-400">
@@ -183,7 +183,7 @@
               </div>
             </div>
           {:else if isLoadingVersions}
-            <div class="flex items-center justify-center gap-2 py-2 text-center text-slate-500">
+            <div class="flex items-center justify-center gap-2 py-2 text-center text-fg-muted">
               <RefreshCw class="h-3.5 w-3.5 animate-spin text-blue-400" />
               <span>Connecting to /api/cde/versions...</span>
             </div>
@@ -192,19 +192,19 @@
 
         <!-- Sync Configuration -->
         <div class="space-y-3">
-          <span class="block text-micro font-semibold uppercase tracking-wider text-slate-400"
+          <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
             >External CDE Synchronization Parameters</span
           >
 
           <!-- Target Project -->
           <div class="space-y-1">
-            <label for="opencde-target-project" class="block font-medium text-slate-400"
+            <label for="opencde-target-project" class="block font-medium text-fg-muted"
               >BIMGuard Target Project</label
             >
             <select
               id="opencde-target-project"
               bind:value={selectedProjectId}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
             >
               {#each projects as p (p.id)}
                 <option value={p.id}>{p.name} (ISO: {p.cde_state || "WIP"})</option>
@@ -215,13 +215,13 @@
           <!-- External CDE Provider -->
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="space-y-1">
-              <label for="opencde-platform" class="block font-medium text-slate-400"
+              <label for="opencde-platform" class="block font-medium text-fg-muted"
                 >External CDE Platform</label
               >
               <select
                 id="opencde-platform"
                 bind:value={externalCdeType}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="Autodesk Construction Cloud (ACC)"
                   >Autodesk Construction Cloud (ACC)</option
@@ -234,13 +234,13 @@
             </div>
 
             <div class="space-y-1">
-              <label for="opencde-target-state" class="block font-medium text-slate-400"
+              <label for="opencde-target-state" class="block font-medium text-fg-muted"
                 >Target ISO 19650 State</label
               >
               <select
                 id="opencde-target-state"
                 bind:value={targetCdeState}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="WIP">WIP (Work in Progress)</option>
                 <option value="SHARED">SHARED (Coordination &amp; Review)</option>
@@ -251,7 +251,7 @@
           </div>
 
           <div class="space-y-1">
-            <label for="opencde-resource-uri" class="block font-medium text-slate-400"
+            <label for="opencde-resource-uri" class="block font-medium text-fg-muted"
               >External Resource URI / Project Identifier</label
             >
             <input
@@ -259,7 +259,7 @@
               type="text"
               bind:value={externalProjectId}
               placeholder="urn:adsk.wipprod:dm.lineage:prj-001"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
             />
           </div>
         </div>
@@ -285,14 +285,14 @@
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-between border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-between border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
-        <span class="text-caption text-slate-500">Conforms to buildingSMART OpenCDE v1.0</span>
+        <span class="text-caption text-fg-muted">Conforms to buildingSMART OpenCDE v1.0</span>
         <div class="flex items-center gap-2">
           <button
             type="button"
             onclick={onClose}
-            class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+            class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
           >
             Cancel
           </button>

@@ -31,7 +31,7 @@
   aria-labelledby="org-picker-title"
 >
   <div
-    class="w-full max-w-md rounded-2xl border border-violet-800/50 bg-slate-900 p-6 shadow-2xl"
+    class="w-full max-w-md rounded-2xl border border-violet-800/50 bg-surface-card p-6 shadow-2xl"
   >
     <div class="mb-4 flex items-center gap-3">
       <div
@@ -40,10 +40,10 @@
         <Building2 class="h-5 w-5" />
       </div>
       <div>
-        <h2 id="org-picker-title" class="text-base font-bold tracking-tight text-slate-50">
+        <h2 id="org-picker-title" class="text-base font-bold tracking-tight text-fg-primary">
           Choose your organization
         </h2>
-        <p class="mt-0.5 text-xs text-slate-400">
+        <p class="mt-0.5 text-xs text-fg-muted">
           You belong to more than one — pick which one to work in first.
         </p>
       </div>
@@ -55,11 +55,11 @@
           type="button"
           onclick={() => choose(org.organization_id)}
           disabled={choosing !== null}
-          class="flex w-full items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-left transition-colors hover:border-violet-700/60 hover:bg-violet-950/30 disabled:opacity-60"
+          class="flex w-full items-center justify-between rounded-xl border border-border-default bg-surface-canvas/60 px-4 py-3 text-left transition-colors hover:border-violet-700/60 hover:bg-violet-950/30 disabled:opacity-60"
         >
           <span>
-            <span class="block text-sm font-semibold text-slate-100">{org.name}</span>
-            <span class="block text-xs capitalize text-slate-500">{org.role}</span>
+            <span class="block text-sm font-semibold text-fg-primary">{org.name}</span>
+            <span class="block text-xs capitalize text-fg-muted">{org.role}</span>
           </span>
           {#if choosing === org.organization_id}
             <span class="text-xs text-violet-400">Switching…</span>
@@ -68,7 +68,7 @@
       {/each}
     </div>
 
-    <p class="mt-4 text-xs text-slate-500">
+    <p class="mt-4 text-xs text-fg-muted">
       You can switch organizations anytime from the header.
     </p>
   </div>
