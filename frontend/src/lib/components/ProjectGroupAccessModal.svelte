@@ -133,20 +133,20 @@
                 type="button"
                 onclick={() => toggleGroup(group.id)}
                 class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors {isAssigned
-                  ? 'bg-violet-950/40 border border-violet-500/30 text-violet-200'
-                  : 'hover:bg-slate-900 text-slate-300 border border-transparent'}"
+                  ? 'bg-accent/15 border border-accent/40 text-accent'
+                  : 'hover:bg-surface-hover text-fg-secondary border border-transparent'}"
               >
                 <div class="flex items-center gap-2.5">
                   <div
                     class="flex h-6 w-6 items-center justify-center rounded-md {isAssigned
-                      ? 'bg-violet-600 text-white'
-                      : 'border border-slate-700 bg-slate-900 text-transparent'}"
+                      ? 'bg-accent text-white'
+                      : 'border border-border-default bg-surface-canvas text-transparent'}"
                   >
                     <Check class="h-3.5 w-3.5 {isAssigned ? 'opacity-100' : 'opacity-0'}" />
                   </div>
                   <span class="font-medium">{group.name}</span>
                 </div>
-                <span class="text-micro text-slate-500 font-mono">
+                <span class="text-micro text-fg-muted font-mono">
                   {group.member_count ?? 0} member{(group.member_count ?? 0) === 1 ? "" : "s"}
                 </span>
               </button>
@@ -163,7 +163,7 @@
         type="button"
         onclick={onClose}
         disabled={saving}
-        class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:opacity-50"
+        class="rounded-xl border border-border-default bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
       >
         Cancel
       </button>
@@ -171,7 +171,7 @@
         type="button"
         onclick={save}
         disabled={saving || loadingGrants}
-        class="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-violet-600/30 transition-all hover:bg-violet-500 disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
       >
         <Save class="h-3.5 w-3.5" />
         <span>{saving ? "Saving…" : "Save Access"}</span>

@@ -335,7 +335,7 @@
           type="button"
           onclick={saveAllDirty}
           disabled={isSavingAll}
-          class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-violet-600/30 transition-all hover:bg-violet-500 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <Save class="h-4 w-4" />
           <span>{isSavingAll ? "Saving…" : `Save All Changes (${dirty.size} pending)`}</span>
@@ -361,7 +361,7 @@
           <select
             bind:value={selectedOrgFilter}
             aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
+            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
           >
             {#if isSuperadmin}
               <option value="all">All Organizations ({orgs.length})</option>
@@ -379,7 +379,7 @@
         <select
           bind:value={docTypeFilter}
           aria-label="Filter by Document Type"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="all">All Types</option>
           {#each docTypes as dt}
@@ -394,7 +394,7 @@
         <select
           bind:value={grantStatusFilter}
           aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="all">All Statuses</option>
           <option value="granted">Granted Only</option>
@@ -487,7 +487,7 @@
                       type="button"
                       disabled={savingOrgId === singleOrg.id}
                       onclick={() => saveOrg(singleOrg.id)}
-                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-violet-500/40 bg-violet-600/30 px-2.5 py-0.5 text-micro font-semibold text-violet-200 transition-colors hover:bg-violet-600/50"
+                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/20 px-2.5 py-0.5 text-micro font-semibold text-accent transition-colors hover:bg-accent/30"
                     >
                       <Save class="h-3 w-3" />
                       <span>{savingOrgId === singleOrg.id ? "Saving…" : "Save Changes"}</span>
@@ -504,7 +504,7 @@
               {@const singleOrg = displayOrgs[0] || orgs[0]}
               {@const isSingleOrgGranted = singleOrg ? (grants[singleOrg.id]?.has(doc.id) ?? false) : false}
               <tr
-                class="transition-colors hover:bg-slate-800/40 {isRowSelected ? 'bg-violet-950/20' : ''}"
+                class="transition-colors hover:bg-surface-hover {isRowSelected ? 'bg-surface-selected' : ''}"
               >
                 <td class="px-4 py-3 text-center">
                   <TableCheckbox

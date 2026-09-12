@@ -405,7 +405,7 @@
           type="button"
           onclick={saveAllDirty}
           disabled={isSavingAll}
-          class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-violet-600/30 transition-all hover:bg-violet-500 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <Save class="h-4 w-4" />
           <span>{isSavingAll ? "Saving…" : `Save All Changes (${dirty.size} pending)`}</span>
@@ -436,7 +436,7 @@
               }
             }}
             aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
+            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
           >
             {#if isSuperadmin}
               <option value="all">All Organizations ({orgs.length})</option>
@@ -454,7 +454,7 @@
         <select
           bind:value={grantStatusFilter}
           aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="all">All Access</option>
           <option value="granted">Granted / Owned</option>
@@ -552,7 +552,7 @@
               {@const assignedGroups = getAssignedGroupsForProject(project.id)}
               {@const isOwner = currentTargetOrg ? (project.organization_id === currentTargetOrg.id || (!project.organization_id && currentTargetOrg.id === 1)) : false}
               <tr
-                class="transition-colors hover:bg-slate-800/40 {isRowSelected ? 'bg-violet-950/20' : ''}"
+                class="transition-colors hover:bg-surface-hover {isRowSelected ? 'bg-surface-selected' : ''}"
               >
                 <td class="px-4 py-3 text-center">
                   <TableCheckbox
@@ -581,10 +581,10 @@
                     <td class="px-4 py-3 text-center">
                       {#if isOrgOwner}
                         <span
-                          class="inline-flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-micro font-semibold text-blue-300"
+                          class="inline-flex items-center gap-1 rounded-lg border border-info-border bg-info-bg px-2.5 py-1 text-micro font-semibold text-info"
                           title="Owning Organization (Primary owner)"
                         >
-                          <Lock class="h-3 w-3 text-blue-400" />
+                          <Lock class="h-3 w-3 text-info" />
                           <span>Owner</span>
                         </span>
                       {:else}
@@ -592,12 +592,12 @@
                           type="button"
                           onclick={() => toggleGrant(org.id, project.id)}
                           class="group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all {isGranted
-                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                            ? 'border-success-border bg-success-bg text-success hover:bg-success-bg/80'
                             : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'}"
                           title={isGranted ? `Revoke access from ${org.name}` : `Grant access to ${org.name}`}
                         >
                           {#if isGranted}
-                            <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
+                            <CheckCircle2 class="h-3.5 w-3.5 text-success" />
                             <span>Granted</span>
                           {:else}
                             <XCircle class="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-400" />
@@ -611,13 +611,13 @@
                   <!-- Org Owner View: Ownership Badge -->
                   <td class="px-4 py-3">
                     {#if isOwner}
-                      <span class="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-micro font-semibold text-blue-300">
-                        <Lock class="h-3 w-3 text-blue-400" />
+                      <span class="inline-flex items-center gap-1 rounded-md border border-info-border bg-info-bg px-2 py-0.5 text-micro font-semibold text-info">
+                        <Lock class="h-3 w-3 text-info" />
                         <span>Owned</span>
                       </span>
                     {:else}
-                      <span class="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-micro font-semibold text-violet-300">
-                        <Share2 class="h-3 w-3 text-violet-400" />
+                      <span class="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-semibold text-accent">
+                        <Share2 class="h-3 w-3 text-accent" />
                         <span>Shared</span>
                       </span>
                     {/if}
@@ -628,8 +628,8 @@
                     {#if assignedGroups.length > 0}
                       <div class="flex flex-wrap gap-1">
                         {#each assignedGroups as groupName}
-                          <span class="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-micro font-medium text-violet-300">
-                            <Users class="h-3 w-3 text-violet-400" />
+                          <span class="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">
+                            <Users class="h-3 w-3 text-accent" />
                             <span>{groupName}</span>
                           </span>
                         {/each}
@@ -721,7 +721,7 @@
     {:else if groups.length > 0}
       <!-- Org Owner: Bulk Assign Group Access -->
       <div class="flex items-center gap-2">
-        <span class="text-micro text-violet-300 font-medium">Assign to Group:</span>
+        <span class="text-micro text-fg-secondary font-medium">Assign to Group:</span>
         <select
           bind:value={bulkTargetGroupId}
           aria-label="Target Group for Bulk Action"
@@ -734,7 +734,7 @@
         <button
           type="button"
           onclick={handleBulkAssignGroup}
-          class="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-violet-500"
+          class="rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-accent-hover"
         >
           Assign Group
         </button>

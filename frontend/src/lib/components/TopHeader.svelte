@@ -146,10 +146,10 @@
               ? `/org-settings?org=${authState.activeOrganizationId}`
               : "/org-settings",
           )}
-        class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 hover:text-white"
+        class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 hover:text-white"
         title="Open Admin Console"
       >
-        <Shield class="h-3.5 w-3.5 text-violet-400" />
+        <Shield class="h-3.5 w-3.5 text-accent" />
         <span>Admin</span>
       </button>
     {/if}

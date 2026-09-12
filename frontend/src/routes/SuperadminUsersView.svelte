@@ -190,7 +190,7 @@
       <button
         type="button"
         onclick={() => (isCreateOrgOpen = true)}
-        class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-violet-600/30 transition-all hover:bg-violet-500"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
       >
         <Plus class="h-4 w-4" />
         <span>New Organization</span>
@@ -267,7 +267,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Search by email, name, or organization…"
-          class="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
+          class="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
         />
       </div>
 
@@ -296,7 +296,7 @@
                         <span class="font-semibold text-slate-100">{user.full_name || user.email || user.id}</span>
                         {#if user.is_superadmin}
                           <span
-                            class="inline-flex items-center gap-1 rounded-md border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-micro font-semibold text-violet-300"
+                            class="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/15 px-1.5 py-0.5 text-micro font-semibold text-accent"
                             title="Platform superadmin"
                           >
                             <ShieldCheck class="h-3 w-3" />
@@ -399,7 +399,7 @@
             type="text"
             bind:value={newOrgName}
             placeholder="e.g. Acme Engineering"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
           />
         </label>
         <label class="block space-y-1.5" for="new-org-code">
@@ -410,7 +410,7 @@
             bind:value={newOrgCode}
             maxlength={PROJECT_CODE_MAX_LENGTH}
             placeholder="e.g. ACME"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
           />
           <span class="block text-caption text-slate-500">
             ISO 19650 Originator code, {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH} alphanumeric
@@ -431,7 +431,7 @@
         type="button"
         onclick={submitCreateOrg}
         disabled={isCreatingOrg || !newOrgName.trim() || newOrgCode.trim().length < PROJECT_CODE_MIN_LENGTH}
-        class="h-9 rounded-xl bg-violet-600 px-4 text-xs font-semibold text-white shadow-lg shadow-violet-950/50 transition-all hover:bg-violet-500 disabled:opacity-50"
+        class="h-9 rounded-xl bg-accent px-4 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
       >
         {isCreatingOrg ? "Creating…" : "Create"}
       </button>
@@ -452,7 +452,7 @@
         <select
           id="assign-org"
           bind:value={assignOrgId}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-hidden"
+          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           {#each orgs as org (org.id)}
             <option value={org.id}>{org.name}</option>
@@ -464,7 +464,7 @@
         <select
           id="assign-role"
           bind:value={assignRole}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-hidden"
+          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
@@ -484,7 +484,7 @@
         type="button"
         onclick={submitAssign}
         disabled={isAssigning || assignOrgId === ""}
-        class="h-9 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-lg shadow-emerald-950/50 transition-all hover:bg-emerald-500 disabled:opacity-50"
+        class="h-9 rounded-xl bg-accent px-4 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
       >
         {isAssigning ? "Assigning…" : "Assign"}
       </button>

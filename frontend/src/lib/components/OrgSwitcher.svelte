@@ -47,7 +47,7 @@
             "hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 disabled:opacity-60 lg:inline-flex",
           )}
         >
-          <Building2 class="h-3.5 w-3.5 shrink-0 text-violet-400" />
+          <Building2 class="h-3.5 w-3.5 shrink-0 text-accent" />
           <Select.Value class="max-w-40 truncate text-xs font-medium text-slate-200">
             {#snippet children({ placeholder })}
               {placeholder ? "Select organization…" : activeName}
@@ -84,7 +84,7 @@
     class="hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs font-medium text-slate-300 lg:inline-flex"
     title="Your organization"
   >
-    <Building2 class="h-3.5 w-3.5 shrink-0 text-violet-400" />
+    <Building2 class="h-3.5 w-3.5 shrink-0 text-accent" />
     {organizations[0]!.name}
   </span>
 {/if}
