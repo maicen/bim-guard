@@ -888,7 +888,7 @@
               <ScanEye class="h-3.5 w-3.5" />
               <span>Open 3D Viewer</span>
             </button>
-            <span class="text-slate-700">•</span>
+            <span class="text-fg-muted">•</span>
             <button
               type="button"
               onclick={() => (isUploadModalOpen = true)}
@@ -1773,7 +1773,7 @@
       </p>
 
       <div
-        class="rounded-2xl border-2 border-dashed border-border-interactive p-6 text-center transition-colors hover:border-slate-500"
+        class="rounded-2xl border-2 border-dashed border-border-interactive p-6 text-center transition-colors hover:border-border-interactive"
       >
         <Upload class="mx-auto mb-2 h-8 w-8 text-fg-muted" />
         <input

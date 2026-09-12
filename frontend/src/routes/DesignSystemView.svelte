@@ -283,7 +283,7 @@
               </span>
               <ul class="space-y-1 text-fg-secondary text-caption list-disc list-inside">
                 <li>Never use hardcoded hex (<code class="font-mono text-nano text-critical">#1e293b</code>), <code class="font-mono text-nano text-critical">rgb()</code>, or <code class="font-mono text-nano text-critical">rgba()</code> in components or CSS</li>
-                <li>Never use raw palette utilities (<code class="font-mono text-nano text-critical">bg-slate-950</code>, <code class="font-mono text-nano text-critical">bg-blue-950/20</code>, <code class="font-mono text-nano text-critical">text-slate-400</code>)</li>
+                <li>Never use raw palette utilities (<code class="font-mono text-nano text-critical">bg-surface-canvas</code>, <code class="font-mono text-nano text-critical">bg-blue-950/20</code>, <code class="font-mono text-nano text-critical">text-fg-muted</code>)</li>
                 <li>Never use hardcoded 3D canvas backgrounds (<code class="font-mono text-nano text-critical">0x020617</code>)</li>
                 <li>Never use <code class="font-mono text-nano text-critical">text-white</code> on slate or surface cards</li>
               </ul>

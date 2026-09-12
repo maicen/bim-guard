@@ -45,11 +45,11 @@
   <!-- Header -->
   <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
     <div>
-      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Workflow</div>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
+      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-fg-muted">Workflow</div>
+      <h1 class="text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl">
         Live Pipeline Tracker
       </h1>
-      <p class="text-xs text-slate-400 sm:text-sm">
+      <p class="text-xs text-fg-muted sm:text-sm">
         Monitor real-time engine execution, stage transitions, and performance metrics via
         Server-Sent Events (SSE).
       </p>

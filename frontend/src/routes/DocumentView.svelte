@@ -115,7 +115,7 @@
     <div
       bind:this={viewerContainerEl}
       style="height: {viewerHeight};"
-      class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl"
+      class="overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-xl"
     >
       <DocumentViewer documentId={documentId!} />
     </div>

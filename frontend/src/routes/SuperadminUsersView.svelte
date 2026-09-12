@@ -205,7 +205,7 @@
   {:else}
     <!-- Organizations -->
     <div class="space-y-3">
-      <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-fg-muted">
         Organizations ({orgs.length})
       </h2>
       {#if orgs.length === 0}
@@ -217,32 +217,32 @@
           onAction={() => (isCreateOrgOpen = true)}
         />
       {:else}
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 shadow-xl">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40 shadow-xl">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead>
-                <tr class="border-b border-slate-800 bg-slate-950/80">
-                  <th class="px-4 py-3 font-semibold text-slate-300">Name</th>
-                  <th class="px-4 py-3 font-semibold text-slate-300">Slug</th>
-                  <th class="px-4 py-3 font-semibold text-slate-300">Org Code</th>
-                  <th class="px-4 py-3 text-center font-semibold text-slate-300">Members</th>
-                  <th class="w-16 px-4 py-3 text-center font-semibold text-slate-300">Delete</th>
+                <tr class="border-b border-border-default bg-surface-canvas/80">
+                  <th class="px-4 py-3 font-semibold text-fg-secondary">Name</th>
+                  <th class="px-4 py-3 font-semibold text-fg-secondary">Slug</th>
+                  <th class="px-4 py-3 font-semibold text-fg-secondary">Org Code</th>
+                  <th class="px-4 py-3 text-center font-semibold text-fg-secondary">Members</th>
+                  <th class="w-16 px-4 py-3 text-center font-semibold text-fg-secondary">Delete</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-800/60">
+              <tbody class="divide-y divide-border-subtle">
                 {#each orgs as org (org.id)}
-                  <tr class="transition-colors hover:bg-slate-800/40">
-                    <td class="px-4 py-3 font-semibold text-slate-100">{org.name}</td>
-                    <td class="px-4 py-3 font-mono text-micro text-slate-400">{org.slug}</td>
-                    <td class="px-4 py-3 font-mono text-micro text-slate-400">{org.org_code}</td>
-                    <td class="px-4 py-3 text-center font-mono text-slate-300">
+                  <tr class="transition-colors hover:bg-surface-hover">
+                    <td class="px-4 py-3 font-semibold text-fg-primary">{org.name}</td>
+                    <td class="px-4 py-3 font-mono text-micro text-fg-muted">{org.slug}</td>
+                    <td class="px-4 py-3 font-mono text-micro text-fg-muted">{org.org_code}</td>
+                    <td class="px-4 py-3 text-center font-mono text-fg-secondary">
                       {memberCounts[org.id] ?? 0}
                     </td>
                     <td class="px-4 py-3 text-center">
                       <button
                         type="button"
                         onclick={() => (orgPendingDelete = org)}
-                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400"
                         title={`Delete ${org.name}`}
                       >
                         <Trash2 class="h-4 w-4" />
@@ -260,14 +260,14 @@
     <!-- Users -->
     <div class="space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-fg-muted">
           Users ({filteredUsers.length})
         </h2>
         <input
           type="text"
           bind:value={searchQuery}
           placeholder="Search by email, name, or organization…"
-          class="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
+          class="w-full max-w-xs rounded-xl border border-border-interactive bg-surface-canvas px-3 py-2 text-xs text-fg-secondary placeholder:text-fg-muted focus:border-accent focus:ring-accent focus:outline-hidden"
         />
       </div>
 
@@ -278,22 +278,22 @@
           icon={Users}
         />
       {:else}
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 shadow-xl">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40 shadow-xl">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead>
-                <tr class="border-b border-slate-800 bg-slate-950/80">
-                  <th class="px-4 py-3 font-semibold text-slate-300">User</th>
-                  <th class="min-w-[16rem] px-4 py-3 font-semibold text-slate-300">Organizations</th>
-                  <th class="w-32 px-4 py-3 text-center font-semibold text-slate-300">Actions</th>
+                <tr class="border-b border-border-default bg-surface-canvas/80">
+                  <th class="px-4 py-3 font-semibold text-fg-secondary">User</th>
+                  <th class="min-w-[16rem] px-4 py-3 font-semibold text-fg-secondary">Organizations</th>
+                  <th class="w-32 px-4 py-3 text-center font-semibold text-fg-secondary">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-800/60">
+              <tbody class="divide-y divide-border-subtle">
                 {#each paginatedUsers as user (user.id)}
-                  <tr class="transition-colors hover:bg-slate-800/40">
+                  <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-2">
-                        <span class="font-semibold text-slate-100">{user.full_name || user.email || user.id}</span>
+                        <span class="font-semibold text-fg-primary">{user.full_name || user.email || user.id}</span>
                         {#if user.is_superadmin}
                           <span
                             class="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/15 px-1.5 py-0.5 text-micro font-semibold text-accent"
@@ -305,20 +305,20 @@
                         {/if}
                       </div>
                       {#if user.full_name && user.email}
-                        <div class="truncate text-micro text-slate-500">{user.email}</div>
+                        <div class="truncate text-micro text-fg-muted">{user.email}</div>
                       {/if}
                     </td>
                     <td class="px-4 py-3">
                       {#if user.organizations.length === 0}
-                        <span class="text-micro text-slate-500">No organizations</span>
+                        <span class="text-micro text-fg-muted">No organizations</span>
                       {:else}
                         <div class="flex flex-wrap gap-1.5">
                           {#each user.organizations as membership (membership.organization_id)}
                             <span
-                              class="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-micro font-medium text-slate-300"
+                              class="inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-medium text-fg-secondary"
                             >
                               {membership.name}
-                              <span class="text-slate-500">· {membership.role}</span>
+                              <span class="text-fg-muted">· {membership.role}</span>
                               <button
                                 type="button"
                                 onclick={() =>
@@ -327,7 +327,7 @@
                                     organizationId: membership.organization_id,
                                     orgName: membership.name,
                                   })}
-                                class="ml-0.5 rounded p-0.5 text-slate-500 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                                class="ml-0.5 rounded p-0.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400"
                                 title={`Remove from ${membership.name}`}
                               >
                                 <X class="h-3 w-3" />
@@ -343,7 +343,7 @@
                           type="button"
                           onclick={() => openAssignModal(user)}
                           disabled={orgs.length === 0}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/60 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-emerald-950/60 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                           title="Assign to an organization"
                         >
                           <UserPlus class="h-4 w-4" />
@@ -352,7 +352,7 @@
                           type="button"
                           onclick={() => (userPendingDelete = user)}
                           disabled={user.id === authState.user?.id}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
                           title={user.id === authState.user?.id
                             ? "You cannot delete your own account"
                             : "Delete user"}
@@ -393,26 +393,26 @@
     {#snippet children()}
       <div class="space-y-4">
         <label class="block space-y-1.5" for="new-org-name">
-          <span class="text-xs font-semibold text-slate-300">Organization name</span>
+          <span class="text-xs font-semibold text-fg-secondary">Organization name</span>
           <input
             id="new-org-name"
             type="text"
             bind:value={newOrgName}
             placeholder="e.g. Acme Engineering"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-interactive bg-surface-canvas px-3 py-2 text-sm text-fg-secondary placeholder:text-fg-muted focus:border-accent focus:ring-accent focus:outline-hidden"
           />
         </label>
         <label class="block space-y-1.5" for="new-org-code">
-          <span class="text-xs font-semibold text-slate-300">Organization code *</span>
+          <span class="text-xs font-semibold text-fg-secondary">Organization code *</span>
           <input
             id="new-org-code"
             type="text"
             bind:value={newOrgCode}
             maxlength={PROJECT_CODE_MAX_LENGTH}
             placeholder="e.g. ACME"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-accent focus:ring-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-interactive bg-surface-canvas px-3 py-2 text-sm uppercase text-fg-secondary placeholder:text-fg-muted focus:border-accent focus:ring-accent focus:outline-hidden"
           />
-          <span class="block text-caption text-slate-500">
+          <span class="block text-caption text-fg-muted">
             ISO 19650 Originator code, {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH} alphanumeric
             characters. Every project or document this organization owns defaults to this code.
           </span>
@@ -423,7 +423,7 @@
       <button
         type="button"
         onclick={() => (isCreateOrgOpen = false)}
-        class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700"
+        class="h-9 rounded-xl border border-border-interactive bg-surface-overlay px-4 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
       >
         Cancel
       </button>
@@ -448,11 +448,11 @@
   >
     {#snippet children()}
       <label class="block space-y-1.5" for="assign-org">
-        <span class="text-xs font-semibold text-slate-300">Organization</span>
+        <span class="text-xs font-semibold text-fg-secondary">Organization</span>
         <select
           id="assign-org"
           bind:value={assignOrgId}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-accent focus:ring-accent focus:outline-hidden"
+          class="w-full cursor-pointer rounded-xl border border-border-interactive bg-surface-canvas px-3 py-2 text-sm text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           {#each orgs as org (org.id)}
             <option value={org.id}>{org.name}</option>
@@ -460,11 +460,11 @@
         </select>
       </label>
       <label class="block space-y-1.5" for="assign-role">
-        <span class="text-xs font-semibold text-slate-300">Role</span>
+        <span class="text-xs font-semibold text-fg-secondary">Role</span>
         <select
           id="assign-role"
           bind:value={assignRole}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-accent focus:ring-accent focus:outline-hidden"
+          class="w-full cursor-pointer rounded-xl border border-border-interactive bg-surface-canvas px-3 py-2 text-sm text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
@@ -476,7 +476,7 @@
       <button
         type="button"
         onclick={() => (assigningUser = null)}
-        class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700"
+        class="h-9 rounded-xl border border-border-interactive bg-surface-overlay px-4 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
       >
         Cancel
       </button>

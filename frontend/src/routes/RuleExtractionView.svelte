@@ -1555,7 +1555,7 @@
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary placeholder-slate-600 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 

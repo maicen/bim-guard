@@ -436,7 +436,7 @@
               }
             }}
             aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
+            class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
           >
             {#if isSuperadmin}
               <option value="all">All Organizations ({orgs.length})</option>
@@ -445,7 +445,7 @@
               <option value={org.id}>{org.name}</option>
             {/each}
           </select>
-          <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
         </div>
       {/if}
 
@@ -454,13 +454,13 @@
         <select
           bind:value={grantStatusFilter}
           aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-accent focus:ring-accent focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
         >
           <option value="all">All Access</option>
           <option value="granted">Granted / Owned</option>
           <option value="ungranted">Not Shared</option>
         </select>
-        <Filter class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <Filter class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
       </div>
     {/snippet}
   </DataTableHeader>
@@ -485,11 +485,11 @@
     />
   {:else}
     <!-- Data Table Container -->
-    <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 shadow-xl">
+    <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40 shadow-xl">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-slate-800 bg-slate-950/80">
+            <tr class="border-b border-border-default bg-surface-canvas/80">
               <th class="w-12 px-4 py-3 text-center">
                 <TableCheckbox
                   checked={allOnPageSelected}
@@ -521,14 +521,14 @@
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
                   <th class="min-w-44 px-4 py-3 text-center">
-                    <div class="truncate font-semibold text-slate-100" title={org.name}>
+                    <div class="truncate font-semibold text-fg-primary" title={org.name}>
                       {org.name}
                     </div>
                     <button
                       type="button"
                       disabled={!dirty.has(org.id) || savingOrgId === org.id}
                       onclick={() => saveOrg(org.id)}
-                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-medium text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-medium text-fg-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Save class="h-3 w-3" />
                       <span>{savingOrgId === org.id ? "Saving…" : dirty.has(org.id) ? "Save" : "Saved"}</span>
@@ -546,7 +546,7 @@
               {/if}
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-800/60">
+          <tbody class="divide-y divide-border-subtle">
             {#each paginatedProjects as project (project.id)}
               {@const isRowSelected = selectedProjectIds.has(project.id)}
               {@const assignedGroups = getAssignedGroupsForProject(project.id)}
@@ -561,15 +561,15 @@
                     ariaLabel={`Select ${project.name}`}
                   />
                 </td>
-                <td class="px-4 py-3 font-medium text-slate-200">
-                  <div class="truncate font-semibold text-slate-100" title={project.name}>
+                <td class="px-4 py-3 font-medium text-fg-secondary">
+                  <div class="truncate font-semibold text-fg-primary" title={project.name}>
                     {project.name}
                   </div>
-                  <div class="text-micro text-slate-500 font-mono">
+                  <div class="text-micro text-fg-muted font-mono">
                     #{project.id} &middot; {project.analysis_type ? formatAnalysisDomain(project.analysis_type) : "Arch"}
                   </div>
                 </td>
-                <td class="px-4 py-3 text-slate-400">
+                <td class="px-4 py-3 text-fg-muted">
                   {project.country || "—"}
                 </td>
 
@@ -593,14 +593,14 @@
                           onclick={() => toggleGrant(org.id, project.id)}
                           class="group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all {isGranted
                             ? 'border-success-border bg-success-bg text-success hover:bg-success-bg/80'
-                            : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'}"
+                            : 'border-border-interactive bg-surface-overlay text-fg-muted hover:border-border-interactive hover:text-fg-primary'}"
                           title={isGranted ? `Revoke access from ${org.name}` : `Grant access to ${org.name}`}
                         >
                           {#if isGranted}
                             <CheckCircle2 class="h-3.5 w-3.5 text-success" />
                             <span>Granted</span>
                           {:else}
-                            <XCircle class="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-400" />
+                            <XCircle class="h-3.5 w-3.5 text-fg-muted group-hover:text-fg-secondary" />
                             <span>No Access</span>
                           {/if}
                         </button>
@@ -635,7 +635,7 @@
                         {/each}
                       </div>
                     {:else}
-                      <span class="text-micro text-slate-500 italic">All organization members (no group gating)</span>
+                      <span class="text-micro text-fg-muted italic">All organization members (no group gating)</span>
                     {/if}
                   </td>
 
@@ -644,10 +644,10 @@
                     <button
                       type="button"
                       onclick={() => (managingProject = project)}
-                      class="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-micro font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+                      class="inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1 text-micro font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-white"
                       title="Manage internal group access"
                     >
-                      <Settings class="h-3 w-3 text-slate-400" />
+                      <Settings class="h-3 w-3 text-fg-muted" />
                       <span>Groups</span>
                     </button>
                   </td>
@@ -657,7 +657,7 @@
                     <button
                       type="button"
                       onclick={() => (deletingProject = project)}
-                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400"
                       title="Delete project"
                     >
                       <Trash2 class="h-4 w-4" />
@@ -696,7 +696,7 @@
         <select
           bind:value={bulkTargetOrgId}
           aria-label="Target Organization for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-lg border border-border-interactive bg-surface-card py-1 pl-2.5 pr-6 text-xs text-fg-secondary focus:outline-hidden"
         >
           <option value="all">All Organizations</option>
           {#each orgs as org (org.id)}
@@ -725,7 +725,7 @@
         <select
           bind:value={bulkTargetGroupId}
           aria-label="Target Group for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-hidden"
+          class="cursor-pointer appearance-none rounded-lg border border-border-interactive bg-surface-card py-1 pl-2.5 pr-6 text-xs text-fg-secondary focus:outline-hidden"
         >
           {#each groups as grp (grp.id)}
             <option value={grp.id}>{grp.name}</option>

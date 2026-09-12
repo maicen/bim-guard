@@ -33,7 +33,7 @@
   ];
 </script>
 
-<div class="min-h-screen bg-slate-950 font-sans text-slate-100 antialiased">
+<div class="min-h-screen bg-surface-canvas font-sans text-fg-primary antialiased">
   <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
     <div class="flex items-center gap-2.5">
       <div
@@ -41,12 +41,12 @@
       >
         BG
       </div>
-      <span class="text-base font-bold tracking-tight text-slate-50">BIM Guard</span>
+      <span class="text-base font-bold tracking-tight text-fg-primary">BIM Guard</span>
     </div>
     <button
       type="button"
       onclick={() => push("/login")}
-      class="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-700 hover:bg-slate-800"
+      class="rounded-lg border border-border-default bg-surface-card/60 px-4 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:border-border-interactive hover:bg-surface-hover"
     >
       Sign in
     </button>
@@ -61,10 +61,10 @@
         <ShieldCheck class="h-3.5 w-3.5" />
         OpenBIM Compliance Engine
       </div>
-      <h1 class="text-3xl font-bold leading-tight tracking-tight text-slate-50 sm:text-5xl">
+      <h1 class="text-3xl font-bold leading-tight tracking-tight text-fg-primary sm:text-5xl">
         Automated code compliance for the models you already have.
       </h1>
-      <p class="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
+      <p class="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-fg-muted sm:text-base">
         BIM Guard reads your IFC models directly, runs galvanic, crevice, and
         microbiological corrosion checks alongside architectural code rules, and
         routes every finding as a BCF issue your team can act on — without
@@ -86,14 +86,14 @@
     <section class="mx-auto max-w-6xl px-6 pb-24">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {#each FEATURES as feature (feature.title)}
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+          <div class="rounded-2xl border border-border-default bg-surface-card/40 p-5">
             <div
               class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent"
             >
               <feature.icon class="h-4 w-4" />
             </div>
-            <h3 class="text-sm font-bold text-slate-100">{feature.title}</h3>
-            <p class="mt-1.5 text-xs leading-relaxed text-slate-400">{feature.body}</p>
+            <h3 class="text-sm font-bold text-fg-primary">{feature.title}</h3>
+            <p class="mt-1.5 text-xs leading-relaxed text-fg-muted">{feature.body}</p>
           </div>
         {/each}
       </div>
@@ -101,7 +101,7 @@
   </main>
 
   <footer
-    class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-slate-800/80 px-6 py-6 text-xs text-slate-500"
+    class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-border-default px-6 py-6 text-xs text-fg-muted"
   >
     <span>BIM Guard OpenBIM Compliance Engine</span>
     <span>&copy; {new Date().getFullYear()} BIM Guard</span>

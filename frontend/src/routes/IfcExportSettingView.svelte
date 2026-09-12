@@ -25,7 +25,7 @@
   </div>
 
   <!-- Download -->
-  <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center">
+  <div class="flex flex-col items-center gap-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 text-center">
     <a
       href="/downloads/IFC_Export_Setting.json"
       download="IFC_Export_Setting.json"
@@ -36,7 +36,7 @@
     </a>
 
     <div>
-      <p class="mx-auto max-w-xl text-xs text-slate-400">
+      <p class="mx-auto max-w-xl text-xs text-fg-muted">
         Import this .json profile into Revit's IFC export setup dialog (Modify Setup → Load
         existing setup...) so every export from this project uses the property sets, quantities,
         and GUID handling BIM Guard expects.
@@ -45,7 +45,7 @@
   </div>
 
   <!-- Setup Guide -->
-  <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center">
+  <div class="flex flex-col items-center gap-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 text-center">
     <a
       href="/downloads/README.md"
       download="IFC_Export_Setting_README.md"
@@ -56,7 +56,7 @@
     </a>
 
     <div>
-      <p class="mx-auto max-w-xl text-xs text-slate-400">
+      <p class="mx-auto max-w-xl text-xs text-fg-muted">
         Covers picking the phase to export per project, why Export Material Psets must stay
         ticked for seismic mass checks, and how to include linked Revit files.
       </p>

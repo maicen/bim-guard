@@ -147,7 +147,7 @@
 
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
     <!-- Class list -->
-    <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+    <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
       <div class="flex flex-wrap gap-1">
         {#each Object.keys(GROUP_LABELS) as g (g)}
           {@const key = g as ClassGroup}
@@ -156,22 +156,22 @@
             onclick={() => (activeGroup = key)}
             class="rounded-lg px-2 py-1 text-nano font-semibold transition-colors {activeGroup === key
               ? 'bg-accent/15 text-accent'
-              : 'text-slate-400 hover:bg-slate-800/60'}"
+              : 'text-fg-muted hover:bg-surface-hover'}"
           >
             {GROUP_LABELS[key]}
             {#if key !== "all"}
-              <span class="text-slate-500">({groupCounts[key]})</span>
+              <span class="text-fg-muted">({groupCounts[key]})</span>
             {/if}
           </button>
         {/each}
       </div>
       <div class="relative">
-        <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+        <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
         <input
           type="text"
           bind:value={search}
           placeholder="Filter classes..."
-          class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-lg border border-border-default bg-surface-canvas py-1.5 pl-8 pr-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         />
       </div>
 
@@ -223,36 +223,36 @@
               <Tag class="h-4 w-4" />
             </div>
             <div class="min-w-0">
-              <h2 class="text-lg font-bold text-slate-50">{propertyDetail.name}</h2>
-              <p class="font-mono text-micro text-slate-500">{propertyDetail.code}</p>
+              <h2 class="text-lg font-bold text-fg-primary">{propertyDetail.name}</h2>
+              <p class="font-mono text-micro text-fg-muted">{propertyDetail.code}</p>
             </div>
           </div>
 
-          <p class="text-sm leading-relaxed text-slate-300">
+          <p class="text-sm leading-relaxed text-fg-secondary">
             {propertyDetail.definition || propertyDetail.description || "No definition available."}
           </p>
           {#if propertyDetail.definition && propertyDetail.description}
-            <p class="text-xs italic text-slate-500">Note: {propertyDetail.description}</p>
+            <p class="text-xs italic text-fg-muted">Note: {propertyDetail.description}</p>
           {/if}
 
           <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
             {#if propertyDetail.data_type}
               <div>
-                <dt class="uppercase tracking-wider text-slate-500">Type</dt>
-                <dd class="font-mono text-slate-200">{propertyDetail.data_type}</dd>
+                <dt class="uppercase tracking-wider text-fg-muted">Type</dt>
+                <dd class="font-mono text-fg-secondary">{propertyDetail.data_type}</dd>
               </div>
             {/if}
             {#if propertyDetail.units.length}
               <div>
-                <dt class="uppercase tracking-wider text-slate-500">Units</dt>
-                <dd class="font-mono text-slate-200">{propertyDetail.units.join(", ")}</dd>
+                <dt class="uppercase tracking-wider text-fg-muted">Units</dt>
+                <dd class="font-mono text-fg-secondary">{propertyDetail.units.join(", ")}</dd>
               </div>
             {/if}
           </dl>
 
           {#if propertyDetail.used_by_classes.length}
             <div>
-              <h3 class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <h3 class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 Used by {propertyDetail.used_by_classes.length}
                 {propertyDetail.used_by_classes.length === 1 ? "class" : "classes"}
               </h3>
@@ -261,7 +261,7 @@
                   <button
                     type="button"
                     onclick={() => selectClass(cls.uri)}
-                    class="rounded-lg border border-slate-700/60 bg-slate-800 px-2 py-1 font-mono text-nano text-slate-300 transition-colors hover:border-accent/50 hover:text-accent"
+                    class="rounded-lg border border-border-default bg-surface-overlay px-2 py-1 font-mono text-nano text-fg-secondary transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     {cls.code}
                   </button>
@@ -290,50 +290,50 @@
               {/if}
             </div>
             <div class="min-w-0">
-              <h2 class="text-lg font-bold text-slate-50">{classDetail.name}</h2>
-              <p class="font-mono text-micro text-slate-500">{classDetail.code}</p>
+              <h2 class="text-lg font-bold text-fg-primary">{classDetail.name}</h2>
+              <p class="font-mono text-micro text-fg-muted">{classDetail.code}</p>
             </div>
           </div>
 
           {#if classDetail.related_ifc_entities.length}
             <div class="flex flex-wrap items-center gap-1.5 text-xs">
-              <span class="uppercase tracking-wider text-slate-500">Applies to</span>
+              <span class="uppercase tracking-wider text-fg-muted">Applies to</span>
               {#each classDetail.related_ifc_entities as entity (entity)}
-                <span class="rounded-lg border border-slate-700/60 bg-slate-800 px-2 py-1 font-mono text-nano text-slate-300">
+                <span class="rounded-lg border border-border-default bg-surface-overlay px-2 py-1 font-mono text-nano text-fg-secondary">
                   {entity}
                 </span>
               {/each}
             </div>
           {/if}
 
-          <p class="text-sm leading-relaxed text-slate-300">
+          <p class="text-sm leading-relaxed text-fg-secondary">
             {classDetail.definition || classDetail.description || "No definition available."}
           </p>
           {#if classDetail.definition && classDetail.description}
-            <p class="text-xs italic text-slate-500">Note: {classDetail.description}</p>
+            <p class="text-xs italic text-fg-muted">Note: {classDetail.description}</p>
           {/if}
 
           {#if classDetail.parent_class_code}
             {@const pUri = parentUri(classDetail)}
             <div class="flex items-center gap-2 text-xs">
-              <span class="uppercase tracking-wider text-slate-500">Extends</span>
+              <span class="uppercase tracking-wider text-fg-muted">Extends</span>
               {#if pUri && classByUri.has(pUri)}
                 <button
                   type="button"
                   onclick={() => selectClass(pUri)}
-                  class="rounded-lg border border-slate-700/60 bg-slate-800 px-2 py-1 font-mono text-nano text-slate-300 transition-colors hover:border-accent/50 hover:text-accent"
+                  class="rounded-lg border border-border-default bg-surface-overlay px-2 py-1 font-mono text-nano text-fg-secondary transition-colors hover:border-accent/50 hover:text-accent"
                 >
                   {classDetail.parent_class_code}
                 </button>
               {:else}
-                <span class="font-mono text-nano text-slate-400">{classDetail.parent_class_code}</span>
+                <span class="font-mono text-nano text-fg-muted">{classDetail.parent_class_code}</span>
               {/if}
             </div>
           {/if}
 
           {#if classDetail.child_class_codes.length}
             <div>
-              <h3 class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <h3 class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 Subtypes
               </h3>
               <div class="flex flex-wrap gap-1.5">
@@ -343,7 +343,7 @@
                     type="button"
                     onclick={() => classByUri.has(childUri) && selectClass(childUri)}
                     disabled={!classByUri.has(childUri)}
-                    class="rounded-lg border border-slate-700/60 bg-slate-800 px-2 py-1 font-mono text-nano text-slate-300 transition-colors enabled:hover:border-accent/50 enabled:hover:text-accent disabled:opacity-50"
+                    class="rounded-lg border border-border-default bg-surface-overlay px-2 py-1 font-mono text-nano text-fg-secondary transition-colors enabled:hover:border-accent/50 enabled:hover:text-accent disabled:opacity-50"
                   >
                     {code}
                   </button>
@@ -361,41 +361,41 @@
             View in bSDD <ExternalLink class="h-3 w-3" />
           </a>
 
-          <div class="border-t border-slate-800 pt-4">
+          <div class="border-t border-border-default pt-4">
             <div class="mb-2 flex items-center justify-between gap-3">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 {classDetail.properties.length} standardized properties
               </h3>
               <input
                 type="text"
                 bind:value={propertyFilter}
                 placeholder="Filter properties..."
-                class="w-48 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-nano text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-48 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-nano text-fg-primary focus:border-accent focus:outline-hidden"
               />
             </div>
-            <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-800">
+            <div class="max-h-96 overflow-y-auto rounded-xl border border-border-default">
               <table class="w-full text-xs">
-                <thead class="sticky top-0 bg-slate-900">
-                  <tr class="border-b border-slate-800 text-micro uppercase tracking-wider text-slate-500">
+                <thead class="sticky top-0 bg-surface-card">
+                  <tr class="border-b border-border-default text-micro uppercase tracking-wider text-fg-muted">
                     <th class="px-3 py-2 text-left">Property</th>
                     <th class="px-3 py-2 text-left">Pset</th>
                     <th class="px-3 py-2 text-left">Type</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-border-subtle">
                   {#each filteredProperties as prop (prop.uri + ":" + (prop.property_set || ""))}
-                    <tr class="hover:bg-slate-800/30">
+                    <tr class="hover:bg-surface-hover">
                       <td class="px-3 py-1.5">
                         <button
                           type="button"
                           onclick={() => selectProperty(prop.uri, selectedClassUri)}
-                          class="font-medium text-slate-200 hover:text-accent hover:underline"
+                          class="font-medium text-fg-secondary hover:text-accent hover:underline"
                         >
                           {prop.name}
                         </button>
                       </td>
-                      <td class="px-3 py-1.5 font-mono text-nano text-slate-500">{prop.property_set || "-"}</td>
-                      <td class="px-3 py-1.5 font-mono text-nano text-slate-500">{prop.data_type || "-"}</td>
+                      <td class="px-3 py-1.5 font-mono text-nano text-fg-muted">{prop.property_set || "-"}</td>
+                      <td class="px-3 py-1.5 font-mono text-nano text-fg-muted">{prop.data_type || "-"}</td>
                     </tr>
                   {/each}
                 </tbody>

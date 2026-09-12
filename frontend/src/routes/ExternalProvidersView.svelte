@@ -509,10 +509,10 @@
     <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id as "parsing" | "llm")} />
 
     {#if activeTab === "env"}
-      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-slate-50">Environment Variables</h2>
-          <p class="text-xs text-slate-400">
+          <h2 class="text-base font-bold tracking-tight text-fg-primary">Environment Variables</h2>
+          <p class="text-xs text-fg-muted">
             Every environment variable this deployment reads, and whether it's currently set in this
             process — names and presence only, values are never sent to the browser. Most are fallbacks
             used only when no matching DB-configured provider instance exists (see the tabs above).
@@ -521,9 +521,9 @@
 
         {#if !authState.isSuperadmin}
           <div
-            class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400"
+            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
           >
-            <ShieldAlert class="h-4 w-4 shrink-0 text-slate-500" />
+            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
             <span>Only a platform superadmin can view environment variable status.</span>
           </div>
         {:else}
@@ -536,7 +536,7 @@
           {/if}
 
           {#if envLoading}
-            <div class="p-8 text-center text-xs text-slate-400">Loading environment status...</div>
+            <div class="p-8 text-center text-xs text-fg-muted">Loading environment status...</div>
           {:else if envVars.length > 0}
             {#if envMissingRequired.length > 0}
               <div
@@ -553,24 +553,24 @@
             <div class="space-y-5">
               {#each envCategories as [category, items] (category)}
                 <div>
-                  <h3 class="mb-2 text-caption font-semibold uppercase tracking-wide text-slate-500">
+                  <h3 class="mb-2 text-caption font-semibold uppercase tracking-wide text-fg-muted">
                     {category}
                   </h3>
-                  <div class="divide-y divide-slate-800/80 rounded-xl border border-slate-800/80 bg-slate-950/60">
+                  <div class="divide-y divide-border-subtle rounded-xl border border-border-default bg-surface-canvas/60">
                     {#each items as item (item.name)}
                       <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
                         <div class="min-w-0">
                           <div class="flex items-center gap-1.5">
-                            <span class="font-mono text-xs font-semibold text-slate-200">{item.name}</span>
+                            <span class="font-mono text-xs font-semibold text-fg-secondary">{item.name}</span>
                             {#if item.required}
                               <span
-                                class="rounded-full border border-slate-700 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-slate-400"
+                                class="rounded-full border border-border-interactive px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-fg-muted"
                                 >Required</span
                               >
                             {/if}
                           </div>
                           {#if item.description}
-                            <p class="mt-0.5 text-caption text-slate-500">{item.description}</p>
+                            <p class="mt-0.5 text-caption text-fg-muted">{item.description}</p>
                           {/if}
                         </div>
                         {#if item.is_set}
@@ -584,7 +584,7 @@
                           <span
                             class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-semibold {item.required
                               ? 'border-rose-800/60 bg-rose-950/60 text-rose-300'
-                              : 'border-slate-700 bg-slate-900 text-slate-500'}"
+                              : 'border-border-interactive bg-surface-card text-fg-muted'}"
                           >
                             <XCircle class="h-3 w-3" />
                             Missing
@@ -600,11 +600,11 @@
         {/if}
       </div>
     {:else if activeTab === "parsing"}
-      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">Document Parsing Engines</h2>
-            <p class="text-xs text-slate-400">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">Document Parsing Engines</h2>
+            <p class="text-xs text-fg-muted">
               Platform-wide — shared by every organization, managed by a superadmin. Local self-hosted
               containers, hosted accounts, or a mix. The default instance is used when an upload doesn't
               name one explicitly.
@@ -624,9 +624,9 @@
 
         {#if !authState.isSuperadmin}
           <div
-            class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400"
+            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
           >
-            <ShieldAlert class="h-4 w-4 shrink-0 text-slate-500" />
+            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
             <span>Read-only — only a platform superadmin can add, edit, or remove parsing engines.</span>
           </div>
         {/if}
@@ -655,13 +655,13 @@
             {#snippet extraFields(kindInfo)}
               {#if (kindInfo as ParsingEngineKind | null)?.supports_strategy}
                 <div>
-                  <label for="engine-strategy" class="mb-1 block text-caption font-semibold text-slate-400"
+                  <label for="engine-strategy" class="mb-1 block text-caption font-semibold text-fg-muted"
                     >Strategy</label
                   >
                   <select
                     id="engine-strategy"
                     bind:value={newEngineStrategy}
-                    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+                    class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
                   >
                     <option value="auto">auto</option>
                     <option value="fast">fast</option>
@@ -675,9 +675,9 @@
         {/if}
 
         {#if enginesLoading}
-          <div class="p-8 text-center text-xs text-slate-400">Loading parsing engines...</div>
+          <div class="p-8 text-center text-xs text-fg-muted">Loading parsing engines...</div>
         {:else if engines.length === 0}
-          <div class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500">
+          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
             No parsing engines configured — document upload falls back to the local, dependency-light
             extractor.
           </div>
@@ -708,12 +708,12 @@
         {/if}
       </div>
     {:else if activeTab === "llm"}
-      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">LLM Providers</h2>
-            <p class="text-xs text-slate-400">
-              Scoped to <span class="font-semibold text-slate-300">{activeOrg.name}</span> — bring your
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">LLM Providers</h2>
+            <p class="text-xs text-fg-muted">
+              Scoped to <span class="font-semibold text-fg-secondary">{activeOrg.name}</span> — bring your
               own API keys per organization. Curate which models each task may use below, under
               Task Shortlists.
             </p>
@@ -764,9 +764,9 @@
         {/if}
 
         {#if llmLoading}
-          <div class="p-8 text-center text-xs text-slate-400">Loading LLM providers...</div>
+          <div class="p-8 text-center text-xs text-fg-muted">Loading LLM providers...</div>
         {:else if llmInstances.length === 0}
-          <div class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500">
+          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
             No LLM providers configured for this organization yet — add one above (e.g. OpenRouter or
             OpenAI) so features like Rule Extraction can pick a real model.
           </div>
@@ -805,20 +805,20 @@
                     <p class="mt-1 text-caption text-rose-400">{modelsError[instance.id]}</p>
                   {:else if modelsById[instance.id]}
                     <div class="mt-1.5 space-y-1">
-                      <p class="text-caption text-slate-500">
+                      <p class="text-caption text-fg-muted">
                         {modelsById[instance.id].length} model{modelsById[instance.id].length === 1 ? "" : "s"} available
                         (showing first 8):
                       </p>
                       <ul class="space-y-0.5">
                         {#each modelsById[instance.id].slice(0, 8) as model (model.id)}
                           <li class="flex flex-wrap items-baseline gap-x-2 text-caption">
-                            <span class="text-slate-300">{model.name}</span>
-                            <span class="text-slate-500">{formatModelMeta(model)}</span>
+                            <span class="text-fg-secondary">{model.name}</span>
+                            <span class="text-fg-muted">{formatModelMeta(model)}</span>
                           </li>
                         {/each}
                       </ul>
                       {#if modelsById[instance.id].length > 8}
-                        <p class="text-caption text-slate-600">…and {modelsById[instance.id].length - 8} more.</p>
+                        <p class="text-caption text-fg-muted">…and {modelsById[instance.id].length - 8} more.</p>
                       {/if}
                     </div>
                   {/if}
@@ -830,10 +830,10 @@
       </div>
 
       <!-- Task Shortlists: which models each task may pick from -->
-      <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-slate-50">Task Shortlists</h2>
-          <p class="text-xs text-slate-400">
+          <h2 class="text-base font-bold tracking-tight text-fg-primary">Task Shortlists</h2>
+          <p class="text-xs text-fg-muted">
             Curate which models each task may use — capped to a deliberate shortlist chosen for
             capability, price, and context window, instead of a provider's whole catalogue.
           </p>
@@ -846,28 +846,28 @@
         {/if}
 
         {#if tasksLoading}
-          <div class="p-8 text-center text-xs text-slate-400">Loading tasks...</div>
+          <div class="p-8 text-center text-xs text-fg-muted">Loading tasks...</div>
         {:else}
           <div class="space-y-2">
             {#each llmTasks as task (task.key)}
               {@const assigned = assignmentsForTask(task.key)}
-              <div class="rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5">
+              <div class="rounded-xl border border-border-default bg-surface-canvas/80 p-3.5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="space-y-0.5">
-                    <div class="text-sm font-semibold text-slate-50">{task.label}</div>
-                    <p class="text-caption text-slate-500">{task.description}</p>
+                    <div class="text-sm font-semibold text-fg-primary">{task.label}</div>
+                    <p class="text-caption text-fg-muted">{task.description}</p>
                   </div>
                   <button
                     type="button"
                     onclick={() => (configuringTask = task)}
-                    class="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-caption font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                    class="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-caption font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
                   >
                     <Settings2 class="h-3.5 w-3.5" />
                     Configure
                   </button>
                 </div>
                 {#if assigned.length === 0}
-                  <p class="mt-2 text-caption text-slate-600">
+                  <p class="mt-2 text-caption text-fg-muted">
                     No shortlist yet — every enabled provider's full catalogue is offered for this task.
                   </p>
                 {:else}
@@ -876,11 +876,11 @@
                       <span
                         class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-micro font-medium {a.is_default
                           ? 'border-amber-800/60 bg-amber-950/60 text-amber-300'
-                          : 'border-slate-700 bg-slate-900 text-slate-300'}"
+                          : 'border-border-interactive bg-surface-card text-fg-secondary'}"
                       >
                         {#if a.is_default}<Star class="h-2.5 w-2.5" fill="currentColor" />{/if}
                         {a.model_name}
-                        <span class="text-slate-500">· {formatModelMeta(a)}</span>
+                        <span class="text-fg-muted">· {formatModelMeta(a)}</span>
                       </span>
                     {/each}
                   </div>

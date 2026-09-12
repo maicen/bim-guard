@@ -133,10 +133,10 @@
   {/if}
 
   {#if isAuthConfigured && authState.user}
-    <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
       <div>
-        <h2 class="text-base font-bold tracking-tight text-slate-50">Your Profile</h2>
-        <p class="text-xs text-slate-400">
+        <h2 class="text-base font-bold tracking-tight text-fg-primary">Your Profile</h2>
+        <p class="text-xs text-fg-muted">
           Display name and title shown alongside your account. Your avatar and email come from
           Google and aren't editable here.
         </p>
@@ -169,14 +169,14 @@
           />
         {:else}
           <div
-            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-slate-300"
+            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-surface-overlay text-lg font-semibold text-fg-secondary"
           >
             {(profileFullName || authState.user.email || "?")[0]?.toUpperCase()}
           </div>
         {/if}
         <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label for="profile-full-name" class="mb-1 block text-caption font-semibold text-slate-400"
+            <label for="profile-full-name" class="mb-1 block text-caption font-semibold text-fg-muted"
               >Display name</label
             >
             <input
@@ -184,11 +184,11 @@
               type="text"
               bind:value={profileFullName}
               placeholder={authState.user.email}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
           <div>
-            <label for="profile-title" class="mb-1 block text-caption font-semibold text-slate-400"
+            <label for="profile-title" class="mb-1 block text-caption font-semibold text-fg-muted"
               >Title / discipline</label
             >
             <input
@@ -196,7 +196,7 @@
               type="text"
               bind:value={profileTitle}
               placeholder="e.g. BIM Coordinator"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -223,29 +223,29 @@
 
   <!-- Environment & Persistence Info -->
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-    <div class="space-y-1 rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <div class="text-xs font-semibold uppercase text-slate-400">Persistence Backend</div>
-      <div class="flex items-center gap-2 text-lg font-bold text-slate-50">
+    <div class="space-y-1 rounded-2xl border border-border-default bg-surface-card/40 p-5">
+      <div class="text-xs font-semibold uppercase text-fg-muted">Persistence Backend</div>
+      <div class="flex items-center gap-2 text-lg font-bold text-fg-primary">
         <Database class="h-4 w-4 text-emerald-400" />
         <span>DB {dbBackend}</span>
       </div>
-      <div class="text-caption text-slate-500">Configured via environment variables</div>
+      <div class="text-caption text-fg-muted">Configured via environment variables</div>
     </div>
 
-    <div class="space-y-1 rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <div class="text-xs font-semibold uppercase text-slate-400">Active Logging Level</div>
+    <div class="space-y-1 rounded-2xl border border-border-default bg-surface-card/40 p-5">
+      <div class="text-xs font-semibold uppercase text-fg-muted">Active Logging Level</div>
       <div class="font-mono text-lg font-bold text-cyan-400">
         {activeLogLevel}
       </div>
-      <div class="text-caption text-slate-500">Dynamic log level filter</div>
+      <div class="text-caption text-fg-muted">Dynamic log level filter</div>
     </div>
   </div>
 
   <!-- Appearance & Theme Selector -->
-  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+  <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
     <div>
-      <h2 class="text-base font-bold tracking-tight text-slate-50">Interface Appearance</h2>
-      <p class="text-xs text-slate-400">
+      <h2 class="text-base font-bold tracking-tight text-fg-primary">Interface Appearance</h2>
+      <p class="text-xs text-fg-muted">
         Select your preferred color theme or synchronize automatically with your operating system.
       </p>
     </div>
@@ -258,13 +258,13 @@
         class="flex flex-col items-start rounded-xl border p-4 text-left transition-all {$themeMode ===
         'dark'
           ? 'border-accent bg-accent/10 ring-1 ring-accent'
-          : 'border-slate-800 bg-slate-900/50 hover:bg-slate-800/60'}"
+          : 'border-border-default bg-surface-card/50 hover:bg-surface-hover'}"
       >
-        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
+        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-overlay">
           <Moon class="h-4 w-4 text-blue-400" />
         </div>
-        <span class="text-sm font-semibold text-slate-50">Dark Theme</span>
-        <span class="mt-0.5 text-caption text-slate-400"
+        <span class="text-sm font-semibold text-fg-primary">Dark Theme</span>
+        <span class="mt-0.5 text-caption text-fg-muted"
           >Deep midnight palette for focused low-light environments</span
         >
       </button>
@@ -276,13 +276,13 @@
         class="flex flex-col items-start rounded-xl border p-4 text-left transition-all {$themeMode ===
         'light'
           ? 'border-accent bg-accent/10 ring-1 ring-accent'
-          : 'border-slate-800 bg-slate-900/50 hover:bg-slate-800/60'}"
+          : 'border-border-default bg-surface-card/50 hover:bg-surface-hover'}"
       >
-        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
+        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-overlay">
           <Sun class="h-4 w-4 text-amber-400" />
         </div>
-        <span class="text-sm font-semibold text-slate-50">Light Theme</span>
-        <span class="mt-0.5 text-caption text-slate-400"
+        <span class="text-sm font-semibold text-fg-primary">Light Theme</span>
+        <span class="mt-0.5 text-caption text-fg-muted"
           >High-contrast clean palette for bright environments</span
         >
       </button>
@@ -294,13 +294,13 @@
         class="flex flex-col items-start rounded-xl border p-4 text-left transition-all {$themeMode ===
         'system'
           ? 'border-accent bg-accent/10 ring-1 ring-accent'
-          : 'border-slate-800 bg-slate-900/50 hover:bg-slate-800/60'}"
+          : 'border-border-default bg-surface-card/50 hover:bg-surface-hover'}"
       >
-        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
-          <Laptop class="h-4 w-4 text-slate-300" />
+        <div class="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-overlay">
+          <Laptop class="h-4 w-4 text-fg-secondary" />
         </div>
-        <span class="text-sm font-semibold text-slate-50">System Auto</span>
-        <span class="mt-0.5 text-caption text-slate-400"
+        <span class="text-sm font-semibold text-fg-primary">System Auto</span>
+        <span class="mt-0.5 text-caption text-fg-muted"
           >Synchronize appearance with OS color scheme</span
         >
       </button>
@@ -308,34 +308,34 @@
   </div>
 
   <!-- Settings Form Table -->
-  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-    <h2 class="text-base font-bold tracking-tight text-slate-50">Database Persisted Settings</h2>
+  <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+    <h2 class="text-base font-bold tracking-tight text-fg-primary">Database Persisted Settings</h2>
 
     {#if isLoading}
-      <div class="p-12 text-center text-xs text-slate-400">Loading settings...</div>
+      <div class="p-12 text-center text-xs text-fg-muted">Loading settings...</div>
     {:else if settings.length === 0}
       <div
-        class="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs text-slate-500"
+        class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted"
       >
         No settings records currently found in the database.
       </div>
     {:else}
       <div class="space-y-4">
         {#each settings as item (item.key)}
-          <div class="space-y-1.5 border-b border-slate-800/80 pb-4 last:border-b-0">
+          <div class="space-y-1.5 border-b border-border-default pb-4 last:border-b-0">
             <div class="flex items-center justify-between">
-              <label for={`setting-${item.key}`} class="font-mono text-xs font-bold text-slate-50"
+              <label for={`setting-${item.key}`} class="font-mono text-xs font-bold text-fg-primary"
                 >{item.key}</label
               >
               {#if item.description}
-                <span class="text-caption text-slate-400">{item.description}</span>
+                <span class="text-caption text-fg-muted">{item.description}</span>
               {/if}
             </div>
             {#if item.key === "BIM_GUARD_LOG_LEVEL"}
               <select
                 id={`setting-${item.key}`}
                 bind:value={item.value}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
               >
                 <option value="DEBUG">DEBUG</option>
                 <option value="INFO">INFO</option>
@@ -348,7 +348,7 @@
                 type="text"
                 bind:value={item.value}
                 placeholder={item.description || item.key}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
+                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
               />
             {/if}
           </div>

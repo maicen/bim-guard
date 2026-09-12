@@ -768,7 +768,7 @@
                 onclick={() => (generateDoclangOnUpload = !generateDoclangOnUpload)}
                 class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {generateDoclangOnUpload
                   ? 'bg-accent'
-                  : 'bg-slate-700'}"
+                  : 'bg-surface-overlay'}"
               >
                 <span
                   class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform {generateDoclangOnUpload
@@ -798,7 +798,7 @@
                     onclick={() => (uploadLimitPages = !uploadLimitPages)}
                     class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {uploadLimitPages
                       ? 'bg-accent'
-                      : 'bg-slate-700'}"
+                      : 'bg-surface-overlay'}"
                   >
                     <span
                       class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform {uploadLimitPages

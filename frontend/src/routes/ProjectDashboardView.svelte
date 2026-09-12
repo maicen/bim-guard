@@ -117,28 +117,28 @@
 
   <!-- Project summary card -->
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Domain</div>
-      <div class="mt-2 text-xl font-bold text-slate-50">
+    <div class="rounded-2xl border border-border-default bg-surface-card/60 p-5">
+      <div class="text-xs font-semibold uppercase tracking-wider text-fg-muted">Domain</div>
+      <div class="mt-2 text-xl font-bold text-fg-primary">
         {selectedProject?.analysis_type ? formatAnalysisDomain(selectedProject.analysis_type) : "—"}
       </div>
     </div>
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Status</div>
-      <div class="mt-2 text-xl font-bold text-slate-50">{selectedProject?.status || "—"}</div>
+    <div class="rounded-2xl border border-border-default bg-surface-card/60 p-5">
+      <div class="text-xs font-semibold uppercase tracking-wider text-fg-muted">Status</div>
+      <div class="mt-2 text-xl font-bold text-fg-primary">{selectedProject?.status || "—"}</div>
     </div>
     <button
       type="button"
       onclick={() => onNavigate("models")}
-      class="group rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-left transition-all hover:border-slate-700"
+      class="group rounded-2xl border border-border-default bg-surface-card/60 p-5 text-left transition-all hover:border-border-interactive"
     >
-      <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400">
+      <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-fg-muted">
         <span>Models</span>
         <ArrowRight class="h-3.5 w-3.5 text-blue-400 opacity-0 transition-all group-hover:opacity-100" />
       </div>
-      <div class="mt-2 flex items-center gap-2 text-xl font-bold text-slate-50">
+      <div class="mt-2 flex items-center gap-2 text-xl font-bold text-fg-primary">
         {isLoadingFiles ? "…" : ifcFiles.length}
-        <span class="text-xs font-normal text-slate-400">attached</span>
+        <span class="text-xs font-normal text-fg-muted">attached</span>
       </div>
       {#if primaryFile}
         <div class="mt-1 flex items-center gap-1.5 truncate text-xs text-emerald-400">
@@ -155,7 +155,7 @@
       <button
         type="button"
         onclick={() => onNavigate(action.view)}
-        class="group rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left transition-all hover:border-slate-700"
+        class="group rounded-2xl border border-border-default bg-surface-card/40 p-5 text-left transition-all hover:border-border-interactive"
       >
         <div
           class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl transition-transform group-hover:scale-110 {COLOR_CLASSES[
@@ -164,8 +164,8 @@
         >
           <action.icon class="h-4 w-4" />
         </div>
-        <h3 class="text-sm font-semibold text-slate-50">{action.label}</h3>
-        <p class="mt-1 text-xs text-slate-400">{action.description}</p>
+        <h3 class="text-sm font-semibold text-fg-primary">{action.label}</h3>
+        <p class="mt-1 text-xs text-fg-muted">{action.description}</p>
       </button>
     {/each}
   </div>

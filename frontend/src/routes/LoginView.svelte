@@ -77,16 +77,16 @@
 
 <div class="flex min-h-[70vh] items-center justify-center">
   <div
-    class="w-full max-w-sm space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center shadow-xl"
+    class="w-full max-w-sm space-y-6 rounded-2xl border border-border-default bg-surface-card/60 p-8 text-center shadow-xl"
   >
     <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent">
       <ShieldCheck class="h-6 w-6" />
     </div>
     <div>
-      <h1 class="text-lg font-semibold text-slate-100">
+      <h1 class="text-lg font-semibold text-fg-primary">
         {mode === "sign-in" ? "Sign in to BIM Guard" : "Create your BIM Guard account"}
       </h1>
-      <p class="mt-1 text-xs text-slate-400">Continue with Google or your email.</p>
+      <p class="mt-1 text-xs text-fg-muted">Continue with Google or your email.</p>
     </div>
 
     {#if !isAuthConfigured}
@@ -112,7 +112,7 @@
       type="button"
       onclick={handleGoogleSignIn}
       disabled={signingIn || !isAuthConfigured}
-      class="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+      class="flex w-full items-center justify-center gap-2 rounded-xl border border-border-interactive bg-surface-canvas px-4 py-2.5 text-sm font-medium text-fg-primary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
     >
       <svg class="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
         <path
@@ -135,17 +135,17 @@
       {signingIn ? "Redirecting…" : "Continue with Google"}
     </button>
 
-    <div class="flex items-center gap-3 text-micro font-medium uppercase tracking-wider text-slate-500">
-      <span class="h-px flex-1 bg-slate-800"></span>
+    <div class="flex items-center gap-3 text-micro font-medium uppercase tracking-wider text-fg-muted">
+      <span class="h-px flex-1 bg-surface-overlay"></span>
       <span>or</span>
-      <span class="h-px flex-1 bg-slate-800"></span>
+      <span class="h-px flex-1 bg-surface-overlay"></span>
     </div>
 
     <form class="space-y-3 text-left" onsubmit={handleEmailSubmit}>
       <div class="space-y-1">
-        <label for="login-email" class="text-caption font-medium text-slate-400">Email</label>
+        <label for="login-email" class="text-caption font-medium text-fg-muted">Email</label>
         <div class="relative">
-          <Mail class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Mail class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
           <input
             id="login-email"
             type="email"
@@ -153,16 +153,16 @@
             autocomplete="email"
             bind:value={email}
             disabled={signingIn || !isAuthConfigured}
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:opacity-60"
+            class="w-full rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-9 pr-3 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden disabled:opacity-60"
             placeholder="you@company.com"
           />
         </div>
       </div>
 
       <div class="space-y-1">
-        <label for="login-password" class="text-caption font-medium text-slate-400">Password</label>
+        <label for="login-password" class="text-caption font-medium text-fg-muted">Password</label>
         <div class="relative">
-          <Lock class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Lock class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
           <input
             id="login-password"
             type="password"
@@ -171,7 +171,7 @@
             autocomplete={mode === "sign-in" ? "current-password" : "new-password"}
             bind:value={password}
             disabled={signingIn || !isAuthConfigured}
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:opacity-60"
+            class="w-full rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-9 pr-3 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden disabled:opacity-60"
             placeholder="••••••••"
           />
         </div>
@@ -190,7 +190,7 @@
       </button>
     </form>
 
-    <p class="text-xs text-slate-400">
+    <p class="text-xs text-fg-muted">
       {#if mode === "sign-in"}
         Don't have an account?
         <button

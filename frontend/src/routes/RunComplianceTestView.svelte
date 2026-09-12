@@ -329,7 +329,7 @@
           type="file"
           accept=".pdf,.doc,.docx,.txt"
           onchange={(e) => (uploadFile = (e.target as HTMLInputElement).files?.[0] || null)}
-          class="block w-full text-micro text-fg-muted file:mr-2 file:rounded-lg file:border-0 file:bg-surface-overlay file:px-2.5 file:py-1.5 file:text-micro file:font-semibold file:text-fg-secondary hover:file:bg-slate-700"
+          class="block w-full text-micro text-fg-muted file:mr-2 file:rounded-lg file:border-0 file:bg-surface-overlay file:px-2.5 file:py-1.5 file:text-micro file:font-semibold file:text-fg-secondary hover:file:bg-surface-hover"
         />
         <select
           bind:value={uploadDocType}

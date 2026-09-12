@@ -222,7 +222,7 @@ print(response.read())
   <!-- Bento Grid Overview -->
   <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
     <BentoBox title="Instant Evaluation" cls="md:col-span-1">
-      <p class="mb-4 text-xs leading-relaxed text-slate-400">
+      <p class="mb-4 text-xs leading-relaxed text-fg-muted">
         Push elements from active views or entire Revit project models directly to BIM Guard without
         exporting IFC files.
       </p>
@@ -233,11 +233,11 @@ print(response.read())
     </BentoBox>
 
     <BentoBox title="Gateway Endpoint" cls="md:col-span-2">
-      <p class="mb-2 text-xs text-slate-400">
+      <p class="mb-2 text-xs text-fg-muted">
         HTTP POST target receiving JSON element collections from Revit extensions:
       </p>
       <div
-        class="flex select-all items-center justify-between overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-blue-400"
+        class="flex select-all items-center justify-between overflow-x-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-xs text-blue-400"
       >
         <span>POST {endpointUrl}</span>
       </div>
@@ -245,13 +245,13 @@ print(response.read())
   </div>
 
   <!-- pyRevit Snippet Section -->
-  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+  <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
     <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div>
-        <h2 class="text-base font-bold tracking-tight text-slate-50">
+        <h2 class="text-base font-bold tracking-tight text-fg-primary">
           pyRevit / IronPython Push Script
         </h2>
-        <p class="text-xs text-slate-400">
+        <p class="text-xs text-fg-muted">
           Embed this script inside your pyRevit ribbon pushbutton to audit selected categories in
           one click.
         </p>
@@ -261,7 +261,7 @@ print(response.read())
         <button
           type="button"
           onclick={copyScript}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3.5 py-1.5 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           {#if copied}
             <Check class="h-3.5 w-3.5 text-emerald-400" />
@@ -285,9 +285,9 @@ print(response.read())
     </div>
 
     <!-- Code Block -->
-    <div class="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+    <div class="relative overflow-hidden rounded-xl border border-border-default bg-surface-canvas">
       <pre
-        class="max-h-72 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-slate-300">{pyRevitScript}</pre>
+        class="max-h-72 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-fg-secondary">{pyRevitScript}</pre>
     </div>
   </div>
 
@@ -304,18 +304,18 @@ print(response.read())
   {/if}
 
   {#if testResponse}
-    <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="space-y-6 rounded-2xl border border-border-default bg-surface-card/60 p-6">
       <div
-        class="flex flex-col justify-between gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center"
+        class="flex flex-col justify-between gap-4 border-b border-border-default pb-4 sm:flex-row sm:items-center"
       >
         <div>
           <div class="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-400">
             Sync Results Received
           </div>
-          <h2 class="text-lg font-bold text-slate-50">
+          <h2 class="text-lg font-bold text-fg-primary">
             {samplePayload.project_name}
           </h2>
-          <p class="text-xs text-slate-400">
+          <p class="text-xs text-fg-muted">
             Assessed {testResponse.element_count} elements against building codes • Theme:
             {testResponse.theme}
           </p>
@@ -323,7 +323,7 @@ print(response.read())
 
         <div class="flex items-center gap-3">
           <div
-            class="flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-300"
+            class="flex items-center gap-1.5 rounded-md border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs font-bold text-fg-secondary"
           >
             <span
               >Pass: {testResponse.results.reduce((acc, r) => acc + (r.pass_count || 0), 0)}</span
@@ -341,22 +341,22 @@ print(response.read())
 
       <!-- Search & Filter Toolbar -->
       <div
-        class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 sm:flex-row"
+        class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-canvas/80 p-3.5 sm:flex-row"
       >
         <div class="relative w-full flex-1">
-          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
           <input
             type="text"
             bind:value={table.search}
             placeholder="Search rules by reference, target, property..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="flex w-full items-center gap-2 sm:w-auto">
           <select
             bind:value={table.filters.status}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Verdicts</option>
             <option value="PASS">PASS Only</option>
@@ -376,12 +376,12 @@ print(response.read())
       />
 
       <!-- Results Table -->
-      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
+      <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-canvas/50">
         <div class="overflow-x-auto">
           <table class="w-full border-collapse text-left text-xs">
             <thead>
               <tr
-                class="border-b border-slate-800 bg-slate-950/80 text-micro font-semibold uppercase tracking-wider text-slate-400"
+                class="border-b border-border-default bg-surface-canvas/80 text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >
                 <th class="w-10 px-3 py-3">
                   <TableCheckbox
@@ -440,17 +440,17 @@ print(response.read())
                 <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/60">
+            <tbody class="divide-y divide-border-subtle">
               {#if table.paginated.length === 0}
                 <tr>
-                  <td colspan="8" class="p-8 text-center text-xs text-slate-500">
+                  <td colspan="8" class="p-8 text-center text-xs text-fg-muted">
                     No sync results match your filter criteria.
                   </td>
                 </tr>
               {:else}
                 {#each table.paginated as rule (rule.rowId)}
                   <tr
-                    class="transition-colors hover:bg-slate-800/30 {table.isSelected(rule.rowId)
+                    class="transition-colors hover:bg-surface-hover {table.isSelected(rule.rowId)
                       ? 'bg-surface-selected'
                       : ''}"
                   >
@@ -461,18 +461,18 @@ print(response.read())
                         ariaLabel={`Select rule ${rule.rule_ref}`}
                       />
                     </td>
-                    <td class="px-3 py-3 font-mono font-semibold text-slate-50">
+                    <td class="px-3 py-3 font-mono font-semibold text-fg-primary">
                       {rule.rule_ref || "Custom Rule"}
                       {#if rule.rule_desc}
-                        <div class="mt-0.5 font-sans text-caption font-normal text-slate-400">
+                        <div class="mt-0.5 font-sans text-caption font-normal text-fg-muted">
                           {rule.rule_desc}
                         </div>
                       {/if}
                     </td>
-                    <td class="px-3 py-3 font-mono text-slate-300">
+                    <td class="px-3 py-3 font-mono text-fg-secondary">
                       <BsddBadge kind="class" value={rule.target} />
                     </td>
-                    <td class="px-3 py-3 font-mono text-slate-300">
+                    <td class="px-3 py-3 font-mono text-fg-secondary">
                       <BsddBadge kind="property" value={rule.property_name} />
                     </td>
                     <td class="px-3 py-3">
@@ -491,7 +491,7 @@ print(response.read())
                       /
                       <span class="font-semibold text-rose-400">{rule.fail_count || 0}</span>
                       /
-                      <span class="text-slate-400">{rule.missing_count || 0}</span>
+                      <span class="text-fg-muted">{rule.missing_count || 0}</span>
                     </td>
                     <td class="max-w-xs px-3 py-3">
                       {#if rule.failures && rule.failures.length > 0}
@@ -506,14 +506,14 @@ print(response.read())
                           {/each}
                         </div>
                       {:else}
-                        <span class="text-slate-500">—</span>
+                        <span class="text-fg-muted">—</span>
                       {/if}
                     </td>
                     <td class="whitespace-nowrap px-3 py-3 text-right">
                       <button
                         type="button"
                         onclick={() => (viewingRule = rule)}
-                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                        class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         title="Inspect rule result details"
                       >
                         <Eye class="h-3.5 w-3.5" />
@@ -545,19 +545,19 @@ print(response.read())
 {#if viewingRule}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
         <div class="flex items-center gap-2">
           <FileText class="h-4 w-4 text-accent" />
-          <h3 class="font-mono text-sm font-bold text-slate-50">
+          <h3 class="font-mono text-sm font-bold text-fg-primary">
             {viewingRule.rule_ref || "Rule Result"}
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (viewingRule = null)}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-4 w-4" />
         </button>
@@ -565,25 +565,25 @@ print(response.read())
 
       <div class="space-y-3 text-xs">
         <div>
-          <span class="mb-1 block font-semibold text-slate-400">Description</span>
-          <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-slate-200">
+          <span class="mb-1 block font-semibold text-fg-muted">Description</span>
+          <div class="rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-fg-secondary">
             {viewingRule.rule_desc || "No description provided"}
           </div>
         </div>
 
         <div
-          class="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption"
+          class="grid grid-cols-2 gap-2 rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption"
         >
           <div>
-            <span class="text-slate-500">Target:</span>
-            <BsddBadge kind="class" value={viewingRule.target} class="text-slate-300" />
+            <span class="text-fg-muted">Target:</span>
+            <BsddBadge kind="class" value={viewingRule.target} class="text-fg-secondary" />
           </div>
           <div>
-            <span class="text-slate-500">Property:</span>
-            <BsddBadge kind="property" value={viewingRule.property_name} class="text-slate-300" />
+            <span class="text-fg-muted">Property:</span>
+            <BsddBadge kind="property" value={viewingRule.property_name} class="text-fg-secondary" />
           </div>
           <div>
-            <span class="text-slate-500">Verdict:</span>
+            <span class="text-fg-muted">Verdict:</span>
             <span
               class="font-bold {viewingRule.status === 'PASS'
                 ? 'text-emerald-400'
@@ -591,8 +591,8 @@ print(response.read())
             >
           </div>
           <div>
-            <span class="text-slate-500">Pass / Fail:</span>
-            <span class="text-slate-300"
+            <span class="text-fg-muted">Pass / Fail:</span>
+            <span class="text-fg-secondary"
               >{viewingRule.pass_count || 0} / {viewingRule.fail_count || 0}</span
             >
           </div>
@@ -600,18 +600,18 @@ print(response.read())
 
         {#if viewingRule.failures && viewingRule.failures.length > 0}
           <div>
-            <span class="mb-1 block font-semibold text-slate-400"
+            <span class="mb-1 block font-semibold text-fg-muted"
               >Non-Compliant Element Instances ({viewingRule.failures.length})</span
             >
             <div
-              class="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2"
+              class="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-border-default bg-surface-canvas p-2"
             >
               {#each viewingRule.failures as f (f.guid)}
                 <div
                   class="rounded-lg border border-rose-900/40 bg-rose-950/20 p-2 font-mono text-caption text-rose-300"
                 >
                   <div class="font-bold">{f.guid}</div>
-                  {#if f.reason}<div class="mt-0.5 text-micro text-slate-400">{f.reason}</div>{/if}
+                  {#if f.reason}<div class="mt-0.5 text-micro text-fg-muted">{f.reason}</div>{/if}
                 </div>
               {/each}
             </div>
@@ -619,11 +619,11 @@ print(response.read())
         {/if}
       </div>
 
-      <div class="flex justify-end border-t border-slate-800 pt-2">
+      <div class="flex justify-end border-t border-border-default pt-2">
         <button
           type="button"
           onclick={() => (viewingRule = null)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>
