@@ -13,4 +13,5 @@ export { default as Tabs, TabsRoot, TabsList, TabsTrigger, TabsContent } from ".
 export { default as Accordion, AccordionRoot, AccordionItem, AccordionHeader, AccordionTrigger, AccordionContent } from "./Accordion.svelte";
 export { default as Select } from "./Select.svelte";
 export type { SelectOption } from "./Select.svelte";
+export { default as Collapsible, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "./Collapsible.svelte";
 

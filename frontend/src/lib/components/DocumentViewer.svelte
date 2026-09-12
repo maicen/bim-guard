@@ -23,6 +23,8 @@
   import DocLangXmlTree from "./DocLangXmlTree.svelte";
   import PdfElementOverlay from "./PdfElementOverlay.svelte";
   import type { ElementLayer, ArrowStyle } from "./PdfElementOverlay.svelte";
+  import { Popover } from "bits-ui";
+  import { Switch } from "./ui";
 
   interface Props {
     documentId: number;
@@ -1527,46 +1529,45 @@
               >
                 Reading order
               </button>
-              <div class="relative">
-                <button
-                  type="button"
-                  onclick={(e) => (e.stopPropagation(), (overlaySettingsOpen = !overlaySettingsOpen))}
+              <Popover.Root bind:open={overlaySettingsOpen}>
+                <Popover.Trigger
                   title="Overlay settings"
-                  aria-expanded={overlaySettingsOpen}
-                  class="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                  aria-label="Overlay settings"
+                  class="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <Settings2 class="h-3.5 w-3.5" />
-                </button>
-                {#if overlaySettingsOpen}
-                  <div
-                    role="none"
-                    onclick={(e) => e.stopPropagation()}
-                    class="absolute right-0 top-full z-40 mt-2 w-64 space-y-3 rounded-xl border border-border-default bg-surface-card p-3 text-xs shadow-xl"
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    side="bottom"
+                    align="end"
+                    sideOffset={8}
+                    class="z-50 w-64 space-y-3 rounded-xl border border-border-default bg-surface-card p-3 text-xs shadow-xl backdrop-blur-md"
                   >
-                    <label class="flex items-center justify-between gap-2">
-                      <span class="font-medium text-fg-secondary">Badges</span>
-                      <input type="checkbox" bind:checked={showElementBadges} />
+                    <label class="flex items-center justify-between gap-2 cursor-pointer">
+                      <span class="font-medium text-fg-secondary">Element Badges</span>
+                      <Switch bind:checked={showElementBadges} ariaLabel="Toggle element badges" />
                     </label>
                     <div class="border-t border-border-default pt-2">
                       <p class="mb-2 font-medium text-fg-secondary">Reading-order arrow style</p>
                       <div class="space-y-2">
                         <label class="flex items-center justify-between gap-2">
                           <span class="text-fg-muted">Color</span>
-                          <input type="color" bind:value={arrowColor} class="h-6 w-10 rounded border border-border-interactive bg-surface-canvas" />
+                          <input type="color" bind:value={arrowColor} class="h-6 w-10 cursor-pointer rounded border border-border-interactive bg-surface-canvas" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
                           <span class="text-fg-muted">Thickness</span>
-                          <input type="range" min="0.5" max="6" step="0.5" bind:value={arrowWidth} class="w-28" />
+                          <input type="range" min="0.5" max="6" step="0.5" bind:value={arrowWidth} class="w-28 accent-accent" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
                           <span class="text-fg-muted">Head size</span>
-                          <input type="range" min="3" max="14" step="1" bind:value={arrowHead} class="w-28" />
+                          <input type="range" min="3" max="14" step="1" bind:value={arrowHead} class="w-28 accent-accent" />
                         </label>
                         <label class="flex items-center justify-between gap-2">
                           <span class="text-fg-muted">Line</span>
                           <select
                             bind:value={arrowLineStyle}
-                            class="rounded border border-border-interactive bg-surface-canvas px-1.5 py-0.5 text-fg-secondary"
+                            class="rounded-lg border border-border-interactive bg-surface-canvas px-2 py-1 text-fg-secondary focus:outline-hidden focus:ring-1 focus:ring-accent"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
@@ -1575,9 +1576,9 @@
                         </label>
                       </div>
                     </div>
-                  </div>
-                {/if}
-              </div>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
             </div>
           {/if}
 
