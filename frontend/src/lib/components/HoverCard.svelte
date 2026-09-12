@@ -220,23 +220,23 @@
         {/if}
 
         {#if title || icon || subtitle}
-          <div class="flex items-start gap-2.5 border-b border-slate-800/80 px-3.5 pb-2 pt-3">
+          <div class="flex items-start gap-2.5 border-b border-border-subtle px-3.5 pb-2 pt-3">
             {#if icon}
               {@const SvelteComponent = icon}
               <div
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-blue-800/50 bg-blue-950/50 text-accent"
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent"
               >
                 <SvelteComponent class="h-3.5 w-3.5" />
               </div>
             {/if}
             <div class="min-w-0">
               {#if title}
-                <div class="wrap-break-word text-xs font-bold tracking-tight text-slate-100">
+                <div class="wrap-break-word text-xs font-bold tracking-tight text-fg-primary">
                   {title}
                 </div>
               {/if}
               {#if subtitle}
-                <div class="mt-0.5 wrap-break-word text-micro text-slate-400">
+                <div class="mt-0.5 wrap-break-word text-micro text-fg-muted">
                   {subtitle}
                 </div>
               {/if}
@@ -244,12 +244,12 @@
           </div>
         {/if}
 
-        <div class="px-3.5 py-2.5 text-caption leading-relaxed text-slate-300">
+        <div class="px-3.5 py-2.5 text-caption leading-relaxed text-fg-secondary">
           {@render children?.()}
         </div>
 
         {#if footer && showFooter}
-          <div class="border-t border-slate-800/80 px-3.5 py-2 text-micro text-slate-400">
+          <div class="border-t border-border-subtle px-3.5 py-2 text-micro text-fg-muted">
             {@render footer?.()}
           </div>
         {/if}

@@ -38,14 +38,14 @@
 </script>
 
 <div
-  class="flex select-none flex-col items-center justify-between gap-4 rounded-b-2xl border-t border-slate-800 bg-slate-950/40 px-4 py-3 text-xs text-slate-400 sm:flex-row"
+  class="flex select-none flex-col items-center justify-between gap-4 rounded-b-2xl border-t border-border-subtle bg-surface-canvas/40 px-4 py-3 text-xs text-fg-muted sm:flex-row"
 >
   <!-- Range indicator & Page size selector -->
   <div class="flex flex-wrap items-center gap-4">
     <span>
-      Showing <strong class="text-slate-200">{startItem}</strong> to
-      <strong class="text-slate-200">{endItem}</strong> of
-      <strong class="text-slate-200">{totalItems}</strong> entries
+      Showing <strong class="text-fg-primary">{startItem}</strong> to
+      <strong class="text-fg-primary">{endItem}</strong> of
+      <strong class="text-fg-primary">{totalItems}</strong> entries
     </span>
 
     <div class="flex items-center gap-1.5">
@@ -53,7 +53,7 @@
       <select
         value={pageSize}
         onchange={handlePageSizeChange}
-        class="cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+        class="cursor-pointer rounded-lg border border-border-default bg-surface-card px-2 py-1 text-xs text-fg-primary focus:outline-hidden focus:ring-1 focus:ring-accent"
       >
         {#each pageSizeOptions as option (option)}
           <option value={option}>{option}</option>
@@ -70,7 +70,7 @@
       type="button"
       onclick={() => goToPage(1)}
       disabled={currentPage === 1}
-      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+      class="rounded-lg border border-border-subtle p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:cursor-not-allowed disabled:opacity-30"
       title="First Page"
     >
       <ChevronsLeft class="h-4 w-4" />
@@ -81,14 +81,14 @@
       type="button"
       onclick={() => goToPage(currentPage - 1)}
       disabled={currentPage === 1}
-      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+      class="rounded-lg border border-border-subtle p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:cursor-not-allowed disabled:opacity-30"
       title="Previous Page"
     >
       <ChevronLeft class="h-4 w-4" />
     </button>
 
     <!-- Page Indicator -->
-    <span class="px-3 py-1 font-semibold text-slate-200">
+    <span class="px-3 py-1 font-semibold text-fg-secondary">
       Page {currentPage} of {totalPages}
     </span>
 
@@ -97,7 +97,7 @@
       type="button"
       onclick={() => goToPage(currentPage + 1)}
       disabled={currentPage === totalPages}
-      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+      class="rounded-lg border border-border-subtle p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:cursor-not-allowed disabled:opacity-30"
       title="Next Page"
     >
       <ChevronRight class="h-4 w-4" />
@@ -108,7 +108,7 @@
       type="button"
       onclick={() => goToPage(totalPages)}
       disabled={currentPage === totalPages}
-      class="rounded-lg border border-slate-800 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+      class="rounded-lg border border-border-subtle p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:cursor-not-allowed disabled:opacity-30"
       title="Last Page"
     >
       <ChevronsRight class="h-4 w-4" />

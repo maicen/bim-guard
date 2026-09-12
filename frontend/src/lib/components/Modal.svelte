@@ -61,22 +61,22 @@
       )}
     >
       <div
-        class="flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-950/60 px-6 py-4"
+        class="flex items-center justify-between gap-4 border-b border-border-subtle bg-surface-canvas/60 px-6 py-4"
       >
         <div class="flex min-w-0 items-center gap-3">
           {#if Icon}
             <div
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-800/60 bg-blue-950/60 text-accent"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent"
             >
               <Icon class="h-4 w-4" />
             </div>
           {/if}
           <div class="min-w-0">
-            <h3 id={titleId} class="truncate text-base font-bold tracking-tight text-slate-50">
+            <h3 id={titleId} class="truncate text-base font-bold tracking-tight text-fg-primary">
               {title}
             </h3>
             {#if subtitle}
-              <p class="mt-0.5 truncate text-xs text-slate-400">{subtitle}</p>
+              <p class="mt-0.5 truncate text-xs text-fg-muted">{subtitle}</p>
             {/if}
           </div>
         </div>
@@ -86,7 +86,7 @@
           <button
             type="button"
             onclick={onClose}
-            class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
             aria-label="Close dialog"
           >
             <X class="h-4 w-4" />
