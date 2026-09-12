@@ -115,21 +115,21 @@
   function getStatusBadge(engineStatus: string) {
     switch (engineStatus) {
       case "complete":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        return "bg-success-bg text-success border-success-border/60";
       case "running":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/20 animate-pulse";
+        return "bg-accent/15 text-accent border-accent/40 animate-pulse";
       case "failed":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/20";
+        return "bg-critical-bg text-critical border-critical-border/60";
       case "not_implemented":
-        return "bg-slate-800 text-slate-400 border-slate-700";
+        return "bg-surface-overlay text-fg-muted border-border-default";
       default:
-        return "bg-slate-800/60 text-slate-400 border-slate-700/60";
+        return "bg-surface-card/60 text-fg-muted border-border-subtle";
     }
   }
 </script>
 
 <div
-  class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-sm"
+  class="space-y-6 rounded-2xl border border-border-subtle bg-surface-card/60 p-6 shadow-xl backdrop-blur-sm"
 >
   <!-- Header -->
   <div class="flex flex-wrap items-center justify-between gap-4">
@@ -138,32 +138,32 @@
         <Activity
           class="h-4 w-4 text-accent {avgProgress > 0 && avgProgress < 100 ? 'animate-pulse' : ''}"
         />
-        <h3 class="text-sm font-bold tracking-tight text-slate-50">
+        <h3 class="text-sm font-bold tracking-tight text-fg-primary">
           Real-Time Pipeline Execution Tracker
         </h3>
         {#if isStreaming}
           <span
-            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-400"
+            class="inline-flex items-center gap-1.5 rounded-md border border-success-border/60 bg-success-bg/60 px-2 py-0.5 text-micro font-semibold text-success"
           >
-            <span class="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400"></span>
+            <span class="h-1.5 w-1.5 animate-ping rounded-full bg-success"></span>
             SSE Live
           </span>
         {/if}
       </div>
-      <p class="mt-0.5 text-xs text-slate-400">
+      <p class="mt-0.5 text-xs text-fg-muted">
         Live per-engine progression across the six compliance stages.
       </p>
     </div>
 
     <!-- Overall Progress Bar -->
     <div class="flex min-w-[220px] items-center gap-3">
-      <div class="h-2 flex-1 overflow-hidden rounded-full border border-slate-800 bg-slate-950">
+      <div class="h-2 flex-1 overflow-hidden rounded-full border border-border-subtle bg-surface-canvas">
         <div
           class="h-2 rounded-full bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-xs transition-all duration-300"
           style="width: {avgProgress}%"
         ></div>
       </div>
-      <span class="font-mono text-xs font-bold text-slate-50">{avgProgress}%</span>
+      <span class="font-mono text-xs font-bold text-fg-primary">{avgProgress}%</span>
     </div>
   </div>
 
@@ -175,25 +175,25 @@
         avgProgress > ((stage.num - 1) / 6) * 100 && avgProgress < (stage.num / 6) * 100}
       <div
         class="rounded-xl border p-3 text-left transition-all {isDone
-          ? 'border-emerald-800/50 bg-emerald-950/20 text-emerald-300'
+          ? 'border-success-border/60 bg-success-bg/30 text-success'
           : isCurrent
-            ? 'border-blue-600/70 bg-blue-950/40 text-blue-200 ring-1 ring-blue-500/40'
-            : 'border-slate-800/80 bg-slate-950/60 text-slate-500'}"
+            ? 'border-accent/70 bg-accent/15 text-accent ring-1 ring-accent/40'
+            : 'border-border-subtle bg-surface-canvas/60 text-fg-muted'}"
       >
         <div class="flex items-center justify-between">
           <span class="font-mono text-micro font-bold uppercase tracking-wider opacity-80"
             >Stage {stage.num}</span
           >
           {#if isDone}
-            <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
+            <CheckCircle2 class="h-3.5 w-3.5 text-success" />
           {:else if isCurrent}
-            <RefreshCw class="h-3.5 w-3.5 animate-spin text-blue-400" />
+            <RefreshCw class="h-3.5 w-3.5 animate-spin text-accent" />
           {:else}
             <Clock class="h-3.5 w-3.5 opacity-40" />
           {/if}
         </div>
-        <div class="mt-1 truncate text-xs font-bold text-slate-50">{stage.name}</div>
-        <div class="mt-0.5 line-clamp-1 text-micro text-slate-400 opacity-70">{stage.desc}</div>
+        <div class="mt-1 truncate text-xs font-bold text-fg-primary">{stage.name}</div>
+        <div class="mt-0.5 line-clamp-1 text-micro text-fg-muted opacity-70">{stage.desc}</div>
       </div>
     {/each}
   </div>

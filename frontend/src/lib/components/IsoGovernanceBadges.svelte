@@ -15,13 +15,13 @@
   function getCdeColor(state: string) {
     switch ((state || "").toUpperCase()) {
       case "PUBLISHED":
-        return "text-emerald-400 border-emerald-800/60 bg-emerald-950/40";
+        return "text-success border-success-border/60 bg-success-bg/40";
       case "SHARED":
-        return "text-blue-400 border-blue-800/60 bg-blue-950/40";
+        return "text-info border-info-border/60 bg-info-bg/40";
       case "ARCHIVED":
-        return "text-slate-400 border-slate-700/60 bg-slate-900/60";
+        return "text-fg-muted border-border-default/60 bg-surface-overlay/60";
       default:
-        return "text-amber-400 border-amber-800/60 bg-amber-950/40";
+        return "text-warning border-warning-border/60 bg-warning-bg/40";
     }
   }
 
@@ -48,7 +48,7 @@
   >
     {#snippet trigger()}
       <span
-        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-amber-400 shadow-xs"
+        class="cursor-help rounded border border-warning-border/50 bg-warning-bg/30 px-1.5 py-0.5 font-semibold text-warning shadow-xs"
       >
         {suitabilityCode}
       </span>
@@ -73,7 +73,7 @@
   >
     {#snippet trigger()}
       <span
-        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-blue-400 shadow-xs"
+        class="cursor-help rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-semibold text-accent shadow-xs"
       >
         {revisionCode}
       </span>
@@ -113,12 +113,12 @@
     <div class="mt-2 flex items-center gap-1 font-mono text-nano">
       {#each CDE_ORDER as state, i (state)}
         {#if i > 0}
-          <span class="text-slate-600">→</span>
+          <span class="text-fg-muted">→</span>
         {/if}
         <span
           class="rounded border px-1.5 py-0.5 {state === cdeCode.toUpperCase()
             ? 'border-accent/50 bg-accent/15 font-bold text-accent'
-            : 'border-slate-700/50 bg-slate-800/60 text-slate-500'}"
+            : 'border-border-subtle bg-surface-card/60 text-fg-muted'}"
         >
           {state}
         </span>
