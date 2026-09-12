@@ -232,7 +232,7 @@
               <select
                 value={selectedFileId}
                 onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
-                class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 {#each ifcFiles as file (file.id)}
                   <option value={file.id}>

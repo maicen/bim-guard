@@ -69,7 +69,7 @@
         {side}
         {align}
         {sideOffset}
-        class="z-[70] max-w-[240px] rounded-lg border border-slate-800 bg-slate-900/95 px-2.5 py-1.5 text-micro font-medium leading-snug text-slate-200 shadow-xl shadow-black/40 backdrop-blur-md outline-none origin-(--bits-tooltip-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        class="z-70 max-w-[240px] rounded-lg border border-slate-800 bg-slate-900/95 px-2.5 py-1.5 text-micro font-medium leading-snug text-slate-200 shadow-xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-tooltip-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
       >
         <TooltipPrimitive.Arrow
           width={7}
