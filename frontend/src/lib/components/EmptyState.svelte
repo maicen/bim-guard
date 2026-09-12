@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ComponentType } from "svelte";
   import { SearchX } from "lucide-svelte";
+  import Button from "./ui/Button.svelte";
 
   interface Props {
     title?: string;
@@ -22,23 +23,23 @@
 </script>
 
 <div
-  class="space-y-3 rounded-2xl border border-dashed border-slate-800 p-12 text-center text-xs text-slate-500 duration-200 animate-in fade-in"
+  class="space-y-3 rounded-2xl border border-dashed border-border-default p-12 text-center text-xs text-fg-muted duration-200 animate-in fade-in"
 >
   <div
-    class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-400"
+    class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-default bg-surface-card text-fg-muted"
   >
     {#if icon}
       {@const SvelteComponent = icon}
       <SvelteComponent class="h-6 w-6" />
     {:else}
-      <SearchX class="h-6 w-6 text-slate-500" />
+      <SearchX class="h-6 w-6" />
     {/if}
   </div>
 
   <div class="space-y-1">
-    <div class="text-sm font-bold text-slate-50">{title}</div>
+    <div class="text-sm font-bold text-fg-primary">{title}</div>
     {#if description}
-      <div class="mx-auto max-w-sm text-xs leading-relaxed text-slate-400">
+      <div class="mx-auto max-w-sm text-xs leading-relaxed text-fg-secondary">
         {description}
       </div>
     {/if}
@@ -48,13 +49,9 @@
 
   {#if actionLabel && onAction}
     <div class="pt-1">
-      <button
-        type="button"
-        onclick={onAction}
-        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
-      >
-        <span>{actionLabel}</span>
-      </button>
+      <Button variant="primary" size="md" onclick={onAction}>
+        {actionLabel}
+      </Button>
     </div>
   {/if}
 </div>
