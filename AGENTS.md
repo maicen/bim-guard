@@ -94,6 +94,14 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
   - **Search & Multi-Criteria Filtering**: Real-time client/server multi-attribute search and dropdown filters with zero-state reset actions.
   - **Column Sorting**: Interactive column headers with ascending/descending direction indicators.
   - **Empty States & Accessibility**: High-polish zero-state placeholders with actionable reset buttons, loading skeletons/spinners, responsive horizontal scroll, and keyboard accessibility.
+- **Strict Semantic Design Tokens & Theme Color Assignment (MANDATORY)**: NEVER use hardcoded color values (`#hex`, `rgb()`, `rgba()`) or raw dark-only palette utilities (e.g. `bg-blue-950/20`, `border-emerald-800`, `text-blue-300`, `bg-rose-950`) for surfaces, text, borders, selections, badges, alerts, or graphics. All UI styles across components, views, SVGs, canvas, and 3D viewers MUST be assigned via the semantic design tokens defined in `frontend/src/app.css` and `@theme`:
+  - **Surfaces**: `bg-surface-canvas` (viewport), `bg-surface-card` (cards/tables), `bg-surface-overlay` (popovers/dialogs), `bg-surface-hover` (interactive hover), `bg-surface-selected` (selected table rows & active cards).
+  - **Typography**: `text-fg-primary` (high-contrast headlines/titles), `text-fg-secondary` (readable body), `text-fg-muted` (metadata & captions), `text-accent` (interactive chromatic accent).
+  - **Borders & Rings**: `border-border-subtle`, `border-border-default`, `border-border-interactive`, `focus:ring-accent`.
+  - **Status & Alerts**: Always use semantic intent bands `critical` / `warning` / `caution` / `success` / `info` (e.g. `bg-critical-bg text-critical border-critical-border`, `bg-success-bg text-success border-success-border`).
+  - **Document & NLP Structure Overlays**: Use CSS variables `var(--color-doc-heading)`, `var(--color-doc-paragraph)`, `var(--color-doc-list)`, `var(--color-doc-table)`, `var(--color-doc-picture)`.
+  - **Table Selections**: Always use `bg-surface-selected` (never `bg-blue-950/*`).
+  - **Atomic Primitives**: Always prefer `<Button>`, `<Input>`, `<FormField>`, `<Card>`, and `<Alert>` from `frontend/src/lib/components/ui/` and `frontend/src/lib/components/` over ad-hoc markup.
 - **bits-ui**: Reach for bits-ui primitives (`Popover`, `DropdownMenu`, `Select`, …) for interaction/focus/positioning-heavy components rather than hand-rolling; see `.claude/skills/svelte-frontend/references/bits-ui.md`. Frontend is Tailwind v4 (`@tailwindcss/vite`, tokens in `frontend/src/app.css`'s `@theme` block — no `tailwind.config.js`).
 - **Reusable Frontend Component Architecture**: Always utilize shared UI building blocks from `frontend/src/lib/components/` instead of duplicating ad-hoc markup:
   - `<PageHeader>`: Top view header with category breadcrumbs, icon, title, subtitle, and action slots.

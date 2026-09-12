@@ -48,32 +48,56 @@ invalid-as-a-color triplet.
   --color-surface-card: rgb(var(--surface-card-rgb));
   --color-surface-overlay: rgb(var(--surface-overlay-rgb));
   --color-surface-hover: rgb(var(--surface-hover-rgb));
+  --color-surface-selected: rgb(var(--accent-rgb) / 0.12);
+  --color-surface-selected-hover: rgb(var(--accent-rgb) / 0.18);
 
   /* Semantic Typography / Foreground */
   --color-fg-primary: rgb(var(--fg-primary-rgb));
   --color-fg-secondary: rgb(var(--fg-secondary-rgb));
   --color-fg-muted: rgb(var(--fg-muted-rgb));
 
-  /* Semantic Borders */
+  /* Semantic Borders & Rings */
   --color-border-subtle: rgb(var(--border-subtle-rgb));
   --color-border-default: rgb(var(--border-default-rgb));
   --color-border-interactive: rgb(var(--border-interactive-rgb));
 
-  /* Semantic Status & Severity */
+  /* Semantic Status & Severity Bands */
   --color-critical: rgb(var(--critical-rgb));
+  --color-critical-bg: rgb(var(--critical-bg-rgb));
+  --color-critical-border: rgb(var(--critical-border-rgb));
+
   --color-warning: rgb(var(--warning-rgb));
+  --color-warning-bg: rgb(var(--warning-bg-rgb));
+  --color-warning-border: rgb(var(--warning-border-rgb));
+
   --color-caution: rgb(var(--caution-rgb));
+  --color-caution-bg: rgb(var(--caution-bg-rgb));
+  --color-caution-border: rgb(var(--caution-border-rgb));
+
   --color-success: rgb(var(--success-rgb));
+  --color-success-bg: rgb(var(--success-bg-rgb));
+  --color-success-border: rgb(var(--success-border-rgb));
+
   --color-info: rgb(var(--info-rgb));
+  --color-info-bg: rgb(var(--info-bg-rgb));
+  --color-info-border: rgb(var(--info-border-rgb));
+
+  /* Document & NLP Entity Visualization Tokens */
+  --color-doc-heading: rgb(var(--doc-heading-rgb));
+  --color-doc-paragraph: rgb(var(--doc-paragraph-rgb));
+  --color-doc-list: rgb(var(--doc-list-rgb));
+  --color-doc-table: rgb(var(--doc-table-rgb));
+  --color-doc-picture: rgb(var(--doc-picture-rgb));
 }
 ```
 
 Consequences to internalise before writing markup:
 
-- **Prefer semantic tokens over hardcoded palette numbers.** Use `bg-surface-card`, `border-border-default`, `text-fg-primary`, and `text-fg-secondary`.
-- **Never write a `dark:` variant.** Colors resolve via channel variables calibrated for WCAG AA (>= 4.5:1) in both light and dark themes.
+- **Mandatory Semantic Token Assignment**: NEVER use hardcoded color values (`#hex`, `rgb()`, `rgba()`) or raw dark-only palette utilities (e.g. `bg-blue-950/20`, `border-emerald-800`, `text-blue-300`, `bg-rose-950`) anywhere in components, SVGs, canvas, or 3D graphics.
+- **Surfaces**: Use `bg-surface-canvas` for viewports, `bg-surface-card` for cards/tables, `bg-surface-overlay` for popovers/flyouts, `bg-surface-hover` for row hovers, and `bg-surface-selected` for selected table rows and active wizard cards.
+- **Never write a `dark:` variant.** Colors resolve via channel variables calibrated for WCAG AA (>= 4.5:1) across both light and dark themes.
 - **`text-fg-primary` is "primary text".** High-contrast text in dark mode, deep contrast in light mode.
-- **`text-white` means "always white"** and is reserved for text sitting on a solid coloured control (an accent button, a rose delete button, a gradient badge).
+- **`text-white` means "always white"** and is reserved strictly for text sitting on a solid chromatic control (such as a primary accent button).
 - Semantic ramp: `surface-canvas` background → `surface-card` container → `surface-overlay` elevated → `border-subtle` / `border-default` dividers → `fg-muted` metadata → `fg-secondary` body → `fg-primary` headline text.
 
 Theme state lives in `frontend/src/lib/theme.ts` (`light | dark | system`,
@@ -199,7 +223,8 @@ is disabled under `prefers-reduced-motion`, which `app.css` honours globally.
 
 ### Don't
 
-- Don't type a hex colour in a component — use the token
+- Don't type a hex colour (#...) or `rgb()`/`rgba()` in a component or CSS — use semantic tokens or theme variables
+- Don't use raw palette utilities (`bg-slate-950`, `bg-blue-950/20`, `text-slate-400`, `border-slate-800`) when a semantic token exists (`bg-surface-canvas`, `bg-surface-selected`, `text-fg-muted`, `border-border-default`)
 - Don't add `text-[Npx]` — the ramp already goes down to 9px
 - Don't introduce accent colours beyond the accent and the severity bands
 - Don't use radius above 12px on rectangles
@@ -229,16 +254,17 @@ The 3D viewport must not claim a fixed height taller than the viewport.
 ### Quick reference
 
 - Interactive: `bg-accent` / `text-accent` / `ring-accent`
-- Canvas `bg-slate-950`, card `bg-slate-900`, border `border-slate-800`
-- Primary text `text-slate-50`, body `text-slate-300`, metadata `text-slate-400`
+- Canvas `bg-surface-canvas`, card `bg-surface-card`, border `border-border-default`, selected row `bg-surface-selected`
+- Primary text `text-fg-primary`, body `text-fg-secondary`, muted `text-fg-muted`, subtle `text-fg-subtle`
+- Document & NLP Entities: `text-doc-heading`, `text-doc-paragraph`, `text-doc-list`, `text-doc-table`, `text-doc-picture`
 - Severity: import from `lib/severity.ts`, never restate
 - Class composition: `cn()` from `lib/utils/cn.ts`
 
 ### Before writing a component, ask
 
 1. Does `lib/components/` already have it? (§12)
-2. Is every colour a token — no hex, no `text-[Npx]`?
-3. Does it read correctly in **both** themes? Any `text-white` on a slate surface is a bug.
+2. Is every colour a token — no hex, no `rgb()`, no raw dark-only utilities, no `text-[Npx]`?
+3. Does it read correctly in **both** themes? Any `text-white` on a slate surface or hardcoded light/dark palette class is a bug.
 4. Is it keyboard-reachable, with a visible focus ring and a label?
 5. If it is a table, does it meet §11 in full?
 6. Does it work at 375px wide?
@@ -258,16 +284,16 @@ same major version bits-ui's own docs and examples assume.
 
 The standalone frontend (`frontend/src/`) translates these design principles into modern Svelte 5 + Tailwind CSS components:
 
-- **Surface Treatment**: Glassmorphic headers (`bg-slate-900/80 backdrop-blur-md`), elevated cards (`bg-slate-900/60 border-slate-800`), and the deep canvas background (`bg-slate-950`) — each inverting with the theme per §1.
+- **Surface Treatment**: Glassmorphic headers (`bg-surface-card/80 backdrop-blur-md`), elevated cards (`bg-surface-card border-border-default`), and the deep canvas background (`bg-surface-canvas`) — each inverting with the theme per §1.
 - **Accent Rhythm**: The single `accent` token for interactive states, with dedicated risk banding for compliance findings drawn from `lib/severity.ts` (§2).
 - **Real-Time Instrumentation**: The `PipelineProgress` component features animated SSE stream status pings, stage step meters, and dynamic metrics chips reflecting the active physics engines.
-- **3D OpenBIM Viewport**: Enclosed viewport canvas (`IfcViewer.svelte`) featuring dark frame styling and model isolation.
+- **3D OpenBIM Viewport**: Enclosed viewport canvas (`IfcViewer.svelte`) featuring dark frame styling and model isolation driven dynamically by theme variables (`--color-surface-canvas`, `--color-border-default`, etc.).
 
 ## 11. Universal Data Table UX Specifications
 
 Every data table across the application (Projects, Documents, Reports & BCF, Rules Catalog, Extracted Rules, Findings & Issues, Revit Sync) must follow these strict UX design rules:
 
-- **Multiple Selection**: Per-row checkboxes (`w-4 h-4 rounded bg-slate-950 border-slate-700 text-accent`), header master checkbox with indeterminate and selected states, and selected row highlights (`bg-blue-950/20`).
+- **Multiple Selection**: Per-row checkboxes (`w-4 h-4 rounded bg-surface-canvas border-border-default text-accent`), header master checkbox with indeterminate and selected states, and selected row highlights (`bg-surface-selected`).
 - **Bulk Action Bar**: Sticky/floating `BulkActionBar.svelte` displaying the selected item count, quick clear button, bulk edit modal launcher, bulk delete launcher, and export buttons.
 - **Table Pagination**: Uniform `TablePagination.svelte` at the footer of every table showing the current page, page size options (10, 25, 50, 100), item range (`Showing 1 to 10 of 42`), and navigation controls.
 - **Search & Multi-Attribute Filters**: Filter toolbar placed above tables with a search input (`Search` icon) and categorized dropdown filters.

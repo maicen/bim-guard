@@ -198,6 +198,20 @@ Automated testing is active and required for all changes:
 
 ---
 
+## Frontend Design System & Semantic Color Tokens (MANDATORY)
+
+All frontend UI code across `frontend/src/` must adhere to the semantic design token architecture:
+- **Never assign hardcoded color values**: Prohibited: hex codes (`#hex`), raw `rgb()`/`rgba()`, and dark-only Tailwind utilities (`bg-blue-950/20`, `border-emerald-800`, `text-blue-300`, `bg-rose-950`).
+- **Semantic Surfaces**: Use `bg-surface-canvas` (base viewport), `bg-surface-card` (cards/tables), `bg-surface-overlay` (popovers/flyouts), `bg-surface-hover` (interactive rows/buttons), `bg-surface-selected` (selected table rows & active cards).
+- **Semantic Typography**: Use `text-fg-primary` (high contrast titles), `text-fg-secondary` (body copy), `text-fg-muted` (metadata & captions), and `text-accent` (interactive chromatic accent).
+- **Semantic Borders & Rings**: Use `border-border-subtle`, `border-border-default`, `border-border-interactive`, and `focus:ring-accent`.
+- **Semantic Status Bands**: Use `bg-critical-bg text-critical border-critical-border`, `bg-warning-bg text-warning border-warning-border`, `bg-caution-bg text-caution border-caution-border`, `bg-success-bg text-success border-success-border`, `bg-info-bg text-info border-info-border`.
+- **Document & NLP Structure Overlays**: Reference CSS variables `var(--color-doc-heading)`, `var(--color-doc-paragraph)`, `var(--color-doc-list)`, `var(--color-doc-table)`, `var(--color-doc-picture)`.
+- **Table Selections**: Always use `bg-surface-selected` (never `bg-blue-950/*`).
+- **Reusable Primitives**: Always prefer `<Button>`, `<Input>`, `<FormField>`, `<Card>`, and `<Alert>` from `frontend/src/lib/components/ui/` and `frontend/src/lib/components/`.
+
+---
+
 ## Forbidden Patterns
 
 Never use any of the following:
@@ -205,6 +219,7 @@ Never use any of the following:
 | Forbidden | Reason / Use instead |
 |---|---|
 | Creating UI in Python / FastHTML | Build all UI in `frontend/` using Svelte 5 + Tailwind CSS. |
+| Hardcoding hex, RGB, or raw dark-only color classes in frontend | Use semantic design tokens from `frontend/src/app.css` (`@theme`). |
 | Hardcoding engineering cutoffs or scoring weights | Rules must be DB-driven. Read from database via `RuleService`. |
 | Returning raw unvalidated dicts from `app/api/**` | Return typed Pydantic models from `app/modules/contracts.py`. |
 | Ad hoc `fetch()` calls in Svelte components | Call backend methods via `frontend/src/lib/api.ts`. |

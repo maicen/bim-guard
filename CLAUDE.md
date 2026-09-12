@@ -276,3 +276,14 @@ All compliance and corrosion analysis workflows are strictly database-driven:
 ## Coding Guidelines
 
 Detailed coding rules covering the FastAPI backend, Svelte 5 frontend, and database operations are in [.github/instructions/project-specific.instructions.md](.github/instructions/project-specific.instructions.md).
+
+### Frontend Design System & Theme Variable Assignment (MANDATORY)
+- **Always use semantic tokens from `frontend/src/app.css` and `@theme`**: Never assign hardcoded hex codes (`#hex`), raw `rgb()`/`rgba()`, or dark-only palette utilities (`bg-blue-950/20`, `border-emerald-800`, `text-blue-300`).
+- **Surfaces**: Use `bg-surface-canvas`, `bg-surface-card`, `bg-surface-overlay`, `bg-surface-hover`, `bg-surface-selected`.
+- **Typography**: Use `text-fg-primary`, `text-fg-secondary`, `text-fg-muted`, and `text-accent`.
+- **Borders & Rings**: Use `border-border-subtle`, `border-border-default`, `border-border-interactive`, and `focus:ring-accent`.
+- **Status & Severity Bands**: Use `bg-critical-bg text-critical border-critical-border`, `bg-warning-bg text-warning border-warning-border`, `bg-caution-bg text-caution border-caution-border`, `bg-success-bg text-success border-success-border`, `bg-info-bg text-info border-info-border`.
+- **Document & NLP Structure Overlays**: Reference CSS variables `var(--color-doc-heading)`, `var(--color-doc-paragraph)`, `var(--color-doc-list)`, `var(--color-doc-table)`, `var(--color-doc-picture)`.
+- **Table Selected Rows**: Always use `bg-surface-selected`.
+- **UI Primitives**: Always prefer `<Button>`, `<Input>`, `<FormField>`, `<Card>`, and `<Alert>` from `frontend/src/lib/components/ui/` and `frontend/src/lib/components/`.
+

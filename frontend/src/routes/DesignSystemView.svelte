@@ -13,6 +13,8 @@
     Moon,
     Laptop,
     Sparkles,
+    FileText,
+    Shield,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import {
@@ -142,7 +144,7 @@
         </p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <!-- Canvas -->
         <Card class="p-4 bg-surface-canvas border-border-default">
           <div class="space-y-2">
@@ -186,7 +188,109 @@
             <p class="text-nano text-fg-muted">Strictly reserved for interactive actions and focus rings.</p>
           </div>
         </Card>
+
+        <!-- Row Selection -->
+        <Card class="p-4 bg-surface-card border-border-default">
+          <div class="space-y-2">
+            <span class="text-micro font-semibold uppercase tracking-wider text-fg-muted">Row Selection</span>
+            <div class="h-12 rounded-lg border border-accent/20 bg-surface-selected flex items-center justify-center text-xs font-mono text-accent">
+              bg-surface-selected
+            </div>
+            <p class="text-nano text-fg-muted">Selected table rows &amp; active navigation items.</p>
+          </div>
+        </Card>
+
+        <!-- Selection Hover -->
+        <Card class="p-4 bg-surface-card border-border-default">
+          <div class="space-y-2">
+            <span class="text-micro font-semibold uppercase tracking-wider text-fg-muted">Selection Hover</span>
+            <div class="h-12 rounded-lg border border-accent/30 bg-surface-selected-hover flex items-center justify-center text-xs font-mono text-accent">
+              bg-surface-selected-hover
+            </div>
+            <p class="text-nano text-fg-muted">Hover state on selected rows &amp; lists.</p>
+          </div>
+        </Card>
       </div>
+
+      <!-- Document & NLP Entity Visualization Tokens -->
+      <Card class="border-border-default">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <FileText class="h-4 w-4 text-accent" />
+            Document &amp; NLP Entity Visualization Tokens
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-xs text-fg-muted mb-4">
+            Standardized semantic tokens for document structural layout analysis, OCR bounding boxes, and compliance text entity classification.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl border border-doc-heading/30 bg-doc-heading/10 space-y-1">
+              <span class="text-micro font-bold uppercase tracking-wider text-doc-heading">Heading</span>
+              <p class="text-xs font-mono text-doc-heading">--color-doc-heading</p>
+              <p class="text-nano text-fg-muted">Section headers &amp; document titles</p>
+            </div>
+            <div class="p-3 rounded-xl border border-doc-paragraph/30 bg-doc-paragraph/10 space-y-1">
+              <span class="text-micro font-bold uppercase tracking-wider text-doc-paragraph">Paragraph</span>
+              <p class="text-xs font-mono text-doc-paragraph">--color-doc-paragraph</p>
+              <p class="text-nano text-fg-muted">Body narrative text blocks</p>
+            </div>
+            <div class="p-3 rounded-xl border border-doc-list/30 bg-doc-list/10 space-y-1">
+              <span class="text-micro font-bold uppercase tracking-wider text-doc-list">List Item</span>
+              <p class="text-xs font-mono text-doc-list">--color-doc-list</p>
+              <p class="text-nano text-fg-muted">Enumerated or bulleted items</p>
+            </div>
+            <div class="p-3 rounded-xl border border-doc-table/30 bg-doc-table/10 space-y-1">
+              <span class="text-micro font-bold uppercase tracking-wider text-doc-table">Table</span>
+              <p class="text-xs font-mono text-doc-table">--color-doc-table</p>
+              <p class="text-nano text-fg-muted">Tabular grid structures &amp; cells</p>
+            </div>
+            <div class="p-3 rounded-xl border border-doc-picture/30 bg-doc-picture/10 space-y-1">
+              <span class="text-micro font-bold uppercase tracking-wider text-doc-picture">Picture / Figure</span>
+              <p class="text-xs font-mono text-doc-picture">--color-doc-picture</p>
+              <p class="text-nano text-fg-muted">Diagrams, figures, and technical drawings</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Token Architecture Standard & Agent Governance -->
+      <Card class="border-border-default bg-surface-card">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <Shield class="h-4 w-4 text-emerald-400" />
+            Coding Agent Semantic Token Architecture Standard
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="space-y-2 p-3 rounded-xl border border-success-border bg-success-bg">
+              <span class="font-bold text-success flex items-center gap-1.5">
+                <CheckCircle2 class="h-3.5 w-3.5" />
+                Required Patterns
+              </span>
+              <ul class="space-y-1 text-fg-secondary text-caption list-disc list-inside">
+                <li>Always use semantic surfaces: <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">bg-surface-canvas</code>, <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">bg-surface-card</code>, <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">bg-surface-selected</code></li>
+                <li>Always use semantic typography: <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">text-fg-primary</code>, <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">text-fg-secondary</code>, <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">text-fg-muted</code></li>
+                <li>Always use semantic borders: <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">border-border-default</code>, <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">border-border-subtle</code></li>
+                <li>Query 3D viewer colors dynamically: <code class="font-mono text-nano text-fg-primary bg-surface-card px-1 py-0.5 rounded">getCssRgb('--color-surface-canvas')</code></li>
+              </ul>
+            </div>
+            <div class="space-y-2 p-3 rounded-xl border border-critical-border bg-critical-bg">
+              <span class="font-bold text-critical flex items-center gap-1.5">
+                <AlertCircle class="h-3.5 w-3.5" />
+                Strictly Prohibited
+              </span>
+              <ul class="space-y-1 text-fg-secondary text-caption list-disc list-inside">
+                <li>Never use hardcoded hex (<code class="font-mono text-nano text-critical">#1e293b</code>), <code class="font-mono text-nano text-critical">rgb()</code>, or <code class="font-mono text-nano text-critical">rgba()</code> in components or CSS</li>
+                <li>Never use raw palette utilities (<code class="font-mono text-nano text-critical">bg-slate-950</code>, <code class="font-mono text-nano text-critical">bg-blue-950/20</code>, <code class="font-mono text-nano text-critical">text-slate-400</code>)</li>
+                <li>Never use hardcoded 3D canvas backgrounds (<code class="font-mono text-nano text-critical">0x020617</code>)</li>
+                <li>Never use <code class="font-mono text-nano text-critical">text-white</code> on slate or surface cards</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <!-- Typography & Contrast Ramp -->
       <Card>
