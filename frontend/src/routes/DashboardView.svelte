@@ -287,8 +287,8 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-base font-bold tracking-tight text-slate-50">Project Registry</h2>
-        <p class="text-xs text-slate-400">
+        <h2 class="text-base font-bold tracking-tight text-fg-primary">Project Registry</h2>
+        <p class="text-xs text-fg-muted">
           Manage OpenBIM projects and jump directly to 3D visualization or compliance analysis.
         </p>
       </div>
@@ -302,22 +302,22 @@
 
     <!-- Filters and Search Bar -->
     <div
-      class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
+      class="flex flex-col items-center gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 md:flex-row"
     >
       <div class="relative w-full flex-1">
-        <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
         <input
           type="text"
           bind:value={table.search}
           placeholder="Filter projects by name or description..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-xl border border-border-default bg-surface-canvas py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
         />
       </div>
 
       <div class="flex w-full items-center gap-2 md:w-auto">
         <select
           bind:value={table.filters.status}
-          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+          class="rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         >
           <option value="all">All Statuses</option>
           <option value="Active">Active</option>
@@ -327,7 +327,7 @@
 
         <select
           bind:value={table.filters.domain}
-          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+          class="rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         >
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
@@ -347,7 +347,7 @@
     />
 
     <!-- Projects Table -->
-    <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+    <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
       {#if isLoading}
         <LoadingState message="Loading project registry..." />
       {:else if table.totalItems === 0}
@@ -363,9 +363,9 @@
         </div>
       {:else}
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-300">
+          <table class="w-full text-left text-xs text-fg-secondary">
             <thead
-              class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+              class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
             >
               <tr>
                 <th class="w-10 px-4 py-3">
@@ -420,10 +420,10 @@
                 <th class="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/60">
+            <tbody class="divide-y divide-border-subtle">
               {#each table.paginated as project (project.id)}
                 <tr
-                  class="transition-colors hover:bg-slate-900/60 {table.isSelected(project.id)
+                  class="transition-colors hover:bg-surface-hover {table.isSelected(project.id)
                     ? 'bg-surface-selected'
                     : ''}"
                 >
@@ -434,18 +434,18 @@
                       ariaLabel={`Select project ${project.name}`}
                     />
                   </td>
-                  <td class="px-4 py-3 font-semibold text-slate-50">
+                  <td class="px-4 py-3 font-semibold text-fg-primary">
                     <div class="flex flex-col items-start">
                       <button
                         type="button"
                         onclick={() => onSelectProjectForDashboard(project.id)}
-                        class="text-left text-sm text-slate-50 transition-colors hover:text-accent hover:underline"
+                        class="text-left text-sm text-fg-primary transition-colors hover:text-accent hover:underline"
                         title="Open project"
                       >
                         {project.name}
                       </button>
                       {#if project.description}
-                        <span class="max-w-sm truncate text-caption font-normal text-slate-400">
+                        <span class="max-w-sm truncate text-caption font-normal text-fg-muted">
                           {project.description}
                         </span>
                       {/if}
@@ -457,7 +457,7 @@
                       'Active'
                         ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
                         : project.status === 'Archived'
-                          ? 'border-slate-700 bg-slate-800 text-slate-400'
+                          ? 'border-border-interactive bg-surface-overlay text-fg-muted'
                           : 'border-amber-800/60 bg-amber-950/40 text-amber-400'}"
                     >
                       {project.status}
@@ -473,7 +473,7 @@
                         >
                       </div>
                     {:else}
-                      <div class="flex items-center gap-1.5 text-slate-500">
+                      <div class="flex items-center gap-1.5 text-fg-muted">
                         <XCircle class="h-4 w-4" />
                         <span class="text-caption">None</span>
                       </div>
@@ -488,8 +488,8 @@
                       {formatAnalysisDomain(project.analysis_type)}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-slate-400">{project.country}</td>
-                  <td class="whitespace-nowrap px-4 py-3 text-slate-500">
+                  <td class="px-4 py-3 text-fg-muted">{project.country}</td>
+                  <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
                     {project.created_at ? project.created_at.substring(0, 10) : "-"}
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-right">
@@ -497,7 +497,7 @@
                       <button
                         type="button"
                         onclick={() => openDetails(project)}
-                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                        class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         title="View project details"
                       >
                         <Eye class="h-3.5 w-3.5" />
@@ -507,7 +507,7 @@
                         <button
                           type="button"
                           onclick={() => onSelectProjectForViewer(project.id)}
-                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="Open in 3D Viewer"
                         >
                           <ScanEye class="h-3.5 w-3.5" />
@@ -563,7 +563,7 @@
                       <button
                         type="button"
                         onclick={() => promptDelete(project.id, project.name)}
-                        class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Delete project"
                       >
                         <Trash2 class="h-3.5 w-3.5" />

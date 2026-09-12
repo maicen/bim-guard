@@ -71,19 +71,19 @@
 {#if isOpen && project}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
             <Sparkles class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-lg font-bold tracking-tight text-slate-50">
+            <h2 class="text-lg font-bold tracking-tight text-fg-primary">
               Quality Improvements — {project.name}
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               Generate and persist an improved IFC version without mutating the original source.
             </p>
           </div>
@@ -91,7 +91,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -115,9 +115,9 @@
         {/if}
 
         <!-- Run form -->
-        <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-          <h3 class="text-sm font-semibold text-slate-50">Execute IFC Quality Improvement</h3>
-          <p class="text-xs text-slate-400">
+        <div class="space-y-3 rounded-2xl border border-border-default bg-surface-canvas/60 p-5">
+          <h3 class="text-sm font-semibold text-fg-primary">Execute IFC Quality Improvement</h3>
+          <p class="text-xs text-fg-muted">
             Triggers an automated quality improvement pass. Normalizes geometric properties,
             property sets, and element GUID linkages without mutating original project IFC files.
           </p>
@@ -146,20 +146,20 @@
 
         <!-- Lineage History Table -->
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-slate-50">Persisted Improvement History</h3>
+          <h3 class="text-sm font-semibold text-fg-primary">Persisted Improvement History</h3>
 
-          <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/40">
+          <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-canvas/40">
             {#if isLoadingHistory}
-              <div class="p-8 text-center text-xs text-slate-400">Loading version history...</div>
+              <div class="p-8 text-center text-xs text-fg-muted">Loading version history...</div>
             {:else if history.length === 0}
-              <div class="p-8 text-center text-xs text-slate-500">
+              <div class="p-8 text-center text-xs text-fg-muted">
                 No improved versions generated yet for this project.
               </div>
             {:else}
               <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-slate-300">
+                <table class="w-full text-left text-xs text-fg-secondary">
                   <thead
-                    class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                    class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >
                     <tr>
                       <th class="px-4 py-3">Source Ver</th>
@@ -170,10 +170,10 @@
                       <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-slate-800/60">
+                  <tbody class="divide-y divide-border-subtle">
                     {#each history as row (row.id)}
-                      <tr class="transition-colors hover:bg-slate-900/50">
-                        <td class="px-4 py-3 font-mono text-slate-400">v{row.source_version}</td>
+                      <tr class="transition-colors hover:bg-surface-hover">
+                        <td class="px-4 py-3 font-mono text-fg-muted">v{row.source_version}</td>
                         <td class="px-4 py-3 font-mono font-semibold text-purple-300"
                           >v{row.version}</td
                         >
@@ -185,11 +185,11 @@
                           </span>
                         </td>
                         <td
-                          class="max-w-xs truncate px-4 py-3 font-mono text-caption text-slate-400"
+                          class="max-w-xs truncate px-4 py-3 font-mono text-caption text-fg-muted"
                         >
                           {JSON.stringify(row.summary || {})}
                         </td>
-                        <td class="whitespace-nowrap px-4 py-3 text-caption text-slate-400">
+                        <td class="whitespace-nowrap px-4 py-3 text-caption text-fg-muted">
                           {row.created_at ? row.created_at.substring(0, 10) : "-"}
                         </td>
                         <td class="whitespace-nowrap px-4 py-3 text-right">
@@ -197,7 +197,7 @@
                             <button
                               type="button"
                               onclick={() => (selectedVersionForView = row)}
-                              class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                              class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                               title="Inspect version details"
                             >
                               <Eye class="h-3.5 w-3.5" />
@@ -225,11 +225,11 @@
       </div>
 
       <!-- Footer -->
-      <div class="flex justify-end border-t border-slate-800 bg-slate-950/60 px-6 py-3">
+      <div class="flex justify-end border-t border-border-default bg-surface-canvas/60 px-6 py-3">
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>
@@ -243,19 +243,19 @@
     class="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
   >
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
         <div class="flex items-center gap-2">
           <Sparkles class="h-4 w-4 text-purple-400" />
-          <h3 class="text-sm font-bold text-slate-50">
+          <h3 class="text-sm font-bold text-fg-primary">
             Lineage Version v{selectedVersionForView.version} Details
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (selectedVersionForView = null)}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-4 w-4" />
         </button>
@@ -263,33 +263,33 @@
 
       <div class="space-y-3 text-xs">
         <div
-          class="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono"
+          class="grid grid-cols-2 gap-2 rounded-xl border border-border-default bg-surface-canvas p-3 font-mono"
         >
           <div>
-            <span class="text-slate-500">Source:</span>
-            <span class="text-slate-300">v{selectedVersionForView.source_version}</span>
+            <span class="text-fg-muted">Source:</span>
+            <span class="text-fg-secondary">v{selectedVersionForView.source_version}</span>
           </div>
           <div>
-            <span class="text-slate-500">Generated:</span>
+            <span class="text-fg-muted">Generated:</span>
             <span class="text-purple-300">v{selectedVersionForView.version}</span>
           </div>
           <div>
-            <span class="text-slate-500">Status:</span>
+            <span class="text-fg-muted">Status:</span>
             <span class="text-emerald-400">{selectedVersionForView.status}</span>
           </div>
           <div>
-            <span class="text-slate-500">Created:</span>
-            <span class="text-slate-400">{selectedVersionForView.created_at?.substring(0, 10)}</span
+            <span class="text-fg-muted">Created:</span>
+            <span class="text-fg-muted">{selectedVersionForView.created_at?.substring(0, 10)}</span
             >
           </div>
         </div>
 
         <div>
-          <span class="text-caption font-semibold uppercase tracking-wider text-slate-400"
+          <span class="text-caption font-semibold uppercase tracking-wider text-fg-muted"
             >Modifications Summary</span
           >
           <pre
-            class="mt-1 max-h-56 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption text-slate-300">{JSON.stringify(
+            class="mt-1 max-h-56 overflow-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption text-fg-secondary">{JSON.stringify(
               selectedVersionForView.summary,
               null,
               2,
@@ -297,8 +297,8 @@
         </div>
 
         {#if selectedVersionForView.output_reference}
-          <div class="truncate text-caption text-slate-400">
-            <span class="font-semibold text-slate-300">Storage Ref:</span>
+          <div class="truncate text-caption text-fg-muted">
+            <span class="font-semibold text-fg-secondary">Storage Ref:</span>
             {selectedVersionForView.output_reference}
           </div>
         {/if}
@@ -308,7 +308,7 @@
         <button
           type="button"
           onclick={() => (selectedVersionForView = null)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>

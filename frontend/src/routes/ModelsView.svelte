@@ -360,7 +360,7 @@
         </button>
 
         <div
-          class="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-2"
+          class="flex flex-wrap items-center gap-2.5 rounded-2xl border border-border-default bg-surface-card/90 p-2"
         >
           <div class="flex items-center gap-2 px-2">
             {#if selectedSource === "supabase"}
@@ -368,14 +368,14 @@
             {:else}
               <FolderGit2 class="h-4 w-4 text-blue-400" />
             {/if}
-            <span class="whitespace-nowrap text-xs font-semibold text-slate-300">Storage Source:</span
+            <span class="whitespace-nowrap text-xs font-semibold text-fg-secondary">Storage Source:</span
             >
           </div>
 
           <select
             bind:value={selectedSource}
             onchange={handleSourceChange}
-            class="max-w-[240px] truncate rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-50 focus:border-blue-500 focus:outline-hidden"
+            class="max-w-[240px] truncate rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-primary focus:border-blue-500 focus:outline-hidden"
           >
             <option value="supabase">Supabase Database (Main Registry)</option>
             {#if repos.length > 0}
@@ -392,7 +392,7 @@
           <button
             type="button"
             onclick={() => (isRepoManagerOpen = true)}
-            class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+            class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
             title="Manage GitHub Repositories (Add, Edit, Delete)"
           >
             <Plus class="h-3.5 w-3.5 text-blue-400" />
@@ -403,7 +403,7 @@
             <button
               type="button"
               onclick={() => initialProjectId && loadFiles(initialProjectId)}
-              class="rounded-xl border border-slate-800 bg-slate-950 p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+              class="rounded-xl border border-border-default bg-surface-canvas p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
               title="Refresh attached models"
             >
               <RotateCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-blue-400' : ''}" />
@@ -415,7 +415,7 @@
                 const repoId = parseInt(selectedSource.split(":")[1], 10);
                 loadSelectedRepoStructure(repoId, true);
               }}
-              class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+              class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
               title="Re-sync GitHub repository models & manifest"
             >
               <RotateCw class="h-3.5 w-3.5 {isRepoLoading ? 'animate-spin text-blue-400' : ''}" />
@@ -436,15 +436,15 @@
   <!-- VIEW 1: ATTACHED MODELS (this project's registry) -->
   {#if selectedSource === "supabase"}
     <div
-      class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
+      class="flex flex-col items-center gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 md:flex-row"
     >
       <div class="relative w-full flex-1">
-        <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
         <input
           type="text"
           bind:value={table.search}
           placeholder="Filter models by filename or role..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-xl border border-border-default bg-surface-canvas py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
         />
       </div>
     </div>
@@ -456,7 +456,7 @@
       onBulkDelete={() => (isBulkDeleteModalOpen = true)}
     />
 
-    <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+    <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
       {#if isLoading}
         <LoadingState message="Loading models…" />
       {:else if table.totalItems === 0}
@@ -473,8 +473,8 @@
         </div>
       {:else}
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-300">
-            <thead class="border-b border-slate-800">
+          <table class="w-full text-left text-xs text-fg-secondary">
+            <thead class="border-b border-border-default">
               <tr>
                 <th class="w-10 px-4 py-3">
                   <TableCheckbox
@@ -496,7 +496,7 @@
                   sortAsc={table.sortAsc}
                   onSort={(f) => table.toggleSort(f)}>Role</SortHeader
                 >
-                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >ISO 19650</th
                 >
                 <SortHeader
@@ -517,7 +517,7 @@
                   sortAsc={table.sortAsc}
                   onSort={(f) => table.toggleSort(f)}>Elements</SortHeader
                 >
-                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Discipline</th
                 >
                 <SortHeader
@@ -527,15 +527,15 @@
                   onSort={(f) => table.toggleSort(f)}>Uploaded</SortHeader
                 >
                 <th
-                  class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Actions</th
                 >
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/60">
+            <tbody class="divide-y divide-border-subtle">
               {#each table.paginated as file (file.id ?? file.file_path)}
                 <tr
-                  class="transition-colors hover:bg-slate-900/60 {table.isSelected(
+                  class="transition-colors hover:bg-surface-hover {table.isSelected(
                     file.id ?? file.file_path,
                   )
                     ? 'bg-surface-selected'
@@ -549,11 +549,11 @@
                     />
                   </td>
                   <td class="max-w-xs truncate px-4 py-3">
-                    <div class="truncate font-semibold text-slate-50" title={file.file_name}>
+                    <div class="truncate font-semibold text-fg-primary" title={file.file_name}>
                       {file.file_name}
                     </div>
                     {#if file.authoring_application}
-                      <div class="truncate text-micro text-slate-500" title={file.authoring_application}>
+                      <div class="truncate text-micro text-fg-muted" title={file.authoring_application}>
                         {file.authoring_application}
                       </div>
                     {/if}
@@ -568,7 +568,7 @@
                       </span>
                     {:else}
                       <span
-                        class="inline-block rounded-md border border-slate-700/60 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase tracking-wider text-slate-400"
+                        class="inline-block rounded-md border border-border-default bg-surface-overlay px-2 py-0.5 text-micro font-semibold uppercase tracking-wider text-fg-muted"
                       >
                         {file.role || "context"}
                       </span>
@@ -581,19 +581,19 @@
                       cdeState={file.cde_state}
                     />
                   </td>
-                  <td class="px-4 py-3 text-slate-400">
+                  <td class="px-4 py-3 text-fg-muted">
                     {file.ifc_schema || "—"}
                   </td>
-                  <td class="px-4 py-3 text-right text-slate-400">
+                  <td class="px-4 py-3 text-right text-fg-muted">
                     {file.storey_count ?? "—"}
                   </td>
-                  <td class="px-4 py-3 text-right text-slate-400">
+                  <td class="px-4 py-3 text-right text-fg-muted">
                     {file.element_count ?? "—"}
                   </td>
-                  <td class="px-4 py-3 text-slate-400" title={JSON.stringify(file.discipline_summary ?? {})}>
+                  <td class="px-4 py-3 text-fg-muted" title={JSON.stringify(file.discipline_summary ?? {})}>
                     {disciplineSummaryLabel(file)}
                   </td>
-                  <td class="px-4 py-3 text-slate-400">
+                  <td class="px-4 py-3 text-fg-muted">
                     {file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : "—"}
                   </td>
                   <td class="px-4 py-3 text-right">
@@ -601,7 +601,7 @@
                       <button
                         type="button"
                         onclick={() => initialProjectId && onSelectProjectForViewer(initialProjectId)}
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         title="Open in 3D Viewer"
                       >
                         <ScanEye class="h-3.5 w-3.5" />
@@ -612,7 +612,7 @@
                           type="button"
                           onclick={() => handleSetPrimary(file)}
                           disabled={file.is_primary || pendingActionId === file.id}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-amber-950/30 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-amber-950/30 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
                           title={file.is_primary ? "Already primary" : "Set as primary model"}
                         >
                           <Star class="h-3.5 w-3.5" />
@@ -633,7 +633,7 @@
                         <button
                           type="button"
                           onclick={() => openEditModal(file)}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="Edit model (name, ISO 19650 fields, replace file)"
                         >
                           <Pencil class="h-3.5 w-3.5" />
@@ -642,7 +642,7 @@
                         <button
                           type="button"
                           onclick={() => promptDelete(file)}
-                          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                           title="Delete model"
                         >
                           <Trash2 class="h-3.5 w-3.5" />
@@ -675,7 +675,7 @@
     <div class="space-y-4">
       {#if isRepoLoading}
         <div
-          class="flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-xs text-slate-400"
+          class="flex items-center justify-center gap-2 rounded-2xl border border-border-default bg-surface-card/40 p-12 text-center text-xs text-fg-muted"
         >
           <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
           <span>Reading GitHub repository structure & OpenBIM models tree...</span>
@@ -683,27 +683,27 @@
       {:else if activeRepoStructure}
         <!-- Repo Banner -->
         <div
-          class="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:flex-row md:items-center"
+          class="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border-default bg-surface-card/80 p-4 md:flex-row md:items-center"
         >
           <div class="space-y-1">
             <div class="flex items-center gap-2">
               <FolderGit2 class="h-5 w-5 text-blue-400" />
-              <h2 class="text-lg font-bold text-slate-50">
+              <h2 class="text-lg font-bold text-fg-primary">
                 {activeRepoStructure.owner}/{activeRepoStructure.name}
               </h2>
               <span
-                class="inline-flex items-center gap-1 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 font-mono text-caption text-slate-400"
+                class="inline-flex items-center gap-1 rounded border border-border-default bg-surface-canvas px-2 py-0.5 font-mono text-caption text-fg-muted"
               >
                 <GitBranch class="h-3 w-3 text-blue-400" />
                 {activeRepoStructure.branch}
               </span>
             </div>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               Discovered <span class="font-semibold text-blue-400"
                 >{activeRepoStructure.models_count}</span
               >
               OpenBIM models across
-              <span class="font-semibold text-slate-300"
+              <span class="font-semibold text-fg-secondary"
                 >{activeRepoStructure.categories.length}</span
               > category folders.
             </p>
@@ -714,7 +714,7 @@
               href={activeRepoStructure.url}
               target="_blank"
               rel="noopener noreferrer"
-              class="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-slate-800"
+              class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-surface-hover"
             >
               <span>GitHub Repo</span>
               <ExternalLink class="h-3.5 w-3.5" />
@@ -724,15 +724,15 @@
 
         <!-- Filter Bar -->
         <div
-          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row"
+          class="flex flex-col items-center gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 md:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               bind:value={table.search}
               placeholder="Search repository IFC models by filename or path..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
             />
           </div>
 
@@ -740,7 +740,7 @@
             <div class="flex w-full items-center gap-2 md:w-auto">
               <select
                 bind:value={repoCategoryFilter}
-                class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
+                class="rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="all">All Category Folders</option>
                 {#each activeRepoStructure.categories as cat (cat)}
@@ -752,16 +752,16 @@
         </div>
 
         <!-- Repo Models Table -->
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           {#if filteredRepoItems.length === 0}
-            <div class="p-12 text-center text-xs text-slate-500">
+            <div class="p-12 text-center text-xs text-fg-muted">
               No OpenBIM models found matching your search or category filter.
             </div>
           {:else}
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-300">
+              <table class="w-full text-left text-xs text-fg-secondary">
                 <thead
-                  class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <tr>
                     <th class="w-10 px-4 py-3">
@@ -782,11 +782,11 @@
                     <th class="px-4 py-3 text-right">Download</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-border-subtle">
                   {#each filteredRepoItems as item (item.path)}
                     {@const isSelected = selectedRepoPaths.has(item.path)}
                     <tr
-                      class="transition-colors hover:bg-slate-900/60 {isSelected
+                      class="transition-colors hover:bg-surface-hover {isSelected
                         ? 'bg-surface-selected'
                         : ''}"
                     >
@@ -797,26 +797,26 @@
                           ariaLabel={`Select ${item.name}`}
                         />
                       </td>
-                      <td class="px-4 py-3 font-semibold text-slate-50">
+                      <td class="px-4 py-3 font-semibold text-fg-primary">
                         <div class="flex items-center gap-2">
                           <Box class="h-4 w-4 shrink-0 text-blue-400" />
                           <span class="text-sm">{item.name}</span>
                         </div>
                       </td>
                       <td
-                        class="max-w-xs truncate px-4 py-3 font-mono text-caption text-slate-400"
+                        class="max-w-xs truncate px-4 py-3 font-mono text-caption text-fg-muted"
                         title={item.path}
                       >
                         {item.path}
                       </td>
                       <td class="px-4 py-3">
                         <span
-                          class="inline-block rounded border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-micro font-semibold uppercase text-slate-300"
+                          class="inline-block rounded border border-border-interactive bg-surface-overlay px-2 py-0.5 font-mono text-micro font-semibold uppercase text-fg-secondary"
                         >
                           {item.category}
                         </span>
                       </td>
-                      <td class="whitespace-nowrap px-4 py-3 text-slate-400">
+                      <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
                         {formatBytes(item.size)}
                       </td>
                       <td class="px-4 py-3 text-center">
@@ -835,7 +835,7 @@
                           href={item.download_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="inline-flex rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="inline-flex rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="Direct download raw IFC"
                         >
                           <Download class="h-3.5 w-3.5" />
@@ -855,9 +855,9 @@
          once at least one repo model is checked. -->
     {#if selectedRepoPaths.size > 0}
       <div
-        class="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-blue-800/60 bg-slate-900 p-4 shadow-lg shadow-black/40"
+        class="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-blue-800/60 bg-surface-card p-4 shadow-lg shadow-black/40"
       >
-        <span class="text-xs font-medium text-slate-300">
+        <span class="text-xs font-medium text-fg-secondary">
           {selectedRepoPaths.size} model{selectedRepoPaths.size === 1 ? "" : "s"} selected
         </span>
         <button

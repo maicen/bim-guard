@@ -375,23 +375,23 @@
 
   {#if selectedProjectId}
     <!-- ═══ BCF Deliverables & Live Topics Hub ═══ -->
-    <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+    <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
       <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <div class="flex items-center gap-2">
             <FolderArchive class="h-4 w-4 text-blue-400" />
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               buildingSMART BCF Collaboration Hub
             </h2>
             <span
-              class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold text-slate-300"
+              class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold text-fg-secondary"
             >
               {activeTab === "live_bcf"
                 ? `${bcfTopics.length} Live Topics`
                 : `${bcfArtifacts.length} Artifacts`}
             </span>
           </div>
-          <p class="mt-1 text-xs text-slate-400">
+          <p class="mt-1 text-xs text-fg-muted">
             Bidirectional BCF REST API v2.1/v3.0 live topics exchange and persisted BCF zip
             deliverables with ISO 19650 governance tags.
           </p>
@@ -400,14 +400,14 @@
         <!-- Tab & Action Controls -->
         <div class="flex shrink-0 flex-wrap items-center gap-2.5">
           <div
-            class="flex items-center rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs"
+            class="flex items-center rounded-xl border border-border-default bg-surface-canvas p-1 text-xs"
           >
             <button
               type="button"
               onclick={() => (activeTab = "live_bcf")}
               class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'live_bcf'
                 ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-slate-50'}"
+                : 'text-fg-muted hover:text-fg-primary'}"
             >
               Live BCF 2.1 Topics
             </button>
@@ -415,8 +415,8 @@
               type="button"
               onclick={() => (activeTab = "artifacts")}
               class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'artifacts'
-                ? 'bg-slate-800 text-slate-50'
-                : 'text-slate-400 hover:text-slate-50'}"
+                ? 'bg-surface-overlay text-fg-primary'
+                : 'text-fg-muted hover:text-fg-primary'}"
             >
               BCF Zip Artifacts
             </button>
@@ -440,7 +440,7 @@
               else loadBcfArtifacts();
             }}
             disabled={isTopicsLoading || isBcfLoading}
-            class="rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50 disabled:opacity-50"
+            class="rounded-xl border border-border-interactive bg-surface-overlay p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
             title="Refresh Deliverables"
           >
             <RefreshCw
@@ -455,22 +455,22 @@
 
         <!-- Filters & Search Toolbar -->
         <div
-          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+          class="flex flex-col items-center gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 md:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               bind:value={topicTable.search}
               placeholder="Search topics by title, GUID, assignee, or description..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <select
               bind:value={topicTable.filters.status}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All Statuses</option>
               <option value="Open">Open</option>
@@ -481,7 +481,7 @@
 
             <select
               bind:value={topicTable.filters.priority}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All Priorities</option>
               <option value="Critical">Critical</option>
@@ -492,7 +492,7 @@
 
             <select
               bind:value={topicTable.filters.cde}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All CDE States</option>
               <option value="WIP">WIP</option>
@@ -533,11 +533,11 @@
             />
           </div>
         {:else}
-          <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+          <div class="overflow-x-auto rounded-xl border border-border-default">
             <table class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-micro font-semibold uppercase tracking-wider text-slate-400"
+                  class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <th class="w-10 px-4 py-3">
                     <TableCheckbox
@@ -584,10 +584,10 @@
                   <th class="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-800/60">
+              <tbody class="divide-y divide-border-subtle">
                 {#each topicTable.paginated as topic (topic.guid)}
                   <tr
-                    class="transition-colors hover:bg-slate-900/60 {topicTable.isSelected(
+                    class="transition-colors hover:bg-surface-hover {topicTable.isSelected(
                       topic.guid,
                     )
                       ? 'bg-surface-selected'
@@ -600,19 +600,19 @@
                         ariaLabel={`Select topic ${topic.title}`}
                       />
                     </td>
-                    <td class="px-4 py-3 font-mono text-caption text-slate-400">
+                    <td class="px-4 py-3 font-mono text-caption text-fg-muted">
                       {topic.guid.substring(0, 8)}...
                     </td>
                     <td class="px-4 py-3">
-                      <div class="font-medium text-slate-50">{topic.title}</div>
-                      <div class="text-micro text-slate-400">
+                      <div class="font-medium text-fg-primary">{topic.title}</div>
+                      <div class="text-micro text-fg-muted">
                         {topic.topic_type || "Clash / Compliance"}
                       </div>
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-1.5">
                         <SeverityBadge severity={topic.topic_status || "Open"} />
-                        <span class="text-micro font-medium text-slate-400">
+                        <span class="text-micro font-medium text-fg-muted">
                           {topic.priority || "Normal"}
                         </span>
                       </div>
@@ -624,14 +624,14 @@
                         cdeState={topic.cde_state || "WIP"}
                       />
                     </td>
-                    <td class="px-4 py-3 font-mono text-slate-300">
+                    <td class="px-4 py-3 font-mono text-fg-secondary">
                       {topic.component_guids ? topic.component_guids.length : 0} GUID{topic
                         .component_guids?.length === 1
                         ? ""
                         : "s"}
                     </td>
                     <td class="px-4 py-3">
-                      <span class="inline-flex items-center gap-1 text-caption text-slate-300">
+                      <span class="inline-flex items-center gap-1 text-caption text-fg-secondary">
                         <Camera class="h-3 w-3 text-blue-400" />
                         <span>{topic.viewpoints_count || 1}</span>
                       </span>
@@ -641,7 +641,7 @@
                         <button
                           type="button"
                           onclick={() => openTopicDetails(topic)}
-                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="View topic discussion & viewpoints"
                         >
                           <Eye class="h-3.5 w-3.5" />
@@ -686,28 +686,28 @@
 
         <!-- Filters & Project Filter Toolbar -->
         <div
-          class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 sm:flex-row"
+          class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 sm:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               bind:value={artifactTable.search}
               placeholder="Filter BCF archives by filename or project..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
 
           {#if selectedProjectId}
             <div
-              class="flex items-center rounded-xl border border-slate-800 bg-slate-900 p-1 text-xs"
+              class="flex items-center rounded-xl border border-border-default bg-surface-card p-1 text-xs"
             >
               <button
                 type="button"
                 onclick={() => (filterToSelectedProject = false)}
                 class="rounded-lg px-2.5 py-1 font-medium transition-colors {!filterToSelectedProject
-                  ? 'bg-slate-800 text-slate-50'
-                  : 'text-slate-400 hover:text-slate-50'}"
+                  ? 'bg-surface-overlay text-fg-primary'
+                  : 'text-fg-muted hover:text-fg-primary'}"
               >
                 All Projects
               </button>
@@ -716,7 +716,7 @@
                 onclick={() => (filterToSelectedProject = true)}
                 class="rounded-lg px-2.5 py-1 font-medium transition-colors {filterToSelectedProject
                   ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-slate-50'}"
+                  : 'text-fg-muted hover:text-fg-primary'}"
               >
                 {currentProject?.name || "Selected"}
               </button>
@@ -734,7 +734,7 @@
         />
 
         {#if isBcfLoading && bcfArtifacts.length === 0}
-          <div class="p-12 text-center text-xs text-slate-400">
+          <div class="p-12 text-center text-xs text-fg-muted">
             <div
               class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"
             ></div>
@@ -742,18 +742,18 @@
           </div>
         {:else if artifactTable.totalItems === 0}
           <div
-            class="rounded-xl border border-dashed border-slate-800 p-12 text-center text-xs text-slate-500"
+            class="rounded-xl border border-dashed border-border-default p-12 text-center text-xs text-fg-muted"
           >
             {filterToSelectedProject
               ? `No BCF reports found for ${currentProject?.name || "this project"}. Run an ARCH Compliance Audit to generate one.`
               : "No persisted BCF artifacts found matching your filter."}
           </div>
         {:else}
-          <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+          <div class="overflow-x-auto rounded-xl border border-border-default">
             <table class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr
-                  class="border-b border-slate-800 bg-slate-950/60 text-micro font-semibold uppercase tracking-wider text-slate-400"
+                  class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <th class="w-10 px-4 py-3">
                     <TableCheckbox
@@ -807,10 +807,10 @@
                   <th class="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-800/60">
+              <tbody class="divide-y divide-border-subtle">
                 {#each artifactTable.paginated as artifact (artifact.id)}
                   <tr
-                    class="transition-colors hover:bg-slate-900/60 {artifactTable.isSelected(
+                    class="transition-colors hover:bg-surface-hover {artifactTable.isSelected(
                       artifact.id,
                     )
                       ? 'bg-surface-selected'
@@ -823,13 +823,13 @@
                         ariaLabel={`Select artifact ${artifact.filename}`}
                       />
                     </td>
-                    <td class="px-4 py-3 font-mono text-slate-500">#{artifact.id}</td>
-                    <td class="px-4 py-3 font-medium text-slate-50">
+                    <td class="px-4 py-3 font-mono text-fg-muted">#{artifact.id}</td>
+                    <td class="px-4 py-3 font-medium text-fg-primary">
                       {getProjectName(artifact.project_id)}
                     </td>
                     <td class="px-4 py-3">
                       <div
-                        class="max-w-xs truncate font-mono text-slate-300"
+                        class="max-w-xs truncate font-mono text-fg-secondary"
                         title={artifact.filename}
                       >
                         {artifact.filename}
@@ -845,10 +845,10 @@
                         {artifact.issue_count} issue{artifact.issue_count === 1 ? "" : "s"}
                       </span>
                     </td>
-                    <td class="px-4 py-3 font-mono text-slate-400">
+                    <td class="px-4 py-3 font-mono text-fg-muted">
                       {formatBytes(artifact.byte_size)}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-3 text-slate-400">
+                    <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
                       {formatDate(artifact.created_at)}
                     </td>
                     <td class="px-4 py-3 text-right">
@@ -878,7 +878,7 @@
                         <button
                           type="button"
                           onclick={() => promptDeleteArtifact(artifact)}
-                          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                           title="Delete BCF archive"
                         >
                           <Trash2 class="h-3.5 w-3.5" />
@@ -906,7 +906,7 @@
     </div>
   {:else}
     <div
-      class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
+      class="rounded-2xl border border-dashed border-border-default p-16 text-center text-xs text-fg-muted"
     >
       Please select a project from the top header to generate and export compliance audit deliverables.
     </div>
