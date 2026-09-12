@@ -854,14 +854,17 @@ def get_rule_source(
         )
 
     snippet = rule.get("source_text") or ""
-    pages = DocumentPagesService().get_pages(int(document_id))
-    page_number = DocumentPagesService.find_best_matching_page(pages, snippet)
+    page_number = rule.get("source_page_number")
+    if not page_number:
+        pages = DocumentPagesService().get_pages(int(document_id))
+        page_number = DocumentPagesService.find_best_matching_page(pages, snippet)
 
     return RuleSourceResponse(
         document_id=int(document_id),
         filename=doc.get("filename", "document"),
         page_number=page_number,
         snippet=snippet,
+        bbox=rule.get("source_bbox"),
     )
 
 

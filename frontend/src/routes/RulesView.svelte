@@ -2487,6 +2487,7 @@
           documentId={viewingSource.document_id}
           page={viewingSource.page_number}
           highlightText={viewingSource.snippet}
+          bbox={viewingSource.bbox}
         />
       </div>
     </div>

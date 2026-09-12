@@ -739,6 +739,11 @@
       <div>
         <h2 class="text-lg font-bold tracking-tight text-slate-50">
           Draft Review ({draftRules.length} draft{draftRules.length === 1 ? "" : "s"})
+          {#if draftRules[0]?.proposed_rule.ruleset_id}
+            <span class="ml-2 rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-caption font-semibold text-slate-400">
+              ruleset {draftRules[0].proposed_rule.ruleset_id}
+            </span>
+          {/if}
         </h2>
         <p class="text-xs text-slate-400">
           Accept or reject each candidate, then promote accepted drafts into the compliance rule

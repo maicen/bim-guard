@@ -1,6 +1,7 @@
 """LLM-only compliance rule extraction from pre-extracted document text."""
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from app.logging_config import get_logger
@@ -271,6 +272,12 @@ class RuleExtractionService:
             for node in nodes
         }
 
+        # One ruleset per extraction run, named after when it ran, so every
+        # draft this call produces (however many nodes/clauses it spans)
+        # stays grouped and identifiable as a batch -- overrides whatever
+        # ruleset_id the LLM itself proposed per-node.
+        batch_ruleset_id = f"EXTRACTED-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
+
         extraction_progress.start(document_id, total=len(nodes))
         semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
 
@@ -289,7 +296,16 @@ class RuleExtractionService:
                 finally:
                     extraction_progress.increment(document_id)
                 return [
-                    self._ground_draft_with_bsdd(draft.model_copy(update={"source_snippet": node.text}))
+                    self._ground_draft_with_bsdd(
+                        draft.model_copy(
+                            update={
+                                "source_snippet": node.text,
+                                "proposed_rule": draft.proposed_rule.model_copy(
+                                    update={"ruleset_id": batch_ruleset_id}
+                                ),
+                            }
+                        )
+                    )
                     for draft in node_drafts
                 ]
 

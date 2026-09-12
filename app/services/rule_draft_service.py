@@ -132,11 +132,15 @@ class RuleDraftService:
             )
 
         payload = RuleCreateRequest.model_validate(row.get("proposed_rule") or {})
+        clause_meta = row.get("clause") or {}
         created = self._rule_service.create_rule(
             rule_id=payload.rule_id,
             description=payload.description or "",
             source_text=row.get("source_snippet") or "",
             source_document_id=row.get("source_document_id"),
+            source_node_id=row.get("source_node_id") or None,
+            source_page_number=clause_meta.get("page_number"),
+            source_bbox=row.get("bbox") or clause_meta.get("bbox"),
             property_set=payload.property_set or "",
             property_name=payload.property_name or "",
             operator=payload.operator or "==",

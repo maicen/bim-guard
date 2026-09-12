@@ -18,6 +18,9 @@ from app.utils import (
 _RICH_COLUMNS = {
     "source_text": str,
     "source_document_id": int,  # FK to documents.id, when the rule was extracted from one
+    "source_node_id": str,  # Links back to the draft's originating DocumentNodeContract.node_id
+    "source_page_number": int,  # 1-based source page number, carried from the draft's clause metadata
+    "source_bbox": dict,  # Bounding box on that page: {l, t, r, b, coord_origin}
     "property_set": str,
     "property_name": str,
     "fallback_property": str,
@@ -403,6 +406,9 @@ class RuleService:
         # rich schema
         source_text: str = "",
         source_document_id: int | None = None,
+        source_node_id: str | None = None,
+        source_page_number: int | None = None,
+        source_bbox: dict | None = None,
         property_set: str = "",
         property_name: str = "",
         fallback_property: str = "",
@@ -453,6 +459,9 @@ class RuleService:
             "parameters": self._norm_json(parameters),
             "source_text": source_text or "",
             "source_document_id": source_document_id,
+            "source_node_id": source_node_id or "",
+            "source_page_number": source_page_number,
+            "source_bbox": source_bbox or None,
             "property_set": property_set or "",
             "property_name": property_name or "",
             "fallback_property": fallback_property or "",

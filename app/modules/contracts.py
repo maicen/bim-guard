@@ -792,6 +792,15 @@ class RuleResponse(TimestampFields):
     source_document_id: Optional[int] = Field(
         default=None, description="FK to documents.id — the document this rule was extracted from, when known"
     )
+    source_node_id: Optional[str] = Field(
+        default=None, description="Links back to the originating DocumentNodeContract.node_id, when known"
+    )
+    source_page_number: Optional[int] = Field(
+        default=None, description="1-based source page number, when known"
+    )
+    source_bbox: Optional[dict[str, Any]] = Field(
+        default=None, description="Bounding box on that page: {l, t, r, b, coord_origin}"
+    )
     mechanism: Optional[str] = None
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None

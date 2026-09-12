@@ -426,6 +426,9 @@ export interface Rule extends Timestamps {
   description?: string;
   source_text?: string;
   source_document_id?: number | null;
+  source_node_id?: string | null;
+  source_page_number?: number | null;
+  source_bbox?: BoundingBox | null;
   mechanism?: string;
   ruleset_id?: string;
   rule_category?: string;
