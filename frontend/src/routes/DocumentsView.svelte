@@ -46,6 +46,8 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
+  import DocumentUploadModal from "../lib/components/DocumentUploadModal.svelte";
+  import DocumentEditModal from "../lib/components/DocumentEditModal.svelte";
 
   /** Icon + accent color for a document's file extension, shown in the table's file column. */
   function fileIconFor(filename: string): { icon: ComponentType; color: string } {
@@ -104,53 +106,17 @@
   // Edit modal state
   let isEditModalOpen = $state(false);
   let docToEdit: DocumentItem | null = $state(null);
-  let editFilename = $state("");
-  let editDocType = $state("Specification");
-  let isSavingEdit = $state(false);
-  let editError = $state("");
 
-  // Upload modal state — a document (PDF/Word/Excel/etc, parsed into DocLang
-  // later in Rule Extraction Studio) or a pre-converted DocLang XML export.
+  // Upload modal state
   let isUploadModalOpen = $state(false);
   let isDriveImportModalOpen = $state(false);
+  let parsingEngines: ParsingEngineInstance[] = $state([]);
+  let generatingDoclangId: number | null = $state(null);
 
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
   export function openUploadModal() {
     isUploadModalOpen = true;
   }
-  let uploadFile: File | null = $state(null);
-  let uploadDocType = $state("Specification");
-  let uploadParser: "auto" | "unstructured" | "light" = $state("auto");
-  let uploadInstance = $state("");
-  let generateDoclangOnUpload = $state(true);
-  let parsingEngines: ParsingEngineInstance[] = $state([]);
-  let isUploading = $state(false);
-  let uploadError = $state("");
-  let generatingDoclangId: number | null = $state(null);
-
-  /** A pre-converted DocLang upload (.doclang, .dclg, .dclx) is already DocLang — no parsing engine or conversion step applies to it. */
-  let isDoclangSelected = $derived(
-    uploadFile ? /\.(doclang|dclg|dclx)$/i.test(uploadFile.name) : false
-  );
-  let isPdfSelected = $derived(uploadFile ? /\.pdf$/i.test(uploadFile.name) : false);
-
-  // Optional page range (1-based, inclusive) trimming a PDF upload down
-  // before storage/extraction -- see app/modules/document_parsing/pdf_page_range.py.
-  // PDF-only; left blank, the whole document is uploaded as before.
-  let uploadLimitPages = $state(false);
-  let uploadStartPage = $state("1");
-  let uploadEndPage = $state("");
-  let uploadPageRangeError = $derived.by(() => {
-    if (!uploadLimitPages) return "";
-    const start = parseInt(uploadStartPage, 10);
-    const end = parseInt(uploadEndPage, 10);
-    if (!uploadStartPage.trim() || !uploadEndPage.trim() || Number.isNaN(start) || Number.isNaN(end)) {
-      return "Enter both a start and end page.";
-    }
-    if (start < 1) return "Start page must be 1 or greater.";
-    if (end < start) return "End page must be greater than or equal to the start page.";
-    return "";
-  });
 
   async function loadParsingEngines() {
     try {
@@ -279,38 +245,6 @@
     }
   }
 
-  async function handleUpload() {
-    if (!uploadFile) return;
-    if (isPdfSelected && uploadLimitPages && uploadPageRangeError) return;
-    isUploading = true;
-    uploadError = "";
-    try {
-      const usePageRange = isPdfSelected && uploadLimitPages && !uploadPageRangeError;
-      const created = await documentsApi.upload(uploadFile, uploadDocType, {
-        parser: uploadParser,
-        engine_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
-        generate_doclang: generateDoclangOnUpload,
-        organization_id: authState.activeOrganizationId,
-        start_page: usePageRange ? parseInt(uploadStartPage, 10) : undefined,
-        end_page: usePageRange ? parseInt(uploadEndPage, 10) : undefined,
-      });
-      documents = [created, ...documents];
-      isUploadModalOpen = false;
-      uploadFile = null;
-      uploadDocType = "Specification";
-      uploadParser = "auto";
-      uploadInstance = "";
-      generateDoclangOnUpload = true;
-      uploadLimitPages = false;
-      uploadStartPage = "1";
-      uploadEndPage = "";
-    } catch (err: any) {
-      uploadError = err.message || "Failed to upload document.";
-    } finally {
-      isUploading = false;
-    }
-  }
-
   function openReader(id: number) {
     const params = new URLSearchParams();
     params.set("doc_id", String(id));
@@ -344,41 +278,7 @@
 
   function openEdit(doc: DocumentItem) {
     docToEdit = doc;
-    editFilename = doc.filename;
-    editDocType = doc.doc_type || "Specification";
-    editError = "";
     isEditModalOpen = true;
-  }
-
-  async function handleSaveEdit() {
-    if (!docToEdit) return;
-    if (!editFilename.trim()) {
-      editError = "Filename is required.";
-      return;
-    }
-    isSavingEdit = true;
-    editError = "";
-    try {
-      const updated = await documentsApi.update(docToEdit.id, {
-        filename: editFilename.trim(),
-        doc_type: editDocType,
-      });
-      documents = documents.map((d) =>
-        d.id === updated.id
-          ? {
-              ...d,
-              filename: updated.filename,
-              doc_type: updated.doc_type,
-            }
-          : d,
-      );
-      isEditModalOpen = false;
-      docToEdit = null;
-    } catch (err: any) {
-      editError = err.message || "Failed to update document.";
-    } finally {
-      isSavingEdit = false;
-    }
   }
 
   function promptDelete(id: number, filename: string) {
@@ -687,241 +587,16 @@
   </div>
 </div>
 
-<!-- Add Document Modal -->
-{#if isUploadModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default pb-3">
-        <h2 class="text-base font-bold text-fg-primary">Add Document</h2>
-        <button
-          type="button"
-          onclick={() => (isUploadModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto pr-1">
-        <div class="space-y-4">
-          {#if uploadError}
-            <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-              {uploadError}
-            </div>
-          {/if}
-
-          <div class="space-y-1.5">
-            <label for="upload-doc-type" class="block text-xs font-semibold text-fg-secondary">
-              Document Type
-            </label>
-            <select
-              id="upload-doc-type"
-              bind:value={uploadDocType}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              {#each DOCUMENT_TYPES as type (type)}
-                <option value={type}>{type}</option>
-              {/each}
-            </select>
-            <p class="text-caption text-fg-muted">
-              Classifies the document for filtering — used later in Rule Extraction Studio.
-            </p>
-          </div>
-
-          {#if !isDoclangSelected}
-            <div class="space-y-1.5">
-              <label for="upload-parser" class="block text-xs font-semibold text-fg-secondary">
-                Parsing Engine
-              </label>
-              <select
-                id="upload-parser"
-                bind:value={uploadParser}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                <option value="auto">Auto (configured engine, falls back to local)</option>
-                <option value="unstructured" disabled={parsingEngines.length === 0}
-                  >Force configured engine only{parsingEngines.length === 0
-                    ? " (no engine configured)"
-                    : " (best quality, slower, uploads file)"}</option
-                >
-                <option value="light">Light local extraction only (instant, no upload)</option>
-              </select>
-            </div>
-
-            <div class="flex items-center justify-between rounded-xl border border-border-default bg-surface-canvas/60 px-3.5 py-2.5">
-              <div>
-                <label for="upload-generate-doclang" class="block text-xs font-semibold text-fg-secondary">
-                  Convert to DocLang now
-                </label>
-                <p class="text-caption text-fg-muted">
-                  When off, the file is stored but DocLang is generated later from the documents table.
-                </p>
-              </div>
-              <button
-                id="upload-generate-doclang"
-                type="button"
-                role="switch"
-                aria-checked={generateDoclangOnUpload}
-                aria-label="Convert to DocLang now"
-                onclick={() => (generateDoclangOnUpload = !generateDoclangOnUpload)}
-                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {generateDoclangOnUpload
-                  ? 'bg-accent'
-                  : 'bg-surface-overlay'}"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform {generateDoclangOnUpload
-                    ? 'translate-x-5'
-                    : 'translate-x-1'}"
-                ></span>
-              </button>
-            </div>
-
-            {#if isPdfSelected}
-              <div class="rounded-xl border border-border-default bg-surface-canvas/60 px-3.5 py-2.5">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <label for="upload-limit-pages" class="block text-xs font-semibold text-fg-secondary">
-                      Limit to a page range
-                    </label>
-                    <p class="text-caption text-fg-muted">
-                      Only these pages are stored and parsed — the rest of the PDF is discarded.
-                    </p>
-                  </div>
-                  <button
-                    id="upload-limit-pages"
-                    type="button"
-                    role="switch"
-                    aria-checked={uploadLimitPages}
-                    aria-label="Limit to a page range"
-                    onclick={() => (uploadLimitPages = !uploadLimitPages)}
-                    class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {uploadLimitPages
-                      ? 'bg-accent'
-                      : 'bg-surface-overlay'}"
-                  >
-                    <span
-                      class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform {uploadLimitPages
-                        ? 'translate-x-5'
-                        : 'translate-x-1'}"
-                    ></span>
-                  </button>
-                </div>
-                {#if uploadLimitPages}
-                  <div class="mt-3 flex items-center gap-2">
-                    <label class="flex-1 space-y-1">
-                      <span class="block text-caption text-fg-muted">Start page</span>
-                      <input
-                        type="text"
-                        inputmode="numeric"
-                        bind:value={uploadStartPage}
-                        class="w-full rounded-lg border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-                      />
-                    </label>
-                    <span class="mt-4 text-fg-muted">–</span>
-                    <label class="flex-1 space-y-1">
-                      <span class="block text-caption text-fg-muted">End page</span>
-                      <input
-                        type="text"
-                        inputmode="numeric"
-                        bind:value={uploadEndPage}
-                        class="w-full rounded-lg border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-                      />
-                    </label>
-                  </div>
-                  {#if uploadPageRangeError}
-                    <p class="mt-1.5 text-caption text-rose-400">{uploadPageRangeError}</p>
-                  {/if}
-                {/if}
-              </div>
-            {/if}
-
-            {#if uploadParser !== "light" && parsingEngines.length > 0}
-              <div class="space-y-1.5">
-                <label for="upload-instance" class="block text-xs font-semibold text-fg-secondary">
-                  Instance
-                </label>
-                <select
-                  id="upload-instance"
-                  bind:value={uploadInstance}
-                  class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-                >
-                  <option value="">Default</option>
-                  {#each parsingEngines as engine (engine.id)}
-                    <option value={engine.name} disabled={!engine.is_enabled}>
-                      {engine.name} ({engine.kind}{engine.is_default ? ", default" : ""}{!engine.is_enabled
-                        ? ", disabled"
-                        : ""})
-                    </option>
-                  {/each}
-                </select>
-                <p class="text-caption text-fg-muted">
-                  Which configured parsing engine to use — see Settings &gt; Parsing Engines.
-                </p>
-              </div>
-            {/if}
-          {:else}
-            <div class="rounded-xl border border-cyan-800/40 bg-cyan-950/20 px-3.5 py-2.5 text-xs text-cyan-300">
-              This is a pre-converted DocLang XML file — it's stored as-is, with no parsing engine or
-              conversion step needed.
-            </div>
-          {/if}
-
-          <div
-            class="rounded-xl border-2 border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-accent"
-          >
-            <FileText class="mx-auto mb-2 h-8 w-8 text-fg-muted" />
-            <p class="mb-3 text-xs text-fg-muted">
-              Upload PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, TXT, an image
-              (PNG/JPEG/TIFF/BMP/WEBP), or pre-converted DocLang files (.dclg, .dclx, .doclang)
-            </p>
-            <label
-              class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
-            >
-              <span>Choose File</span>
-              <input
-                type="file"
-                accept=".pdf,.docx,.xlsx,.pptx,.md,.markdown,.adoc,.asciidoc,.html,.htm,.csv,.txt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.doclang,.dclg,.dclx"
-                onchange={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  if (target.files) uploadFile = target.files[0];
-                }}
-                class="hidden"
-              />
-            </label>
-          </div>
-
-          {#if uploadFile}
-            <div
-              class="flex items-center justify-between rounded-xl border border-border-default bg-surface-canvas p-3 text-xs"
-            >
-              <span class="truncate font-medium text-fg-primary">{uploadFile.name}</span>
-              <span class="text-fg-muted">{(uploadFile.size / 1024).toFixed(1)} KB</span>
-            </div>
-          {/if}
-
-          <div class="flex justify-end gap-2 border-t border-border-default pt-2">
-            <button
-              type="button"
-              onclick={() => (isUploadModalOpen = false)}
-              class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary hover:bg-surface-hover"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!uploadFile || isUploading || (isPdfSelected && uploadLimitPages && !!uploadPageRangeError)}
-              onclick={handleUpload}
-              class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
-            >
-              {isUploading ? "Extracting Text..." : "Upload & Extract"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
+<DocumentUploadModal
+  isOpen={isUploadModalOpen}
+  {parsingEngines}
+  onClose={() => (isUploadModalOpen = false)}
+  onUploaded={(created) => {
+    documents = [created, ...documents];
+    isUploadModalOpen = false;
+    flashSuccess(`Uploaded "${created.filename}".`);
+  }}
+/>
 
 {#if isDriveImportModalOpen}
   <GoogleDriveImportModal
@@ -930,96 +605,18 @@
   />
 {/if}
 
-<!-- Edit Document Modal -->
-{#if isEditModalOpen && docToEdit}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            <Pencil class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              Edit Document #{docToEdit.id}
-            </h2>
-            <p class="text-xs text-fg-muted">
-              Update specification filename and document type
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={() => (isEditModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- Body Form -->
-      <div class="flex-1 space-y-4 overflow-y-auto p-6">
-        {#if editError}
-          <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-            {editError}
-          </div>
-        {/if}
-
-        <div class="space-y-1.5">
-          <label for="edit-doc-filename" class="block text-xs font-semibold text-fg-secondary">
-            Filename <span class="text-rose-400">*</span>
-          </label>
-          <input
-            id="edit-doc-filename"
-            type="text"
-            bind:value={editFilename}
-            placeholder="e.g. BuildingCode_Part9_Specifications.pdf"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <label for="edit-doc-type" class="block text-xs font-semibold text-fg-secondary">
-            Document Type
-          </label>
-          <select
-            id="edit-doc-type"
-            bind:value={editDocType}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            {#each DOCUMENT_TYPES as type (type)}
-              <option value={type}>{type}</option>
-            {/each}
-          </select>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={() => (isEditModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isSavingEdit || !editFilename.trim()}
-          onclick={handleSaveEdit}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
-        >
-          <span>{isSavingEdit ? "Saving..." : "Save Changes"}</span>
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<DocumentEditModal
+  isOpen={isEditModalOpen}
+  doc={docToEdit}
+  onClose={() => {
+    isEditModalOpen = false;
+    docToEdit = null;
+  }}
+  onSaved={(updated) => {
+    documents = documents.map((d) => (d.id === updated.id ? { ...d, ...updated } : d));
+    flashSuccess(`Updated document "${updated.filename}".`);
+  }}
+/>
 
 <ConfirmModal
   bind:isOpen={isDeleteModalOpen}
