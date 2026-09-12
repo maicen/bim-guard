@@ -574,7 +574,7 @@
               {@const FileIcon = fi.icon}
               <tr
                 class="transition-colors hover:bg-slate-900/60 {table.isSelected(doc.id)
-                  ? 'bg-blue-950/20'
+                  ? 'bg-surface-selected'
                   : ''}"
               >
                 <td class="w-10 px-4 py-3">
@@ -644,7 +644,7 @@
                       type="button"
                       disabled={doc.has_doclang || generatingDoclangId === doc.id}
                       onclick={() => generateDoclangForRow(doc)}
-                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-30"
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success disabled:cursor-not-allowed disabled:opacity-30"
                       title={doc.has_doclang ? "DocLang already generated" : "Generate DocLang"}
                     >
                       <Sparkles class="h-3.5 w-3.5 {generatingDoclangId === doc.id ? 'animate-pulse' : ''}" />
@@ -652,7 +652,7 @@
                     <button
                       type="button"
                       onclick={() => openEdit(doc)}
-                      class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
                       title="Edit document"
                     >
                       <Pencil class="h-3.5 w-3.5" />

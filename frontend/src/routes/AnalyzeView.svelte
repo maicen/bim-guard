@@ -1326,7 +1326,7 @@
                     {@const isDq = isDataQuality(issue)}
                     <tr
                       class="group transition-colors hover:bg-slate-900/60 {isSelected(issue.id)
-                        ? 'bg-blue-950/20'
+                        ? 'bg-surface-selected'
                         : ''}"
                     >
                       <!-- Row Checkbox -->

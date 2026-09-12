@@ -1292,7 +1292,7 @@
                     {@const mech = describeMechanism(rule.mechanism || "CODE")}
                     <tr
                       class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.id)
-                        ? 'bg-blue-950/20'
+                        ? 'bg-surface-selected'
                         : ''}"
                     >
                       <td class="w-10 px-4 py-3">

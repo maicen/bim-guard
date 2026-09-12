@@ -831,7 +831,7 @@
                 {#each draftTable.paginated as draft (draft.id)}
                   <tr
                     class="transition-colors hover:bg-slate-900/60 {draftTable.isSelected(draft.id!)
-                      ? 'bg-blue-950/20'
+                      ? 'bg-surface-selected'
                       : ''}"
                   >
                     <td class="px-3 py-3 text-center">
@@ -899,7 +899,7 @@
                           <button
                             type="button"
                             onclick={() => reviewDraft(draft, "accepted")}
-                            class="rounded-lg bg-slate-800 p-1.5 text-emerald-400 transition-colors hover:bg-emerald-950/40"
+                            class="rounded-lg bg-surface-card p-1.5 text-success transition-colors hover:bg-success-bg/60"
                             title="Accept draft"
                           >
                             <Check class="h-3.5 w-3.5" />
@@ -907,7 +907,7 @@
                           <button
                             type="button"
                             onclick={() => reviewDraft(draft, "rejected")}
-                            class="rounded-lg bg-slate-800 p-1.5 text-rose-400 transition-colors hover:bg-rose-950/40"
+                            class="rounded-lg bg-surface-card p-1.5 text-critical transition-colors hover:bg-critical-bg/60"
                             title="Reject draft"
                           >
                             <X class="h-3.5 w-3.5" />
@@ -1131,7 +1131,7 @@
               {#each table.paginated as rule (rule.rowId)}
                 <tr
                   class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.rowId)
-                    ? 'bg-blue-950/20'
+                    ? 'bg-surface-selected'
                     : ''}"
                 >
                   <td class="px-3 py-3 text-center">

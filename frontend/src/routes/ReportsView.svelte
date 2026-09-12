@@ -590,7 +590,7 @@
                     class="transition-colors hover:bg-slate-900/60 {topicTable.isSelected(
                       topic.guid,
                     )
-                      ? 'bg-blue-950/20'
+                      ? 'bg-surface-selected'
                       : ''}"
                   >
                     <td class="w-10 px-4 py-3">
@@ -649,7 +649,7 @@
                         <button
                           type="button"
                           onclick={() => openTopicEdit(topic)}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
                           title="Edit topic"
                         >
                           <Pencil class="h-3.5 w-3.5" />
@@ -657,7 +657,7 @@
                         <button
                           type="button"
                           onclick={() => promptDeleteTopic(topic)}
-                          class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-critical-bg/40 hover:text-critical"
                           title="Delete topic"
                         >
                           <Trash2 class="h-3.5 w-3.5" />
@@ -813,7 +813,7 @@
                     class="transition-colors hover:bg-slate-900/60 {artifactTable.isSelected(
                       artifact.id,
                     )
-                      ? 'bg-blue-950/20'
+                      ? 'bg-surface-selected'
                       : ''}"
                   >
                     <td class="w-10 px-4 py-3">

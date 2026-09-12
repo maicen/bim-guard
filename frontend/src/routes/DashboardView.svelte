@@ -424,7 +424,7 @@
               {#each table.paginated as project (project.id)}
                 <tr
                   class="transition-colors hover:bg-slate-900/60 {table.isSelected(project.id)
-                    ? 'bg-blue-950/20'
+                    ? 'bg-surface-selected'
                     : ''}"
                 >
                   <td class="w-10 px-4 py-3">
@@ -535,7 +535,7 @@
                         <button
                           type="button"
                           onclick={() => (rulesetBindingsTarget = project)}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
                           title="Rule Assignments"
                         >
                           <ListChecks class="h-3.5 w-3.5" />
@@ -544,7 +544,7 @@
                         <button
                           type="button"
                           onclick={() => (documentBindingsTarget = project)}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-950/30 hover:text-emerald-400"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
                           title="Document Assignments"
                         >
                           <BookOpen class="h-3.5 w-3.5" />
@@ -554,7 +554,7 @@
                       <button
                         type="button"
                         onclick={() => openEdit(project)}
-                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
                         title="Edit project"
                       >
                         <Pencil class="h-3.5 w-3.5" />

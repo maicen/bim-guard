@@ -538,7 +538,7 @@
                   class="transition-colors hover:bg-slate-900/60 {table.isSelected(
                     file.id ?? file.file_path,
                   )
-                    ? 'bg-blue-950/20'
+                    ? 'bg-surface-selected'
                     : ''}"
                 >
                   <td class="w-10 px-4 py-3">
@@ -622,7 +622,7 @@
                           type="button"
                           onclick={() => handleRefreshMetadata(file)}
                           disabled={refreshingId === file.id}
-                          class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-950/30 hover:text-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
                           title="Refresh IFC metadata (schema, storeys, elements, discipline)"
                         >
                           <RefreshCw
@@ -787,7 +787,7 @@
                     {@const isSelected = selectedRepoPaths.has(item.path)}
                     <tr
                       class="transition-colors hover:bg-slate-900/60 {isSelected
-                        ? 'bg-blue-950/20'
+                        ? 'bg-surface-selected'
                         : ''}"
                     >
                       <td class="w-10 px-4 py-3">

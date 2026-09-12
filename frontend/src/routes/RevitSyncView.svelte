@@ -451,7 +451,7 @@ print(response.read())
                 {#each table.paginated as rule (rule.rowId)}
                   <tr
                     class="transition-colors hover:bg-slate-800/30 {table.isSelected(rule.rowId)
-                      ? 'bg-blue-950/20'
+                      ? 'bg-surface-selected'
                       : ''}"
                   >
                     <td class="w-10 px-3 py-3">
