@@ -3,26 +3,18 @@
   import { push } from "svelte-spa-router";
   import {
     BookOpen,
-    Plus,
     Upload,
     CloudDownload,
     Trash2,
-    FileText,
-    FileSpreadsheet,
-    FileImage,
-    Presentation,
-    File as FileGeneric,
     Eye,
     Pencil,
-    X,
     CheckCircle2,
-    Search,
     RotateCw,
     FolderSync,
     Sparkles,
     FileCode,
   } from "lucide-svelte";
-  import type { ComponentType } from "svelte";
+  import Icon from "@iconify/svelte";
   import { documentsApi, parsingEnginesApi } from "../lib/api";
   import { withAuthToken } from "../lib/authToken";
   import { authState } from "../lib/auth.svelte";
@@ -49,22 +41,22 @@
   import DocumentUploadModal from "../lib/components/DocumentUploadModal.svelte";
   import DocumentEditModal from "../lib/components/DocumentEditModal.svelte";
 
-  /** Icon + accent color for a document's file extension, shown in the table's file column. */
-  function fileIconFor(filename: string): { icon: ComponentType; color: string } {
+  /** Icon identifier for a document's file extension, rendered as a vscode-icons SVG. */
+  function fileIconFor(filename: string): string {
     const ext = (filename.split(".").pop() || "").toLowerCase();
     switch (ext) {
       case "pdf":
-        return { icon: FileText, color: "text-rose-400" };
+        return "vscode-icons:file-type-pdf2";
       case "doc":
       case "docx":
-        return { icon: FileText, color: "text-blue-400" };
+        return "vscode-icons:file-type-word";
       case "xls":
       case "xlsx":
       case "csv":
-        return { icon: FileSpreadsheet, color: "text-emerald-400" };
+        return "vscode-icons:file-type-excel";
       case "ppt":
       case "pptx":
-        return { icon: Presentation, color: "text-orange-400" };
+        return "vscode-icons:file-type-powerpoint";
       case "png":
       case "jpg":
       case "jpeg":
@@ -72,23 +64,25 @@
       case "tif":
       case "bmp":
       case "webp":
-        return { icon: FileImage, color: "text-purple-400" };
+        return "vscode-icons:file-type-image";
       case "html":
       case "htm":
+        return "vscode-icons:file-type-html";
       case "adoc":
       case "asciidoc":
-        return { icon: FileCode, color: "text-amber-400" };
+        return "vscode-icons:file-type-asciidoc";
       case "doclang":
       case "dclg":
       case "dclx":
       case "xml":
-        return { icon: FileCode, color: "text-cyan-400" };
+        return "vscode-icons:file-type-xml";
       case "md":
       case "markdown":
+        return "vscode-icons:file-type-markdown";
       case "txt":
-        return { icon: FileText, color: "text-fg-muted" };
+        return "vscode-icons:file-type-text";
       default:
-        return { icon: FileGeneric, color: "text-fg-muted" };
+        return "vscode-icons:default-file";
     }
   }
 
@@ -470,8 +464,6 @@
           </thead>
           <tbody class="divide-y divide-border-subtle">
             {#each table.paginated as doc (doc.id)}
-              {@const fi = fileIconFor(doc.filename)}
-              {@const FileIcon = fi.icon}
               <tr
                 class="transition-colors hover:bg-surface-hover {table.isSelected(doc.id)
                   ? 'bg-surface-selected'
@@ -488,7 +480,7 @@
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <span class="relative inline-flex shrink-0">
-                      <FileIcon class="h-4 w-4 {fi.color}" />
+                      <Icon icon={fileIconFor(doc.filename)} class="h-4 w-4 shrink-0" />
                       {#if doc.has_doclang}
                         <CheckCircle2
                           class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-surface-card text-emerald-400"
