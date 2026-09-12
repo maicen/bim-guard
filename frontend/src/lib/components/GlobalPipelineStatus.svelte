@@ -16,12 +16,12 @@
       <button
         type="button"
         onclick={() => onOpen?.(run.projectId)}
-        class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-300 transition-colors hover:bg-blue-500/20"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-info-border bg-info-bg px-2.5 py-1 text-xs font-medium text-info transition-colors hover:bg-info-bg/80"
         title={`${run.projectName} — analysis running`}
       >
         <Activity class="h-3 w-3 animate-pulse" />
         <span class="max-w-36 truncate">{run.projectName}</span>
-        <span class="font-mono text-micro text-blue-400">{avgPipelineProgress(run.status)}%</span>
+        <span class="font-mono text-micro text-info">{avgPipelineProgress(run.status)}%</span>
       </button>
     {/each}
   </div>

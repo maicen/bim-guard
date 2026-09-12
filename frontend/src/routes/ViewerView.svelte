@@ -117,10 +117,10 @@
 <div class="mx-auto space-y-4">
   {#if selectedElementGuid}
     <div
-      class="flex items-center justify-between rounded-xl border border-blue-800/60 bg-blue-950/40 p-3 text-xs text-blue-300"
+      class="flex items-center justify-between rounded-xl border border-info-border bg-info-bg p-3 text-xs text-info"
     >
       <div class="flex items-center gap-2">
-        <ScanEye class="h-4 w-4 shrink-0 text-blue-400" />
+        <ScanEye class="h-4 w-4 shrink-0 text-info" />
         <span
           >Focusing on violating element GUID: <strong class="font-mono"
             >{selectedElementGuid}</strong
@@ -130,7 +130,7 @@
       <button
         type="button"
         onclick={() => (selectedElementGuid = null)}
-        class="text-caption text-blue-400 underline hover:text-slate-50"
+        class="text-caption text-info underline hover:text-fg-primary"
       >
         Clear Selection
       </button>
@@ -139,7 +139,7 @@
 
   {#if !selectedProjectId && projects.length > 0}
     <div
-      class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
+      class="flex items-center justify-between rounded-xl border border-border-default bg-surface-card p-4 text-xs text-fg-muted"
     >
       <span
         >No project currently selected. Please select a project from the top header above, or open a local IFC file directly in the viewport below.</span
@@ -147,7 +147,7 @@
     </div>
   {:else if projects.length === 0}
     <div
-      class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400"
+      class="flex items-center justify-between rounded-xl border border-border-default bg-surface-card p-4 text-xs text-fg-muted"
     >
       <span
         >No saved projects with IFC models found. You can upload an IFC model under Projects or open

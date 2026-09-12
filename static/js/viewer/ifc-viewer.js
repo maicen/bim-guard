@@ -23,17 +23,35 @@ function createEmitter() {
     };
 }
 
+function getCssHex(varName, fallbackHex) {
+    if (typeof window === "undefined" || typeof document === "undefined") return fallbackHex;
+    try {
+        const val = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        if (!val) return fallbackHex;
+        const rgbMatch = val.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+        if (rgbMatch) {
+            return (parseInt(rgbMatch[1], 10) << 16) | (parseInt(rgbMatch[2], 10) << 8) | parseInt(rgbMatch[3], 10);
+        }
+        if (val.startsWith("#")) {
+            return parseInt(val.slice(1), 16);
+        }
+    } catch {
+        // Fallback
+    }
+    return fallbackHex;
+}
+
 function getThemeConfig() {
     const isLight = typeof document !== "undefined" && document.documentElement.classList.contains("light");
     return {
         isLight,
-        // Match --color-surface-canvas: #020617 (dark) / #f8fafc (light)
-        canvasHex: isLight ? 0xf8fafc : 0x020617,
-        // Grid lines matching --border-default / --border-subtle
-        gridColor: isLight ? 0xcbd5e1 : 0x334155,
-        gridSecondaryColor: isLight ? 0xe2e8f0 : 0x1e293b,
+        // Match --color-surface-canvas
+        canvasHex: getCssHex("--color-surface-canvas", isLight ? 0xf8fafc : 0x020617),
+        // Grid lines matching --color-border-default / --color-border-subtle
+        gridColor: getCssHex("--color-border-default", isLight ? 0xcbd5e1 : 0x334155),
+        gridSecondaryColor: getCssHex("--color-border-subtle", isLight ? 0xe2e8f0 : 0x1e293b),
         // Error highlighting matching --color-critical
-        errorHex: isLight ? 0xbe123c : 0xf43f5e,
+        errorHex: getCssHex("--color-critical", isLight ? 0xbe123c : 0xf43f5e),
     };
 }
 

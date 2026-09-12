@@ -30,8 +30,8 @@
         type="button"
         {...props}
         class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors {isActive
-          ? 'border-blue-800/60 bg-blue-950/40 text-blue-300'
-          : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-50'}"
+          ? 'border-accent/40 bg-accent/15 text-accent'
+          : 'border-border-default bg-surface-card text-fg-muted hover:border-border-interactive hover:text-fg-primary'}"
       >
         <Plug class="h-3.5 w-3.5" />
         Integrations

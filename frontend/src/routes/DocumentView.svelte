@@ -87,7 +87,7 @@
     {#snippet badge()}
       {#if doc?.doc_type}
         <span
-          class="rounded-md border border-slate-700/60 bg-slate-800 px-2 py-0.5 text-caption font-medium text-blue-300"
+          class="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-caption font-medium text-accent"
         >
           {doc.doc_type}
         </span>
@@ -97,7 +97,7 @@
       <button
         type="button"
         onclick={onBack}
-        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
       >
         <ArrowLeft class="h-3.5 w-3.5" />
         <span>Back to Documents</span>
