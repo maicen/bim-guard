@@ -1,15 +1,15 @@
 <script lang="ts">
   import { BookOpenCheck, Box, BookText, LifeBuoy, ChevronDown, ExternalLink } from "lucide-svelte";
+  import { DropdownMenu as Menu } from "bits-ui";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
+  import DropdownMenu from "./DropdownMenu.svelte";
 
   interface Props {
     activeView: string;
   }
 
   let { activeView }: Props = $props();
-
-  let open = $state(false);
 
   // Reference material, not project work — pulled out of the working sidebar
   // (see Tenant & Workspace Blueprint, Priority 11 in TODO.md) into its own
@@ -22,66 +22,63 @@
   ];
 
   let isActive = $derived(ITEMS.some((item) => item.id === activeView));
-
-  function toggle(e: MouseEvent) {
-    e.stopPropagation();
-    open = !open;
-  }
 </script>
 
-<svelte:document onclick={() => (open = false)} />
-
-<div class="relative hidden md:block">
-  <button
-    type="button"
-    onclick={toggle}
-    class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors {isActive
-      ? 'border-blue-800/60 bg-blue-950/40 text-blue-300'
-      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-50'}"
-    aria-haspopup="true"
-    aria-expanded={open}
-  >
-    <LifeBuoy class="h-3.5 w-3.5" />
-    Resources
-    <ChevronDown class="h-3 w-3" />
-  </button>
-
-  {#if open}
-    <div
-      class="absolute right-0 top-full z-40 mt-2 w-52 rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-xl"
-    >
-      {#each ITEMS as item (item.id)}
-        <a
-          href={authState.activeOrganizationId
-            ? `/${item.id}?org=${authState.activeOrganizationId}`
-            : `/${item.id}`}
-          use:link
-          onclick={() => (open = false)}
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors {activeView ===
-          item.id
-            ? 'bg-accent text-white'
-            : 'text-slate-300 hover:bg-slate-800 hover:text-slate-50'}"
-        >
-          <item.icon class="h-3.5 w-3.5" />
-          {item.label}
-        </a>
-      {/each}
-
-      <div class="my-1 border-t border-slate-800"></div>
-
-      <a
-        href="/api/docs"
-        target="_blank"
-        rel="noopener noreferrer"
-        onclick={() => (open = false)}
-        class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
-        title="Open Swagger OpenAPI Documentation"
+<div class="hidden md:block">
+  <DropdownMenu width="w-52">
+    {#snippet trigger({ props })}
+      <button
+        type="button"
+        {...props}
+        class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors {isActive
+          ? 'border-blue-800/60 bg-blue-950/40 text-blue-300'
+          : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-50'}"
       >
-        <span class="flex items-center gap-2">
-          <ExternalLink class="h-3.5 w-3.5" />
-          API Docs
-        </span>
-      </a>
-    </div>
-  {/if}
+        <LifeBuoy class="h-3.5 w-3.5" />
+        Resources
+        <ChevronDown class="h-3 w-3" />
+      </button>
+    {/snippet}
+
+    {#each ITEMS as item (item.id)}
+      <Menu.Item>
+        {#snippet child({ props })}
+          <a
+            {...props}
+            href={authState.activeOrganizationId
+              ? `/${item.id}?org=${authState.activeOrganizationId}`
+              : `/${item.id}`}
+            use:link
+            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors data-highlighted:bg-slate-800 data-highlighted:text-slate-50 {activeView ===
+            item.id
+              ? 'bg-accent text-white'
+              : 'text-slate-300'}"
+          >
+            <item.icon class="h-3.5 w-3.5" />
+            {item.label}
+          </a>
+        {/snippet}
+      </Menu.Item>
+    {/each}
+
+    <Menu.Separator class="my-1 border-t border-slate-800" />
+
+    <Menu.Item>
+      {#snippet child({ props })}
+        <a
+          {...props}
+          href="/api/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors data-highlighted:bg-slate-800 data-highlighted:text-slate-50"
+          title="Open Swagger OpenAPI Documentation"
+        >
+          <span class="flex items-center gap-2">
+            <ExternalLink class="h-3.5 w-3.5" />
+            API Docs
+          </span>
+        </a>
+      {/snippet}
+    </Menu.Item>
+  </DropdownMenu>
 </div>

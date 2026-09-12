@@ -53,6 +53,8 @@
   import HoverCard from "../lib/components/HoverCard.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
+  import DropdownMenu from "../lib/components/DropdownMenu.svelte";
+  import { DropdownMenu as Menu } from "bits-ui";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -99,22 +101,6 @@
 
   // Import IDS modal state
   let isImportIdsModalOpen = $state(false);
-
-  // Import/Export dropdown menu state (header actions)
-  let isImportExportMenuOpen = $state(false);
-  let importExportMenuEl: HTMLDivElement | null = $state(null);
-
-  function handleImportExportOutsideClick(event: MouseEvent) {
-    if (importExportMenuEl && !importExportMenuEl.contains(event.target as Node)) {
-      isImportExportMenuOpen = false;
-    }
-  }
-
-  $effect(() => {
-    if (!isImportExportMenuOpen) return;
-    window.addEventListener("click", handleImportExportOutsideClick);
-    return () => window.removeEventListener("click", handleImportExportOutsideClick);
-  });
 
   // Save Snapshot modal state
   let isSaveSnapshotModalOpen = $state(false);
@@ -752,74 +738,67 @@
 
       {#if activeMainTab === "rules"}
         <!-- Import/Export: one grouped menu instead of separate IDS/JSON buttons -->
-        <div class="relative" bind:this={importExportMenuEl}>
-          <button
-            type="button"
-            onclick={() => (isImportExportMenuOpen = !isImportExportMenuOpen)}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
-            title="Import or export rules"
-            aria-expanded={isImportExportMenuOpen}
-            aria-haspopup="menu"
-          >
-            <Upload class="h-3.5 w-3.5 text-emerald-400" />
-            <span>Import / Export</span>
-            <ChevronDown
-              class="h-3 w-3 text-slate-400 transition-transform {isImportExportMenuOpen
-                ? 'rotate-180'
-                : ''}"
-            />
-          </button>
-
-          {#if isImportExportMenuOpen}
-            <div
-              role="menu"
-              class="absolute right-0 z-30 mt-2 w-64 space-y-1 rounded-2xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-2xl duration-100 animate-in fade-in slide-in-from-top-1"
+        <DropdownMenu width="w-64" contentClass="rounded-2xl p-1.5">
+          {#snippet trigger({ props })}
+            {@const menuOpen = props["data-state"] === "open"}
+            <button
+              type="button"
+              {...props}
+              class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+              title="Import or export rules"
             >
-              <button
-                type="button"
-                role="menuitem"
-                onclick={() => {
-                  isImportExportMenuOpen = false;
-                  openImportIdsModal();
-                }}
-                class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
-              >
-                <Upload class="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                <span class="flex-1">Import Ruleset...</span>
-                <span class="text-micro font-normal text-slate-500">IDS / JSON</span>
-              </button>
+              <Upload class="h-3.5 w-3.5 text-emerald-400" />
+              <span>Import / Export</span>
+              <ChevronDown
+                class="h-3 w-3 text-slate-400 transition-transform {menuOpen ? 'rotate-180' : ''}"
+              />
+            </button>
+          {/snippet}
 
-              <div class="my-1 border-t border-slate-800"></div>
+          <Menu.Item
+            onSelect={openImportIdsModal}
+            class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
+          >
+            <Upload class="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+            <span class="flex-1">Import Ruleset...</span>
+            <span class="text-micro font-normal text-slate-500">IDS / JSON</span>
+          </Menu.Item>
 
-              {#if selectedFolderId}
+          <Menu.Separator class="my-1 border-t border-slate-800" />
+
+          {#if selectedFolderId}
+            <Menu.Item>
+              {#snippet child({ props })}
                 <a
-                  role="menuitem"
+                  {...props}
                   href={rulesApi.getIdsExportUrl(selectedFolderId)}
-                  onclick={() => (isImportExportMenuOpen = false)}
-                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
                 >
                   <FileCode class="h-3.5 w-3.5 shrink-0 text-blue-400" />
                   <span class="flex-1">Export as IDS XML</span>
                   <Download class="h-3 w-3 text-slate-500" />
                 </a>
+              {/snippet}
+            </Menu.Item>
+            <Menu.Item>
+              {#snippet child({ props })}
                 <a
-                  role="menuitem"
+                  {...props}
                   href={rulesApi.getJsonExportUrl(selectedFolderId)}
-                  onclick={() => (isImportExportMenuOpen = false)}
-                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 hover:bg-slate-800"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
                 >
                   <FileJson class="h-3.5 w-3.5 shrink-0 text-amber-400" />
                   <span class="flex-1">Export as JSON</span>
                   <Download class="h-3 w-3 text-slate-500" />
                 </a>
-              {:else}
-                <p class="px-3 py-2 text-caption text-slate-500">
-                  Select a ruleset folder on the left to export it.
-                </p>
-              {/if}
-            </div>
+              {/snippet}
+            </Menu.Item>
+          {:else}
+            <p class="px-3 py-2 text-caption text-slate-500">
+              Select a ruleset folder on the left to export it.
+            </p>
           {/if}
-        </div>
+        </DropdownMenu>
 
         {#if selectedFolderId}
           <button
