@@ -708,9 +708,9 @@
   <!-- Header -->
   <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
     <div>
-      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Library</div>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">Rules Catalog</h1>
-      <p class="text-xs text-slate-400 sm:text-sm">
+      <div class="mb-1 text-xs font-bold uppercase tracking-widest text-fg-muted">Library</div>
+      <h1 class="text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl">Rules Catalog</h1>
+      <p class="text-xs text-fg-muted sm:text-sm">
         Engineering criteria for corrosion, seismic clearance, and architectural building codes.
       </p>
     </div>
@@ -719,7 +719,7 @@
       <button
         type="button"
         onclick={() => loadData(true)}
-        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
         title="Refresh rules catalog"
       >
         <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
@@ -729,7 +729,7 @@
       <button
         type="button"
         onclick={handleSeedRules}
-        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
         title="Seed engine rulesets: GC-001, CC-001, MC-001"
       >
         <Database class="h-3.5 w-3.5 text-emerald-400" />
@@ -744,27 +744,27 @@
             <button
               type="button"
               {...props}
-              class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+              class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3.5 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
               title="Import or export rules"
             >
               <Upload class="h-3.5 w-3.5 text-emerald-400" />
               <span>Import / Export</span>
               <ChevronDown
-                class="h-3 w-3 text-slate-400 transition-transform {menuOpen ? 'rotate-180' : ''}"
+                class="h-3 w-3 text-fg-muted transition-transform {menuOpen ? 'rotate-180' : ''}"
               />
             </button>
           {/snippet}
 
           <Menu.Item
             onSelect={openImportIdsModal}
-            class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
+            class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-fg-secondary data-highlighted:bg-surface-hover"
           >
             <Upload class="h-3.5 w-3.5 shrink-0 text-emerald-400" />
             <span class="flex-1">Import Ruleset...</span>
-            <span class="text-micro font-normal text-slate-500">IDS / JSON</span>
+            <span class="text-micro font-normal text-fg-muted">IDS / JSON</span>
           </Menu.Item>
 
-          <Menu.Separator class="my-1 border-t border-slate-800" />
+          <Menu.Separator class="my-1 border-t border-border-default" />
 
           {#if selectedFolderId}
             <Menu.Item>
@@ -772,11 +772,11 @@
                 <a
                   {...props}
                   href={rulesApi.getIdsExportUrl(selectedFolderId)}
-                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-fg-secondary data-highlighted:bg-surface-hover"
                 >
                   <FileCode class="h-3.5 w-3.5 shrink-0 text-blue-400" />
                   <span class="flex-1">Export as IDS XML</span>
-                  <Download class="h-3 w-3 text-slate-500" />
+                  <Download class="h-3 w-3 text-fg-muted" />
                 </a>
               {/snippet}
             </Menu.Item>
@@ -785,16 +785,16 @@
                 <a
                   {...props}
                   href={rulesApi.getJsonExportUrl(selectedFolderId)}
-                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-slate-200 data-highlighted:bg-slate-800"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left font-semibold text-fg-secondary data-highlighted:bg-surface-hover"
                 >
                   <FileJson class="h-3.5 w-3.5 shrink-0 text-amber-400" />
                   <span class="flex-1">Export as JSON</span>
-                  <Download class="h-3 w-3 text-slate-500" />
+                  <Download class="h-3 w-3 text-fg-muted" />
                 </a>
               {/snippet}
             </Menu.Item>
           {:else}
-            <p class="px-3 py-2 text-caption text-slate-500">
+            <p class="px-3 py-2 text-caption text-fg-muted">
               Select a ruleset folder on the left to export it.
             </p>
           {/if}
@@ -804,7 +804,7 @@
           <button
             type="button"
             onclick={openSaveSnapshotModal}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3.5 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
             title="Save the current folder's rules as a reusable snapshot"
           >
             <Camera class="h-3.5 w-3.5 text-purple-400" />
@@ -815,7 +815,7 @@
         <button
           type="button"
           onclick={openImportIdsModal}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
           title="Parse a buildingSMART IDS (.ids/XML) or BIM-Guard JSON ruleset file into new rules"
         >
           <Upload class="h-3.5 w-3.5 text-emerald-400" />
@@ -825,7 +825,7 @@
         <button
           type="button"
           onclick={onNavigateToManualRuleEditor}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
           title="Opens the Manual Rule Editor page, organized by building element category"
         >
           <span>Manual</span>
@@ -861,7 +861,7 @@
 
   <!-- Main Tab Toggle: Rules Catalog vs Saved Snapshots -->
   <div
-    class="flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-1.5"
+    class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
   >
     <button
       type="button"
@@ -869,7 +869,7 @@
       class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
       'rules'
         ? 'bg-accent text-white shadow-xs'
-        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
     >
       <ListChecks class="h-3.5 w-3.5" />
       <span>Rules Catalog</span>
@@ -880,7 +880,7 @@
       class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
       'snapshots'
         ? 'bg-accent text-white shadow-xs'
-        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
     >
       <Camera class="h-3.5 w-3.5" />
       <span>Snapshots</span>
@@ -893,7 +893,7 @@
   {#if activeMainTab === "rules"}
     <!-- Category Selector Tabs: Arch | Piping | Seismic -->
     <div
-      class="flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-1.5"
+      class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
     >
       <button
         type="button"
@@ -904,7 +904,7 @@
         class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'all'
           ? 'bg-accent text-white shadow-xs'
-          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
       >
         All Categories
       </button>
@@ -917,7 +917,7 @@
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'Arch'
           ? 'bg-blue-600 text-white shadow-xs'
-          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
       >
         <span class="h-2 w-2 rounded-full bg-blue-400"></span>
         <span>Arch</span>
@@ -932,7 +932,7 @@
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'Piping'
           ? 'bg-amber-600 text-white shadow-xs'
-          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
       >
         <span class="h-2 w-2 rounded-full bg-amber-400"></span>
         <span>Piping</span>
@@ -947,7 +947,7 @@
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'seismic'
           ? 'bg-purple-600 text-white shadow-xs'
-          : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
       >
         <span class="h-2 w-2 rounded-full bg-purple-400"></span>
         <span>Seismic</span>
@@ -959,7 +959,7 @@
     <div class="relative flex flex-col items-stretch gap-0 md:flex-row">
       <!-- Folder tree sidebar -->
       <div
-        class="flex w-full shrink-0 flex-col space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 md:w-auto md:rounded-r-none"
+        class="flex w-full shrink-0 flex-col space-y-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 md:w-auto md:rounded-r-none"
         style="max-width: 100%;"
         style:width={typeof window !== "undefined" && window.innerWidth >= 768
           ? `${sidebarWidth}px`
@@ -967,7 +967,7 @@
       >
         <div class="flex items-center justify-between px-1">
           <div class="flex items-center gap-1.5">
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <div class="text-xs font-bold uppercase tracking-wider text-fg-muted">
               Ruleset Folders
             </div>
             {#if folders.length > 0}
@@ -977,7 +977,7 @@
                 class="rounded-md p-1 transition-colors {isFolderSelectionMode ||
                 selectedFolderRulesetIds.length > 0
                   ? 'bg-blue-500/10 text-blue-400'
-                  : 'text-slate-500 hover:bg-slate-800 hover:text-slate-50'}"
+                  : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
                 title={isFolderSelectionMode
                   ? "Exit folder select mode"
                   : "Select multiple folders"}
@@ -989,7 +989,7 @@
           <button
             type="button"
             onclick={openCreateFolderModal}
-            class="inline-flex items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-800/80 px-2 py-1 text-caption font-semibold text-slate-300 transition-colors hover:bg-blue-600 hover:text-white"
+            class="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-overlay px-2 py-1 text-caption font-semibold text-fg-secondary transition-colors hover:bg-blue-600 hover:text-white"
             title="Create New Ruleset Folder"
           >
             <Plus class="h-3.5 w-3.5" />
@@ -1003,7 +1003,7 @@
             class="flex items-center justify-between gap-1 rounded-xl border border-blue-800 bg-blue-950/90 p-2 text-xs text-blue-200 shadow-md duration-150 animate-in fade-in"
           >
             <div class="flex items-center gap-1 truncate text-caption font-medium">
-              <span class="font-bold text-slate-50">{selectedFolderRulesetIds.length}</span>
+              <span class="font-bold text-fg-primary">{selectedFolderRulesetIds.length}</span>
               <span class="truncate">selected</span>
             </div>
             <div class="flex items-center gap-1">
@@ -1026,7 +1026,7 @@
               <button
                 type="button"
                 onclick={() => (selectedFolderRulesetIds = [])}
-                class="rounded-md p-1 text-blue-300 hover:bg-blue-900/60 hover:text-slate-50"
+                class="rounded-md p-1 text-blue-300 hover:bg-blue-900/60 hover:text-fg-primary"
                 title="Clear selection"
               >
                 <X class="h-3.5 w-3.5" />
@@ -1041,7 +1041,7 @@
             onclick={() => (selectedFolderId = null)}
             class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium transition-colors {!selectedFolderId
               ? 'bg-accent text-white shadow-xs'
-              : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+              : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
           >
             <div class="flex items-center gap-2">
               <FolderOpen class="h-3.5 w-3.5" />
@@ -1055,7 +1055,7 @@
               class="group/folder relative flex items-center justify-between rounded-xl text-xs font-medium transition-colors {selectedFolderId ===
               folder.ruleset_id
                 ? 'bg-accent text-white shadow-xs'
-                : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
+                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
             >
               {#if isFolderSelectionMode || selectedFolderRulesetIds.length > 0}
                 <button
@@ -1068,7 +1068,7 @@
                     type="checkbox"
                     checked={selectedFolderRulesetIds.includes(folder.ruleset_id)}
                     tabindex="-1"
-                    class="pointer-events-none h-3.5 w-3.5 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                    class="pointer-events-none h-3.5 w-3.5 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                   />
                 </button>
               {/if}
@@ -1152,15 +1152,15 @@
         <div
           class="h-full w-1 rounded-full transition-all duration-150 {isDraggingDivider
             ? 'w-1.5 bg-accent shadow-[0_0_10px_rgba(0,113,227,0.9)]'
-            : 'bg-slate-800 group-hover:bg-accent/80'}"
+            : 'bg-surface-overlay group-hover:bg-accent/80'}"
         ></div>
         <!-- Grip handle indicator in the middle -->
         <div
-          class="pointer-events-none absolute top-1/2 flex h-7 w-4 -translate-y-1/2 items-center justify-center rounded-md border border-slate-700 bg-slate-900 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 {isDraggingDivider
+          class="pointer-events-none absolute top-1/2 flex h-7 w-4 -translate-y-1/2 items-center justify-center rounded-md border border-border-interactive bg-surface-card opacity-0 shadow-lg transition-opacity group-hover:opacity-100 {isDraggingDivider
             ? 'border-accent bg-accent opacity-100!'
             : ''}"
         >
-          <GripVertical class="h-3 w-3 text-slate-400 {isDraggingDivider ? 'text-slate-50' : ''}" />
+          <GripVertical class="h-3 w-3 text-fg-muted {isDraggingDivider ? 'text-fg-primary' : ''}" />
         </div>
       </div>
 
@@ -1168,21 +1168,21 @@
       <div class="min-w-0 flex-1 space-y-4 pt-4 md:pl-4 md:pt-0">
         <!-- Search & Filters -->
         <div
-          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3.5 sm:flex-row"
+          class="flex flex-col items-center gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-3.5 sm:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               bind:value={table.search}
               placeholder="Search rules by ID, description, property..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-1.5 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas py-1.5 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <select
             bind:value={selectedMechanism}
-            class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="all">All Mechanisms</option>
             <option value="CODE">Building Code</option>
@@ -1193,12 +1193,12 @@
           </select>
 
           <label
-            class="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-slate-400"
+            class="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-fg-muted"
           >
             <input
               type="checkbox"
               bind:checked={filterNeedsReview}
-              class="rounded border-slate-700 bg-slate-950 text-accent"
+              class="rounded border-border-interactive bg-surface-canvas text-accent"
             />
             <span>Needs Review</span>
           </label>
@@ -1214,18 +1214,18 @@
         />
 
         <!-- Table Container -->
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           {#if isLoading}
-            <div class="p-12 text-center text-xs text-slate-400">Loading compliance rules...</div>
+            <div class="p-12 text-center text-xs text-fg-muted">Loading compliance rules...</div>
           {:else if table.totalItems === 0}
-            <div class="space-y-2 p-12 text-center text-xs text-slate-500">
+            <div class="space-y-2 p-12 text-center text-xs text-fg-muted">
               <p>No rules found for this folder or filter criteria.</p>
             </div>
           {:else}
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-300">
+              <table class="w-full text-left text-xs text-fg-secondary">
                 <thead
-                  class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <tr>
                     <th class="w-10 px-4 py-3">
@@ -1234,7 +1234,7 @@
                         checked={table.allFilteredSelected}
                         indeterminate={table.someFilteredSelected}
                         onchange={() => table.toggleSelectAll()}
-                        class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                        class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         title="Select or deselect all visible rules"
                       />
                     </th>
@@ -1287,11 +1287,11 @@
                     <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-border-subtle">
                   {#each table.paginated as rule (rule.id)}
                     {@const mech = describeMechanism(rule.mechanism || "CODE")}
                     <tr
-                      class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.id)
+                      class="transition-colors hover:bg-surface-hover {table.isSelected(rule.id)
                         ? 'bg-surface-selected'
                         : ''}"
                     >
@@ -1300,7 +1300,7 @@
                           type="checkbox"
                           checked={table.isSelected(rule.id)}
                           onchange={() => table.toggleSelect(rule.id)}
-                          class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                          class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         />
                       </td>
                       <td class="px-4 py-3">
@@ -1320,10 +1320,10 @@
                         >
                           {#snippet trigger()}
                             <span class="block min-w-0 cursor-help text-left">
-                              <span class="block font-mono font-bold text-slate-100">
+                              <span class="block font-mono font-bold text-fg-primary">
                                 {rule.rule_id || `Rule #${rule.id}`}
                               </span>
-                              <span class="block max-w-xs truncate text-caption text-slate-400">
+                              <span class="block max-w-xs truncate text-caption text-fg-muted">
                                 {rule.description || "No description"}
                               </span>
                             </span>
@@ -1333,16 +1333,16 @@
                             <p>{rule.description || "This rule carries no description."}</p>
 
                             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
-                              <dt class="uppercase tracking-wider text-slate-500">Checks</dt>
-                              <dd class="wrap-break-word font-mono text-slate-200">
+                              <dt class="uppercase tracking-wider text-fg-muted">Checks</dt>
+                              <dd class="wrap-break-word font-mono text-fg-secondary">
                                 {rule.property_set || "Pset_Compliance"}.{rule.property_name || "-"}
                               </dd>
-                              <dt class="uppercase tracking-wider text-slate-500">Category</dt>
-                              <dd class="wrap-break-word font-mono text-slate-200">
+                              <dt class="uppercase tracking-wider text-fg-muted">Category</dt>
+                              <dd class="wrap-break-word font-mono text-fg-secondary">
                                 {rule.rule_category || rule.category || "-"}
                               </dd>
-                              <dt class="uppercase tracking-wider text-slate-500">Severity</dt>
-                              <dd class="font-mono text-slate-200">{rule.severity || "-"}</dd>
+                              <dt class="uppercase tracking-wider text-fg-muted">Severity</dt>
+                              <dd class="font-mono text-fg-secondary">{rule.severity || "-"}</dd>
                             </dl>
 
                             {#if rule.needs_review}
@@ -1398,7 +1398,7 @@
                           >
                             {#snippet trigger()}
                               <span
-                                class="inline-block cursor-help rounded bg-slate-800 px-2 py-0.5 font-mono text-micro font-semibold text-slate-300"
+                                class="inline-block cursor-help rounded bg-surface-overlay px-2 py-0.5 font-mono text-micro font-semibold text-fg-secondary"
                               >
                                 {rule.mechanism || "CODE"}
                               </span>
@@ -1412,13 +1412,13 @@
                           </HoverCard>
                         {:else}
                           <span
-                            class="inline-block rounded bg-slate-800 px-2 py-0.5 font-mono text-micro font-semibold text-slate-300"
+                            class="inline-block rounded bg-surface-overlay px-2 py-0.5 font-mono text-micro font-semibold text-fg-secondary"
                           >
                             {rule.mechanism || "CODE"}
                           </span>
                         {/if}
                       </td>
-                      <td class="px-4 py-3 font-mono text-caption text-slate-300">
+                      <td class="px-4 py-3 font-mono text-caption text-fg-secondary">
                         <div>
                           <BsddBadge
                             kind="property"
@@ -1427,7 +1427,7 @@
                             fallback="-"
                           />
                         </div>
-                        <div class="text-micro text-slate-500">
+                        <div class="text-micro text-fg-muted">
                           {rule.property_set || "Pset_Compliance"}
                         </div>
                         {#if rule.target_ifc_class}
@@ -1443,7 +1443,7 @@
                               >≡ {rule.compare_property || "same element"}</span
                             >
                             {#if rule.name_pattern}
-                              <span class="font-sans text-micro text-slate-500"
+                              <span class="font-sans text-micro text-fg-muted"
                                 >pattern: {rule.name_pattern}</span
                               >
                             {/if}
@@ -1491,7 +1491,7 @@
                           <button
                             type="button"
                             onclick={() => openViewModal(rule)}
-                            class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
                             title="View rule specifications"
                           >
                             <Eye class="h-3.5 w-3.5" />
@@ -1499,7 +1499,7 @@
                           <button
                             type="button"
                             onclick={() => openEditModal(rule)}
-                            class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
                             title="Edit rule"
                           >
                             <Edit3 class="h-3.5 w-3.5" />
@@ -1507,7 +1507,7 @@
                           <button
                             type="button"
                             onclick={() => promptDelete(rule.id, rule.rule_id || "")}
-                            class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                             title="Delete rule"
                           >
                             <Trash2 class="h-3.5 w-3.5" />
@@ -1545,12 +1545,12 @@
 
       <div class="flex flex-col items-center gap-3 md:flex-row">
         <div class="relative w-full flex-1">
-          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
           <input
             type="text"
             bind:value={snapshotTable.search}
             placeholder="Search snapshots by name, source folder, or notes..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-3.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas py-2.5 pl-10 pr-3.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>
@@ -1571,10 +1571,10 @@
           icon={Camera}
         />
       {:else}
-        <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/60">
+        <div class="overflow-x-auto rounded-2xl border border-border-default bg-surface-card/60">
           <table class="w-full text-xs">
             <thead>
-              <tr class="border-b border-slate-800">
+              <tr class="border-b border-border-default">
                 <th class="w-10 px-4 py-3">
                   <TableCheckbox
                     checked={snapshotTable.allFilteredSelected}
@@ -1596,7 +1596,7 @@
                   onSort={(f) => snapshotTable.toggleSort(f)}>Source Folder</SortHeader
                 >
                 <th
-                  class="px-4 py-3 text-left text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="px-4 py-3 text-left text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Mode</th
                 >
                 <SortHeader
@@ -1619,14 +1619,14 @@
                   onSort={(f) => snapshotTable.toggleSort(f)}>Saved</SortHeader
                 >
                 <th
-                  class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Actions</th
                 >
               </tr>
             </thead>
             <tbody>
               {#each snapshotTable.paginated as snap (snap.id)}
-                <tr class="border-b border-slate-800/60 transition-colors hover:bg-slate-800/30">
+                <tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
                   <td class="px-4 py-3">
                     <TableCheckbox
                       checked={snapshotTable.isSelected(snap.id)}
@@ -1634,25 +1634,25 @@
                       ariaLabel={`Select snapshot ${snap.name}`}
                     />
                   </td>
-                  <td class="px-4 py-3 font-medium text-slate-50">{snap.name}</td>
-                  <td class="px-4 py-3 font-mono text-slate-400">{snap.source_ruleset_id}</td>
+                  <td class="px-4 py-3 font-medium text-fg-primary">{snap.name}</td>
+                  <td class="px-4 py-3 font-mono text-fg-muted">{snap.source_ruleset_id}</td>
                   <td class="px-4 py-3">
                     <span
-                      class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                      class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold uppercase text-fg-secondary"
                     >
                       {snap.source_mode}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-slate-400">{snap.category}</td>
-                  <td class="px-4 py-3 text-center text-slate-300">{snap.rule_count}</td>
-                  <td class="px-4 py-3 text-slate-400"
+                  <td class="px-4 py-3 text-fg-muted">{snap.category}</td>
+                  <td class="px-4 py-3 text-center text-fg-secondary">{snap.rule_count}</td>
+                  <td class="px-4 py-3 text-fg-muted"
                     >{snap.created_at ? new Date(snap.created_at).toLocaleString() : "—"}</td
                   >
                   <td class="px-4 py-3">
                     <div class="flex items-center justify-end gap-1">
                       <a
                         href={rulesApi.getSnapshotPdfUrl(snap.id)}
-                        class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         title="Download PDF"
                       >
                         <FileText class="h-3.5 w-3.5" />
@@ -1660,7 +1660,7 @@
                       <button
                         type="button"
                         onclick={() => (snapshotToDelete = snap)}
-                        class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Delete snapshot"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
@@ -1692,16 +1692,16 @@
 {#if isModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h2 class="text-base font-bold text-slate-50">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
+        <h2 class="text-base font-bold text-fg-primary">
           {editingRule ? "Edit Rule" : "Create New Rule"}
         </h2>
         <button
           type="button"
           onclick={() => (isModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -1735,25 +1735,25 @@
 {#if isViewModalOpen && ruleToView}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
             <ListChecks class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="font-mono text-base font-bold text-slate-50">
+            <h2 class="font-mono text-base font-bold text-fg-primary">
               {ruleToView.rule_id || `Rule #${ruleToView.id}`}
             </h2>
-            <p class="text-xs text-slate-400">Rule Specification &amp; Conditions</p>
+            <p class="text-xs text-fg-muted">Rule Specification &amp; Conditions</p>
           </div>
         </div>
         <button
           type="button"
           onclick={() => (isViewModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -1762,67 +1762,67 @@
       <!-- Body -->
       <div class="space-y-4 overflow-y-auto p-6 text-xs">
         <div>
-          <span class="mb-1 block font-semibold text-slate-400">Description</span>
-          <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-slate-200">
+          <span class="mb-1 block font-semibold text-fg-muted">Description</span>
+          <div class="rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-fg-secondary">
             {ruleToView.description || "No description provided."}
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-slate-500"
+          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
+            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >Category</span
             >
-            <span class="font-mono font-semibold text-slate-50"
+            <span class="font-mono font-semibold text-fg-primary"
               >{ruleToView.category || "Arch"}</span
             >
           </div>
 
-          <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-slate-500"
+          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
+            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >Mechanism</span
             >
-            <span class="font-mono font-semibold text-slate-50"
+            <span class="font-mono font-semibold text-fg-primary"
               >{ruleToView.mechanism || "CODE"}</span
             >
           </div>
 
-          <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-slate-500"
+          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
+            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >Severity</span
             >
             <span class="font-semibold text-amber-400">{ruleToView.severity}</span>
           </div>
 
-          <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-2.5">
-            <span class="block text-micro font-semibold uppercase tracking-wider text-slate-500"
+          <div class="rounded-xl border border-border-default bg-surface-canvas/40 p-2.5">
+            <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >Ruleset / Folder</span
             >
-            <span class="block truncate font-mono text-slate-300"
+            <span class="block truncate font-mono text-fg-secondary"
               >{ruleToView.ruleset_id || "Global"}</span
             >
           </div>
         </div>
 
-        <div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
-          <span class="block text-micro font-semibold uppercase tracking-wider text-slate-400"
+        <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/70 p-3.5">
+          <span class="block text-micro font-semibold uppercase tracking-wider text-fg-muted"
             >Target &amp; Condition</span
           >
           <div class="grid grid-cols-2 gap-2 font-mono text-caption">
             <div>
-              <span class="text-slate-500">Pset:</span>
-              <span class="text-slate-300">{ruleToView.property_set || "Pset_Compliance"}</span>
+              <span class="text-fg-muted">Pset:</span>
+              <span class="text-fg-secondary">{ruleToView.property_set || "Pset_Compliance"}</span>
             </div>
             <div>
-              <span class="text-slate-500">Property:</span>
-              <span class="text-slate-300">{ruleToView.property_name || "—"}</span>
+              <span class="text-fg-muted">Property:</span>
+              <span class="text-fg-secondary">{ruleToView.property_name || "—"}</span>
             </div>
             <div>
-              <span class="text-slate-500">Operator:</span>
+              <span class="text-fg-muted">Operator:</span>
               <span class="text-cyan-300">{ruleToView.operator || "=="}</span>
             </div>
             <div>
-              <span class="text-slate-500">Target Value:</span>
+              <span class="text-fg-muted">Target Value:</span>
               <span class="text-emerald-300"
                 >{ruleToView.check_value ||
                   (ruleToView.value_min
@@ -1840,11 +1840,11 @@
         </div>
 
         <div>
-          <span class="mb-1 block text-micro font-semibold uppercase tracking-wider text-slate-500"
+          <span class="mb-1 block text-micro font-semibold uppercase tracking-wider text-fg-muted"
             >Raw JSON Definition</span
           >
           <pre
-            class="max-h-40 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption text-slate-400">{JSON.stringify(
+            class="max-h-40 overflow-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption text-fg-muted">{JSON.stringify(
               ruleToView,
               null,
               2,
@@ -1854,7 +1854,7 @@
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-between border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-between border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
         <button
           type="button"
@@ -1862,7 +1862,7 @@
             isViewModalOpen = false;
             if (ruleToView) openEditModal(ruleToView);
           }}
-          class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-50 transition-colors hover:bg-slate-700"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-3 py-1.5 text-xs text-fg-primary transition-colors hover:bg-surface-hover"
         >
           <Edit3 class="h-3.5 w-3.5" />
           <span>Edit this Rule</span>
@@ -1871,7 +1871,7 @@
         <button
           type="button"
           onclick={() => (isViewModalOpen = false)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>
@@ -1894,10 +1894,10 @@
 {#if isFolderModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             {#if isEditingFolder}
@@ -1907,10 +1907,10 @@
             {/if}
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               {isEditingFolder ? `Edit Folder: ${folderRulesetId}` : "Create Ruleset Folder"}
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               {isEditingFolder
                 ? "Update folder name, category, and scope"
                 : "Organize compliance rules under a new domain ruleset"}
@@ -1920,7 +1920,7 @@
         <button
           type="button"
           onclick={() => (isFolderModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -1935,7 +1935,7 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="folder-ruleset-id" class="block font-semibold text-slate-300">
+          <label for="folder-ruleset-id" class="block font-semibold text-fg-secondary">
             Ruleset Identifier (ID) <span class="text-rose-400">*</span>
           </label>
           <input
@@ -1944,17 +1944,17 @@
             bind:value={folderRulesetId}
             disabled={isEditingFolder}
             placeholder="e.g. BUILDING-CODE-PART3 or GC-001"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
           />
           {#if !isEditingFolder}
-            <p class="text-caption text-slate-500">
+            <p class="text-caption text-fg-muted">
               Unique ID used to link member rules (e.g. CODE-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
             </p>
           {/if}
         </div>
 
         <div class="space-y-1.5">
-          <label for="folder-display-name" class="block font-semibold text-slate-300">
+          <label for="folder-display-name" class="block font-semibold text-fg-secondary">
             Display Name
           </label>
           <input
@@ -1962,19 +1962,19 @@
             type="text"
             bind:value={folderDisplayName}
             placeholder="e.g. Building Code Part 3 - Fire Protection & Safety"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label for="folder-category" class="block font-semibold text-slate-300">
+            <label for="folder-category" class="block font-semibold text-fg-secondary">
               Domain Category
             </label>
             <select
               id="folder-category"
               bind:value={folderCategory}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Arch">Arch (Architectural)</option>
               <option value="Piping">Piping (Corrosion)</option>
@@ -1983,13 +1983,13 @@
           </div>
 
           <div class="space-y-1.5">
-            <label for="folder-mechanism-scope" class="block font-semibold text-slate-300">
+            <label for="folder-mechanism-scope" class="block font-semibold text-fg-secondary">
               Mechanism Scope
             </label>
             <select
               id="folder-mechanism-scope"
               bind:value={folderMechanismScope}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="CODE">CODE (Building Code)</option>
               <option value="GC-001">GC-001 (Galvanic)</option>
@@ -2001,25 +2001,25 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="folder-desc" class="block font-semibold text-slate-300"> Description </label>
+          <label for="folder-desc" class="block font-semibold text-fg-secondary"> Description </label>
           <textarea
             id="folder-desc"
             rows="3"
             bind:value={folderDescription}
             placeholder="Regulatory standard, scope notes, or compliance criteria..."
-            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full resize-y rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
       </div>
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
       >
         <button
           type="button"
           onclick={() => (isFolderModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -2057,24 +2057,24 @@
 {#if isBulkEditRulesModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <Pencil class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               Bulk Edit {table.selectedCount} Rules
             </h2>
-            <p class="text-xs text-slate-400">Apply batch changes to selected compliance rules</p>
+            <p class="text-xs text-fg-muted">Apply batch changes to selected compliance rules</p>
           </div>
         </div>
         <button
           type="button"
           onclick={() => (isBulkEditRulesModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -2088,13 +2088,13 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="bulk-rule-ruleset" class="block font-semibold text-slate-300">
+          <label for="bulk-rule-ruleset" class="block font-semibold text-fg-secondary">
             Move to Ruleset Folder
           </label>
           <select
             id="bulk-rule-ruleset"
             bind:value={bulkRuleRulesetId}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current folder —</option>
             {#each folders as f (f)}
@@ -2105,13 +2105,13 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label for="bulk-rule-category" class="block font-semibold text-slate-300">
+            <label for="bulk-rule-category" class="block font-semibold text-fg-secondary">
               Domain Category
             </label>
             <select
               id="bulk-rule-category"
               bind:value={bulkRuleCategory}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="Arch">Arch (Architectural)</option>
@@ -2121,13 +2121,13 @@
           </div>
 
           <div class="space-y-1.5">
-            <label for="bulk-rule-mechanism" class="block font-semibold text-slate-300">
+            <label for="bulk-rule-mechanism" class="block font-semibold text-fg-secondary">
               Mechanism
             </label>
             <select
               id="bulk-rule-mechanism"
               bind:value={bulkRuleMechanism}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="CODE">CODE (Building Code)</option>
@@ -2141,13 +2141,13 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label for="bulk-rule-severity" class="block font-semibold text-slate-300">
+            <label for="bulk-rule-severity" class="block font-semibold text-fg-secondary">
               Severity
             </label>
             <select
               id="bulk-rule-severity"
               bind:value={bulkRuleSeverity}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="Critical">Critical</option>
@@ -2158,13 +2158,13 @@
           </div>
 
           <div class="space-y-1.5">
-            <label for="bulk-rule-review" class="block font-semibold text-slate-300">
+            <label for="bulk-rule-review" class="block font-semibold text-fg-secondary">
               Review Status
             </label>
             <select
               id="bulk-rule-review"
               bind:value={bulkRuleNeedsReview}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="0">Mark as Approved (0)</option>
@@ -2175,12 +2175,12 @@
       </div>
 
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
       >
         <button
           type="button"
           onclick={() => (isBulkEditRulesModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -2201,24 +2201,24 @@
 {#if isBulkEditFoldersModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <Pencil class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               Bulk Edit {selectedFolderRulesetIds.length} Folders
             </h2>
-            <p class="text-xs text-slate-400">Apply batch changes to selected ruleset folders</p>
+            <p class="text-xs text-fg-muted">Apply batch changes to selected ruleset folders</p>
           </div>
         </div>
         <button
           type="button"
           onclick={() => (isBulkEditFoldersModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -2232,13 +2232,13 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="bulk-folder-category" class="block font-semibold text-slate-300">
+          <label for="bulk-folder-category" class="block font-semibold text-fg-secondary">
             Domain Category
           </label>
           <select
             id="bulk-folder-category"
             bind:value={bulkFolderCategory}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current —</option>
             <option value="Arch">Arch (Architectural)</option>
@@ -2248,13 +2248,13 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="bulk-folder-mechanism-scope" class="block font-semibold text-slate-300">
+          <label for="bulk-folder-mechanism-scope" class="block font-semibold text-fg-secondary">
             Mechanism Scope
           </label>
           <select
             id="bulk-folder-mechanism-scope"
             bind:value={bulkFolderMechanismScope}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current —</option>
             <option value="CODE">CODE (Building Code)</option>
@@ -2267,12 +2267,12 @@
       </div>
 
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
       >
         <button
           type="button"
           onclick={() => (isBulkEditFoldersModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -2308,9 +2308,9 @@
 {#if isImportIdsModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div
             class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2 text-emerald-400"
@@ -2318,8 +2318,8 @@
             <Upload class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">Import Ruleset</h2>
-            <p class="text-xs text-slate-400">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">Import Ruleset</h2>
+            <p class="text-xs text-fg-muted">
               Parse a buildingSMART IDS (.ids/XML) or BIM-Guard JSON ruleset file into new rules
             </p>
           </div>
@@ -2327,7 +2327,7 @@
         <button
           type="button"
           onclick={() => (isImportIdsModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -2348,16 +2348,16 @@
 {#if isSaveSnapshotModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
             <Camera class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">Save Rule Snapshot</h2>
-            <p class="text-xs text-slate-400">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">Save Rule Snapshot</h2>
+            <p class="text-xs text-fg-muted">
               Freeze "{selectedFolderId}"'s current rules into a named, downloadable snapshot
             </p>
           </div>
@@ -2365,7 +2365,7 @@
         <button
           type="button"
           onclick={() => (isSaveSnapshotModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -2379,23 +2379,23 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="snapshot-name" class="block font-semibold text-slate-300">
+          <label for="snapshot-name" class="block font-semibold text-fg-secondary">
             Snapshot Name <span class="text-rose-400">*</span>
           </label>
           <input
             id="snapshot-name"
             type="text"
             bind:value={saveSnapshotName}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="space-y-1.5">
-          <label for="snapshot-mode" class="block font-semibold text-slate-300">Source Mode</label>
+          <label for="snapshot-mode" class="block font-semibold text-fg-secondary">Source Mode</label>
           <select
             id="snapshot-mode"
             bind:value={saveSnapshotSourceMode}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="manual">Manual</option>
             <option value="pdf">PDF Extraction</option>
@@ -2405,24 +2405,24 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="snapshot-notes" class="block font-semibold text-slate-300">Notes</label>
+          <label for="snapshot-notes" class="block font-semibold text-fg-secondary">Notes</label>
           <textarea
             id="snapshot-notes"
             rows="3"
             bind:value={saveSnapshotNotes}
             placeholder="Optional context for this configuration..."
-            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full resize-y rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
       </div>
 
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas px-6 py-3"
       >
         <button
           type="button"
           onclick={() => (isSaveSnapshotModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -2465,19 +2465,19 @@
 {#if viewingSource}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-slate-50">{viewingSource.filename}</h2>
+          <h2 class="text-base font-bold tracking-tight text-fg-primary">{viewingSource.filename}</h2>
           {#if viewingSource.page_number}
-            <p class="mt-0.5 text-xs text-slate-400">Page {viewingSource.page_number}</p>
+            <p class="mt-0.5 text-xs text-fg-muted">Page {viewingSource.page_number}</p>
           {/if}
         </div>
         <button
           type="button"
           onclick={() => (viewingSource = null)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>

@@ -574,20 +574,20 @@
   {/if}
 
   <!-- Configuration & Input Section -->
-  <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+  <div class="space-y-6 rounded-2xl border border-border-default bg-surface-card/40 p-6">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <!-- Document Source Selector -->
       <div class="space-y-2">
         <label
           for="rule-doc-source"
-          class="block text-xs font-bold uppercase tracking-wider text-slate-400"
+          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
         >
           Source Specification Document
         </label>
         <select
           id="rule-doc-source"
           bind:value={selectedDocId}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         >
           <option value={null}>-- Select from Document Library --</option>
           {#each documents as doc (doc.id)}
@@ -600,15 +600,15 @@
       <div class="space-y-2">
         <label
           for="rule-ai-model"
-          class="block text-xs font-bold uppercase tracking-wider text-slate-400"
+          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
         >
           Extraction Model / Parser
         </label>
         {#if llmModelsLoading}
-          <p class="text-caption text-slate-500">Loading available models…</p>
+          <p class="text-caption text-fg-muted">Loading available models…</p>
         {:else if llmModels.length === 0}
           <div
-            class="rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-500"
+            class="rounded-xl border border-dashed border-border-default bg-surface-canvas/60 px-3.5 py-2.5 text-xs text-fg-muted"
           >
             {llmModelsError || "No LLM provider configured for this organization."} Add one under
             <a href="#/external-providers" class="font-semibold text-accent hover:underline"
@@ -619,14 +619,14 @@
           <select
             id="rule-ai-model"
             bind:value={selectedModel}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             {#each llmModels as model (model.id)}
               <option value={model.id}>{model.name} — {formatModelMeta(model)}</option>
             {/each}
           </select>
           {#if !usingShortlist}
-            <p class="text-caption text-slate-600">
+            <p class="text-caption text-fg-muted">
               Showing this provider's full catalogue — curate a shortlist under
               <a href="#/external-providers" class="font-semibold text-accent hover:underline"
                 >Admin → External Providers → LLM Providers</a
@@ -638,15 +638,15 @@
     </div>
 
     {#if selectedDocId && isLoadingSections}
-      <p class="text-xs text-slate-400">Detecting sections…</p>
+      <p class="text-xs text-fg-muted">Detecting sections…</p>
     {:else if selectedDocId && docSections.length > 0}
       <div
         role="group"
         aria-labelledby="rule-section-scope-label"
-        class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+        class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/60 p-4"
       >
         <div class="flex items-center justify-between gap-3">
-          <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+          <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-fg-muted">
             Optionally Scope Extraction to a Section / Paragraph
           </span>
           <div class="flex shrink-0 items-center gap-3 text-micro font-semibold text-accent">
@@ -658,7 +658,7 @@
             </button>
           </div>
         </div>
-        <p class="text-micro text-slate-500">
+        <p class="text-micro text-fg-muted">
           {docSections.length} section{docSections.length === 1 ? "" : "s"} detected. Pick one or more
           to scope the extraction, or leave all unselected to process the whole document.
           {#if sectionsEnhanced}
@@ -690,7 +690,7 @@
         </div>
       </div>
     {:else if selectedDocId}
-      <p class="text-xs text-slate-400">
+      <p class="text-xs text-fg-muted">
         No sections were detected — extraction will run over the whole document.
       </p>
     {:else}
@@ -698,7 +698,7 @@
       <div class="space-y-2">
         <label
           for="rule-raw-text"
-          class="block text-xs font-bold uppercase tracking-wider text-slate-400"
+          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
         >
           Or Paste Building Code / Specification Clauses Directly:
         </label>
@@ -707,7 +707,7 @@
           bind:value={rawText}
           rows="6"
           placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-xl border border-border-default bg-surface-canvas p-3.5 font-mono text-xs leading-relaxed text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
         ></textarea>
       </div>
     {/if}
@@ -737,15 +737,15 @@
   {#if selectedDocId && (isLoadingDrafts || draftRules.length > 0)}
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-bold tracking-tight text-slate-50">
+        <h2 class="text-lg font-bold tracking-tight text-fg-primary">
           Draft Review ({draftRules.length} draft{draftRules.length === 1 ? "" : "s"})
           {#if draftRules[0]?.proposed_rule.ruleset_id}
-            <span class="ml-2 rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-caption font-semibold text-slate-400">
+            <span class="ml-2 rounded-full border border-border-interactive bg-surface-card px-2.5 py-0.5 text-caption font-semibold text-fg-muted">
               ruleset {draftRules[0].proposed_rule.ruleset_id}
             </span>
           {/if}
         </h2>
-        <p class="text-xs text-slate-400">
+        <p class="text-xs text-fg-muted">
           Accept or reject each candidate, then promote accepted drafts into the compliance rule
           library. Drafts persist across sessions.
         </p>
@@ -755,20 +755,20 @@
         <LoadingState message="Loading extraction drafts…" />
       {:else}
         <div
-          class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+          class="flex flex-col items-center gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 md:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               bind:value={draftTable.search}
               placeholder="Search drafts by reference, description, property..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
           <select
             bind:value={draftTable.filters.status}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Statuses</option>
             <option value="pending_review">Pending Review</option>
@@ -803,11 +803,11 @@
           {/snippet}
         </BulkActionBar>
 
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-300">
+            <table class="w-full text-left text-xs text-fg-secondary">
               <thead
-                class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
               >
                 <tr>
                   <th class="w-10 px-3 py-3 text-center">
@@ -827,10 +827,10 @@
                   <th class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-800/60">
+              <tbody class="divide-y divide-border-subtle">
                 {#each draftTable.paginated as draft (draft.id)}
                   <tr
-                    class="transition-colors hover:bg-slate-900/60 {draftTable.isSelected(draft.id!)
+                    class="transition-colors hover:bg-surface-hover {draftTable.isSelected(draft.id!)
                       ? 'bg-surface-selected'
                       : ''}"
                   >
@@ -853,7 +853,7 @@
                         {draft.status.replace("_", " ")}
                       </span>
                     </td>
-                    <td class="px-3 py-3 font-mono font-bold text-slate-50"
+                    <td class="px-3 py-3 font-mono font-bold text-fg-primary"
                       >{draft.proposed_rule.rule_id}</td
                     >
                     <td class="max-w-xs truncate px-3 py-3" title={draft.proposed_rule.description}>
@@ -869,7 +869,7 @@
                         {/if}
                       </div>
                     </td>
-                    <td class="px-3 py-3 font-mono text-slate-400">
+                    <td class="px-3 py-3 font-mono text-fg-muted">
                       <div class="flex items-center gap-1.5">
                         <span
                           >{draft.proposed_rule.property_set || "—"} / {draft.proposed_rule
@@ -916,7 +916,7 @@
                         <button
                           type="button"
                           onclick={() => viewDraftSource(draft)}
-                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="View source in document"
                         >
                           <Eye class="h-3.5 w-3.5" />
@@ -924,7 +924,7 @@
                         <button
                           type="button"
                           onclick={() => openEditDraftModal(draft)}
-                          class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                           title="Edit draft"
                         >
                           <Pencil class="h-3.5 w-3.5" />
@@ -967,10 +967,10 @@
     <div class="space-y-4">
       <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 class="text-lg font-bold tracking-tight text-slate-50">
+          <h2 class="text-lg font-bold tracking-tight text-fg-primary">
             Extracted Rules Review ({extractedRules.length} rules identified)
           </h2>
-          <p class="text-xs text-slate-400">
+          <p class="text-xs text-fg-muted">
             Review, modify properties, filter, and select rules to persist to the library.
           </p>
         </div>
@@ -979,21 +979,21 @@
           <div class="flex flex-col">
             <label
               for="extraction-ruleset"
-              class="mb-0.5 text-micro font-semibold uppercase tracking-wider text-slate-400"
+              class="mb-0.5 text-micro font-semibold uppercase tracking-wider text-fg-muted"
               >Rule Folder</label
             >
             <input
               id="extraction-ruleset"
               type="text"
               bind:value={formRulesetId}
-              class="w-44 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-44 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <button
             type="button"
             onclick={addManualDraftRule}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-all hover:bg-slate-700"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-all hover:bg-surface-hover"
           >
             <Plus class="h-3.5 w-3.5" />
             <span>Add Rule</span>
@@ -1015,22 +1015,22 @@
 
       <!-- Filter Toolbar -->
       <div
-        class="flex flex-col items-center gap-3 rounded-2xl border border-slate-800/90 bg-slate-950/80 p-3.5 md:flex-row"
+        class="flex flex-col items-center gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 md:flex-row"
       >
         <div class="relative w-full flex-1">
-          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
           <input
             type="text"
             bind:value={table.search}
             placeholder="Search draft rules by reference, description, property..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="flex w-full items-center gap-2 md:w-auto">
           <select
             bind:value={table.filters.severity}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Severities</option>
             <option value="Critical">Critical</option>
@@ -1054,11 +1054,11 @@
       />
 
       <!-- Table Container -->
-      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-300">
+          <table class="w-full text-left text-xs text-fg-secondary">
             <thead
-              class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+              class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
             >
               <tr>
                 <th class="w-10 px-3 py-3 text-center">
@@ -1127,10 +1127,10 @@
                 <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/60">
+            <tbody class="divide-y divide-border-subtle">
               {#each table.paginated as rule (rule.rowId)}
                 <tr
-                  class="transition-colors hover:bg-slate-900/60 {table.isSelected(rule.rowId)
+                  class="transition-colors hover:bg-surface-hover {table.isSelected(rule.rowId)
                     ? 'bg-surface-selected'
                     : ''}"
                 >
@@ -1141,35 +1141,35 @@
                       ariaLabel={`Select rule ${rule.rule_id}`}
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono font-bold text-slate-50">
+                  <td class="px-3 py-3 font-mono font-bold text-fg-primary">
                     <input
                       type="text"
                       bind:value={rule.rule_id}
-                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-slate-50 hover:border-slate-700 focus:border-accent focus:outline-hidden"
+                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-fg-primary hover:border-border-interactive focus:border-accent focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3">
                     <input
                       type="text"
                       bind:value={rule.description}
-                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-hidden"
+                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-fg-secondary hover:border-border-interactive focus:border-accent focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-slate-400">
+                  <td class="px-3 py-3 font-mono text-fg-muted">
                     <input
                       type="text"
                       bind:value={rule.property_set}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-400 hover:border-slate-700 focus:border-accent focus:outline-hidden"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-fg-muted hover:border-border-interactive focus:border-accent focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-slate-300">
+                  <td class="px-3 py-3 font-mono text-fg-secondary">
                     <input
                       type="text"
                       bind:value={rule.property_name}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-hidden"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-fg-secondary hover:border-border-interactive focus:border-accent focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-slate-400">
+                  <td class="px-3 py-3 font-mono text-fg-muted">
                     {rule.operator || "=="}
                   </td>
                   <td class="px-3 py-3 font-mono text-cyan-300">
@@ -1179,7 +1179,7 @@
                   <td class="px-3 py-3">
                     <select
                       bind:value={rule.severity}
-                      class="rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-hidden"
+                      class="rounded border border-border-default bg-surface-canvas px-2 py-0.5 text-micro font-semibold text-fg-primary focus:outline-hidden"
                     >
                       <option value="Critical">Critical</option>
                       <option value="High">High</option>
@@ -1192,7 +1192,7 @@
                       <button
                         type="button"
                         onclick={() => (viewingDraftRule = rule)}
-                        class="rounded-lg bg-slate-800 p-1.5 text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                        class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         title="Inspect draft details"
                       >
                         <Eye class="h-3.5 w-3.5" />
@@ -1200,7 +1200,7 @@
                       <button
                         type="button"
                         onclick={() => removeDraftRule(rule.rowId)}
-                        class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Remove draft rule"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
@@ -1236,7 +1236,7 @@
   icon={CheckCircle2}
   onClose={() => (showReturnPrompt = false)}
 >
-  <p class="text-slate-300">
+  <p class="text-fg-secondary">
     You can switch back to the Run Compliance Audit tab now — it will pick up this ruleset
     automatically.
   </p>
@@ -1255,19 +1255,19 @@
 {#if viewingDraftSource}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-slate-50">{viewingDraftSource.filename}</h2>
+          <h2 class="text-base font-bold tracking-tight text-fg-primary">{viewingDraftSource.filename}</h2>
           {#if viewingDraftSource.page_number}
-            <p class="mt-0.5 text-xs text-slate-400">Page {viewingDraftSource.page_number}</p>
+            <p class="mt-0.5 text-xs text-fg-muted">Page {viewingDraftSource.page_number}</p>
           {/if}
         </div>
         <button
           type="button"
           onclick={() => (viewingDraftSource = null)}
-          class="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -1305,17 +1305,17 @@
 {#if editingDraft && editForm}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
         <div class="flex items-center gap-2">
           <Pencil class="h-4 w-4 text-accent" />
-          <h3 class="font-mono text-sm font-bold text-slate-50">Edit Draft</h3>
+          <h3 class="font-mono text-sm font-bold text-fg-primary">Edit Draft</h3>
         </div>
         <button
           type="button"
           onclick={closeEditDraftModal}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-4 w-4" />
         </button>
@@ -1323,57 +1323,57 @@
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
-          <label for="edit-draft-description" class="block font-semibold text-slate-300"
+          <label for="edit-draft-description" class="block font-semibold text-fg-secondary"
             >Description</label
           >
           <textarea
             id="edit-draft-description"
             bind:value={editForm.description}
             rows="2"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas p-3 text-fg-primary focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div class="space-y-1">
-            <label for="edit-draft-target" class="block font-semibold text-slate-300"
+            <label for="edit-draft-target" class="block font-semibold text-fg-secondary"
               >Target IFC Class</label
             >
             <input
               id="edit-draft-target"
               type="text"
               bind:value={editForm.target_ifc_class}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-pset" class="block font-semibold text-slate-300"
+            <label for="edit-draft-pset" class="block font-semibold text-fg-secondary"
               >Property Set</label
             >
             <input
               id="edit-draft-pset"
               type="text"
               bind:value={editForm.property_set}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-prop" class="block font-semibold text-slate-300">Property</label>
+            <label for="edit-draft-prop" class="block font-semibold text-fg-secondary">Property</label>
             <input
               id="edit-draft-prop"
               type="text"
               bind:value={editForm.property_name}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-operator" class="block font-semibold text-slate-300"
+            <label for="edit-draft-operator" class="block font-semibold text-fg-secondary"
               >Operator</label
             >
             <select
               id="edit-draft-operator"
               bind:value={editForm.operator}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:outline-hidden"
             >
               <option value="==">== (Equals)</option>
               <option value="!=">!= (Not equals)</option>
@@ -1386,24 +1386,24 @@
             </select>
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-value" class="block font-semibold text-slate-300"
+            <label for="edit-draft-value" class="block font-semibold text-fg-secondary"
               >Check Value</label
             >
             <input
               id="edit-draft-value"
               type="text"
               bind:value={editForm.check_value}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-severity" class="block font-semibold text-slate-300"
+            <label for="edit-draft-severity" class="block font-semibold text-fg-secondary"
               >Severity</label
             >
             <select
               id="edit-draft-severity"
               bind:value={editForm.severity}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:outline-hidden"
             >
               <option value="mandatory">Mandatory</option>
               <option value="recommended">Recommended</option>
@@ -1412,11 +1412,11 @@
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
+      <div class="flex justify-end gap-2 border-t border-border-default pt-2">
         <button
           type="button"
           onclick={closeEditDraftModal}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -1436,19 +1436,19 @@
 {#if viewingDraftRule}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
         <div class="flex items-center gap-2">
           <FileText class="h-4 w-4 text-accent" />
-          <h3 class="font-mono text-sm font-bold text-slate-50">
+          <h3 class="font-mono text-sm font-bold text-fg-primary">
             {viewingDraftRule.rule_id || "Draft Rule"}
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (viewingDraftRule = null)}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-4 w-4" />
         </button>
@@ -1456,38 +1456,38 @@
 
       <div class="space-y-3 text-xs">
         <div>
-          <span class="mb-1 block font-semibold text-slate-400">Description</span>
-          <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-slate-200">
+          <span class="mb-1 block font-semibold text-fg-muted">Description</span>
+          <div class="rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-fg-secondary">
             {viewingDraftRule.description || "No description"}
           </div>
         </div>
 
         <div
-          class="grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption"
+          class="grid grid-cols-2 gap-2 rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption"
         >
           <div>
-            <span class="text-slate-500">Pset:</span>
-            <span class="text-slate-300">{viewingDraftRule.property_set || "—"}</span>
+            <span class="text-fg-muted">Pset:</span>
+            <span class="text-fg-secondary">{viewingDraftRule.property_set || "—"}</span>
           </div>
           <div>
-            <span class="text-slate-500">Property:</span>
+            <span class="text-fg-muted">Property:</span>
             <BsddBadge
               kind="property"
               value={viewingDraftRule.property_name}
               propertySet={viewingDraftRule.property_set}
-              class="text-slate-300"
+              class="text-fg-secondary"
             />
           </div>
           <div>
-            <span class="text-slate-500">Operator:</span>
+            <span class="text-fg-muted">Operator:</span>
             <span class="text-cyan-300">{viewingDraftRule.operator || "=="}</span>
           </div>
           <div>
-            <span class="text-slate-500">Target Value:</span>
+            <span class="text-fg-muted">Target Value:</span>
             <span class="text-emerald-300">{viewingDraftRule.check_value || "—"}</span>
           </div>
           <div>
-            <span class="text-slate-500">Severity:</span>
+            <span class="text-fg-muted">Severity:</span>
             <span class="font-semibold text-amber-400">{viewingDraftRule.severity}</span>
           </div>
         </div>
@@ -1497,7 +1497,7 @@
         <button
           type="button"
           onclick={() => (viewingDraftRule = null)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
         >
           Close
         </button>
@@ -1510,19 +1510,19 @@
 {#if isDraftBulkEditModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-md space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-md space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="flex items-center justify-between border-b border-border-default pb-3">
         <div class="flex items-center gap-2">
           <SlidersHorizontal class="h-4 w-4 text-blue-400" />
-          <h3 class="text-sm font-bold text-slate-50">
+          <h3 class="text-sm font-bold text-fg-primary">
             Bulk Edit Draft Rules ({table.selectedCount} selected)
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (isDraftBulkEditModalOpen = false)}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-4 w-4" />
         </button>
@@ -1530,13 +1530,13 @@
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
-          <label for="bulk-draft-severity" class="block font-semibold text-slate-300"
+          <label for="bulk-draft-severity" class="block font-semibold text-fg-secondary"
             >Severity</label
           >
           <select
             id="bulk-draft-severity"
             bind:value={bulkDraftSeverity}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Severity --</option>
             <option value="Critical">Critical</option>
@@ -1547,7 +1547,7 @@
         </div>
 
         <div class="space-y-1">
-          <label for="bulk-draft-pset" class="block font-semibold text-slate-300"
+          <label for="bulk-draft-pset" class="block font-semibold text-fg-secondary"
             >Property Set</label
           >
           <input
@@ -1555,16 +1555,16 @@
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary placeholder-slate-600 focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="space-y-1">
-          <label for="bulk-draft-op" class="block font-semibold text-slate-300">Operator</label>
+          <label for="bulk-draft-op" class="block font-semibold text-fg-secondary">Operator</label>
           <select
             id="bulk-draft-op"
             bind:value={bulkDraftOperator}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Operator --</option>
             <option value="==">== (Equals)</option>
@@ -1579,11 +1579,11 @@
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
+      <div class="flex justify-end gap-2 border-t border-border-default pt-2">
         <button
           type="button"
           onclick={() => (isDraftBulkEditModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:text-fg-primary"
         >
           Cancel
         </button>

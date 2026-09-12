@@ -175,21 +175,21 @@
   />
 
   <!-- Step 1: Project -->
-  <div class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+  <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
     <div class="flex items-center gap-2.5">
       {#if project}
         <CheckCircle2 class="h-5 w-5 shrink-0 text-emerald-400" />
       {:else}
         <Circle class="h-5 w-5 shrink-0 text-accent" />
       {/if}
-      <h2 class="text-base font-bold tracking-tight text-slate-50">1. Choose a project</h2>
+      <h2 class="text-base font-bold tracking-tight text-fg-primary">1. Choose a project</h2>
     </div>
 
     {#if !project}
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <!-- Choose existing -->
-        <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-          <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+        <div class="space-y-2.5 rounded-xl border border-border-default bg-surface-canvas/40 p-4">
+          <span class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
             <FolderOpen class="h-3.5 w-3.5 text-accent" />
             Choose Existing Project
           </span>
@@ -198,7 +198,7 @@
               bind:value={selectedExistingProjectId}
               onchange={handleSelectExistingProject}
               disabled={isLoadingProjects}
-              class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
+              class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
             >
               <option value={null}
                 >{isLoadingProjects ? "Loading…" : "-- Select a project --"}</option
@@ -208,19 +208,19 @@
               {/each}
             </select>
             <ChevronDown
-              class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
             />
           </div>
-          <p class="text-micro text-slate-500">Pick up where you left off on a saved project.</p>
+          <p class="text-micro text-fg-muted">Pick up where you left off on a saved project.</p>
         </div>
 
         <!-- Create new -->
-        <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-          <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+        <div class="space-y-2.5 rounded-xl border border-border-default bg-surface-canvas/40 p-4">
+          <span class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
             <PlayCircle class="h-3.5 w-3.5 text-accent" />
             Create New Project
           </span>
-          <p class="text-micro text-slate-500">
+          <p class="text-micro text-fg-muted">
             Give it a name, country and analysis type — you can attach the IFC model in the same
             step.
           </p>
@@ -234,13 +234,13 @@
         </div>
       </div>
     {:else}
-      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3.5">
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-canvas/50 p-3.5">
         <div class="min-w-0">
-          <p class="truncate text-sm font-semibold text-slate-100">{project.name}</p>
-          <p class="text-micro text-slate-500">{project.country} · {formatAnalysisDomain(project.analysis_type)}</p>
+          <p class="truncate text-sm font-semibold text-fg-primary">{project.name}</p>
+          <p class="text-micro text-fg-muted">{project.country} · {formatAnalysisDomain(project.analysis_type)}</p>
         </div>
         {#if isCheckingModel}
-          <span class="flex shrink-0 items-center gap-1.5 text-micro text-slate-500">
+          <span class="flex shrink-0 items-center gap-1.5 text-micro text-fg-muted">
             <Loader2 class="h-3.5 w-3.5 animate-spin" /> Checking for a model…
           </span>
         {:else if hasModel}
@@ -264,7 +264,7 @@
 
   <!-- Step 2: Ruleset -->
   <div
-    class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 {!project
+    class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 {!project
       ? 'pointer-events-none opacity-50'
       : ''}"
   >
@@ -274,14 +274,14 @@
       {:else}
         <Circle class="h-5 w-5 shrink-0 text-accent" />
       {/if}
-      <h2 class="text-base font-bold tracking-tight text-slate-50">2. Pick a ruleset</h2>
+      <h2 class="text-base font-bold tracking-tight text-fg-primary">2. Pick a ruleset</h2>
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <!-- Choose existing -->
-      <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+      <div class="space-y-2.5 rounded-xl border border-border-default bg-surface-canvas/40 p-4">
         <div class="flex items-center justify-between">
-          <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+          <span class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
             <FolderOpen class="h-3.5 w-3.5 text-accent" />
             Choose Existing Ruleset
           </span>
@@ -290,7 +290,7 @@
             onclick={refreshFolders}
             disabled={isFoldersLoading}
             title="Refresh the ruleset list"
-            class="rounded-lg p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50"
+            class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
           >
             <RefreshCw class="h-3.5 w-3.5 {isFoldersLoading ? 'animate-spin' : ''}" />
           </button>
@@ -299,7 +299,7 @@
           <select
             bind:value={selectedFolder}
             disabled={isFoldersLoading}
-            class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
+            class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
           >
             <option value="">{isFoldersLoading ? "Loading…" : "-- Select a ruleset --"}</option>
             {#each ruleFolders as folder (folder.ruleset_id)}
@@ -307,18 +307,18 @@
             {/each}
           </select>
           <ChevronDown
-            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
           />
         </div>
-        <p class="text-micro text-slate-500">
+        <p class="text-micro text-fg-muted">
           Just saved one in another tab? Click back into this tab and it refreshes
           automatically — or use the refresh button above.
         </p>
       </div>
 
       <!-- Upload new -->
-      <div class="space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-        <span class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+      <div class="space-y-2.5 rounded-xl border border-border-default bg-surface-canvas/40 p-4">
+        <span class="flex items-center gap-1.5 text-xs font-bold text-fg-secondary">
           <UploadCloud class="h-3.5 w-3.5 text-accent" />
           Upload New Document
         </span>
@@ -329,11 +329,11 @@
           type="file"
           accept=".pdf,.doc,.docx,.txt"
           onchange={(e) => (uploadFile = (e.target as HTMLInputElement).files?.[0] || null)}
-          class="block w-full text-micro text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-800 file:px-2.5 file:py-1.5 file:text-micro file:font-semibold file:text-slate-200 hover:file:bg-slate-700"
+          class="block w-full text-micro text-fg-muted file:mr-2 file:rounded-lg file:border-0 file:bg-surface-overlay file:px-2.5 file:py-1.5 file:text-micro file:font-semibold file:text-fg-secondary hover:file:bg-slate-700"
         />
         <select
           bind:value={uploadDocType}
-          class="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+          class="w-full rounded-lg border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         >
           {#each DOCUMENT_TYPES as type (type)}
             <option value={type}>{type}</option>
@@ -347,7 +347,7 @@
         >
           {isUploadingDoc ? "Uploading…" : "Upload & Extract Rules"}
         </button>
-        <p class="text-micro text-slate-500">
+        <p class="text-micro text-fg-muted">
           Opens Rule Extraction Studio in a new tab to review and approve the extracted rules.
         </p>
       </div>
@@ -356,13 +356,13 @@
 
   <!-- Step 3: Run -->
   <div
-    class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 {!project || !hasRuleset
+    class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 {!project || !hasRuleset
       ? 'pointer-events-none opacity-50'
       : ''}"
   >
     <div class="flex items-center gap-2.5">
       <Circle class="h-5 w-5 shrink-0 text-accent" />
-      <h2 class="text-base font-bold tracking-tight text-slate-50">3. Run the audit</h2>
+      <h2 class="text-base font-bold tracking-tight text-fg-primary">3. Run the audit</h2>
     </div>
 
     {#if runError}

@@ -70,7 +70,7 @@
         <button
           type="button"
           onclick={onBack}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <ArrowLeft class="h-3.5 w-3.5" />
           <span>Back to Rules Catalog</span>
@@ -93,13 +93,13 @@
       {@const domIcon = DOMAIN_ICONS[domain.key] || Layers}
 
       {@const SvelteComponent = domIcon}
-      <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+      <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
         <div class="flex items-center gap-2.5">
-          <SvelteComponent class="h-4 w-4 text-slate-300" />
-          <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+          <SvelteComponent class="h-4 w-4 text-fg-secondary" />
+          <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
           {#if domain.computed}
             <span
-              class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-micro font-semibold uppercase text-slate-400"
+              class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold uppercase text-fg-muted"
             >
               Computed
             </span>
@@ -108,9 +108,9 @@
 
         {#if domain.computed}
           <div
-            class="flex items-start gap-2.5 rounded-xl border border-slate-800/80 bg-slate-950/40 p-3 text-xs text-slate-400"
+            class="flex items-start gap-2.5 rounded-xl border border-border-default bg-surface-canvas/40 p-3 text-xs text-fg-muted"
           >
-            <Info class="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+            <Info class="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
             <span>
               {domain.label} is computed automatically by the ARCH engine, not from editable rules — nothing
               to add here.
@@ -119,18 +119,18 @@
         {:else}
           <div class="space-y-2">
             {#each domain.targets as target (target)}
-              <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/40">
+              <div class="overflow-hidden rounded-xl border border-border-default bg-surface-canvas/40">
                 <div class="flex items-center justify-between p-3">
                   <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-200">{target.label}</span>
-                    <BsddBadge kind="class" value={target.ifcClass} class="font-mono text-micro text-slate-500" />
+                    <span class="text-xs font-bold text-fg-secondary">{target.label}</span>
+                    <BsddBadge kind="class" value={target.ifcClass} class="font-mono text-micro text-fg-muted" />
                   </div>
                   <button
                     type="button"
                     onclick={() => toggleAdd(target)}
                     class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-caption font-semibold transition-colors {activeTarget ===
                     target.ifcClass
-                      ? 'border border-slate-700 bg-slate-800 text-slate-300'
+                      ? 'border border-border-interactive bg-surface-overlay text-fg-secondary'
                       : 'border border-accent/30 bg-accent/15 text-accent hover:bg-accent/25'}"
                   >
                     {#if activeTarget === target.ifcClass}
@@ -145,7 +145,7 @@
 
                 {#if activeTarget === target.ifcClass}
                   <div class="p-3 pt-0">
-                    <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div class="rounded-xl border border-border-default bg-surface-card/60 p-3">
                       <RuleForm
                         compact
                         lockedTargetIfcClass={target.ifcClass}

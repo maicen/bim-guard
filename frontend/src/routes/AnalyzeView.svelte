@@ -624,7 +624,7 @@
 <div class="space-y-6 pb-12">
   <!-- Top Navigation & Title Bar -->
   <div
-    class="flex flex-col justify-between gap-4 border-b border-slate-800/80 pb-6 lg:flex-row lg:items-center"
+    class="flex flex-col justify-between gap-4 border-b border-border-default pb-6 lg:flex-row lg:items-center"
   >
     <div>
       <div
@@ -632,14 +632,14 @@
       >
         <span>Compliance Audit</span>
         <span>•</span>
-        <span class="text-slate-400">
+        <span class="text-fg-muted">
           {activeCategory === "seismic"
             ? "Seismic Bracing"
             : "Piping Services"}
         </span>
       </div>
       <h1
-        class="flex flex-wrap items-center gap-3 text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl"
+        class="flex flex-wrap items-center gap-3 text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl"
       >
         <span
           >{activeCategory === "seismic"
@@ -663,7 +663,7 @@
           </span>
         {/if}
       </h1>
-      <p class="mt-1 max-w-3xl text-xs text-slate-400 sm:text-sm">
+      <p class="mt-1 max-w-3xl text-xs text-fg-muted sm:text-sm">
         {#if activeCategory === "seismic"}
           Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149) buffer volume
           and bracing audits.
@@ -677,7 +677,7 @@
       <!-- Active Rulesets within this category -->
       {#if categoryFolders.length > 0}
         <div class="mt-3 flex flex-wrap items-center gap-1.5">
-          <span class="text-micro font-bold uppercase tracking-wider text-slate-500"
+          <span class="text-micro font-bold uppercase tracking-wider text-fg-muted"
             >Active Rulesets:</span
           >
           {#each categoryFolders as folder (folder)}
@@ -722,7 +722,7 @@
         <button
           type="button"
           onclick={handleCancelRun}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-card px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
           title="Abandon the run in progress"
         >
           <span>Cancel</span>
@@ -732,11 +732,11 @@
       <!-- Engine Selector (PIPING only) -->
       {#if activeCategory !== "seismic"}
         <div
-          class="flex items-center gap-2 border-l border-slate-800 pl-1"
+          class="flex items-center gap-2 border-l border-border-default pl-1"
           role="group"
           aria-label="Corrosion engines"
         >
-          <span class="text-micro font-bold uppercase tracking-wider text-slate-500">Engines</span>
+          <span class="text-micro font-bold uppercase tracking-wider text-fg-muted">Engines</span>
           {#each PIPING_ENGINES as engine (engine.id)}
             {@const info = describeMechanism(engine.label)}
             <!-- Deciding which engines to run is a real choice, and the
@@ -759,7 +759,7 @@
                     engine.id,
                   )
                     ? 'border-amber-800/80 bg-amber-950/60 text-amber-300'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'}"
+                    : 'border-border-default bg-surface-card/60 text-fg-muted hover:text-fg-primary'}"
                 >
                   <input
                     type="checkbox"
@@ -792,7 +792,7 @@
           onclick={() => handleRun(true)}
           title="Force uncached recomputation against the latest IFC digest"
           aria-label="Force uncached recomputation against the latest IFC digest"
-          class="rounded-lg border border-slate-800 bg-slate-900/80 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg border border-border-default bg-surface-card/80 p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <RefreshCw class="h-3.5 w-3.5 {isRunning ? 'animate-spin' : ''}" />
         </button>
@@ -810,25 +810,25 @@
   {#if currentProject}
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <!-- Project Metadata Card -->
-      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
+      <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-fg-muted"
             >Target Project</span
           >
           <span
             class="rounded px-2 py-0.5 text-micro font-semibold uppercase {currentProject.status ===
             'Active'
               ? 'border border-emerald-800/60 bg-emerald-950/60 text-emerald-400'
-              : 'bg-slate-800 text-slate-400'}"
+              : 'bg-surface-overlay text-fg-muted'}"
           >
             {currentProject.status}
           </span>
         </div>
         <div>
-          <div class="truncate text-sm font-bold text-slate-50">
+          <div class="truncate text-sm font-bold text-fg-primary">
             {currentProject.name}
           </div>
-          <div class="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
+          <div class="mt-0.5 flex items-center gap-2 text-xs text-fg-muted">
             <span>Jurisdiction: <strong>{currentProject.country}</strong></span>
             <span>•</span>
             <span>Type: <strong>{formatAnalysisDomain(currentProject.analysis_type)}</strong></span>
@@ -837,9 +837,9 @@
       </div>
 
       <!-- IFC Model Card & Lineage -->
-      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
+      <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-fg-muted"
             >IFC Model Lineage</span
           >
           {#if currentProject.ifc_file_path}
@@ -859,20 +859,20 @@
         {#if currentProject.ifc_file_path}
           <div class="space-y-1 text-xs">
             <div
-              class="truncate font-mono text-caption text-slate-300"
+              class="truncate font-mono text-caption text-fg-secondary"
               title={currentProject.ifc_file_path}
             >
               {currentProject.ifc_file_path.split("/").pop()}
             </div>
             {#if currentProject.ifc_md5_hash}
-              <div class="flex items-center gap-1.5 font-mono text-micro text-slate-500">
+              <div class="flex items-center gap-1.5 font-mono text-micro text-fg-muted">
                 <span>Digest: {currentProject.ifc_md5_hash.slice(0, 16)}…</span>
                 <button
                   type="button"
                   onclick={() => copyText(currentProject?.ifc_md5_hash || "")}
                   title="Copy full digest"
                   aria-label="Copy full digest"
-                  class="hover:text-slate-300"
+                  class="hover:text-fg-primary"
                 >
                   <Copy class="h-3 w-3" />
                 </button>
@@ -892,7 +892,7 @@
             <button
               type="button"
               onclick={() => (isUploadModalOpen = true)}
-              class="text-xs text-slate-400 transition-colors hover:text-slate-50"
+              class="text-xs text-fg-muted transition-colors hover:text-fg-primary"
             >
               Replace Model
             </button>
@@ -911,12 +911,12 @@
       </div>
 
       <!-- Analysis Inputs (Standards & Client Docs) -->
-      <div class="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
+      <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
+          <span class="text-xs font-bold uppercase tracking-wider text-fg-muted"
             >Linked Standards &amp; Inputs</span
           >
-          <span class="font-mono text-xs font-bold text-slate-300"
+          <span class="font-mono text-xs font-bold text-fg-secondary"
             >{analysisInputs.length} linked</span
           >
         </div>
@@ -934,10 +934,10 @@
             {/each}
           </div>
         {:else}
-          <div class="text-xs text-slate-500">Default regulatory rulepacks will be evaluated.</div>
+          <div class="text-xs text-fg-muted">Default regulatory rulepacks will be evaluated.</div>
         {/if}
         <div
-          class="flex items-center gap-1.5 border-t border-slate-800/60 pt-1 text-micro text-slate-400"
+          class="flex items-center gap-1.5 border-t border-border-subtle pt-1 text-micro text-fg-muted"
         >
           <span
             class="inline-flex items-center gap-1 rounded border border-blue-800/60 bg-blue-950/60 px-1.5 py-0.5 font-semibold text-blue-300"
@@ -1000,7 +1000,7 @@
         >
           <Info class="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
           <div>
-            <strong class="font-bold text-slate-50">White Box Data-Quality Doctrine:</strong>
+            <strong class="font-bold text-fg-primary">White Box Data-Quality Doctrine:</strong>
             <span>
               {dataQualityCount} unassessed service elements are explicitly reported below as
               <strong>Data Quality</strong> findings (assigned to the BIM Coordinator) rather than fabricating
@@ -1012,14 +1012,14 @@
 
       <!-- Executive KPI Statistics Grid -->
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-xs">
-          <div class="text-caption font-semibold uppercase tracking-wider text-slate-400">
+        <div class="rounded-2xl border border-border-default bg-surface-card/60 p-4 shadow-xs">
+          <div class="text-caption font-semibold uppercase tracking-wider text-fg-muted">
             Total Findings
           </div>
-          <div class="mt-1 text-2xl font-bold text-slate-50">
+          <div class="mt-1 text-2xl font-bold text-fg-primary">
             {result.issue_stats.total}
           </div>
-          <div class="mt-0.5 text-micro text-slate-500">Non-compliant items</div>
+          <div class="mt-0.5 text-micro text-fg-muted">Non-compliant items</div>
         </div>
         <div class="rounded-2xl border border-red-900/40 bg-red-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-red-300">
@@ -1069,23 +1069,23 @@
       </div>
 
       <!-- Findings Table & Export Controls -->
-      <div class="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+      <div class="space-y-5 rounded-2xl border border-border-default bg-surface-card/40 p-6">
         <!-- Toolbar Header -->
         <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-fg-primary">
               <span>Audit Findings</span>
-              <span class="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+              <span class="rounded-md bg-surface-overlay px-2 py-0.5 font-mono text-xs text-fg-secondary">
                 {totalMatching.toLocaleString()} of {runTotalIssues.toLocaleString()}
               </span>
               {#if isPageLoading}
-                <span class="inline-flex items-center gap-1 text-caption text-slate-500">
+                <span class="inline-flex items-center gap-1 text-caption text-fg-muted">
                   <RefreshCw class="h-3 w-3 animate-spin" />
                   <span>Loading…</span>
                 </span>
               {/if}
             </h2>
-            <p class="mt-0.5 text-xs text-slate-400">
+            <p class="mt-0.5 text-xs text-fg-muted">
               Component compliance verdicts, authoritative citations, and actionable engineering
               mitigations.
             </p>
@@ -1130,7 +1130,7 @@
                   exportFilters.bands,
                   exportFilters.includeDataQuality,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-3.5 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                 title="Download tabulated audit spreadsheet with lineage and citations"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -1146,7 +1146,7 @@
                   exportFilters.bands,
                   exportFilters.includeDataQuality,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-3.5 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                 title="Download structured machine-readable JSON analysis report"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -1160,7 +1160,7 @@
         <div class="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-12">
           <!-- Search Input -->
           <div class="relative sm:col-span-6">
-            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
             <input
               type="text"
               value={searchTerm}
@@ -1169,7 +1169,7 @@
                 reloadAfterFilterChange();
               }}
               placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas py-2 pl-9 pr-3 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
 
@@ -1181,7 +1181,7 @@
                 severityFilter = (e.currentTarget as HTMLSelectElement).value;
                 reloadAfterFilterChange();
               }}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="all">All Severities</option>
               <option value="critical">Critical</option>
@@ -1200,7 +1200,7 @@
                 mechanismFilter = (e.currentTarget as HTMLSelectElement).value;
                 reloadAfterFilterChange();
               }}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="all">All Mechanisms</option>
               {#if selectedSlug === "corrosion"}
@@ -1218,7 +1218,7 @@
         </div>
 
         <!-- Low Risk Visibility Toggle -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between px-1 text-xs text-slate-400 gap-2">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between px-1 text-xs text-fg-muted gap-2">
           <div class="flex items-center gap-4">
             <label class="flex cursor-pointer select-none items-center gap-2">
               <input
@@ -1228,7 +1228,7 @@
                   showLowRisk = (e.currentTarget as HTMLInputElement).checked;
                   reloadAfterFilterChange();
                 }}
-                class="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-accent focus:ring-0"
+                class="h-3.5 w-3.5 rounded border-border-interactive bg-surface-card text-accent focus:ring-0"
               />
               <span>Include Low Severity verdicts in list</span>
             </label>
@@ -1241,12 +1241,12 @@
                   enableShacl = (e.currentTarget as HTMLInputElement).checked;
                   reloadAfterFilterChange();
                 }}
-                class="h-3.5 w-3.5 rounded border-purple-700 bg-slate-900 text-purple-500 focus:ring-0"
+                class="h-3.5 w-3.5 rounded border-purple-700 bg-surface-card text-purple-500 focus:ring-0"
               />
               <span class="text-purple-400 font-semibold">Enable SHACL validation side-channel</span>
             </label>
           </div>
-          <span class="text-caption text-slate-500">
+          <span class="text-caption text-fg-muted">
             {totalMatching.toLocaleString()} matching {totalMatching === 1 ? "finding" : "findings"}
           </span>
         </div>
@@ -1262,16 +1262,16 @@
         />
 
         <!-- Tabular Findings Table -->
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-canvas/50">
           {#if totalMatching === 0}
-            <div class="p-12 text-center text-xs text-slate-500">
+            <div class="p-12 text-center text-xs text-fg-muted">
               No compliance issues match your selected filters.
             </div>
           {:else}
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-300">
+              <table class="w-full text-left text-xs text-fg-secondary">
                 <thead
-                  class="border-b border-slate-800 bg-slate-950 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                  class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <tr>
                     <th class="w-10 px-4 py-3.5">
@@ -1280,7 +1280,7 @@
                         checked={allOnPageSelected}
                         indeterminate={someOnPageSelected}
                         onchange={() => toggleSelectAllOnPage()}
-                        class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                        class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         title="Select every finding on this page"
                       />
                     </th>
@@ -1294,17 +1294,17 @@
                       Severity
                     </SortHeader>
                     <th
-                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                     >
                       Rule &amp; Mechanism
                     </th>
                     <th
-                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                     >
                       Element GUID
                     </th>
                     <th
-                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-slate-400"
+                      class="px-4 py-3.5 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                     >
                       Finding &amp; Citations
                     </th>
@@ -1321,11 +1321,11 @@
                     <th class="px-4 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-border-subtle">
                   {#each visibleIssues as issue (issue.id)}
                     {@const isDq = isDataQuality(issue)}
                     <tr
-                      class="group transition-colors hover:bg-slate-900/60 {isSelected(issue.id)
+                      class="group transition-colors hover:bg-surface-hover {isSelected(issue.id)
                         ? 'bg-surface-selected'
                         : ''}"
                     >
@@ -1335,7 +1335,7 @@
                           type="checkbox"
                           checked={isSelected(issue.id)}
                           onchange={() => toggleSelect(issue.id)}
-                          class="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-accent focus:ring-accent"
+                          class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         />
                       </td>
 
@@ -1343,7 +1343,7 @@
                       <td class="whitespace-nowrap px-4 py-3.5 align-top">
                         {#if isDq}
                           <span
-                            class="inline-block rounded-md border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-micro font-semibold uppercase text-slate-300"
+                            class="inline-block rounded-md border border-border-interactive bg-surface-overlay px-2.5 py-0.5 text-micro font-semibold uppercase text-fg-secondary"
                           >
                             Data Quality
                           </span>
@@ -1376,10 +1376,10 @@
 
                       <!-- Rule & Mechanism -->
                       <td class="px-4 py-3.5 align-top font-mono">
-                        <div class="text-xs font-bold text-slate-50">
+                        <div class="text-xs font-bold text-fg-primary">
                           {issue.rule_id}
                         </div>
-                        <div class="mt-0.5 text-micro text-slate-400">
+                        <div class="mt-0.5 text-micro text-fg-muted">
                           {issue.mechanism}
                         </div>
                       </td>
@@ -1387,7 +1387,7 @@
                       <!-- Element GUID -->
                       <td class="px-4 py-3.5 align-top">
                         <div
-                          class="flex items-center gap-1.5 font-mono text-caption text-slate-300"
+                          class="flex items-center gap-1.5 font-mono text-caption text-fg-secondary"
                         >
                           <span class="max-w-[140px] truncate" title={issue.element_id}
                             >{issue.element_id}</span
@@ -1395,7 +1395,7 @@
                           <button
                             type="button"
                             onclick={() => copyText(issue.element_id)}
-                            class="text-slate-500 transition-colors hover:text-slate-50"
+                            class="text-fg-muted transition-colors hover:text-fg-primary"
                             title="Copy GUID"
                             aria-label="Copy GUID"
                           >
@@ -1403,7 +1403,7 @@
                           </button>
                         </div>
                         {#if issue.details?.ifc_type}
-                          <div class="mt-0.5 font-mono text-micro text-slate-500">
+                          <div class="mt-0.5 font-mono text-micro text-fg-muted">
                             {issue.details.ifc_type}
                           </div>
                         {/if}
@@ -1411,11 +1411,11 @@
 
                       <!-- Finding, Mitigation, & Citations -->
                       <td class="max-w-md px-4 py-3.5 align-top">
-                        <div class="font-semibold text-slate-100">
+                        <div class="font-semibold text-fg-primary">
                           {issue.title}
                         </div>
                         {#if issue.mitigation}
-                          <div class="mt-1 line-clamp-2 text-caption text-slate-400">
+                          <div class="mt-1 line-clamp-2 text-caption text-fg-muted">
                             {issue.mitigation}
                           </div>
                         {/if}
@@ -1425,7 +1425,7 @@
                           <div class="mt-2 flex flex-wrap items-center gap-1.5">
                             {#each issue.citations as cit (cit)}
                               <span
-                                class="inline-flex items-center gap-1 rounded border border-indigo-900/60 bg-slate-900 px-2 py-0.5 text-micro font-medium text-indigo-300"
+                                class="inline-flex items-center gap-1 rounded border border-indigo-900/60 bg-surface-card px-2 py-0.5 text-micro font-medium text-indigo-300"
                                 title={cit.reason}
                               >
                                 <FileText class="h-2.5 w-2.5 opacity-70" />
@@ -1439,19 +1439,19 @@
                       <!-- Score or Clearance Depth -->
                       <td class="px-4 py-3.5 text-center align-top font-mono">
                         {#if isDq}
-                          <span class="text-caption text-slate-500">N/A</span>
+                          <span class="text-caption text-fg-muted">N/A</span>
                         {:else if issue.score !== undefined && issue.score > 0}
-                          <div class="text-xs font-bold text-slate-50">
+                          <div class="text-xs font-bold text-fg-primary">
                             {issue.score.toFixed(2)}
                           </div>
-                          <div class="text-nano text-slate-500">Risk Score</div>
+                          <div class="text-nano text-fg-muted">Risk Score</div>
                         {:else if issue.details?.intrusion_depth_mm !== undefined}
                           <div class="text-xs font-bold text-red-400">
                             {issue.details.intrusion_depth_mm} mm
                           </div>
-                          <div class="text-nano text-slate-500">Clash Intrusion</div>
+                          <div class="text-nano text-fg-muted">Clash Intrusion</div>
                         {:else}
-                          <span class="text-caption text-slate-500">-</span>
+                          <span class="text-caption text-fg-muted">-</span>
                         {/if}
                       </td>
 
@@ -1460,7 +1460,7 @@
                         <button
                           type="button"
                           onclick={() => (inspectedIssue = issue)}
-                          class="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+                          class="inline-flex items-center gap-1 rounded-lg bg-surface-overlay px-2.5 py-1 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
                         >
                           <span>Details</span>
                         </button>
@@ -1514,16 +1514,16 @@
           {:else if result.shacl_issues}
             <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {#each result.shacl_issues as issue}
-                <div class="rounded-xl border border-purple-800/40 bg-slate-950 p-4 text-xs">
+                <div class="rounded-xl border border-purple-800/40 bg-surface-canvas p-4 text-xs">
                   <div class="mb-2 flex items-start justify-between">
                     <span class="font-bold text-purple-200 font-mono text-micro">{issue.element_id || 'Unknown Node'}</span>
                     <span class="rounded bg-purple-900/60 px-2 py-1 text-micro font-semibold uppercase text-purple-300">
                       {issue.band || 'Violation'}
                     </span>
                   </div>
-                  <div class="mb-1 text-slate-300 font-semibold">{issue.title}</div>
+                  <div class="mb-1 text-fg-secondary font-semibold">{issue.title}</div>
                   {#if issue.rule_id}
-                    <div class="mt-2 truncate font-mono text-micro text-slate-500">
+                    <div class="mt-2 truncate font-mono text-micro text-fg-muted">
                       Shape: {issue.rule_id}
                     </div>
                   {/if}
@@ -1535,16 +1535,16 @@
       {/if}
   {:else if !isRunning}
     <div
-      class="space-y-3 rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
+      class="space-y-3 rounded-2xl border border-dashed border-border-default p-16 text-center text-xs text-fg-muted"
     >
       <div
-        class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-400"
+        class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-default bg-surface-card text-fg-muted"
       >
         <Compass class="h-6 w-6" />
       </div>
       <div>
-        <div class="text-sm font-bold text-slate-50">No Analysis Run Loaded</div>
-        <div class="mx-auto mt-1 max-w-sm text-xs text-slate-400">
+        <div class="text-sm font-bold text-fg-primary">No Analysis Run Loaded</div>
+        <div class="mx-auto mt-1 max-w-sm text-xs text-fg-muted">
           Select an OpenBIM project above and click <strong>"Run Audit"</strong>
           to compute compliance across corrosion engines or Blue Halo seismic clearance envelopes.
         </div>
@@ -1572,31 +1572,31 @@
            Report"), so the finding's own title, band and rule id are restated
            here where they read as the subject of the report. -->
       <div class="space-y-1.5">
-        <h3 class="text-sm font-bold leading-snug text-slate-50">{inspectedIssue.title}</h3>
-        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+        <h3 class="text-sm font-bold leading-snug text-fg-primary">{inspectedIssue.title}</h3>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
           <SeverityBadge severity={isDq ? "data_quality" : inspectedIssue.band} />
-          <span class="font-mono text-caption text-slate-300">{inspectedIssue.rule_id}</span>
-          <span class="text-slate-600">•</span>
-          <span>Mechanism: <strong class="text-slate-200">{inspectedIssue.mechanism}</strong></span>
+          <span class="font-mono text-caption text-fg-secondary">{inspectedIssue.rule_id}</span>
+          <span class="text-fg-muted">•</span>
+          <span>Mechanism: <strong class="text-fg-secondary">{inspectedIssue.mechanism}</strong></span>
         </div>
       </div>
 
       <!-- Element Context Card -->
-      <div class="space-y-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">
+      <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/60 p-4">
+        <div class="text-xs font-bold uppercase tracking-wider text-fg-muted">
           Target IFC Element
         </div>
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span class="text-slate-500">GlobalId (GUID):</span>
-            <div class="mt-0.5 flex items-center gap-1.5 font-mono text-slate-200">
+            <span class="text-fg-muted">GlobalId (GUID):</span>
+            <div class="mt-0.5 flex items-center gap-1.5 font-mono text-fg-secondary">
               <span class="truncate">{inspectedIssue.element_id}</span>
               <button
                 type="button"
                 onclick={() => copyText(inspectedIssue?.element_id || "")}
                 title="Copy GUID"
                 aria-label="Copy GUID"
-                class="text-slate-400 hover:text-slate-50"
+                class="text-fg-muted hover:text-fg-primary"
               >
                 <Copy class="h-3 w-3" />
               </button>
@@ -1604,8 +1604,8 @@
           </div>
           {#if inspectedIssue.assignee_role}
             <div>
-              <span class="text-slate-500">Assigned Resolution Role:</span>
-              <div class="mt-0.5 font-semibold text-slate-200">
+              <span class="text-fg-muted">Assigned Resolution Role:</span>
+              <div class="mt-0.5 font-semibold text-fg-secondary">
                 {inspectedIssue.assignee_role}
               </div>
             </div>
@@ -1616,11 +1616,11 @@
       <!-- Description & Mitigations -->
       {#if inspectedIssue.description}
         <div class="space-y-1">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-fg-muted">
             Why this element failed
           </h4>
           <p
-            class="rounded-xl border border-slate-800/60 bg-slate-950/40 p-3 text-xs text-slate-300"
+            class="rounded-xl border border-border-subtle bg-surface-canvas/40 p-3 text-xs text-fg-secondary"
           >
             {inspectedIssue.description}
           </p>
@@ -1691,7 +1691,7 @@
                   <span>{cit.standard} — {cit.clause}</span>
                 </div>
                 {#if cit.reason}
-                  <div class="mt-1 text-caption text-slate-300">
+                  <div class="mt-1 text-caption text-fg-secondary">
                     {cit.reason}
                   </div>
                 {/if}
@@ -1705,12 +1705,12 @@
       {#if inspectedIssue.details && Object.keys(inspectedIssue.details).length > 0}
         <details class="space-y-1">
           <summary
-            class="cursor-pointer text-xs font-bold uppercase tracking-wider text-slate-400 transition-colors hover:text-slate-200"
+            class="cursor-pointer text-xs font-bold uppercase tracking-wider text-fg-muted transition-colors hover:text-fg-primary"
           >
             Metadata Parameters
           </summary>
           <pre
-            class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-caption text-slate-400">{JSON.stringify(
+            class="overflow-x-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption text-fg-muted">{JSON.stringify(
               inspectedIssue.details,
               null,
               2,
@@ -1723,7 +1723,7 @@
       <button
         type="button"
         onclick={() => (inspectedIssue = null)}
-        class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 transition-colors hover:bg-slate-700"
+        class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
       >
         Close
       </button>
@@ -1751,36 +1751,36 @@
 <!-- IFC Upload Modal -->
 {#if isUploadModalOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs duration-200 animate-in fade-in"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-surface-canvas/80 p-4 backdrop-blur-xs duration-200 animate-in fade-in"
   >
     <div
-      class="w-full max-w-md space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-md space-y-4 rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-slate-50">Upload IFC Model</h3>
+        <h3 class="text-base font-bold text-fg-primary">Upload IFC Model</h3>
         <button
           type="button"
           onclick={() => (isUploadModalOpen = false)}
-          class="text-slate-400 hover:text-slate-50"
+          class="text-fg-muted hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
       </div>
 
-      <p class="text-xs text-slate-400">
+      <p class="text-xs text-fg-muted">
         Attach or update the IFC model for <strong>{currentProject?.name}</strong> (Session A file lineage
         with SHA-256 digest).
       </p>
 
       <div
-        class="rounded-2xl border-2 border-dashed border-slate-700 p-6 text-center transition-colors hover:border-slate-500"
+        class="rounded-2xl border-2 border-dashed border-border-interactive p-6 text-center transition-colors hover:border-slate-500"
       >
-        <Upload class="mx-auto mb-2 h-8 w-8 text-slate-400" />
+        <Upload class="mx-auto mb-2 h-8 w-8 text-fg-muted" />
         <input
           type="file"
           accept=".ifc"
           onchange={(e) => (uploadFile = e.currentTarget.files?.[0] || null)}
-          class="text-xs text-slate-300 file:mr-3 file:rounded-xl file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-hover"
+          class="text-xs text-fg-secondary file:mr-3 file:rounded-xl file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-hover"
         />
       </div>
 
@@ -1802,7 +1802,7 @@
         <button
           type="button"
           onclick={() => (isUploadModalOpen = false)}
-          class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:text-slate-50"
+          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg-primary"
         >
           Cancel
         </button>

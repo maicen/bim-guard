@@ -105,7 +105,7 @@
     <button
       type="button"
       onclick={onClose}
-      class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+      class="h-9 rounded-xl border border-border-interactive bg-surface-overlay px-4 text-xs font-semibold text-fg-secondary hover:bg-surface-hover"
     >
       Cancel
     </button>

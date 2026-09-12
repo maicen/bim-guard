@@ -349,9 +349,9 @@
   }
 
   function domainBadge(rules: RuleComplianceResult[]): { label: string; cls: string } {
-    if (!rules.length) return { label: "N/A", cls: "bg-slate-800 text-slate-400 border-slate-700" };
+    if (!rules.length) return { label: "N/A", cls: "bg-surface-overlay text-fg-muted border-border-interactive" };
     const real = rules.filter((r) => r.status !== "NO_ELEMENTS");
-    if (!real.length) return { label: "N/A", cls: "bg-slate-800 text-slate-400 border-slate-700" };
+    if (!real.length) return { label: "N/A", cls: "bg-surface-overlay text-fg-muted border-border-interactive" };
     const nFail = real.filter((r) => r.status === "FAIL").length;
     if (nFail)
       return {
@@ -425,17 +425,17 @@
 <div class="mx-auto max-w-7xl space-y-5">
   <!-- ═══ Header ═══ -->
   <div>
-    <div class="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Analysis</div>
-    <h1 class="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
+    <div class="mb-1 text-xs font-bold uppercase tracking-widest text-fg-muted">Analysis</div>
+    <h1 class="text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl">
       {#if result}
         {result.project_name} — ARCH Analysis{folderNote}
       {:else}
         Architectural Compliance Audit
       {/if}
     </h1>
-    <p class="mt-1 text-xs text-slate-400 sm:text-sm">
+    <p class="mt-1 text-xs text-fg-muted sm:text-sm">
       {#if selectedFolder}
-        Domain-based compliance check against the <strong class="font-mono text-slate-300"
+        Domain-based compliance check against the <strong class="font-mono text-fg-secondary"
           >{selectedFolderDisplayName}</strong
         > ruleset.
       {:else}
@@ -459,15 +459,15 @@
           </span>
         {/if}
         {#if durationSeconds !== undefined && durationSeconds !== null}
-          <span class="inline-flex items-center gap-1 font-mono text-xs text-slate-400">
+          <span class="inline-flex items-center gap-1 font-mono text-xs text-fg-muted">
             <Timer class="h-3.5 w-3.5 text-blue-400" />
             ⏱ {formatDuration(durationSeconds)}
           </span>
         {/if}
         {#if uniqueElements > 0}
-          <span class="text-xs text-slate-400">
-            🔍 <strong class="text-slate-300">{uniqueElements}</strong> element(s) checked across
-            <strong class="text-slate-300">{rulesWithElements}</strong> applicable rule(s) — every match
+          <span class="text-xs text-fg-muted">
+            🔍 <strong class="text-fg-secondary">{uniqueElements}</strong> element(s) checked across
+            <strong class="text-fg-secondary">{rulesWithElements}</strong> applicable rule(s) — every match
             evaluated, no sampling
           </span>
         {/if}
@@ -478,17 +478,17 @@
   <!-- ═══ Ruleset Folder Selector ═══ -->
   {#if selectedProjectId}
     <div
-      class="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-slate-900/50 p-4 sm:flex-row sm:items-center"
+      class="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-surface-card/50 p-4 sm:flex-row sm:items-center"
     >
       <div class="flex shrink-0 items-center gap-2">
         <FolderOpen class="h-4 w-4 text-accent" />
-        <span class="text-xs font-bold text-slate-300">Ruleset</span>
+        <span class="text-xs font-bold text-fg-secondary">Ruleset</span>
       </div>
       <div class="relative flex-1 sm:max-w-xs">
         <select
           bind:value={selectedFolder}
           disabled={isFoldersLoading}
-          class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
+          class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
         >
           <option value="">{isFoldersLoading ? "Loading folders…" : "All Rules"}</option>
           {#each ruleFolders as folder (folder)}
@@ -496,17 +496,17 @@
           {/each}
         </select>
         <ChevronDown
-          class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+          class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
         />
       </div>
       {#if selectedFolder}
-        <span class="shrink-0 text-micro text-slate-500"
-          >Selected: <span class="font-mono text-slate-300">{selectedFolder}</span> (scopes audit to this
+        <span class="shrink-0 text-micro text-fg-muted"
+          >Selected: <span class="font-mono text-fg-secondary">{selectedFolder}</span> (scopes audit to this
           ruleset only)</span
         >
       {:else}
-        <span class="shrink-0 text-micro text-slate-500"
-          >Scope: <span class="text-slate-300">All building code rules</span></span
+        <span class="shrink-0 text-micro text-fg-muted"
+          >Scope: <span class="text-fg-secondary">All building code rules</span></span
         >
       {/if}
     </div>
@@ -518,7 +518,7 @@
        instead of requiring a trip back to the top of the page. -->
   <div
     class="flex flex-wrap items-center justify-center gap-2.5 {result
-      ? 'sticky top-16 z-20 -mx-4 bg-slate-950/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 md:-mx-8 md:px-8'
+      ? 'sticky top-16 z-20 -mx-4 bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 md:-mx-8 md:px-8'
       : ''}"
   >
     {#if result && selectedProjectId}
@@ -537,7 +537,7 @@
         <a
           href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
           download
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
         >
           <Download class="h-3.5 w-3.5" />
           BCF
@@ -621,53 +621,53 @@
   {#if result}
     <!-- ═══ Building Overview card ═══ -->
     {#if buildingSummary && (buildingSummary.storey_count || buildingSummary.room_count)}
-      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
         <!-- Header -->
         <button
           type="button"
-          class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+          class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
           onclick={() => toggleSection("building")}
         >
-          <h2 class="flex items-center gap-2 text-sm font-bold text-slate-50">
+          <h2 class="flex items-center gap-2 text-sm font-bold text-fg-primary">
             <Building2 class="h-4 w-4 text-blue-400" />
             Building Overview
           </h2>
           {#if openSections["building"]}
-            <ChevronDown class="h-4 w-4 text-slate-400" />
+            <ChevronDown class="h-4 w-4 text-fg-muted" />
           {:else}
-            <ChevronRight class="h-4 w-4 text-slate-400" />
+            <ChevronRight class="h-4 w-4 text-fg-muted" />
           {/if}
         </button>
 
         <!-- Stat strip (always visible) -->
         <div class="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-4">
-          <div class="rounded-xl bg-slate-800/60 px-4 py-3 text-center">
-            <span class="block text-2xl font-bold text-slate-50"
+          <div class="rounded-xl bg-surface-overlay px-4 py-3 text-center">
+            <span class="block text-2xl font-bold text-fg-primary"
               >{buildingSummary.storey_count || 0}</span
             >
-            <span class="text-xs text-slate-400">Storeys</span>
+            <span class="text-xs text-fg-muted">Storeys</span>
           </div>
-          <div class="rounded-xl bg-slate-800/60 px-4 py-3 text-center">
-            <span class="block text-2xl font-bold text-slate-50"
+          <div class="rounded-xl bg-surface-overlay px-4 py-3 text-center">
+            <span class="block text-2xl font-bold text-fg-primary"
               >{buildingSummary.room_count || 0}</span
             >
-            <span class="text-xs text-slate-400">Rooms / Spaces</span>
+            <span class="text-xs text-fg-muted">Rooms / Spaces</span>
           </div>
-          <div class="rounded-xl bg-slate-800/60 px-4 py-3 text-center">
-            <span class="block text-2xl font-bold text-slate-50">
+          <div class="rounded-xl bg-surface-overlay px-4 py-3 text-center">
+            <span class="block text-2xl font-bold text-fg-primary">
               {buildingSummary.total_gfa_m2
                 ? buildingSummary.total_gfa_m2.toLocaleString(undefined, {
                     maximumFractionDigits: 1,
                   })
                 : "—"}
             </span>
-            <span class="text-xs text-slate-400">GFA m²</span>
+            <span class="text-xs text-fg-muted">GFA m²</span>
           </div>
-          <div class="rounded-xl bg-slate-800/60 px-4 py-3 text-center">
-            <span class="block text-2xl font-bold text-slate-50"
+          <div class="rounded-xl bg-surface-overlay px-4 py-3 text-center">
+            <span class="block text-2xl font-bold text-fg-primary"
               >{buildingSummary.external_door_count || 0}</span
             >
-            <span class="text-xs text-slate-400">Exit Doors</span>
+            <span class="text-xs text-fg-muted">Exit Doors</span>
           </div>
         </div>
 
@@ -679,21 +679,21 @@
                 (buildingSummary.floor_heights || []).map((h) => [h.from, h.height_mm]),
               )}
               <div>
-                <h3 class="mb-2 text-xs font-semibold text-slate-300">Floor Breakdown</h3>
-                <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+                <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Floor Breakdown</h3>
+                <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                   <table class="w-full text-xs">
                     <thead>
-                      <tr class="bg-slate-800/80">
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <tr class="bg-surface-overlay">
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                           >Storey</th
                         >
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                           >Floor-to-Floor</th
                         >
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-slate-400"
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                           >Rooms</th
                         >
-                        <th class="px-3 py-2 text-right text-xs font-semibold text-slate-400"
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                           >Area m²</th
                         >
                       </tr>
@@ -702,19 +702,19 @@
                       {#each buildingSummary.storeys as s (s.name)}
                         {@const ri = buildingSummary.rooms_per_storey?.[s.name]}
                         {@const hMm = floorHeightMap[s.name]}
-                        <tr class="border-b border-slate-800/60 last:border-0">
-                          <td class="px-3 py-2 text-xs font-medium text-slate-50">{s.name}</td>
-                          <td class="px-3 py-2 font-mono text-xs text-slate-300">
+                        <tr class="border-b border-border-subtle last:border-0">
+                          <td class="px-3 py-2 text-xs font-medium text-fg-primary">{s.name}</td>
+                          <td class="px-3 py-2 font-mono text-xs text-fg-secondary">
                             {#if hMm}
                               {hMm >= 1000
                                 ? `${(hMm / 1000).toFixed(2)} m`
                                 : `${hMm.toLocaleString()} mm`}
                             {:else}—{/if}
                           </td>
-                          <td class="px-3 py-2 text-center text-xs text-slate-300"
+                          <td class="px-3 py-2 text-center text-xs text-fg-secondary"
                             >{ri?.count || "—"}</td
                           >
-                          <td class="px-3 py-2 text-right font-mono text-xs text-slate-300">
+                          <td class="px-3 py-2 text-right font-mono text-xs text-fg-secondary">
                             {ri?.total_area_m2
                               ? ri.total_area_m2.toLocaleString(undefined, {
                                   maximumFractionDigits: 1,
@@ -732,7 +732,7 @@
             <!-- Element count badges -->
             {#if buildingSummary.element_counts && Object.keys(buildingSummary.element_counts).length}
               <div>
-                <h3 class="mb-2 text-xs font-semibold text-slate-300">Elements Found</h3>
+                <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Elements Found</h3>
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.element_counts).sort( ([a], [b]) => (ELEM_LABELS[a] || a).localeCompare(ELEM_LABELS[b] || b) ) as [k, v] (k)}
                     <span
@@ -748,7 +748,7 @@
             <!-- Fixture count badges -->
             {#if buildingSummary.fixture_counts && Object.keys(buildingSummary.fixture_counts).length}
               <div>
-                <h3 class="mb-2 text-xs font-semibold text-slate-300">Plumbing Fixtures</h3>
+                <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Plumbing Fixtures</h3>
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.fixture_counts).sort() as [k, v] (k)}
                     <span
@@ -764,7 +764,7 @@
             <!-- Alarm count badges -->
             {#if buildingSummary.alarm_counts && Object.keys(buildingSummary.alarm_counts).length}
               <div>
-                <h3 class="mb-2 text-xs font-semibold text-slate-300">Fire / CO Alarms</h3>
+                <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Fire / CO Alarms</h3>
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.alarm_counts).sort() as [k, v] (k)}
                     <span
@@ -780,7 +780,7 @@
             <!-- QA warnings -->
             {#if (buildingSummary.unplaced_rooms?.length || 0) > 0 || (buildingSummary.unnamed_elements?.length || 0) > 0}
               <div>
-                <h3 class="mb-2 text-xs font-semibold text-slate-300">Model QA</h3>
+                <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Model QA</h3>
                 <div class="space-y-1 rounded-lg border border-amber-800/40 bg-amber-950/30 p-3">
                   {#if (buildingSummary.unplaced_rooms?.length || 0) > 0}
                     <p class="text-xs text-amber-300">
@@ -811,7 +811,7 @@
 
       {#if isNewGroup}
         <div
-          class="px-1 pt-3 text-caption font-bold uppercase tracking-wider text-slate-500 first:pt-0"
+          class="px-1 pt-3 text-caption font-bold uppercase tracking-wider text-fg-muted first:pt-0"
         >
           {GROUP_LABELS[domain.group]}
         </div>
@@ -827,7 +827,7 @@
         {@const eFail = allPasses.filter((x) => !x.passes).length}
         {@const eBadge =
           allPasses.length === 0
-            ? { label: "N/A", cls: "bg-slate-800 text-slate-400 border-slate-700" }
+            ? { label: "N/A", cls: "bg-surface-overlay text-fg-muted border-border-interactive" }
             : eFail > 0
               ? {
                   label: `${eFail} check(s) failed`,
@@ -835,22 +835,22 @@
                 }
               : { label: "All pass", cls: "bg-emerald-950/80 text-emerald-300 border-emerald-800" }}
 
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
             <div class="flex items-center gap-3">
               <Footprints class="h-4 w-4 text-amber-400" />
-              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {eBadge.cls}"
                 >{eBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-slate-400" />{:else}<ChevronRight
-                class="h-4 w-4 text-slate-400"
+            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
+                class="h-4 w-4 text-fg-muted"
               />{/if}
           </button>
 
@@ -862,44 +862,44 @@
                 <div>
                   <button
                     type="button"
-                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300"
+                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
                     onclick={() => toggleSection("exit-count")}
                   >
                     {#if openSections["exit-count"]}<ChevronDown
                         class="h-3.5 w-3.5"
                       />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                     Exit Count ({exitData.total_exterior_doors || 0} exterior door(s))
-                    <span class="font-mono text-micro text-slate-500"
+                    <span class="font-mono text-micro text-fg-muted"
                       >{ePass}/{exitResults.length} pass</span
                     >
                   </button>
                   {#if openSections["exit-count"]}
-                    <div class="overflow-auto rounded-lg border border-slate-800">
+                    <div class="overflow-auto rounded-lg border border-border-default">
                       <table class="w-full text-xs">
                         <thead
-                          ><tr class="bg-slate-800/80">
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                          ><tr class="bg-surface-overlay">
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Storey</th
                             >
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                               >Exits</th
                             >
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                               >Required</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Status</th
                             >
                           </tr></thead
                         >
                         <tbody>
                           {#each exitResults as r (r)}
-                            <tr class="border-b border-slate-800/60 last:border-0">
-                              <td class="px-3 py-2 text-xs text-slate-50">{r.storey}</td>
-                              <td class="px-3 py-2 text-center font-mono text-xs text-slate-300"
+                            <tr class="border-b border-border-subtle last:border-0">
+                              <td class="px-3 py-2 text-xs text-fg-primary">{r.storey}</td>
+                              <td class="px-3 py-2 text-center font-mono text-xs text-fg-secondary"
                                 >{r.exit_count}</td
                               >
-                              <td class="px-3 py-2 text-center font-mono text-xs text-slate-300"
+                              <td class="px-3 py-2 text-center font-mono text-xs text-fg-secondary"
                                 >{r.required_min}</td
                               >
                               <td
@@ -926,54 +926,54 @@
                 <div>
                   <button
                     type="button"
-                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300"
+                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
                     onclick={() => toggleSection("travel-dist")}
                   >
                     {#if openSections["travel-dist"]}<ChevronDown
                         class="h-3.5 w-3.5"
                       />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                     Travel Distance
-                    <span class="font-mono text-micro text-slate-500"
+                    <span class="font-mono text-micro text-fg-muted"
                       >{tdPass}/{travel.length} pass</span
                     >
                   </button>
                   {#if openSections["travel-dist"]}
-                    <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+                    <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                       <table class="w-full text-xs">
                         <thead
-                          ><tr class="bg-slate-800/80">
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                          ><tr class="bg-surface-overlay">
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Floor</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Room</th
                             >
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                               >Distance</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Nearest Exit</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Status</th
                             >
                           </tr></thead
                         >
                         <tbody>
                           {#each [...travel].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
-                            <tr class="border-b border-slate-800/60 last:border-0">
-                              <td class="px-3 py-2 text-xs text-slate-400"
+                            <tr class="border-b border-border-subtle last:border-0">
+                              <td class="px-3 py-2 text-xs text-fg-muted"
                                 >{r.storey_name || "—"}</td
                               >
-                              <td class="px-3 py-2 text-xs text-slate-50"
+                              <td class="px-3 py-2 text-xs text-fg-primary"
                                 >{(r.space_name || "").slice(0, 35)}</td
                               >
-                              <td class="px-3 py-2 text-right font-mono text-xs text-slate-300">
+                              <td class="px-3 py-2 text-right font-mono text-xs text-fg-secondary">
                                 {r.travel_distance_m !== null && r.travel_distance_m !== undefined
                                   ? `${r.travel_distance_m.toFixed(1)} m`
                                   : "No path"}
                               </td>
-                              <td class="px-3 py-2 text-xs text-slate-300"
+                              <td class="px-3 py-2 text-xs text-fg-secondary"
                                 >{r.nearest_exit || "—"}</td
                               >
                               <td
@@ -1001,25 +1001,25 @@
           ? { label: "Inventory only", cls: "bg-blue-950/80 text-blue-300 border-blue-800" }
           : {
               label: "N/A — no fixtures found",
-              cls: "bg-slate-800 text-slate-400 border-slate-700",
+              cls: "bg-surface-overlay text-fg-muted border-border-interactive",
             }}
 
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
             <div class="flex items-center gap-3">
               <Droplets class="h-4 w-4 text-cyan-400" />
-              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {pBadge.cls}"
                 >{pBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-slate-400" />{:else}<ChevronRight
-                class="h-4 w-4 text-slate-400"
+            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
+                class="h-4 w-4 text-fg-muted"
               />{/if}
           </button>
           {#if isOpen && Object.keys(fc).length}
@@ -1045,7 +1045,7 @@
           !gResults.length && !gWarnings.length
             ? {
                 label: "N/A — no garage detected",
-                cls: "bg-slate-800 text-slate-400 border-slate-700",
+                cls: "bg-surface-overlay text-fg-muted border-border-interactive",
               }
             : gFail > 0
               ? {
@@ -1054,64 +1054,64 @@
                 }
               : { label: "All pass", cls: "bg-emerald-950/80 text-emerald-300 border-emerald-800" }}
 
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
             <div class="flex items-center gap-3">
-              <Car class="h-4 w-4 text-slate-300" />
-              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <Car class="h-4 w-4 text-fg-secondary" />
+              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {gBadge.cls}"
                 >{gBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-slate-400" />{:else}<ChevronRight
-                class="h-4 w-4 text-slate-400"
+            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
+                class="h-4 w-4 text-fg-muted"
               />{/if}
           </button>
           {#if isOpen && gResults.length}
             <div class="px-4 pb-5">
-              <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+              <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                 <table class="w-full text-xs">
                   <thead
-                    ><tr class="bg-slate-800/80">
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400">Type</th>
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                    ><tr class="bg-surface-overlay">
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Type</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Element</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Garage Space</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Adjacent</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Rating</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Required</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Status</th
                       >
                     </tr></thead
                   >
                   <tbody>
                     {#each [...gResults].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
-                      <tr class="border-b border-slate-800/60 last:border-0">
-                        <td class="px-3 py-2 text-xs font-semibold text-slate-50"
+                      <tr class="border-b border-border-subtle last:border-0">
+                        <td class="px-3 py-2 text-xs font-semibold text-fg-primary"
                           >{r.element_type}</td
                         >
-                        <td class="px-3 py-2 font-mono text-xs text-slate-300"
+                        <td class="px-3 py-2 font-mono text-xs text-fg-secondary"
                           >{(r.element_name || "").slice(0, 35)}</td
                         >
-                        <td class="px-3 py-2 text-xs text-slate-300"
+                        <td class="px-3 py-2 text-xs text-fg-secondary"
                           >{(r.garage_space || "").slice(0, 25)}</td
                         >
-                        <td class="px-3 py-2 text-xs text-slate-300"
+                        <td class="px-3 py-2 text-xs text-fg-secondary"
                           >{(r.adjacent_space || "").slice(0, 25)}</td
                         >
                         <td
@@ -1123,7 +1123,7 @@
                         >
                           {r.fire_rating_raw || "⚠ Not declared"}
                         </td>
-                        <td class="px-3 py-2 font-mono text-xs text-slate-400"
+                        <td class="px-3 py-2 font-mono text-xs text-fg-muted"
                           >≥ {r.required_min} min</td
                         >
                         <td
@@ -1152,10 +1152,10 @@
                 : Layers}
 
         {@const SvelteComponent = domIcon}
-        <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40">
+        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-800/30"
+            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
             <div class="flex items-center gap-3">
@@ -1164,16 +1164,16 @@
                   ? 'text-rose-400'
                   : domain.key === 'windows'
                     ? 'text-cyan-400'
-                    : 'text-slate-300'}"
+                    : 'text-fg-secondary'}"
               />
-              <h3 class="text-sm font-bold text-slate-50">{domain.label}</h3>
+              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {badge.cls}"
                 >{badge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-slate-400" />{:else}<ChevronRight
-                class="h-4 w-4 text-slate-400"
+            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
+                class="h-4 w-4 text-fg-muted"
               />{/if}
           </button>
 
@@ -1188,58 +1188,58 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300"
+                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
                       onclick={() => toggleSection("daylight")}
                     >
                       {#if openSections["daylight"]}<ChevronDown
                           class="h-3.5 w-3.5"
                         />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                       Daylight Ratio
-                      <span class="font-mono text-micro text-slate-500"
+                      <span class="font-mono text-micro text-fg-muted"
                         >{dPass}/{daylight.length} pass</span
                       >
                     </button>
                     {#if openSections["daylight"] || dFail > 0}
-                      <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+                      <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                         <table class="w-full text-xs">
                           <thead
-                            ><tr class="bg-slate-800/80">
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            ><tr class="bg-surface-overlay">
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Floor</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Room</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Floor m²</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Window m²</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Ratio</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Status</th
                               >
                             </tr></thead
                           >
                           <tbody>
                             {#each [...daylight].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
-                              <tr class="border-b border-slate-800/60 last:border-0">
-                                <td class="px-3 py-2 text-xs text-slate-400"
+                              <tr class="border-b border-border-subtle last:border-0">
+                                <td class="px-3 py-2 text-xs text-fg-muted"
                                   >{r.storey_name || "—"}</td
                                 >
-                                <td class="px-3 py-2 text-xs text-slate-50"
+                                <td class="px-3 py-2 text-xs text-fg-primary"
                                   >{(r.space_name || "").slice(0, 35)}</td
                                 >
-                                <td class="px-3 py-2 text-right font-mono text-xs text-slate-300"
+                                <td class="px-3 py-2 text-right font-mono text-xs text-fg-secondary"
                                   >{r.floor_area_m2.toFixed(1)}</td
                                 >
-                                <td class="px-3 py-2 text-right font-mono text-xs text-slate-300"
+                                <td class="px-3 py-2 text-right font-mono text-xs text-fg-secondary"
                                   >{r.total_window_area_m2.toFixed(2)}</td
                                 >
-                                <td class="px-3 py-2 text-right font-mono text-xs text-slate-300"
+                                <td class="px-3 py-2 text-right font-mono text-xs text-fg-secondary"
                                   >{r.daylight_ratio.toFixed(3)}</td
                                 >
                                 <td
@@ -1266,32 +1266,32 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300"
+                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
                       onclick={() => toggleSection("fire-sep")}
                     >
                       {#if openSections["fire-sep"]}<ChevronDown
                           class="h-3.5 w-3.5"
                         />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                       Fire Separation
-                      <span class="font-mono text-micro text-slate-500"
+                      <span class="font-mono text-micro text-fg-muted"
                         >{fPass}/{fireSep.length} pass</span
                       >
                     </button>
                     {#if openSections["fire-sep"] || fFail > 0}
-                      <div class="max-h-64 overflow-auto rounded-lg border border-slate-800">
+                      <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                         <table class="w-full text-xs">
                           <thead
-                            ><tr class="bg-slate-800/80">
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                            ><tr class="bg-surface-overlay">
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Wall</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Between Spaces</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Fire Rating</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-400"
+                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Status</th
                               >
                             </tr></thead
@@ -1303,11 +1303,11 @@
                                 (r.adjacent_spaces?.length > 2
                                   ? ` +${r.adjacent_spaces.length - 2}`
                                   : "")}
-                              <tr class="border-b border-slate-800/60 last:border-0">
-                                <td class="px-3 py-2 font-mono text-xs text-slate-50"
+                              <tr class="border-b border-border-subtle last:border-0">
+                                <td class="px-3 py-2 font-mono text-xs text-fg-primary"
                                   >{(r.wall_name || "").slice(0, 35)}</td
                                 >
-                                <td class="px-3 py-2 text-xs text-slate-300"
+                                <td class="px-3 py-2 text-xs text-fg-secondary"
                                   >{spaces.slice(0, 50)}</td
                                 >
                                 <td
@@ -1338,14 +1338,14 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300"
+                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
                       onclick={() => toggleSection("alarms")}
                     >
                       {#if openSections["alarms"]}<ChevronDown
                           class="h-3.5 w-3.5"
                         />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                       Alarm Inventory
-                      <span class="font-mono text-micro text-slate-500"
+                      <span class="font-mono text-micro text-fg-muted"
                         >{Object.values(buildingSummary.alarm_counts).reduce((a, b) => a + b, 0)} alarms</span
                       >
                     </button>
@@ -1365,7 +1365,7 @@
 
               <!-- Per-rule collapsible sections -->
               {#if activeRules.length === 0}
-                <p class="text-xs italic text-slate-500">
+                <p class="text-xs italic text-fg-muted">
                   No applicable checks found in the rule library for this category.
                 </p>
               {:else}
@@ -1384,19 +1384,19 @@
                   {@const isRuleOpen =
                     openRules[rKey] || rStatus === "FAIL" || rStatus === "MISSING_DATA"}
 
-                  <div class="overflow-hidden rounded-xl border border-slate-800/60">
+                  <div class="overflow-hidden rounded-xl border border-border-subtle">
                     <button
                       type="button"
-                      class="flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/30"
+                      class="flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
                       onclick={() => toggleRule(rKey)}
                     >
                       <div class="flex min-w-0 items-center gap-2">
                         {#if isRuleOpen}<ChevronDown
-                            class="h-3.5 w-3.5 shrink-0 text-slate-400"
-                          />{:else}<ChevronRight class="h-3.5 w-3.5 shrink-0 text-slate-400" />{/if}
-                        <span class="truncate text-xs font-medium text-slate-200">{ruleLabel}</span>
+                            class="h-3.5 w-3.5 shrink-0 text-fg-muted"
+                          />{:else}<ChevronRight class="h-3.5 w-3.5 shrink-0 text-fg-muted" />{/if}
+                        <span class="truncate text-xs font-medium text-fg-secondary">{ruleLabel}</span>
                       </div>
-                      <span class="ml-2 shrink-0 font-mono text-micro text-slate-400"
+                      <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
                         >{summaryTxt} · {ruleRequiredText(rule)}</span
                       >
                     </button>
@@ -1404,10 +1404,10 @@
                     {#if isRuleOpen}
                       {#if rule.property_name}
                         <div
-                          class="flex items-center gap-1.5 border-t border-slate-800/60 px-3.5 py-1.5 text-micro text-slate-500"
+                          class="flex items-center gap-1.5 border-t border-border-subtle px-3.5 py-1.5 text-micro text-fg-muted"
                         >
                           Checks
-                          <BsddBadge kind="property" value={rule.property_name} class="font-mono text-slate-300" />
+                          <BsddBadge kind="property" value={rule.property_name} class="font-mono text-fg-secondary" />
                         </div>
                       {/if}
                       <ElementResultsTable
@@ -1477,7 +1477,7 @@
             onclick={() =>
               selectedProjectId &&
               openViewerInNewTab(selectedProjectId, undefined, result?.bcf_artifact_id || undefined)}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3.5 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
           >
             <ScanEye class="h-3.5 w-3.5" />
             Review in 3D
@@ -1486,7 +1486,7 @@
       </div>
     {/if}
   {:else if isRunning}
-    <div class="space-y-2 p-16 text-center text-xs text-slate-400">
+    <div class="space-y-2 p-16 text-center text-xs text-fg-muted">
       <div
         class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent"
       ></div>
@@ -1500,7 +1500,7 @@
     </div>
   {:else}
     <div
-      class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
+      class="rounded-2xl border border-dashed border-border-default p-16 text-center text-xs text-fg-muted"
     >
       {#if !selectedProjectId}
         Please select a project from the top header to inspect building code compliance.
