@@ -48,26 +48,26 @@
 
 <div class="space-y-4">
   {#if importError}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
+    <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical">
       {importError}
     </div>
   {/if}
 
   <div class="space-y-1.5">
-    <label for="import-ruleset-file" class="block text-xs font-semibold text-slate-300">
-      Ruleset File <span class="text-rose-400">*</span>
+    <label for="import-ruleset-file" class="block text-xs font-semibold text-fg-secondary">
+      Ruleset File <span class="text-critical">*</span>
     </label>
     <input
       id="import-ruleset-file"
       type="file"
       accept=".ids,.xml,.json"
       onchange={handleFileChange}
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-1 file:text-xs file:text-slate-50 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary file:mr-3 file:rounded-lg file:border-0 file:bg-surface-card file:px-3 file:py-1 file:text-xs file:text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
     />
-    <p class="text-caption text-slate-500">
+    <p class="text-caption text-fg-muted">
       Accepts a buildingSMART IDS (.ids/.xml) file or a BIM-Guard JSON ruleset (.json).
       {#if importFile}
-        <span class="font-semibold text-slate-400">
+        <span class="font-semibold text-fg-secondary">
           Detected format: {detectedFormat === "json" ? "JSON" : "IDS XML"}
         </span>
       {/if}
@@ -75,26 +75,26 @@
   </div>
 
   <div class="space-y-1.5">
-    <label for="import-ruleset-folder" class="block text-xs font-semibold text-slate-300">
-      Rule Folder <span class="text-rose-400">*</span>
+    <label for="import-ruleset-folder" class="block text-xs font-semibold text-fg-secondary">
+      Rule Folder <span class="text-critical">*</span>
     </label>
     <input
       id="import-ruleset-folder"
       type="text"
       bind:value={importRulesetId}
       placeholder="e.g. IMPORTED-RULES or an existing folder name"
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:ring-accent focus:outline-hidden"
     />
-    <p class="text-caption text-slate-500">
+    <p class="text-caption text-fg-muted">
       Imported rules are saved under this folder and flagged for review (needs_review).
     </p>
   </div>
 
-  <div class="flex justify-end gap-2 border-t border-slate-800 pt-2">
+  <div class="flex justify-end gap-2 border-t border-border-subtle pt-2">
     <button
       type="button"
       onclick={onCancel}
-      class="rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-50 hover:bg-slate-700"
+      class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
     >
       Cancel
     </button>
@@ -102,7 +102,7 @@
       type="button"
       disabled={isImporting || !importFile || !importRulesetId.trim()}
       onclick={handleImport}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isImporting ? "Importing..." : "Import Rules"}</span>
     </button>

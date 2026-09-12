@@ -82,7 +82,7 @@
     <span class="flex-1 truncate">{node.section_name || "Untitled section"}</span>
     {#if node.node_type === "table"}
       <span
-        class="inline-flex items-center gap-1 rounded bg-cyan-950/80 border border-cyan-800/50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 shrink-0"
+        class="inline-flex items-center gap-1 rounded bg-doc-table/15 border border-doc-table/40 px-1.5 py-0.5 text-[10px] font-semibold text-doc-table shrink-0"
         title="DocLang OTSL Table"
       >
         <Table2 class="h-3 w-3" />

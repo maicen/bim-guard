@@ -75,30 +75,30 @@
 >
   {#if errorMessage}
     <div
-      class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
+      class="flex items-center gap-2 rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical"
     >
-      <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
+      <AlertTriangle class="h-4 w-4 shrink-0 text-critical" />
       <span>{errorMessage}</span>
     </div>
   {/if}
 
   <div
-    class="rounded-xl border border-slate-800/80 bg-slate-950 p-3.5 text-xs leading-relaxed text-slate-400"
+    class="rounded-xl border border-border-subtle bg-surface-canvas p-3.5 text-xs leading-relaxed text-fg-muted"
   >
-    Fields set to <strong class="text-slate-200">"Keep Current..."</strong> will remain unchanged on all
+    Fields set to <strong class="text-fg-primary">"Keep Current..."</strong> will remain unchanged on all
     selected topics.
   </div>
 
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <!-- Status -->
     <div class="space-y-1.5">
-      <label for="bulk-bcf-status" class="block text-xs font-semibold text-slate-300">
+      <label for="bulk-bcf-status" class="block text-xs font-semibold text-fg-secondary">
         Topic Status
       </label>
       <select
         id="bulk-bcf-status"
         bind:value={topicStatus}
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
       >
         <option value="no_change">-- Keep Current Status --</option>
         <option value="Open">Open</option>
@@ -110,13 +110,13 @@
 
     <!-- Priority -->
     <div class="space-y-1.5">
-      <label for="bulk-bcf-priority" class="block text-xs font-semibold text-slate-300">
+      <label for="bulk-bcf-priority" class="block text-xs font-semibold text-fg-secondary">
         Priority
       </label>
       <select
         id="bulk-bcf-priority"
         bind:value={priority}
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
       >
         <option value="no_change">-- Keep Current Priority --</option>
         <option value="Critical">Critical</option>
@@ -129,13 +129,13 @@
 
   <!-- CDE State -->
   <div class="space-y-1.5">
-    <label for="bulk-bcf-cde" class="block text-xs font-semibold text-slate-300">
+    <label for="bulk-bcf-cde" class="block text-xs font-semibold text-fg-secondary">
       ISO 19650 CDE State
     </label>
     <select
       id="bulk-bcf-cde"
       bind:value={cdeState}
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+      class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
     >
       <option value="no_change">-- Keep Current CDE State --</option>
       {#each CDE_STATE_CHOICES as state (state)}
@@ -148,7 +148,7 @@
     <button
       type="button"
       onclick={onClose}
-      class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+      class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
     >
       Cancel
     </button>
@@ -156,7 +156,7 @@
       type="button"
       disabled={isSaving || !hasChanges}
       onclick={handleSave}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isSaving ? "Applying Changes..." : `Update ${selectedTopicGuids.length} Topics`}</span>
     </button>

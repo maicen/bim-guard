@@ -64,12 +64,12 @@
   </div>
 
   <!-- What's Included -->
-  <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-    <h2 class="text-base font-bold tracking-tight text-slate-50">What's Included</h2>
-    <ul class="grid grid-cols-1 gap-2 text-xs text-slate-400 sm:grid-cols-2">
+  <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card p-6">
+    <h2 class="text-base font-bold tracking-tight text-fg-primary">What's Included</h2>
+    <ul class="grid grid-cols-1 gap-2 text-xs text-fg-muted sm:grid-cols-2">
       {#each CHECKLIST as item (item)}
         <li class="flex items-start gap-2">
-          <CheckCircle2 class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+          <CheckCircle2 class="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
           <span>{item}</span>
         </li>
       {/each}

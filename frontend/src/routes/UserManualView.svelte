@@ -95,27 +95,27 @@
   <div class="space-y-4">
     {#each STEPS as s (s)}
       <div
-        class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 transition-all hover:border-slate-700"
+        class="space-y-4 rounded-2xl border border-border-default bg-surface-card p-6 transition-all hover:border-border-interactive"
       >
         <div class="flex items-start gap-4">
           <div
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-sm font-bold text-blue-400"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-sm font-bold text-accent"
           >
             {s.step}
           </div>
           <div class="flex-1 space-y-1">
-            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-slate-50">
+            <h2 class="flex items-center gap-2 text-base font-bold tracking-tight text-fg-primary">
               <s.icon class="h-4 w-4 text-accent" />
               <span>{s.title}</span>
             </h2>
-            <p class="text-xs leading-relaxed text-slate-300">
+            <p class="text-xs leading-relaxed text-fg-secondary">
               {s.description}
             </p>
           </div>
         </div>
 
         <div
-          class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-emerald-400"
+          class="flex items-center gap-2 rounded-xl border border-success-border bg-success-bg p-3 text-xs text-success"
         >
           <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
           <span>{s.result}</span>
@@ -128,7 +128,7 @@
               onclick={() => onNavigate(act.view)}
               class="inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-semibold transition-all {act.primary
                 ? 'bg-accent text-white shadow-xs hover:bg-accent-hover'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-50'}"
+                : 'bg-surface-overlay text-fg-secondary hover:bg-surface-hover hover:text-fg-primary'}"
             >
               <span>{act.label}</span>
               <ArrowRight class="h-3 w-3" />

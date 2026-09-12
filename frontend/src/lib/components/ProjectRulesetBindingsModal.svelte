@@ -71,29 +71,29 @@
   {onClose}
 >
   {#if loading}
-    <p class="text-xs text-slate-500">Loading…</p>
+    <p class="text-xs text-fg-muted">Loading…</p>
   {:else if error}
-    <p class="text-xs text-rose-400">{error}</p>
+    <p class="text-xs text-critical">{error}</p>
   {:else if available.length === 0}
-    <p class="text-xs text-slate-500">
+    <p class="text-xs text-fg-muted">
       This project's organization hasn't been granted any custom rulesets yet — ask the platform
       superadmin to grant one under Ruleset Access. Built-in code rules still apply regardless.
     </p>
   {:else}
-    <p class="mb-3 text-xs text-slate-500">
+    <p class="mb-3 text-xs text-fg-muted">
       Only rulesets checked here run against this project's analysis. Built-in code rules always
       apply; this controls the custom rulesets your organization has been granted.
     </p>
     <div class="max-h-80 space-y-1 overflow-y-auto">
       {#each available as rulesetId (rulesetId)}
         <label
-          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-slate-200 transition-colors hover:bg-slate-800"
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-fg-secondary transition-colors hover:bg-surface-hover"
         >
           <input
             type="checkbox"
             checked={selected.has(rulesetId)}
             onchange={() => toggle(rulesetId)}
-            class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-950 text-accent focus:ring-1 focus:ring-blue-500"
+            class="h-3.5 w-3.5 rounded border-border-default bg-surface-canvas text-accent focus:ring-1 focus:ring-accent"
           />
           {rulesetId}
         </label>

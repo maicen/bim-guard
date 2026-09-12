@@ -67,14 +67,14 @@
       onAction={() => onNavigate?.("newproject")}
     />
   {:else if selectedProjectId}
-    <div class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div class="space-y-6 rounded-2xl border border-border-default bg-surface-card p-6">
+      <div class="flex items-center justify-between border-b border-border-subtle pb-4">
         <div class="flex items-center gap-2">
-          <Activity class="h-5 w-5 animate-pulse text-emerald-400" />
-          <h2 class="text-base font-bold tracking-tight text-slate-50">Active Engine Pipeline</h2>
+          <Activity class="h-5 w-5 animate-pulse text-success" />
+          <h2 class="text-base font-bold tracking-tight text-fg-primary">Active Engine Pipeline</h2>
         </div>
-        <div class="text-xs text-slate-400">
-          Listening to <code class="font-mono text-slate-300">/api/events/{selectedProjectId}</code>
+        <div class="text-xs text-fg-muted">
+          Listening to <code class="font-mono text-fg-secondary">/api/events/{selectedProjectId}</code>
         </div>
       </div>
 
@@ -82,7 +82,7 @@
     </div>
   {:else}
     <div
-      class="rounded-2xl border border-dashed border-slate-800 p-16 text-center text-xs text-slate-500"
+      class="rounded-2xl border border-dashed border-border-default p-16 text-center text-xs text-fg-muted"
     >
       Please select a project from the top header to inspect its live pipeline events.
     </div>

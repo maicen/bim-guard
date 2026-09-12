@@ -105,21 +105,21 @@
             <button
               type="button"
               onclick={() => removeFile(i)}
-              class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-400"
+              class="rounded p-1 text-fg-muted hover:bg-critical-bg hover:text-critical"
               aria-label="Remove file"
             >
               <XIcon class="h-3.5 w-3.5" />
             </button>
           </div>
         {/each}
-        <p class="text-micro text-slate-500">
+        <p class="text-micro text-fg-muted">
           Select the radio button to mark which file is the primary model.
         </p>
       </div>
     {/if}
 
     {#if errorMessage}
-      <div class="rounded-lg border border-rose-800/60 bg-rose-950/40 p-2.5 text-xs text-rose-300">
+      <div class="rounded-lg border border-critical-border bg-critical-bg p-2.5 text-xs text-critical">
         {errorMessage}
       </div>
     {/if}

@@ -59,32 +59,32 @@
     {@attach dialog(handleCancel)}
   >
     <div
-      class="w-full max-w-md animate-scale-up space-y-5 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+      class="w-full max-w-md animate-scale-up space-y-5 rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
     >
       <div class="flex items-start gap-3.5">
         {#if danger}
           <div
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-800/80 bg-rose-950/80 text-rose-400"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-critical-border bg-critical-bg text-critical"
           >
             <AlertTriangle class="h-5 w-5" />
           </div>
         {/if}
         <div class="min-w-0 flex-1 space-y-1.5">
-          <h2 id={titleId} class="text-base font-bold tracking-tight text-slate-50">
+          <h2 id={titleId} class="text-base font-bold tracking-tight text-fg-primary">
             {title}
           </h2>
-          <p id={bodyId} class="text-xs leading-relaxed text-slate-400">
+          <p id={bodyId} class="text-xs leading-relaxed text-fg-muted">
             {message}
           </p>
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-2.5 border-t border-slate-800/80 pt-2">
+      <div class="flex items-center justify-end gap-2.5 border-t border-border-subtle pt-2">
         <button
           type="button"
           onclick={handleCancel}
           disabled={isSubmitting}
-          class="h-9 rounded-xl border border-slate-700 bg-slate-800 px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50 disabled:opacity-50"
+          class="h-9 rounded-xl border border-border-default bg-surface-overlay px-4 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
         >
           {cancelText}
         </button>
@@ -94,10 +94,10 @@
           onclick={handleConfirm}
           disabled={isSubmitting}
           class={cn(
-            "h-9 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-50",
+            "h-9 rounded-xl px-4 text-xs font-semibold text-white transition-all disabled:opacity-50",
             danger
-              ? "bg-rose-600 text-white shadow-lg shadow-rose-950/50 hover:bg-rose-500"
-              : "bg-accent text-white shadow-lg shadow-blue-950/50 hover:bg-accent-hover",
+              ? "bg-rose-600 hover:bg-rose-700 shadow-xs"
+              : "bg-accent hover:bg-accent-hover shadow-xs",
           )}
         >
           {isSubmitting ? "Processing..." : confirmText}

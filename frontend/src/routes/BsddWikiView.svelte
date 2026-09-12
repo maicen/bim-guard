@@ -178,9 +178,9 @@
       {#if isLoadingList}
         <LoadingState message="Loading ontology..." />
       {:else if listError}
-        <p class="text-xs text-rose-400">{listError}</p>
+        <p class="text-xs text-critical">{listError}</p>
       {:else if filteredClasses.length === 0}
-        <p class="text-xs text-slate-500">No classes match "{search}".</p>
+        <p class="text-xs text-fg-muted">No classes match "{search}".</p>
       {:else}
         <div class="max-h-[60vh] space-y-0.5 overflow-y-auto">
           {#each filteredClasses as cls (cls.uri)}
@@ -190,10 +190,10 @@
               class="block w-full rounded-lg px-2.5 py-1.5 text-left transition-colors {selectedClassUri ===
               cls.uri
                 ? 'bg-accent/15 text-accent'
-                : 'text-slate-300 hover:bg-slate-800/60'}"
+                : 'text-fg-secondary hover:bg-surface-hover'}"
             >
               <span class="block truncate text-xs font-semibold">{cls.name}</span>
-              <span class="block truncate font-mono text-nano text-slate-500">{cls.code}</span>
+              <span class="block truncate font-mono text-nano text-fg-muted">{cls.code}</span>
             </button>
           {/each}
         </div>
@@ -201,11 +201,11 @@
     </div>
 
     <!-- Detail panel -->
-    <div class="min-h-[60vh] rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+    <div class="min-h-[60vh] rounded-2xl border border-border-default bg-surface-card p-6">
       {#if isLoadingDetail}
         <LoadingState message="Loading..." />
       {:else if detailError}
-        <p class="text-xs text-rose-400">{detailError}</p>
+        <p class="text-xs text-critical">{detailError}</p>
       {:else if selectedPropertyUri && propertyDetail}
         <div class="space-y-4">
           {#if cameFromClassUri}

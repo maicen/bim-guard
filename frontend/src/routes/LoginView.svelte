@@ -90,14 +90,14 @@
     </div>
 
     {#if !isAuthConfigured}
-      <p class="rounded-lg border border-amber-800/60 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+      <p class="rounded-lg border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning">
         Sign-in isn't configured in this environment. Set VITE_SUPABASE_URL and
         VITE_SUPABASE_ANON_KEY (see frontend/.env.example).
       </p>
     {/if}
 
     {#if error}
-      <p class="rounded-lg border border-critical-border/60 bg-critical-bg/40 px-3 py-2 text-xs text-critical">
+      <p class="rounded-lg border border-critical-border bg-critical-bg px-3 py-2 text-xs text-critical">
         {error}
       </p>
     {/if}
@@ -217,7 +217,7 @@
         type="button"
         onclick={handleDevSignIn}
         disabled={signingIn}
-        class="w-full rounded-xl border border-dashed border-amber-700/60 bg-transparent px-4 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-950/30 disabled:cursor-not-allowed disabled:opacity-60"
+        class="w-full rounded-xl border border-dashed border-warning-border bg-transparent px-4 py-2 text-xs font-medium text-warning transition-colors hover:bg-warning-bg/40 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Sign in as dev test user
       </button>
