@@ -127,7 +127,7 @@
         class="flex items-center justify-between border-b border-slate-800 bg-slate-950/50 px-6 py-4"
       >
         <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-800/50 bg-blue-950/60 p-2 text-blue-400">
+          <div class="rounded-xl border border-accent/30 bg-accent/10 p-2 text-accent">
             <FolderGit2 class="h-5 w-5" />
           </div>
           <div>
@@ -302,7 +302,7 @@
                     </span>
                     {#if repo.url.includes("maicen/bimguard-test-models")}
                       <span
-                        class="rounded-md border border-blue-800/60 bg-blue-950/80 px-2 py-0.5 text-micro font-semibold text-blue-300"
+                        class="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-semibold text-accent"
                       >
                         Default Test Repo
                       </span>

@@ -97,13 +97,13 @@
     {/if}
 
     {#if error}
-      <p class="rounded-lg border border-rose-800/60 bg-rose-950/40 px-3 py-2 text-xs text-rose-300">
+      <p class="rounded-lg border border-critical-border/60 bg-critical-bg/40 px-3 py-2 text-xs text-critical">
         {error}
       </p>
     {/if}
 
     {#if confirmationSent}
-      <p class="rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-300">
+      <p class="rounded-lg border border-success-border/60 bg-success-bg/40 px-3 py-2 text-xs text-success">
         Check {email} for a confirmation link, then sign in.
       </p>
     {/if}

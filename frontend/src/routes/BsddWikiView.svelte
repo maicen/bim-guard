@@ -219,7 +219,7 @@
           {/if}
 
           <div class="flex items-start gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-800/50 bg-blue-950/50 text-accent">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent">
               <Tag class="h-4 w-4" />
             </div>
             <div class="min-w-0">
@@ -282,7 +282,7 @@
       {:else if selectedClassUri && classDetail}
         <div class="space-y-4">
           <div class="flex items-start gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-800/50 bg-blue-950/50 text-accent">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent">
               {#if classDetail.class_type === "GroupOfProperties"}
                 <Layers class="h-4 w-4" />
               {:else}

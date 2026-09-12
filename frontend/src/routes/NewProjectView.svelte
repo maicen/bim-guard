@@ -656,7 +656,7 @@
                   onclick={() => (projectType = type)}
                   class="flex items-center justify-center rounded-xl border px-2.5 py-2.5 text-center text-caption font-semibold transition-all {projectType ===
                   type
-                    ? 'border-accent bg-blue-950/60 text-slate-50 ring-1 ring-accent'
+                    ? 'border-accent bg-accent/15 text-fg-primary ring-1 ring-accent'
                     : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-slate-200'}"
                 >
                   {type}
@@ -729,7 +729,7 @@
             ondragleave={handleIfcDragLeave}
             ondrop={preventDefault(handleIfcDrop)}
             class="rounded-2xl border-2 border-dashed p-8 text-center transition-colors {isDraggingIfc
-              ? 'border-accent bg-blue-950/20'
+              ? 'border-accent bg-accent/10'
               : 'border-slate-700 bg-slate-950/40 hover:border-accent'}"
           >
             <Upload
@@ -767,7 +767,7 @@
                 <div
                   class="flex items-center gap-2 rounded-xl border p-3 transition-all {idx ===
                   primaryIndex
-                    ? 'border-accent bg-blue-950/30'
+                    ? 'border-accent bg-accent/15'
                     : 'border-slate-800 bg-slate-950'}"
                 >
                   <button
@@ -949,7 +949,7 @@
                   class="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-all {selectedDocIds.has(
                     doc.id,
                   )
-                    ? 'border-accent bg-blue-950/30'
+                    ? 'border-accent bg-accent/15'
                     : 'border-slate-800 bg-slate-950 hover:border-slate-700'}"
                 >
                   <div class="flex items-center gap-2.5 truncate">
@@ -1010,7 +1010,7 @@
                     class="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-all {selectedStandardIds.has(
                       standard.id,
                     )
-                      ? 'border-accent bg-blue-950/30'
+                      ? 'border-accent bg-accent/15'
                       : 'border-slate-800 bg-slate-950 hover:border-slate-700'}"
                   >
                     <div class="truncate pr-2">

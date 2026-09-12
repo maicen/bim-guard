@@ -81,9 +81,9 @@
 
   {#if successMessage}
     <div
-      class="flex items-center gap-2.5 rounded-xl border border-emerald-800 bg-emerald-950/50 p-4 text-xs text-emerald-300"
+      class="flex items-center gap-2.5 rounded-xl border border-success-border/60 bg-success-bg/40 p-4 text-xs text-success"
     >
-      <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
+      <CheckCircle2 class="h-4 w-4 shrink-0 text-success" />
       <span>{successMessage}</span>
     </div>
   {/if}

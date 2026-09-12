@@ -56,7 +56,7 @@
     <!-- Hero -->
     <section class="mx-auto max-w-4xl px-6 pb-16 pt-10 text-center sm:pb-20 sm:pt-16">
       <div
-        class="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-md border border-blue-800/60 bg-blue-950/40 px-3 py-1 text-xs font-medium text-blue-300"
+        class="mx-auto mb-6 inline-flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent"
       >
         <ShieldCheck class="h-3.5 w-3.5" />
         OpenBIM Compliance Engine
@@ -88,7 +88,7 @@
         {#each FEATURES as feature (feature.title)}
           <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
             <div
-              class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl border border-blue-800/60 bg-blue-950/60 text-accent"
+              class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent"
             >
               <feature.icon class="h-4 w-4" />
             </div>
