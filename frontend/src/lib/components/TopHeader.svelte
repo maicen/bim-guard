@@ -80,13 +80,13 @@
 </script>
 
 <header
-  class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/60 px-4 md:px-6"
+  class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border-default bg-surface-canvas/60 px-4 md:px-6"
 >
   <div class="flex min-w-0 items-center gap-2">
     <button
       type="button"
       onclick={onOpenMobileNav}
-      class="-ml-1 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-50 md:hidden"
+      class="-ml-1 rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden"
       aria-label="Open navigation"
       aria-controls="app-sidebar"
     >
@@ -105,24 +105,24 @@
                once here -- it replaced the old header project switcher and must
                not also repeat as a separate badge. -->
           <BreadcrumbItem>
-            <BreadcrumbPage current={false} title={selectedProject.name} class="truncate font-semibold text-slate-100">
+            <BreadcrumbPage current={false} title={selectedProject.name} class="truncate font-semibold text-fg-primary">
               {selectedProject.short_name || selectedProject.name}
               {#if selectedProject.project_code}
-                <span class="font-normal text-slate-500">· {selectedProject.project_code}</span>
+                <span class="font-normal text-fg-muted">· {selectedProject.project_code}</span>
               {/if}
             </BreadcrumbPage>
           </BreadcrumbItem>
           <BreadcrumbSeparator class="hidden sm:inline-flex" />
           <BreadcrumbItem class="hidden sm:inline-flex">
-            <BreadcrumbPage class="text-slate-400">{headerInfo.title}</BreadcrumbPage>
+            <BreadcrumbPage class="text-fg-muted">{headerInfo.title}</BreadcrumbPage>
           </BreadcrumbItem>
         {:else}
           <BreadcrumbItem class="hidden sm:inline-flex">
-            <BreadcrumbPage current={false} class="font-medium text-slate-500">{headerInfo.section}</BreadcrumbPage>
+            <BreadcrumbPage current={false} class="font-medium text-fg-muted">{headerInfo.section}</BreadcrumbPage>
           </BreadcrumbItem>
           <BreadcrumbSeparator class="hidden sm:inline-flex" />
           <BreadcrumbItem>
-            <BreadcrumbPage class="truncate font-semibold text-slate-100">{headerInfo.title}</BreadcrumbPage>
+            <BreadcrumbPage class="truncate font-semibold text-fg-primary">{headerInfo.title}</BreadcrumbPage>
           </BreadcrumbItem>
         {/if}
       </BreadcrumbList>

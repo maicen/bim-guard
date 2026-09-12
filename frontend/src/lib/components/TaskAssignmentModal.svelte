@@ -146,7 +146,7 @@
         type="search"
         bind:value={filter}
         placeholder="Filter models…"
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
       />
 
       {#if saveError}
@@ -156,11 +156,11 @@
       {/if}
 
       {#if instances.length === 0}
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-fg-muted">
           No enabled LLM provider instances for this organization — add one first.
         </p>
       {:else if loading}
-        <div class="flex items-center gap-2 p-6 text-xs text-slate-400">
+        <div class="flex items-center gap-2 p-6 text-xs text-fg-muted">
           <Loader2 class="h-4 w-4 animate-spin" />
           <span>Loading models from {instances.length} provider instance{instances.length === 1 ? "" : "s"}…</span>
         </div>
@@ -174,22 +174,22 @@
             <div
               class="flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs transition-colors {isSelected
                 ? 'bg-accent/10'
-                : 'hover:bg-slate-800'}"
+                : 'hover:bg-surface-hover'}"
             >
               <input
                 type="checkbox"
                 checked={isSelected}
                 onchange={() => toggle(model)}
-                class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-slate-600 bg-slate-950 text-accent focus:ring-1 focus:ring-blue-500"
+                class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border-subtle bg-surface-canvas text-accent focus:ring-1 focus:ring-blue-500"
               />
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="truncate font-semibold text-slate-100">{model.name}</span>
-                  <span class="rounded-md border border-slate-800 bg-slate-900 px-1.5 py-0.5 text-micro text-slate-500"
+                  <span class="truncate font-semibold text-fg-primary">{model.name}</span>
+                  <span class="rounded-md border border-border-default bg-surface-card px-1.5 py-0.5 text-micro text-fg-muted"
                     >{model.instanceName}</span
                   >
                 </div>
-                <div class="text-caption text-slate-500">{formatModelMeta(model)}</div>
+                <div class="text-caption text-fg-muted">{formatModelMeta(model)}</div>
               </div>
               <button
                 type="button"
@@ -198,13 +198,13 @@
                 title={isSelected ? "Make default for this task" : "Select this model first"}
                 class="shrink-0 rounded-md p-1 transition-colors disabled:opacity-30 {defaultKey === key
                   ? 'text-amber-400'
-                  : 'text-slate-600 hover:text-slate-300'}"
+                  : 'text-fg-muted hover:text-fg-primary'}"
               >
                 <Star class="h-3.5 w-3.5" fill={defaultKey === key ? "currentColor" : "none"} />
               </button>
             </div>
           {:else}
-            <p class="p-4 text-center text-xs text-slate-500">No models match "{filter}".</p>
+            <p class="p-4 text-center text-xs text-fg-muted">No models match "{filter}".</p>
           {/each}
         </div>
       {/if}
@@ -212,12 +212,12 @@
   {/snippet}
   {#snippet footer()}
     <div class="flex w-full items-center justify-between gap-2">
-      <span class="text-caption text-slate-500">{selected.size} model{selected.size === 1 ? "" : "s"} shortlisted</span>
+      <span class="text-caption text-fg-muted">{selected.size} model{selected.size === 1 ? "" : "s"} shortlisted</span>
       <div class="flex gap-2">
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl border border-slate-800 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:text-slate-50"
+          class="rounded-xl border border-border-default px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg-primary"
         >
           Cancel
         </button>

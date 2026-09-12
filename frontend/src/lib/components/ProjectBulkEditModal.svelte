@@ -65,19 +65,19 @@
 {#if isOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <SlidersHorizontal class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               Bulk Edit ({selectedProjectIds.length} Projects)
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               Update status, domain, or jurisdiction for all selected projects.
             </p>
           </div>
@@ -85,7 +85,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -103,22 +103,22 @@
         {/if}
 
         <div
-          class="rounded-xl border border-slate-800/80 bg-slate-950 p-3.5 text-xs leading-relaxed text-slate-400"
+          class="rounded-xl border border-border-default bg-surface-canvas p-3.5 text-xs leading-relaxed text-fg-muted"
         >
-          Fields set to <strong class="text-slate-200">"Keep Current..."</strong> will remain unchanged
+          Fields set to <strong class="text-fg-secondary">"Keep Current..."</strong> will remain unchanged
           on all selected projects.
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <!-- Status -->
           <div class="space-y-1.5">
-            <label for="bulk-proj-status" class="block text-xs font-semibold text-slate-300">
+            <label for="bulk-proj-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
             <select
               id="bulk-proj-status"
               bind:value={status}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="no_change">-- Keep Current Status --</option>
               <option value="Active">Active</option>
@@ -129,13 +129,13 @@
 
           <!-- Jurisdiction -->
           <div class="space-y-1.5">
-            <label for="bulk-proj-country" class="block text-xs font-semibold text-slate-300">
+            <label for="bulk-proj-country" class="block text-xs font-semibold text-fg-secondary">
               Jurisdiction
             </label>
             <select
               id="bulk-proj-country"
               bind:value={country}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="no_change">-- Keep Current Jurisdiction --</option>
               <option value="Canada">Canada (NBC)</option>
@@ -148,13 +148,13 @@
 
         <!-- Analysis Domain -->
         <div class="space-y-1.5">
-          <label for="bulk-proj-domain" class="block text-xs font-semibold text-slate-300">
+          <label for="bulk-proj-domain" class="block text-xs font-semibold text-fg-secondary">
             Analysis Domain
           </label>
           <select
             id="bulk-proj-domain"
             bind:value={analysisType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Domain --</option>
             <option value="Arch">Arch</option>
@@ -165,13 +165,13 @@
 
         <!-- Project Type -->
         <div class="space-y-1.5">
-          <label for="bulk-proj-type" class="block text-xs font-semibold text-slate-300">
+          <label for="bulk-proj-type" class="block text-xs font-semibold text-fg-secondary">
             Project Type
           </label>
           <select
             id="bulk-proj-type"
             bind:value={projectType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Project Type --</option>
             {#each PROJECT_TYPES as type (type)}
@@ -183,12 +183,12 @@
 
       <!-- Footer Actions -->
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>

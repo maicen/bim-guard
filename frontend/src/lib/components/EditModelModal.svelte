@@ -115,22 +115,22 @@
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div class="space-y-1.5 sm:col-span-2">
-          <label for="model-file-name" class="block text-xs font-semibold text-slate-300">
+          <label for="model-file-name" class="block text-xs font-semibold text-fg-secondary">
             File Name
           </label>
           <input
             id="model-file-name"
             type="text"
             bind:value={fileName}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
         <div class="space-y-1.5">
-          <label for="model-role" class="block text-xs font-semibold text-slate-300"> Role </label>
+          <label for="model-role" class="block text-xs font-semibold text-fg-secondary"> Role </label>
           <select
             id="model-role"
             bind:value={role}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             {#each IFC_FILE_ROLES as r (r)}
               <option value={r}>{r}</option>
@@ -141,131 +141,131 @@
 
       <!-- Replace IFC file -->
       <div class="space-y-1.5">
-        <label for="model-replace" class="block text-xs font-semibold text-slate-300">
+        <label for="model-replace" class="block text-xs font-semibold text-fg-secondary">
           Replace IFC File
         </label>
         {#if replacement}
           <div
-            class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5"
+            class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-canvas/40 p-2.5"
           >
-            <span class="min-w-0 flex-1 truncate text-xs text-slate-200">{replacement.name}</span>
+            <span class="min-w-0 flex-1 truncate text-xs text-fg-secondary">{replacement.name}</span>
             <button
               type="button"
               onclick={() => (replacement = null)}
-              class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-400"
+              class="rounded p-1 text-fg-muted hover:bg-surface-hover hover:text-rose-400"
               aria-label="Cancel replacement"
             >
               <XIcon class="h-3.5 w-3.5" />
             </button>
           </div>
-          <p class="text-micro text-slate-500">
+          <p class="text-micro text-fg-muted">
             The stored file swaps for this one when you save; schema, storey/element counts, and
             discipline breakdown are re-read from it.
           </p>
         {:else}
           <label
             id="model-replace"
-            class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-3 text-center transition-colors hover:border-slate-600"
+            class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border-interactive bg-surface-canvas/40 p-3 text-center transition-colors hover:border-border-interactive"
           >
-            <UploadCloud class="h-4 w-4 text-slate-400" />
-            <span class="text-xs font-medium text-slate-300">Click to choose a replacement .ifc file</span>
+            <UploadCloud class="h-4 w-4 text-fg-muted" />
+            <span class="text-xs font-medium text-fg-secondary">Click to choose a replacement .ifc file</span>
             <input type="file" accept=".ifc" class="hidden" onchange={handleReplacementInput} />
           </label>
         {/if}
       </div>
 
       <!-- ISO 19650 fields -->
-      <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-300">
+      <div class="space-y-3 rounded-xl border border-border-default bg-surface-canvas/70 p-4">
+        <div class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
           ISO 19650 Container Naming
         </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div class="space-y-1">
-            <label for="model-project-code" class="block text-caption font-semibold text-slate-400"
+            <label for="model-project-code" class="block text-caption font-semibold text-fg-muted"
               >Project Code</label
             >
             <input
               id="model-project-code"
               type="text"
               bind:value={projectCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-originator" class="block text-caption font-semibold text-slate-400"
+            <label for="model-originator" class="block text-caption font-semibold text-fg-muted"
               >Originator</label
             >
             <input
               id="model-originator"
               type="text"
               bind:value={originator}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-volume" class="block text-caption font-semibold text-slate-400"
+            <label for="model-volume" class="block text-caption font-semibold text-fg-muted"
               >Volume/System</label
             >
             <input
               id="model-volume"
               type="text"
               bind:value={volumeSystem}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-level" class="block text-caption font-semibold text-slate-400"
+            <label for="model-level" class="block text-caption font-semibold text-fg-muted"
               >Level</label
             >
             <input
               id="model-level"
               type="text"
               bind:value={level}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-type" class="block text-caption font-semibold text-slate-400"
+            <label for="model-type" class="block text-caption font-semibold text-fg-muted"
               >Type</label
             >
             <input
               id="model-type"
               type="text"
               bind:value={type}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-number" class="block text-caption font-semibold text-slate-400"
+            <label for="model-number" class="block text-caption font-semibold text-fg-muted"
               >Number</label
             >
             <input
               id="model-number"
               type="text"
               bind:value={number}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-suitability" class="block text-caption font-semibold text-slate-400"
+            <label for="model-suitability" class="block text-caption font-semibold text-fg-muted"
               >Suitability</label
             >
             <input
               id="model-suitability"
               type="text"
               bind:value={suitabilityCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="model-revision" class="block text-caption font-semibold text-slate-400"
+            <label for="model-revision" class="block text-caption font-semibold text-fg-muted"
               >Revision</label
             >
             <input
               id="model-revision"
               type="text"
               bind:value={revisionCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 font-mono text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -278,7 +278,7 @@
       type="button"
       onclick={handleClose}
       disabled={isSaving}
-      class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-100"
+      class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:text-fg-primary"
     >
       Cancel
     </button>

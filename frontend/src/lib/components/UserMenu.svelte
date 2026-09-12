@@ -17,7 +17,7 @@
   let isSuperadmin = $derived(authState.profile?.profile.is_superadmin ?? false);
 
   const ITEM_CLASS =
-    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-300 transition-colors data-highlighted:bg-slate-800 data-highlighted:text-slate-50";
+    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-fg-secondary transition-colors data-highlighted:bg-surface-hover data-highlighted:text-fg-primary";
 
   function goToProfile() {
     const orgId = authState.activeOrganizationId;
@@ -52,14 +52,14 @@
 {#if !isAuthConfigured}
   <!-- Sign-in isn't configured in this environment; nothing to show. -->
 {:else if authState.loading}
-  <span class="h-7 w-7 animate-pulse rounded-full bg-slate-800"></span>
+  <span class="h-7 w-7 animate-pulse rounded-full bg-surface-overlay"></span>
 {:else if authState.user}
   <DropdownMenu width="w-56" align="end">
     {#snippet trigger({ props })}
       <button
         type="button"
         {...props}
-        class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-600"
+        class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-border-interactive bg-surface-card text-xs font-semibold text-fg-secondary transition-colors hover:border-border-interactive"
         aria-label="Account menu"
       >
         {#if avatarUrl}
@@ -70,8 +70,8 @@
       </button>
     {/snippet}
 
-    <p class="truncate px-2.5 py-1.5 text-xs font-medium text-slate-200">{displayName}</p>
-    <p class="truncate px-2.5 pb-1.5 text-xs text-slate-500">{authState.user.email}</p>
+    <p class="truncate px-2.5 py-1.5 text-xs font-medium text-fg-secondary">{displayName}</p>
+    <p class="truncate px-2.5 pb-1.5 text-xs text-fg-muted">{authState.user.email}</p>
     {#if activeOrg}
       <p class="truncate px-2.5 pb-1.5 text-xs capitalize text-violet-400">
         {activeOrg.name} &middot; {activeOrg.role}
@@ -110,7 +110,7 @@
   <button
     type="button"
     onclick={() => push("/login")}
-    class="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs font-medium text-slate-300 transition-colors hover:border-slate-700 hover:text-slate-50"
+    class="flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-card/60 px-2.5 py-1 text-xs font-medium text-fg-secondary transition-colors hover:border-border-interactive hover:text-fg-primary"
   >
     <LogIn class="h-3.5 w-3.5" />
     Sign in

@@ -113,19 +113,19 @@
 {#if isOpen && project}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
           <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
             <Pencil class="h-5 w-5" />
           </div>
           <div>
-            <h2 class="text-base font-bold tracking-tight text-slate-50">
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">
               Edit Project #{project.id}
             </h2>
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-fg-muted">
               Update project metadata and regulatory configuration
             </p>
           </div>
@@ -133,7 +133,7 @@
         <button
           type="button"
           onclick={onClose}
-          class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           <X class="h-5 w-5" />
         </button>
@@ -151,7 +151,7 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="edit-proj-name" class="block text-xs font-semibold text-slate-300">
+          <label for="edit-proj-name" class="block text-xs font-semibold text-fg-secondary">
             Project Name <span class="text-rose-400">*</span>
           </label>
           <input
@@ -159,13 +159,13 @@
             type="text"
             bind:value={name}
             placeholder="e.g. Waterfront Commercial Tower"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="space-y-1.5">
-            <label for="edit-proj-short-name" class="block text-xs font-semibold text-slate-300">
+            <label for="edit-proj-short-name" class="block text-xs font-semibold text-fg-secondary">
               Short Name <span class="text-rose-400">*</span>
             </label>
             <input
@@ -174,11 +174,11 @@
               bind:value={shortName}
               maxlength={SHORT_NAME_MAX_LENGTH}
               placeholder="e.g. Waterfront Tower"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1.5">
-            <label for="edit-proj-code" class="block text-xs font-semibold text-slate-300">
+            <label for="edit-proj-code" class="block text-xs font-semibold text-fg-secondary">
               Project Code <span class="text-rose-400">*</span>
             </label>
             <input
@@ -187,13 +187,13 @@
               bind:value={projectCode}
               maxlength={PROJECT_CODE_MAX_LENGTH}
               placeholder="e.g. WFT"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs uppercase text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <label for="edit-proj-desc" class="block text-xs font-semibold text-slate-300">
+          <label for="edit-proj-desc" class="block text-xs font-semibold text-fg-secondary">
             Description
           </label>
           <textarea
@@ -201,19 +201,19 @@
             rows="3"
             bind:value={description}
             placeholder="Optional project scope or notes..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="space-y-1.5">
-            <label for="edit-proj-status" class="block text-xs font-semibold text-slate-300">
+            <label for="edit-proj-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
             <select
               id="edit-proj-status"
               bind:value={status}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Active">Active</option>
               <option value="Draft">Draft</option>
@@ -222,13 +222,13 @@
           </div>
 
           <div class="space-y-1.5">
-            <label for="edit-proj-country" class="block text-xs font-semibold text-slate-300">
+            <label for="edit-proj-country" class="block text-xs font-semibold text-fg-secondary">
               Jurisdiction
             </label>
             <select
               id="edit-proj-country"
               bind:value={country}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
             >
               <option value="Canada">Canada (NBC)</option>
               <option value="US">United States (IBC)</option>
@@ -239,13 +239,13 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="edit-proj-domain" class="block text-xs font-semibold text-slate-300">
+          <label for="edit-proj-domain" class="block text-xs font-semibold text-fg-secondary">
             Analysis Domain
           </label>
           <select
             id="edit-proj-domain"
             bind:value={analysisType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
@@ -254,13 +254,13 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="edit-proj-type" class="block text-xs font-semibold text-slate-300">
+          <label for="edit-proj-type" class="block text-xs font-semibold text-fg-secondary">
             Project Type <span class="text-rose-400">*</span>
           </label>
           <select
             id="edit-proj-type"
             bind:value={projectType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             {#each PROJECT_TYPES as type (type)}
               <option value={type}>{type}</option>
@@ -269,20 +269,20 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="edit-proj-classification" class="block text-xs font-semibold text-slate-300">
+          <label for="edit-proj-classification" class="block text-xs font-semibold text-fg-secondary">
             Classification Standard
           </label>
           <select
             id="edit-proj-classification"
             bind:value={classificationStandard}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
+            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="">Not set</option>
             {#each classificationStandards as std (std.uri)}
               <option value={std.code}>{std.name}</option>
             {/each}
           </select>
-          <p class="text-caption text-slate-500">
+          <p class="text-caption text-fg-muted">
             Element and property codes are resolved against this bSDD dictionary throughout the project.
           </p>
         </div>
@@ -290,12 +290,12 @@
 
       <!-- Footer Actions -->
       <div
-        class="flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/60 px-6 py-3"
+        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/60 px-6 py-3"
       >
         <button
           type="button"
           onclick={onClose}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-50"
+          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           Cancel
         </button>

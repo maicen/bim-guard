@@ -44,29 +44,29 @@
           type="button"
           {...props}
           class={cn(
-            "hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-700 disabled:opacity-60 lg:inline-flex",
+            "hidden items-center gap-1.5 rounded-lg border border-border-default bg-surface-card/60 px-2.5 py-1 text-fg-secondary transition-colors hover:border-border-interactive disabled:opacity-60 lg:inline-flex",
           )}
         >
           <Building2 class="h-3.5 w-3.5 shrink-0 text-accent" />
-          <Select.Value class="max-w-40 truncate text-xs font-medium text-slate-200">
+          <Select.Value class="max-w-40 truncate text-xs font-medium text-fg-secondary">
             {#snippet children({ placeholder })}
               {placeholder ? "Select organization…" : activeName}
             {/snippet}
           </Select.Value>
-          <ChevronDown class="h-3 w-3 shrink-0 text-slate-400" />
+          <ChevronDown class="h-3 w-3 shrink-0 text-fg-muted" />
         </button>
       {/snippet}
     </Select.Trigger>
 
     <Select.Portal>
       <Select.Content
-        class="z-40 max-h-64 w-56 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+        class="z-40 max-h-64 w-56 space-y-1 overflow-y-auto rounded-xl border border-border-default bg-surface-card p-1.5 text-xs shadow-xl outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
       >
         {#each organizations as org (org.organization_id)}
           <Select.Item
             value={String(org.organization_id)}
             label={org.name}
-            class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-slate-300 data-highlighted:bg-slate-800 data-highlighted:text-slate-50"
+            class="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-fg-secondary data-highlighted:bg-surface-hover data-highlighted:text-fg-primary"
           >
             {#snippet children({ selected })}
               <span class="truncate">{org.name}</span>
@@ -81,7 +81,7 @@
   </Select.Root>
 {:else if organizations.length === 1}
   <span
-    class="hidden items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-xs font-medium text-slate-300 lg:inline-flex"
+    class="hidden items-center gap-1.5 rounded-lg border border-border-default bg-surface-card/60 px-2.5 py-1 text-xs font-medium text-fg-secondary lg:inline-flex"
     title="Your organization"
   >
     <Building2 class="h-3.5 w-3.5 shrink-0 text-accent" />

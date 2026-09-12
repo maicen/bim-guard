@@ -496,7 +496,7 @@
 {#if !showAppShell}
   <!-- Signed out: the landing page and sign-in screen are full-bleed, with
        none of the working app's sidebar/header chrome around them. -->
-  <div class="min-h-screen bg-slate-950 font-sans text-slate-100 antialiased">
+  <div class="min-h-screen bg-surface-canvas font-sans text-fg-primary antialiased">
     {#if activeView === "login"}
       <div class="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6">
         <LoginView />
@@ -507,7 +507,7 @@
   </div>
 {:else}
 <div
-  class="flex min-h-screen bg-slate-950 font-sans text-slate-100 antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
+  class="flex min-h-screen bg-surface-canvas font-sans text-fg-primary antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
 >
   <!-- Apple-Style Sidebar (Admin Portal vs Workspace) -->
   {#if ADMIN_VIEWS.has(activeView)}
@@ -548,7 +548,7 @@
     <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
       <svelte:boundary>
         {#if isAuthConfigured && authState.loading}
-          <div class="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">
+          <div class="flex min-h-[50vh] items-center justify-center text-sm text-fg-muted">
             Loading your session…
           </div>
         {:else if authGateBlocking}
@@ -672,7 +672,7 @@
 
     <!-- Clean Footer -->
     <footer
-      class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80 bg-slate-950/40 px-8 py-4 text-xs text-slate-500"
+      class="flex flex-wrap items-center justify-between gap-4 border-t border-border-default bg-surface-canvas/40 px-8 py-4 text-xs text-fg-muted"
     >
       <div>
         <span>BIM Guard OpenBIM Compliance Engine</span>
