@@ -1,0 +1,2 @@
+id,element_id,rule_id,mechanism,band,score,title,description,mitigation,assignee_role,status,is_data_quality,check,overlap_volume_mm3,clearance_mm,standards
+XM-0001,0St58in6H1V81MuS6hDkEp,XM-001.DQ,data_quality,low,0.0000,XM-001 not assessed: Unknown absent from the series,"'Unknown' has no entry in the galvanic series, so no potential gap can be computed. An unlisted material is unassessed, not benign.","Add Unknown to the GC-001 galvanic series, or confirm the material normalisation is correct.",Mechanical engineer,open,yes,material_not_in_series,,,BIMGUARD-XM-001

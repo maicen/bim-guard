@@ -1,0 +1,91 @@
+{
+  "model": "test_hospital_mep_demo.ifc",
+  "model_stem": "test_hospital_mep_demo",
+  "model_path": "D:\\Zigurat Masters\\bim-guard\\data\\test_hospital_mep_demo.ifc",
+  "model_sha256": "302dcad174e8b94d7196527365d95aae1596861f90457473ca7d74e451f30b54",
+  "engine_set": "MM-001",
+  "engines_requested": [
+    "MM-001"
+  ],
+  "engines_canonical": [
+    "MM-001"
+  ],
+  "include_low": true,
+  "element_count": 420,
+  "wall_clock_seconds": 0.69,
+  "findings_total": 182,
+  "verdicts_total": 146,
+  "data_quality_total": 36,
+  "bands": {
+    "critical": 0,
+    "high": 0,
+    "medium": 146,
+    "low": 0
+  },
+  "data_quality_status": {
+    "unmapped_pairing": 36
+  },
+  "per_engine": {
+    "GC-001": {
+      "verdicts": 0,
+      "data_quality": 0
+    },
+    "CC-001": {
+      "verdicts": 0,
+      "data_quality": 0
+    },
+    "MC-001": {
+      "verdicts": 0,
+      "data_quality": 0
+    },
+    "MM-001": {
+      "verdicts": 146,
+      "data_quality": 36
+    },
+    "XM-001": {
+      "verdicts": 0,
+      "data_quality": 0
+    }
+  },
+  "rows_missing_ruleset_version": 0,
+  "ruleset_versions": {
+    "MM-001": "BIMGUARD-MM-001 v1.0.0"
+  },
+  "coverage": {
+    "elements": 420,
+    "material_resolved": 378,
+    "material_pct": 90.0,
+    "system_assigned": 420,
+    "system_pct": 100.0,
+    "hydraulics_available": 294,
+    "hydraulics_pct": 70.0,
+    "no_material": 42,
+    "no_system": 0,
+    "no_hydraulics": 126
+  },
+  "parity": {
+    "model_validate_ok": true,
+    "csv_header": [
+      "id",
+      "element_id",
+      "rule_id",
+      "mechanism",
+      "band",
+      "score",
+      "title",
+      "description",
+      "mitigation",
+      "assignee_role",
+      "status",
+      "is_data_quality",
+      "check",
+      "overlap_volume_mm3",
+      "clearance_mm",
+      "standards"
+    ],
+    "csv_header_matches_exporter_columns": true,
+    "contract_fields_unpopulated_on_every_issue": []
+  },
+  "bcf": null,
+  "compliance_error": null
+}
