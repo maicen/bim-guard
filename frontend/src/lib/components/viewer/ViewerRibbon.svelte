@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import { Tooltip as TooltipPrimitive } from "bits-ui";
+  import Tooltip from "../Tooltip.svelte";
   import TabStrip from "../TabStrip.svelte";
   import type { TabStripItem } from "../TabStrip.svelte";
   import {
@@ -217,31 +219,35 @@
   }
 </script>
 
+<TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={200}>
 <div class="flex shrink-0 flex-col gap-2 border-b border-slate-800 bg-slate-900/60 px-3 py-2">
   <div class="flex flex-wrap items-center justify-between gap-2">
     <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id)} ariaLabel="Viewer ribbon" />
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       {#if ifcFiles.length > 1}
-        <div class="relative">
-          <select
-            value={selectedFileId}
-            onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
-            class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
-            title="Switch which of this project's models the viewport renders"
-          >
-            {#each ifcFiles as file (file.id)}
-              <option value={file.id}>
-                {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
-                  ? " (primary)"
-                  : ""}
-              </option>
-            {/each}
-          </select>
-          <ChevronDown
-            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-          />
-        </div>
+        <Tooltip text="Switch which of this project's models the viewport renders">
+          {#snippet trigger()}
+            <div class="relative">
+              <select
+                value={selectedFileId}
+                onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
+                class="w-full max-w-[220px] appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none"
+              >
+                {#each ifcFiles as file (file.id)}
+                  <option value={file.id}>
+                    {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
+                      ? " (primary)"
+                      : ""}
+                  </option>
+                {/each}
+              </select>
+              <ChevronDown
+                class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              />
+            </div>
+          {/snippet}
+        </Tooltip>
       {:else if fileName}
         <span
           class="max-w-[220px] truncate rounded-md border border-blue-800/40 bg-blue-950/60 px-2.5 py-1.5 text-xs font-medium text-blue-300"
@@ -251,15 +257,18 @@
         </span>
       {/if}
 
-      <button
-        type="button"
-        onclick={() => fileInputEl?.click()}
-        class="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
-        title="Open a local IFC model directly"
-      >
-        <UploadCloud class="h-3.5 w-3.5" />
-        <span>Open Local IFC</span>
-      </button>
+      <Tooltip text="Open a local IFC model directly">
+        {#snippet trigger()}
+          <button
+            type="button"
+            onclick={() => fileInputEl?.click()}
+            class="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-50"
+          >
+            <UploadCloud class="h-3.5 w-3.5" />
+            <span>Open Local IFC</span>
+          </button>
+        {/snippet}
+      </Tooltip>
       <input
         type="file"
         accept=".ifc"
@@ -272,152 +281,250 @@
 
   <div class="flex flex-wrap items-center gap-1">
     {#if activeTab === "view"}
-      <div class="rbn-group" title="Camera projection">
-        <button
-          type="button"
-          class="rbn-btn {projection === 'Perspective' ? 'active' : ''}"
-          onclick={toggleProjection}
-        >
-          <Box class="h-4 w-4" /><span>{projection === "Perspective" ? "Persp" : "Ortho"}</span>
-        </button>
+      <Tooltip text={projection === "Perspective" ? "Switch to orthographic projection" : "Switch to perspective projection"}>
+        {#snippet trigger()}
+          <button
+            type="button"
+            class="rbn-btn {projection === 'Perspective' ? 'active' : ''}"
+            onclick={toggleProjection}
+          >
+            <Box class="h-4 w-4" /><span>{projection === "Perspective" ? "Persp" : "Ortho"}</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <div class="rbn-divider"></div>
+      <div class="rbn-group">
+        <Tooltip text="Orbit navigation — drag to rotate around the model">
+          {#snippet trigger()}
+            <button
+              type="button"
+              class="rbn-btn {navMode === 'Orbit' ? 'active' : ''}"
+              onclick={() => setNavMode("Orbit")}
+            >
+              <Orbit class="h-4 w-4" /><span>Orbit</span>
+            </button>
+          {/snippet}
+        </Tooltip>
+        <Tooltip text="First-person walk navigation">
+          {#snippet trigger()}
+            <button
+              type="button"
+              class="rbn-btn {navMode === 'FirstPerson' ? 'active' : ''}"
+              onclick={() => setNavMode("FirstPerson")}
+            >
+              <Footprints class="h-4 w-4" /><span>Walk</span>
+            </button>
+          {/snippet}
+        </Tooltip>
+        <Tooltip text="Locked top-down plan navigation">
+          {#snippet trigger()}
+            <button
+              type="button"
+              class="rbn-btn {navMode === 'Plan' ? 'active' : ''}"
+              onclick={() => setNavMode("Plan")}
+            >
+              <LayoutPanelTop class="h-4 w-4" /><span>Plan</span>
+            </button>
+          {/snippet}
+        </Tooltip>
       </div>
       <div class="rbn-divider"></div>
-      <div class="rbn-group" title="Navigation mode">
-        <button
-          type="button"
-          class="rbn-btn {navMode === 'Orbit' ? 'active' : ''}"
-          onclick={() => setNavMode("Orbit")}
-        >
-          <Orbit class="h-4 w-4" /><span>Orbit</span>
-        </button>
-        <button
-          type="button"
-          class="rbn-btn {navMode === 'FirstPerson' ? 'active' : ''}"
-          onclick={() => setNavMode("FirstPerson")}
-        >
-          <Footprints class="h-4 w-4" /><span>Walk</span>
-        </button>
-        <button
-          type="button"
-          class="rbn-btn {navMode === 'Plan' ? 'active' : ''}"
-          onclick={() => setNavMode("Plan")}
-        >
-          <LayoutPanelTop class="h-4 w-4" /><span>Plan</span>
-        </button>
+      <Tooltip text="Fit the whole model in view">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={fit}>
+            <Maximize class="h-4 w-4" /><span>Fit</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <div class="rbn-divider"></div>
+      <div class="rbn-group">
+        <Tooltip text="Toggle section clipping — click a surface to place a cutting plane">
+          {#snippet trigger()}
+            <button
+              type="button"
+              class="rbn-btn {clippingActive ? 'active warning' : ''}"
+              onclick={toggleClippingMode}
+            >
+              <Scissors class="h-4 w-4" /><span>Section</span>
+            </button>
+          {/snippet}
+        </Tooltip>
+        <Tooltip text={clippingVisible ? "Hide the clipped-away geometry" : "Show the clipped-away geometry"}>
+          {#snippet trigger()}
+            <button type="button" class="rbn-btn" onclick={toggleClippingVisibility}>
+              {#if clippingVisible}<Eye class="h-4 w-4" />{:else}<EyeOff class="h-4 w-4" />{/if}
+            </button>
+          {/snippet}
+        </Tooltip>
+        <Tooltip text="Remove all section clipping planes">
+          {#snippet trigger()}
+            <button type="button" class="rbn-btn danger" onclick={clearClipping}>Clear</button>
+          {/snippet}
+        </Tooltip>
       </div>
       <div class="rbn-divider"></div>
-      <button type="button" class="rbn-btn" onclick={fit}>
-        <Maximize class="h-4 w-4" /><span>Fit</span>
-      </button>
+      <Tooltip text={gridVisible ? "Hide the ground grid" : "Show the ground grid"}>
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn {gridVisible ? 'active' : ''}" onclick={toggleGrid}>
+            <Grid3x3 class="h-4 w-4" /><span>Grid</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip text="Toggle fullscreen viewport">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={toggleFullscreen}>
+            <Expand class="h-4 w-4" /><span>Full</span>
+          </button>
+        {/snippet}
+      </Tooltip>
       <div class="rbn-divider"></div>
-      <div class="rbn-group" title="Section clipping planes">
-        <button
-          type="button"
-          class="rbn-btn {clippingActive ? 'active warning' : ''}"
-          onclick={toggleClippingMode}
-        >
-          <Scissors class="h-4 w-4" /><span>Section</span>
-        </button>
-        <button type="button" class="rbn-btn" onclick={toggleClippingVisibility}>
-          {#if clippingVisible}<Eye class="h-4 w-4" />{:else}<EyeOff class="h-4 w-4" />{/if}
-        </button>
-        <button type="button" class="rbn-btn danger" onclick={clearClipping}>Clear</button>
-      </div>
-      <div class="rbn-divider"></div>
-      <button type="button" class="rbn-btn {gridVisible ? 'active' : ''}" onclick={toggleGrid}>
-        <Grid3x3 class="h-4 w-4" /><span>Grid</span>
-      </button>
-      <button type="button" class="rbn-btn" onclick={toggleFullscreen}>
-        <Expand class="h-4 w-4" /><span>Full</span>
-      </button>
-      <div class="rbn-divider"></div>
-      <div class="rbn-group" title="Plan / elevation / section views">
-        <button type="button" class="rbn-btn" onclick={() => viewerAPI.views.plan()}>
-          <LayoutPanelTop class="h-4 w-4" /><span>Plan</span>
-        </button>
+      <div class="rbn-group">
+        <Tooltip text="Open a top-down plan view of a storey">
+          {#snippet trigger()}
+            <button type="button" class="rbn-btn" onclick={() => viewerAPI.views.plan()}>
+              <LayoutPanelTop class="h-4 w-4" /><span>Plan</span>
+            </button>
+          {/snippet}
+        </Tooltip>
         {#if plans.length > 1}
-          <select class="rbn-select" onchange={openPlan}>
-            {#each plans as plan (plan.id)}
-              <option value={plan.id} selected={activeViewId === plan.id}>{plan.label}</option>
-            {/each}
-          </select>
+          <Tooltip text="Switch between the model's plan views">
+            {#snippet trigger()}
+              <select class="rbn-select" onchange={openPlan}>
+                {#each plans as plan (plan.id)}
+                  <option value={plan.id} selected={activeViewId === plan.id}>{plan.label}</option>
+                {/each}
+              </select>
+            {/snippet}
+          </Tooltip>
         {/if}
-        <button type="button" class="rbn-btn" onclick={() => viewerAPI.views.elevation()}>
-          <Building2 class="h-4 w-4" /><span>Elevation</span>
-        </button>
+        <Tooltip text="Open an elevation (front/back/left/right) view">
+          {#snippet trigger()}
+            <button type="button" class="rbn-btn" onclick={() => viewerAPI.views.elevation()}>
+              <Building2 class="h-4 w-4" /><span>Elevation</span>
+            </button>
+          {/snippet}
+        </Tooltip>
         {#if elevations.length > 1}
-          <select class="rbn-select" onchange={openElevation}>
-            {#each elevations as elevation (elevation.id)}
-              <option value={elevation.id} selected={activeViewId === elevation.id}
-                >{elevation.label}</option
-              >
-            {/each}
-          </select>
+          <Tooltip text="Switch between the model's elevation views">
+            {#snippet trigger()}
+              <select class="rbn-select" onchange={openElevation}>
+                {#each elevations as elevation (elevation.id)}
+                  <option value={elevation.id} selected={activeViewId === elevation.id}
+                    >{elevation.label}</option
+                  >
+                {/each}
+              </select>
+            {/snippet}
+          </Tooltip>
         {/if}
-        <button
-          type="button"
-          class="rbn-btn {sectionModeActive ? 'active warning' : ''}"
-          onclick={toggleSectionMode}
-          title="Click a surface in the 3D view to create a section view"
-        >
-          <MousePointer2 class="h-4 w-4" /><span>Pick section</span>
-        </button>
+        <Tooltip text="Click a surface in the 3D view to create a section view">
+          {#snippet trigger()}
+            <button
+              type="button"
+              class="rbn-btn {sectionModeActive ? 'active warning' : ''}"
+              onclick={toggleSectionMode}
+            >
+              <MousePointer2 class="h-4 w-4" /><span>Pick section</span>
+            </button>
+          {/snippet}
+        </Tooltip>
         {#if hasOpenView}
-          <button type="button" class="rbn-btn" onclick={backTo3d}>
-            <ArrowLeft class="h-4 w-4" /><span>Back to 3D</span>
-          </button>
-          <button type="button" class="rbn-btn" onclick={saveViewAsViewpoint}>
-            <Link2 class="h-4 w-4" /><span>Save as BCF viewpoint</span>
-          </button>
+          <Tooltip text="Return to the free 3D view">
+            {#snippet trigger()}
+              <button type="button" class="rbn-btn" onclick={backTo3d}>
+                <ArrowLeft class="h-4 w-4" /><span>Back to 3D</span>
+              </button>
+            {/snippet}
+          </Tooltip>
+          <Tooltip text="Save this view as a BCF viewpoint on the selected topic">
+            {#snippet trigger()}
+              <button type="button" class="rbn-btn" onclick={saveViewAsViewpoint}>
+                <Link2 class="h-4 w-4" /><span>Save as BCF viewpoint</span>
+              </button>
+            {/snippet}
+          </Tooltip>
         {/if}
       </div>
       <div class="rbn-divider"></div>
-      <button
-        type="button"
-        class="rbn-btn {isolateActive ? 'active' : ''}"
-        disabled={!canIsolate}
-        onclick={toggleIsolate}
+      <Tooltip
+        text={canIsolate
+          ? isolateActive
+            ? "Show hidden elements again"
+            : "Isolate the current selection, hiding everything else"
+          : "Select an element first to isolate it"}
       >
-        <Building2 class="h-4 w-4" /><span>{isolateActive ? "Isolated" : "Isolate"}</span>
-      </button>
+        {#snippet trigger()}
+          <button
+            type="button"
+            class="rbn-btn {isolateActive ? 'active' : ''}"
+            disabled={!canIsolate}
+            onclick={toggleIsolate}
+          >
+            <Building2 class="h-4 w-4" /><span>{isolateActive ? "Isolated" : "Isolate"}</span>
+          </button>
+        {/snippet}
+      </Tooltip>
     {:else if activeTab === "layers"}
-      <button type="button" class="rbn-btn" onclick={showAllLayers}>
-        <Eye class="h-4 w-4" /><span>Show all</span>
-      </button>
-      <button type="button" class="rbn-btn" onclick={hideAllLayers}>
-        <EyeOff class="h-4 w-4" /><span>Hide all</span>
-      </button>
+      <Tooltip text="Show every category">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={showAllLayers}>
+            <Eye class="h-4 w-4" /><span>Show all</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip text="Hide every category">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={hideAllLayers}>
+            <EyeOff class="h-4 w-4" /><span>Hide all</span>
+          </button>
+        {/snippet}
+      </Tooltip>
       <span class="ml-2 text-xs text-slate-500">{layers.length} categories</span>
     {:else if activeTab === "drawings"}
-      <button
-        type="button"
-        class="rbn-btn"
-        disabled={!hasOpenView}
-        onclick={createDrawing}
-        title={hasOpenView ? "" : "Open a plan/elevation/section view first"}
-      >
-        <SquarePlus class="h-4 w-4" /><span>New drawing from current view</span>
-      </button>
-      <button
-        type="button"
-        class="rbn-btn"
-        disabled={drawingCount === 0 || !selectedTopic}
-        onclick={attachDrawingToBcf}
-        title={selectedTopic ? "" : "Select a BCF topic first"}
-      >
-        <Link2 class="h-4 w-4" /><span>Attach to BCF topic</span>
-      </button>
+      <Tooltip text={hasOpenView ? "Create a technical drawing from the open plan/elevation/section view" : "Open a plan/elevation/section view first"}>
+        {#snippet trigger()}
+          <button
+            type="button"
+            class="rbn-btn"
+            disabled={!hasOpenView}
+            onclick={createDrawing}
+          >
+            <SquarePlus class="h-4 w-4" /><span>New drawing from current view</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip text={selectedTopic ? "Attach the active drawing's DXF to the selected BCF topic" : "Select a BCF topic first"}>
+        {#snippet trigger()}
+          <button
+            type="button"
+            class="rbn-btn"
+            disabled={drawingCount === 0 || !selectedTopic}
+            onclick={attachDrawingToBcf}
+          >
+            <Link2 class="h-4 w-4" /><span>Attach to BCF topic</span>
+          </button>
+        {/snippet}
+      </Tooltip>
       <span class="ml-2 text-xs text-slate-500">{drawingCount} drawing(s)</span>
     {:else if activeTab === "bcf"}
-      <button type="button" class="rbn-btn" onclick={createTopic}>
-        <FilePlus2 class="h-4 w-4" /><span>Create topic</span>
-      </button>
-      <button type="button" class="rbn-btn" onclick={downloadBcf}>
-        <Download class="h-4 w-4" /><span>Download BCF</span>
-      </button>
+      <Tooltip text="Create a new BCF topic">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={createTopic}>
+            <FilePlus2 class="h-4 w-4" /><span>Create topic</span>
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip text="Export all BCF topics as a .bcfzip file">
+        {#snippet trigger()}
+          <button type="button" class="rbn-btn" onclick={downloadBcf}>
+            <Download class="h-4 w-4" /><span>Download BCF</span>
+          </button>
+        {/snippet}
+      </Tooltip>
     {/if}
   </div>
 </div>
+</TooltipPrimitive.Provider>
 
 <style>
   .rbn-group {
