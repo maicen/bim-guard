@@ -28,10 +28,10 @@
   // Pipeline-status variants are local; the severity bands come from the shared
   // table so this and <SeverityBadge> cannot drift apart again.
   const STATUS_STYLES: Record<string, string> = {
-    complete: "bg-emerald-950/80 border-emerald-800 text-emerald-400",
-    running: "bg-blue-950/80 border-blue-800 text-blue-300 animate-pulse",
-    pending: "bg-slate-900 border-slate-800 text-slate-400",
-    failed: "bg-rose-950/80 border-rose-800 text-rose-400",
+    complete: "bg-success-bg border-success-border text-success",
+    running: "bg-accent/15 border-accent/40 text-accent animate-pulse",
+    pending: "bg-surface-card border-border-default text-fg-muted",
+    failed: "bg-critical-bg border-critical-border text-critical",
   };
 
   let normalizedKey = $derived((variant || "").toLowerCase().replace("-", "_"));

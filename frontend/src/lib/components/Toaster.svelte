@@ -11,10 +11,10 @@
   } as const;
 
   const STYLES: Record<ToastVariant, string> = {
-    success: "border-emerald-800/80 bg-emerald-950/90 text-emerald-200",
-    error: "border-rose-800/80 bg-rose-950/90 text-rose-200",
-    warning: "border-amber-800/80 bg-amber-950/90 text-amber-200",
-    info: "border-blue-800/80 bg-blue-950/90 text-blue-200",
+    success: "border-success-border bg-success-bg text-success",
+    error: "border-critical-border bg-critical-bg text-critical",
+    warning: "border-warning-border bg-warning-bg text-warning",
+    info: "border-info-border bg-info-bg text-info",
   };
 </script>
 

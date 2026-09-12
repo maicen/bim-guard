@@ -24,24 +24,24 @@
 
   const CONFIG = {
     error: {
-      bg: "bg-rose-950/40 border-rose-800/80 text-rose-200",
+      bg: "bg-critical-bg border-critical-border text-critical",
       icon: AlertCircle,
-      iconColor: "text-rose-400",
+      iconColor: "text-critical",
     },
     warning: {
-      bg: "bg-amber-950/40 border-amber-800/80 text-amber-200",
+      bg: "bg-warning-bg border-warning-border text-warning",
       icon: AlertTriangle,
-      iconColor: "text-amber-400",
+      iconColor: "text-warning",
     },
     success: {
-      bg: "bg-emerald-950/40 border-emerald-800/80 text-emerald-200",
+      bg: "bg-success-bg border-success-border text-success",
       icon: CheckCircle2,
-      iconColor: "text-emerald-400",
+      iconColor: "text-success",
     },
     info: {
-      bg: "bg-blue-950/40 border-blue-800/80 text-blue-200",
+      bg: "bg-info-bg border-info-border text-info",
       icon: Info,
-      iconColor: "text-blue-400",
+      iconColor: "text-info",
     },
   };
 

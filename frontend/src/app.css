@@ -18,6 +18,43 @@
   --color-accent: rgb(var(--accent-rgb));
   --color-accent-hover: rgb(var(--accent-hover-rgb));
 
+  /* Semantic Surfaces */
+  --color-surface-canvas: rgb(var(--surface-canvas-rgb));
+  --color-surface-card: rgb(var(--surface-card-rgb));
+  --color-surface-overlay: rgb(var(--surface-overlay-rgb));
+  --color-surface-hover: rgb(var(--surface-hover-rgb));
+
+  /* Semantic Typography / Foreground */
+  --color-fg-primary: rgb(var(--fg-primary-rgb));
+  --color-fg-secondary: rgb(var(--fg-secondary-rgb));
+  --color-fg-muted: rgb(var(--fg-muted-rgb));
+
+  /* Semantic Borders */
+  --color-border-subtle: rgb(var(--border-subtle-rgb));
+  --color-border-default: rgb(var(--border-default-rgb));
+  --color-border-interactive: rgb(var(--border-interactive-rgb));
+
+  /* Semantic Status & Severity Bands */
+  --color-critical: rgb(var(--critical-rgb));
+  --color-critical-bg: rgb(var(--critical-bg-rgb));
+  --color-critical-border: rgb(var(--critical-border-rgb));
+
+  --color-warning: rgb(var(--warning-rgb));
+  --color-warning-bg: rgb(var(--warning-bg-rgb));
+  --color-warning-border: rgb(var(--warning-border-rgb));
+
+  --color-caution: rgb(var(--caution-rgb));
+  --color-caution-bg: rgb(var(--caution-bg-rgb));
+  --color-caution-border: rgb(var(--caution-border-rgb));
+
+  --color-success: rgb(var(--success-rgb));
+  --color-success-bg: rgb(var(--success-bg-rgb));
+  --color-success-border: rgb(var(--success-border-rgb));
+
+  --color-info: rgb(var(--info-rgb));
+  --color-info-bg: rgb(var(--info-bg-rgb));
+  --color-info-border: rgb(var(--info-border-rgb));
+
   --color-slate-50: rgb(var(--slate-50-rgb));
   --color-slate-100: rgb(var(--slate-100-rgb));
   --color-slate-200: rgb(var(--slate-200-rgb));
@@ -98,6 +135,43 @@ html.dark {
   letter-spacing: -0.015em;
   color-scheme: dark;
 
+  /* Semantic Surfaces */
+  --surface-canvas-rgb: 2 6 23;        /* #020617 - app background */
+  --surface-card-rgb: 15 23 42;        /* #0f172a - cards & surfaces */
+  --surface-overlay-rgb: 30 41 59;     /* #1e293b - elevated panels & flyouts */
+  --surface-hover-rgb: 51 65 85;       /* #334155 - hover state surface */
+
+  /* Semantic Foregrounds */
+  --fg-primary-rgb: 248 250 252;       /* #f8fafc - primary high-contrast text */
+  --fg-secondary-rgb: 203 213 225;     /* #cbd5e1 - readable body text */
+  --fg-muted-rgb: 148 163 184;         /* #94a3b8 - secondary labels & meta */
+
+  /* Semantic Borders */
+  --border-subtle-rgb: 30 41 59;       /* #1e293b - card boundaries */
+  --border-default-rgb: 51 65 85;      /* #334155 - input borders, table rules */
+  --border-interactive-rgb: 71 85 105; /* #475569 - hover/active borders */
+
+  /* Semantic Status & Severity (Dark Mode: calibrated luminous text on tinted dark background) */
+  --critical-rgb: 253 164 175;          /* #fda4af rose-300 */
+  --critical-bg-rgb: 76 5 25;           /* #4c0519 rose-950/70 */
+  --critical-border-rgb: 159 18 57;     /* #9f1239 rose-800 */
+
+  --warning-rgb: 252 211 77;            /* #fcd34d amber-300 */
+  --warning-bg-rgb: 69 26 3;            /* #451a03 amber-950/70 */
+  --warning-border-rgb: 146 64 14;      /* #92400e amber-800 */
+
+  --caution-rgb: 253 224 71;            /* #fde047 yellow-300 */
+  --caution-bg-rgb: 66 32 6;            /* #422006 yellow-950/70 */
+  --caution-border-rgb: 133 77 14;      /* #854d0e yellow-800 */
+
+  --success-rgb: 110 231 183;           /* #6ee7b7 emerald-300 */
+  --success-bg-rgb: 2 44 34;            /* #022c22 emerald-950/70 */
+  --success-border-rgb: 6 95 70;        /* #065f46 emerald-800 */
+
+  --info-rgb: 165 180 252;              /* #a5b4fc indigo-300 */
+  --info-bg-rgb: 30 27 75;              /* #1e1b4b indigo-950/70 */
+  --info-border-rgb: 55 48 163;         /* #3730a3 indigo-800 */
+
   /* Dark Theme Palette (Default) */
   --slate-950-rgb: 2 6 23;      /* #020617 - app background */
   --slate-900-rgb: 15 23 42;    /* #0f172a - cards & surfaces */
@@ -129,6 +203,43 @@ html.dark {
 html.light,
 html:not(.dark) {
   color-scheme: light;
+
+  /* Semantic Surfaces */
+  --surface-canvas-rgb: 248 250 252;   /* #f8fafc - light canvas */
+  --surface-card-rgb: 255 255 255;     /* #ffffff - crisp white cards */
+  --surface-overlay-rgb: 241 245 249;  /* #f1f5f9 - light elevated panel */
+  --surface-hover-rgb: 241 245 249;    /* #f1f5f9 - light hover */
+
+  /* Semantic Foregrounds */
+  --fg-primary-rgb: 15 23 42;          /* #0f172a - high-contrast deep text */
+  --fg-secondary-rgb: 51 65 85;        /* #334155 - readable body */
+  --fg-muted-rgb: 100 116 139;         /* #64748b - muted text */
+
+  /* Semantic Borders */
+  --border-subtle-rgb: 241 245 249;    /* #f1f5f9 - light subtle border */
+  --border-default-rgb: 226 232 240;   /* #e2e8f0 - card borders */
+  --border-interactive-rgb: 203 213 225;/* #cbd5e1 - input and interactive borders */
+
+  /* Semantic Status & Severity (Light Mode: WCAG AA >= 4.5:1 contrast text on soft pastel bg) */
+  --critical-rgb: 190 18 60;           /* #be123c rose-700 */
+  --critical-bg-rgb: 255 228 230;      /* #ffe4e6 rose-100 */
+  --critical-border-rgb: 254 205 211;  /* #fecdd3 rose-200 */
+
+  --warning-rgb: 180 83 9;             /* #b45309 amber-700 */
+  --warning-bg-rgb: 254 243 199;       /* #fef3c7 amber-100 */
+  --warning-border-rgb: 253 230 138;   /* #fde68a amber-200 */
+
+  --caution-rgb: 161 98 7;             /* #a16207 yellow-700 */
+  --caution-bg-rgb: 254 249 195;       /* #fef9c3 yellow-100 */
+  --caution-border-rgb: 254 240 138;   /* #fef08a yellow-200 */
+
+  --success-rgb: 4 120 87;             /* #047857 emerald-700 */
+  --success-bg-rgb: 209 250 229;       /* #d1fae5 emerald-100 */
+  --success-border-rgb: 110 231 183;   /* #6ee7b7 emerald-300 */
+
+  --info-rgb: 67 56 202;               /* #4338ca indigo-700 */
+  --info-bg-rgb: 224 231 255;          /* #e0e7ff indigo-100 */
+  --info-border-rgb: 199 210 254;      /* #c7d2fe indigo-200 */
 
   /* Light Theme Palette - Apple / Modern SaaS Light Palette */
   --slate-950-rgb: 248 250 252;  /* #f8fafc - app background (slate-50) */

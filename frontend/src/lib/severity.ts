@@ -17,28 +17,28 @@ export interface SeverityStyle {
 
 export const SEVERITY_STYLES: Record<Severity, SeverityStyle> = {
   critical: {
-    badge: "bg-rose-950/70 text-rose-300 border-rose-800/80 shadow-rose-950/20",
-    dot: "bg-rose-400",
+    badge: "bg-critical-bg text-critical border-critical-border",
+    dot: "bg-critical",
   },
   high: {
-    badge: "bg-amber-950/70 text-amber-300 border-amber-800/80 shadow-amber-950/20",
-    dot: "bg-amber-400",
+    badge: "bg-warning-bg text-warning border-warning-border",
+    dot: "bg-warning",
   },
   medium: {
-    badge: "bg-yellow-950/70 text-yellow-300 border-yellow-800/80 shadow-yellow-950/20",
-    dot: "bg-yellow-400",
+    badge: "bg-caution-bg text-caution border-caution-border",
+    dot: "bg-caution",
   },
   low: {
-    badge: "bg-emerald-950/70 text-emerald-300 border-emerald-800/80 shadow-emerald-950/20",
-    dot: "bg-emerald-400",
+    badge: "bg-success-bg text-success border-success-border",
+    dot: "bg-success",
   },
   data_quality: {
-    badge: "bg-indigo-950/70 text-indigo-300 border-indigo-800/80 shadow-indigo-950/20",
-    dot: "bg-indigo-400",
+    badge: "bg-info-bg text-info border-info-border",
+    dot: "bg-info",
   },
   neutral: {
-    badge: "bg-slate-800 text-slate-300 border-slate-700 shadow-slate-900/20",
-    dot: "bg-slate-400",
+    badge: "bg-surface-overlay text-fg-secondary border-border-default",
+    dot: "bg-fg-muted",
   },
 };
 
