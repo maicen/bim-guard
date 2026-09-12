@@ -43,32 +43,38 @@ invalid-as-a-color triplet.
 
 ```css
 @theme {
-  --color-slate-950: rgb(var(--slate-950-rgb));
-  --color-slate-50: rgb(var(--slate-50-rgb));
-}
-:root,
-html.dark {
-  --slate-950-rgb: 2 6 23;
-  --slate-50-rgb: 248 250 252;
-}
-html.light {
-  --slate-950-rgb: 248 250 252;
-  --slate-50-rgb: 2 6 23;
+  /* Semantic Surfaces */
+  --color-surface-canvas: rgb(var(--surface-canvas-rgb));
+  --color-surface-card: rgb(var(--surface-card-rgb));
+  --color-surface-overlay: rgb(var(--surface-overlay-rgb));
+  --color-surface-hover: rgb(var(--surface-hover-rgb));
+
+  /* Semantic Typography / Foreground */
+  --color-fg-primary: rgb(var(--fg-primary-rgb));
+  --color-fg-secondary: rgb(var(--fg-secondary-rgb));
+  --color-fg-muted: rgb(var(--fg-muted-rgb));
+
+  /* Semantic Borders */
+  --color-border-subtle: rgb(var(--border-subtle-rgb));
+  --color-border-default: rgb(var(--border-default-rgb));
+  --color-border-interactive: rgb(var(--border-interactive-rgb));
+
+  /* Semantic Status & Severity */
+  --color-critical: rgb(var(--critical-rgb));
+  --color-warning: rgb(var(--warning-rgb));
+  --color-caution: rgb(var(--caution-rgb));
+  --color-success: rgb(var(--success-rgb));
+  --color-info: rgb(var(--info-rgb));
 }
 ```
 
 Consequences to internalise before writing markup:
 
-- **Never write a `dark:` variant.** `bg-slate-900` is a near-black card in dark
-  mode and a white card in light mode, automatically.
-- **`text-slate-50` is "primary text".** Near-white in dark mode, near-black in
-  light mode. Use it for headings, labels and input values.
-- **`text-white` means "always white"** and is reserved for text sitting on a
-  solid coloured control (an accent button, a rose delete button, a gradient
-  badge). Using it for ordinary text produces white-on-white in light mode.
-- Semantic ramp: `slate-950` canvas → `slate-900` card → `slate-800` border →
-  `slate-700` interactive border/hover → `slate-500/400` metadata → `slate-300`
-  body → `slate-50` primary text.
+- **Prefer semantic tokens over hardcoded palette numbers.** Use `bg-surface-card`, `border-border-default`, `text-fg-primary`, and `text-fg-secondary`.
+- **Never write a `dark:` variant.** Colors resolve via channel variables calibrated for WCAG AA (>= 4.5:1) in both light and dark themes.
+- **`text-fg-primary` is "primary text".** High-contrast text in dark mode, deep contrast in light mode.
+- **`text-white` means "always white"** and is reserved for text sitting on a solid coloured control (an accent button, a rose delete button, a gradient badge).
+- Semantic ramp: `surface-canvas` background → `surface-card` container → `surface-overlay` elevated → `border-subtle` / `border-default` dividers → `fg-muted` metadata → `fg-secondary` body → `fg-primary` headline text.
 
 Theme state lives in `frontend/src/lib/theme.ts` (`light | dark | system`,
 persisted at `localStorage['bimguard_theme']`, default dark) with a blocking
@@ -285,3 +291,24 @@ To maintain cohesive design patterns and avoid duplicate markup, all UI views mu
 - **`<HoverCard.svelte>`**: Hover/focus-triggered rich preview popover (bits-ui `Popover`), used for supplementary detail without a click or modal.
 - **`<DropdownMenu.svelte>`**: Thin bits-ui `DropdownMenu` wrapper for triggered menus (Escape/outside-click dismissal, roving keyboard nav) — used by `IntegrationsMenu`, `ResourcesMenu`, `UserMenu`, and `RulesView`'s Import/Export menu.
 - **`<OrgSwitcher.svelte>`**: bits-ui `Select`-backed organization switcher in the header, syncing to `authState.activeOrganizationId`.
+
+### Core Atomic Primitives (`frontend/src/lib/components/ui/`)
+
+To eliminate bespoke, duplicated button and input markup across views, always prefer these shared base primitives:
+
+- **`<Button.svelte>`**: Standardized button primitive supporting 5 variants (`primary`, `secondary`, `outline`, `ghost`, `destructive`), 5 sizes (`xs`, `sm`, `md`, `lg`, `icon`), built-in SVG loading spinner, and keyboard accessibility.
+- **`<Input.svelte>`**: Form input with prefix/suffix icon slots, semantic focus rings, and reactive error border styling.
+- **`<FormField.svelte>`**: Form field layout wrapper with label, required asterisk, helper text hint, and validation error messages.
+- **`<Card.svelte>` / `<CardHeader.svelte>` / `<CardTitle.svelte>` / `<CardContent.svelte>`**: Semantic card container set wrapping standard background, border, and padding tokens.
+
+## 13. Living Design System & UI Kit Showcase
+
+A dedicated interactive showcase is available in-app at **`#/design-system`** (reachable from the top navigation under **Resources → Design System**).
+
+The showcase allows live inspection of:
+- Semantic color tokens, surface elevations, and foreground contrast levels.
+- Real-time dark, light, and system theme switching side-by-side.
+- The button primitive matrix across all variants, sizes, and states (including dynamic loading spinner tests).
+- Form inputs, icon slot positioning, and validation error states.
+- OpenBIM compliance severity badges (`critical`, `high`, `medium`, `low`, `data_quality`) and pipeline execution status chips.
+

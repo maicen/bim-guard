@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BookOpenCheck, Box, BookText, LifeBuoy, ChevronDown, ExternalLink } from "lucide-svelte";
+  import { BookOpenCheck, Box, BookText, LifeBuoy, ChevronDown, ExternalLink, Palette } from "lucide-svelte";
   import { DropdownMenu as Menu } from "bits-ui";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -19,6 +19,7 @@
     { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
     { id: "modeling-manual", label: "Modeling Manual", icon: Box },
     { id: "bsdd-wiki", label: "bSDD Wiki", icon: BookText },
+    { id: "design-system", label: "Design System", icon: Palette },
   ];
 
   let isActive = $derived(ITEMS.some((item) => item.id === activeView));

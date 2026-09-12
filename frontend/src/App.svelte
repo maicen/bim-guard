@@ -33,6 +33,7 @@
   import UserManualView from "./routes/UserManualView.svelte";
   import ModelingManualView from "./routes/ModelingManualView.svelte";
   import BsddWikiView from "./routes/BsddWikiView.svelte";
+  import DesignSystemView from "./routes/DesignSystemView.svelte";
   import RevitSyncView from "./routes/RevitSyncView.svelte";
   import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
   import SettingsView from "./routes/SettingsView.svelte";
@@ -625,6 +626,8 @@
           <ModelingManualView />
         {:else if activeView === "bsdd-wiki"}
           <BsddWikiView />
+        {:else if activeView === "design-system"}
+          <DesignSystemView />
         {:else if activeView === "revit-sync"}
           <RevitSyncView />
         {:else if activeView === "ifc-export-setting"}
