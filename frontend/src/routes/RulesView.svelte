@@ -804,100 +804,79 @@
   {/if}
 
   <!-- Main Tab Toggle: Rules Catalog vs Saved Snapshots -->
-  <div
-    class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
+  <Tabs.Root
+    value={activeMainTab}
+    onValueChange={(val) => switchMainTab(val as "rules" | "snapshots")}
+    class="w-fit"
   >
-    <button
-      type="button"
-      onclick={() => switchMainTab("rules")}
-      class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
-      'rules'
-        ? 'bg-accent text-white shadow-xs'
-        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
+    <Tabs.List
+      class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
     >
-      <ListChecks class="h-3.5 w-3.5" />
-      <span>Rules Catalog</span>
-    </button>
-    <button
-      type="button"
-      onclick={() => switchMainTab("snapshots")}
-      class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
-      'snapshots'
-        ? 'bg-accent text-white shadow-xs'
-        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-    >
-      <Camera class="h-3.5 w-3.5" />
-      <span>Snapshots</span>
-      {#if snapshots.length > 0}
-        <span class="ml-0.5 text-micro opacity-75">({snapshots.length})</span>
-      {/if}
-    </button>
-  </div>
+      <Tabs.Trigger
+        value="rules"
+        class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+      >
+        <ListChecks class="h-3.5 w-3.5" />
+        <span>Rules Catalog</span>
+      </Tabs.Trigger>
+      <Tabs.Trigger
+        value="snapshots"
+        class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+      >
+        <Camera class="h-3.5 w-3.5" />
+        <span>Snapshots</span>
+        {#if snapshots.length > 0}
+          <span class="ml-0.5 text-micro opacity-75">({snapshots.length})</span>
+        {/if}
+      </Tabs.Trigger>
+    </Tabs.List>
+  </Tabs.Root>
 
   {#if activeMainTab === "rules"}
     <!-- Category Selector Tabs: Arch | Piping | Seismic -->
-    <div
-      class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
+    <Tabs.Root
+      value={selectedCategory}
+      onValueChange={(val) => {
+        selectedCategory = val as RulesetCategory | "all";
+        selectedFolderId = null;
+      }}
+      class="w-fit"
     >
-      <button
-        type="button"
-        onclick={() => {
-          selectedCategory = "all";
-          selectedFolderId = null;
-        }}
-        class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
-        'all'
-          ? 'bg-accent text-white shadow-xs'
-          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
+      <Tabs.List
+        class="flex w-fit items-center gap-2 rounded-2xl border border-border-default bg-surface-card/60 p-1.5"
       >
-        All Categories
-      </button>
-      <button
-        type="button"
-        onclick={() => {
-          selectedCategory = "Arch";
-          selectedFolderId = null;
-        }}
-        class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
-        'Arch'
-          ? 'bg-blue-600 text-white shadow-xs'
-          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-      >
-        <span class="h-2 w-2 rounded-full bg-blue-400"></span>
-        <span>Arch</span>
-        <span class="ml-0.5 text-micro opacity-75">({archCount})</span>
-      </button>
-      <button
-        type="button"
-        onclick={() => {
-          selectedCategory = "Piping";
-          selectedFolderId = null;
-        }}
-        class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
-        'Piping'
-          ? 'bg-amber-600 text-white shadow-xs'
-          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-      >
-        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-        <span>Piping</span>
-        <span class="ml-0.5 text-micro opacity-75">({pipingCount})</span>
-      </button>
-      <button
-        type="button"
-        onclick={() => {
-          selectedCategory = "seismic";
-          selectedFolderId = null;
-        }}
-        class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
-        'seismic'
-          ? 'bg-purple-600 text-white shadow-xs'
-          : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-      >
-        <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-        <span>Seismic</span>
-        <span class="ml-0.5 text-micro opacity-75">({seismicCount})</span>
-      </button>
-    </div>
+        <Tabs.Trigger
+          value="all"
+          class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          All Categories
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="Arch"
+          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+          <span>Arch</span>
+          <span class="ml-0.5 text-micro opacity-75">({archCount})</span>
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="Piping"
+          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+          <span>Piping</span>
+          <span class="ml-0.5 text-micro opacity-75">({pipingCount})</span>
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="seismic"
+          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+          <span>Seismic</span>
+          <span class="ml-0.5 text-micro opacity-75">({seismicCount})</span>
+        </Tabs.Trigger>
+      </Tabs.List>
+    </Tabs.Root>
 
     <!-- Main Layout: Resizable Split View (Folders Sidebar + Draggable Divider + Rules Table) -->
     <div class="relative flex flex-col items-stretch gap-0 md:flex-row">
