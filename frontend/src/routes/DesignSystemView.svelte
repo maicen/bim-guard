@@ -15,6 +15,7 @@
     Sparkles,
     FileText,
     Shield,
+    ChevronDown,
   } from "lucide-svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import {
@@ -25,8 +26,18 @@
     CardHeader,
     CardTitle,
     CardContent,
+    Checkbox,
+    Switch,
+    Separator,
+    Select,
+    Accordion,
+    AccordionItem,
+    AccordionHeader,
+    AccordionTrigger,
+    AccordionContent,
     type ButtonVariant,
     type ButtonSize,
+    type SelectOption,
   } from "../lib/components/ui";
   import Badge from "../lib/components/Badge.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
@@ -36,6 +47,16 @@
   // Interactive controls for testing the components
   let isButtonLoading = $state(false);
   let isButtonDisabled = $state(false);
+  let demoSwitch = $state(true);
+  let demoCheckbox = $state(true);
+  let demoIndeterminate = $state(false);
+  let demoSelectValue = $state("critical");
+  const DEMO_SELECT_OPTIONS: SelectOption[] = [
+    { value: "critical", label: "Critical Severity (Immediate Failure)" },
+    { value: "high", label: "High Severity" },
+    { value: "medium", label: "Medium Severity (Needs Review)" },
+    { value: "low", label: "Low Severity (Advisory)" },
+  ];
   let sampleInputValue = $state("PRJ-BIMGUARD-001");
   let sampleErrorValue = $state("Invalid ISO 19650 identifier");
   let activeTab = $state<"tokens" | "components" | "forms" | "badges">("tokens");
@@ -336,13 +357,13 @@
             <h3 class="text-xs font-bold text-fg-primary">Button Primitive Interactive Matrix</h3>
             <p class="text-nano text-fg-muted">Test real-time loading spinners, disabled states, and size scales.</p>
           </div>
-          <div class="flex items-center gap-3">
-            <label class="flex items-center gap-1.5 text-xs text-fg-secondary cursor-pointer select-none">
-              <input type="checkbox" bind:checked={isButtonLoading} class="rounded text-accent focus:ring-accent" />
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 text-xs text-fg-secondary cursor-pointer select-none">
+              <Checkbox bind:checked={isButtonLoading} />
               <span>Loading State</span>
             </label>
-            <label class="flex items-center gap-1.5 text-xs text-fg-secondary cursor-pointer select-none">
-              <input type="checkbox" bind:checked={isButtonDisabled} class="rounded text-accent focus:ring-accent" />
+            <label class="flex items-center gap-2 text-xs text-fg-secondary cursor-pointer select-none">
+              <Checkbox bind:checked={isButtonDisabled} />
               <span>Disabled State</span>
             </label>
           </div>
@@ -401,6 +422,78 @@
           <p class="text-nano text-fg-muted mt-3">
             Per DESIGN.md §5: XS uses <code>rounded-md</code>, SM uses <code>rounded-lg</code>, MD/LG use <code>rounded-xl</code>. Rectangular buttons never use <code>rounded-full</code>.
           </p>
+        </CardContent>
+      </Card>
+
+      <!-- Bits-UI Primitives Showcase -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Headless bits-ui Primitives (WAI-ARIA Compliant)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Checkbox & Switch -->
+            <div class="space-y-4 rounded-xl border border-border-default bg-surface-overlay p-4">
+              <h4 class="text-xs font-bold text-fg-primary uppercase tracking-wider">Toggles & Checks</h4>
+              <div class="space-y-3">
+                <label class="flex items-center gap-3 text-xs text-fg-secondary cursor-pointer select-none">
+                  <Checkbox bind:checked={demoCheckbox} />
+                  <span>Accessible bits-ui Checkbox (Checked: {demoCheckbox})</span>
+                </label>
+                <label class="flex items-center gap-3 text-xs text-fg-secondary cursor-pointer select-none">
+                  <Checkbox bind:indeterminate={demoIndeterminate} />
+                  <span>Indeterminate Checkbox State</span>
+                </label>
+                <Separator class="my-2" />
+                <label class="flex items-center justify-between text-xs text-fg-secondary cursor-pointer select-none">
+                  <span>Accessible bits-ui Switch</span>
+                  <Switch bind:checked={demoSwitch} />
+                </label>
+              </div>
+            </div>
+
+            <!-- Select Primitive -->
+            <div class="space-y-4 rounded-xl border border-border-default bg-surface-overlay p-4">
+              <h4 class="text-xs font-bold text-fg-primary uppercase tracking-wider">Dropdown Select</h4>
+              <div class="space-y-2">
+                <p class="text-nano text-fg-muted">Keyboard navigable listbox with floating portal and ARIA focus management.</p>
+                <Select
+                  options={DEMO_SELECT_OPTIONS}
+                  bind:value={demoSelectValue}
+                  placeholder="Select severity level…"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Accordion Primitive -->
+          <div class="mt-6 space-y-2">
+            <h4 class="text-xs font-bold text-fg-primary uppercase tracking-wider">Accordion Section</h4>
+            <Accordion type="single" value="item-1">
+              <AccordionItem value="item-1" class="px-4 py-3">
+                <AccordionHeader>
+                  <AccordionTrigger class="flex w-full items-center justify-between font-semibold text-xs text-fg-primary cursor-pointer">
+                    <span>ISO 19650 Naming & CDE Governance Compliance</span>
+                    <ChevronDown class="h-4 w-4 text-fg-muted transition-transform duration-200" />
+                  </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionContent class="pt-2 text-xs text-fg-secondary leading-relaxed">
+                  All compliance rules and verification engines conform to ISO 19650-2 Common Data Environment (CDE) state transitions. Non-conformances trigger automated BCF topic exports.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-2" class="px-4 py-3">
+                <AccordionHeader>
+                  <AccordionTrigger class="flex w-full items-center justify-between font-semibold text-xs text-fg-primary cursor-pointer">
+                    <span>ThatOpen Engine WebGL Shader Theme Integration</span>
+                    <ChevronDown class="h-4 w-4 text-fg-muted transition-transform duration-200" />
+                  </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionContent class="pt-2 text-xs text-fg-secondary leading-relaxed">
+                  The Three.js scene background, grid plane colors, and BCF diagnostic mesh highlighters synchronize dynamically with active CSS custom property tokens.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
         </CardContent>
       </Card>
     </div>

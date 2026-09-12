@@ -45,8 +45,14 @@ export const SEVERITY_STYLES: Record<Severity, SeverityStyle> = {
 /** Verdicts and legacy spellings that alias onto a band. */
 const ALIASES: Record<string, Severity> = {
   fail: "critical",
+  error: "critical",
+  mandatory: "critical",
+  warning: "high",
+  caution: "medium",
   missing: "medium",
   missing_data: "medium",
+  recommendation: "medium",
+  advisory: "low",
   pass: "low",
   "data quality": "data_quality",
 };

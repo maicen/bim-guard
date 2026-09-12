@@ -1286,14 +1286,15 @@
 
 {#if draftSourceError}
   <div
-    class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-red-800/60 bg-red-950/90 px-4 py-3 text-xs text-red-200 shadow-2xl"
+    class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-critical-border bg-critical-bg px-4 py-3 text-xs text-critical shadow-2xl backdrop-blur-md"
   >
     <div class="flex items-start justify-between gap-3">
       <span>{draftSourceError}</span>
       <button
         type="button"
         onclick={() => (draftSourceError = "")}
-        class="shrink-0 text-red-300 hover:text-red-100"
+        class="shrink-0 text-critical hover:text-fg-primary"
+        aria-label="Dismiss error"
       >
         <X class="h-3.5 w-3.5" />
       </button>

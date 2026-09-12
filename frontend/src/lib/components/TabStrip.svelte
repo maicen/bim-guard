@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Component, ComponentType } from "svelte";
+  import { Tabs } from "bits-ui";
 
   export interface TabStripItem {
     id: string;
@@ -19,31 +20,28 @@
 </script>
 
 <!--
-  Generic tab strip — same visual treatment as AnalysisDomainTabs.svelte but
-  driven by a `tabs` prop instead of a hardcoded 3-domain list, so any view
-  that needs a simple switcher (e.g. External Providers' Document Parsing /
-  LLM Providers panels) can reuse it instead of hand-rolling one.
+  Generic tab strip built on bits-ui Tabs primitive for full WAI-ARIA
+  keyboard navigation (Left/Right arrow keys, Home/End, focus roving).
 -->
-<div
-  class="flex w-fit shrink-0 items-center gap-1 rounded-xl border border-border-interactive bg-surface-overlay p-1"
-  role="tablist"
-  aria-label={ariaLabel}
+<Tabs.Root
+  value={active}
+  onValueChange={(val) => onSelect(val)}
+  class="w-fit shrink-0"
 >
-  {#each tabs as tab (tab.id)}
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active === tab.id}
-      onclick={() => onSelect(tab.id)}
-      class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors {active ===
-      tab.id
-        ? 'bg-accent text-white'
-        : 'text-fg-muted hover:text-white'}"
-    >
-      {#if tab.icon}
-        <tab.icon class="h-3.5 w-3.5" />
-      {/if}
-      {tab.label}
-    </button>
-  {/each}
-</div>
+  <Tabs.List
+    class="flex w-fit items-center gap-1 rounded-xl border border-border-interactive bg-surface-overlay p-1"
+    aria-label={ariaLabel}
+  >
+    {#each tabs as tab (tab.id)}
+      <Tabs.Trigger
+        value={tab.id}
+        class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-fg-muted hover:text-fg-primary data-[state=active]:bg-accent data-[state=active]:text-white shadow-none data-[state=active]:shadow-xs"
+      >
+        {#if tab.icon}
+          <tab.icon class="h-3.5 w-3.5" />
+        {/if}
+        {tab.label}
+      </Tabs.Trigger>
+    {/each}
+  </Tabs.List>
+</Tabs.Root>

@@ -54,6 +54,9 @@
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import DropdownMenu from "../lib/components/DropdownMenu.svelte";
+  import SeverityBadge from "../lib/components/SeverityBadge.svelte";
+  import Badge from "../lib/components/Badge.svelte";
+  import Tooltip from "../lib/components/Tooltip.svelte";
   import { DropdownMenu as Menu } from "bits-ui";
   import { describeMechanism } from "../lib/glossary";
   import { createTableState } from "../lib/tableState.svelte";
@@ -1229,13 +1232,12 @@
                 >
                   <tr>
                     <th class="w-10 px-4 py-3">
-                      <input
-                        type="checkbox"
+                      <TableCheckbox
                         checked={table.allFilteredSelected}
                         indeterminate={table.someFilteredSelected}
                         onchange={() => table.toggleSelectAll()}
-                        class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         title="Select or deselect all visible rules"
+                        ariaLabel="Select or deselect all visible rules"
                       />
                     </th>
                     <SortHeader
@@ -1296,11 +1298,10 @@
                         : ''}"
                     >
                       <td class="w-10 px-4 py-3">
-                        <input
-                          type="checkbox"
+                        <TableCheckbox
                           checked={table.isSelected(rule.id)}
                           onchange={() => table.toggleSelect(rule.id)}
-                          class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
+                          ariaLabel="Select rule {rule.rule_id}"
                         />
                       </td>
                       <td class="px-4 py-3">
@@ -1467,51 +1468,52 @@
                           >
                         {/if}
                         {#if rule.needs_review}
-                          <span
-                            class="py-0.2 mt-1 inline-block rounded border border-amber-800 bg-amber-950/70 px-1.5 font-sans text-nano font-medium text-amber-400"
-                          >
-                            Needs Review
-                          </span>
+                          <div class="mt-1">
+                            <Badge variant="high" size="sm">Needs Review</Badge>
+                          </div>
                         {/if}
                       </td>
                       <td class="px-4 py-3">
-                        <span
-                          class="inline-block rounded px-2 py-0.5 text-micro font-semibold {rule.severity ===
-                            'Critical' || rule.severity === 'mandatory'
-                            ? 'border border-red-800/60 bg-red-950/60 text-red-400'
-                            : rule.severity === 'High'
-                              ? 'border border-orange-800/60 bg-orange-950/60 text-orange-400'
-                              : 'border border-yellow-800/60 bg-yellow-950/60 text-yellow-400'}"
-                        >
-                          {rule.severity}
-                        </span>
+                        <SeverityBadge severity={rule.severity} size="xs" />
                       </td>
                       <td class="whitespace-nowrap px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onclick={() => openViewModal(rule)}
-                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                            title="View rule specifications"
-                          >
-                            <Eye class="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onclick={() => openEditModal(rule)}
-                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                            title="Edit rule"
-                          >
-                            <Edit3 class="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onclick={() => promptDelete(rule.id, rule.rule_id || "")}
-                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
-                            title="Delete rule"
-                          >
-                            <Trash2 class="h-3.5 w-3.5" />
-                          </button>
+                          <Tooltip text="View rule specifications">
+                            {#snippet trigger()}
+                              <button
+                                type="button"
+                                onclick={() => openViewModal(rule)}
+                                class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                                aria-label="View rule specifications"
+                              >
+                                <Eye class="h-3.5 w-3.5" />
+                              </button>
+                            {/snippet}
+                          </Tooltip>
+                          <Tooltip text="Edit rule">
+                            {#snippet trigger()}
+                              <button
+                                type="button"
+                                onclick={() => openEditModal(rule)}
+                                class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                                aria-label="Edit rule"
+                              >
+                                <Edit3 class="h-3.5 w-3.5" />
+                              </button>
+                            {/snippet}
+                          </Tooltip>
+                          <Tooltip text="Delete rule">
+                            {#snippet trigger()}
+                              <button
+                                type="button"
+                                onclick={() => promptDelete(rule.id, rule.rule_id || "")}
+                                class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-critical-bg hover:text-critical"
+                                aria-label="Delete rule"
+                              >
+                                <Trash2 class="h-3.5 w-3.5" />
+                              </button>
+                            {/snippet}
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
@@ -2495,10 +2497,10 @@
 {/if}
 
 {#if sourceViewError}
-  <div class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-red-800/60 bg-red-950/90 px-4 py-3 text-xs text-red-200 shadow-2xl">
+  <div class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-critical-border bg-critical-bg px-4 py-3 text-xs text-critical shadow-2xl backdrop-blur-md">
     <div class="flex items-start justify-between gap-3">
       <span>{sourceViewError}</span>
-      <button type="button" onclick={() => (sourceViewError = "")} class="shrink-0 text-red-300 hover:text-red-100">
+      <button type="button" onclick={() => (sourceViewError = "")} class="shrink-0 text-critical hover:text-fg-primary" aria-label="Dismiss error">
         <X class="h-3.5 w-3.5" />
       </button>
     </div>

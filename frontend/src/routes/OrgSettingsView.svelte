@@ -10,6 +10,7 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import Button from "../lib/components/ui/Button.svelte";
   import { organizationsApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -452,14 +453,14 @@
             Owners and admins always see every project.
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onclick={() => (newGroupModalOpen = true)}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
         >
           <Plus class="h-3.5 w-3.5" />
           New group
-        </button>
+        </Button>
       </div>
 
       {#if groups.length === 0}

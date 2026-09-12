@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Attachment } from "svelte/attachments";
+  import Checkbox from "./ui/Checkbox.svelte";
 
   let {
     checked = $bindable(false),
@@ -18,19 +18,22 @@
     onchange?: (event: Event) => void;
   } = $props();
 
-  // `indeterminate` has no HTML attribute, so it has to be set on the element.
-  const trackIndeterminate: Attachment<HTMLInputElement> = (node) => {
-    node.indeterminate = indeterminate;
-  };
+  function handleCheckedChange(val: boolean | "indeterminate") {
+    if (val === "indeterminate") {
+      checked = false;
+    } else {
+      checked = val;
+    }
+    onchange?.(new Event("change"));
+  }
 </script>
 
-<input
-  type="checkbox"
-  bind:checked
-  {disabled}
-  {title}
-  aria-label={ariaLabel}
-  onchange={(event) => onchange?.(event)}
-  {@attach trackIndeterminate}
-  class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent transition-all focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
-/>
+<span {title} class="inline-flex items-center">
+  <Checkbox
+    bind:checked
+    bind:indeterminate
+    {disabled}
+    {ariaLabel}
+    onCheckedChange={() => onchange?.(new Event("change"))}
+  />
+</span>

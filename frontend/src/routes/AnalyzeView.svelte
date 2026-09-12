@@ -53,6 +53,7 @@
   import { toasts } from "../lib/toast.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
 
@@ -1275,13 +1276,12 @@
                 >
                   <tr>
                     <th class="w-10 px-4 py-3.5">
-                      <input
-                        type="checkbox"
+                      <TableCheckbox
                         checked={allOnPageSelected}
                         indeterminate={someOnPageSelected}
                         onchange={() => toggleSelectAllOnPage()}
-                        class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
                         title="Select every finding on this page"
+                        ariaLabel="Select every finding on this page"
                       />
                     </th>
                     <SortHeader
@@ -1331,47 +1331,16 @@
                     >
                       <!-- Row Checkbox -->
                       <td class="w-10 px-4 py-3.5 align-top">
-                        <input
-                          type="checkbox"
+                        <TableCheckbox
                           checked={isSelected(issue.id)}
                           onchange={() => toggleSelect(issue.id)}
-                          class="h-4 w-4 cursor-pointer rounded border-border-interactive bg-surface-canvas text-accent focus:ring-accent"
+                          ariaLabel="Select finding {issue.id}"
                         />
                       </td>
 
                       <!-- Severity Band Tag -->
                       <td class="whitespace-nowrap px-4 py-3.5 align-top">
-                        {#if isDq}
-                          <span
-                            class="inline-block rounded-md border border-border-interactive bg-surface-overlay px-2.5 py-0.5 text-micro font-semibold uppercase text-fg-secondary"
-                          >
-                            Data Quality
-                          </span>
-                        {:else if issue.band === "critical"}
-                          <span
-                            class="inline-block rounded-md border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-xs"
-                          >
-                            Critical
-                          </span>
-                        {:else if issue.band === "high"}
-                          <span
-                            class="inline-block rounded-md border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-xs"
-                          >
-                            High
-                          </span>
-                        {:else if issue.band === "medium"}
-                          <span
-                            class="inline-block rounded-md border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-xs"
-                          >
-                            Medium
-                          </span>
-                        {:else}
-                          <span
-                            class="inline-block rounded-md border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-xs"
-                          >
-                            Low
-                          </span>
-                        {/if}
+                        <SeverityBadge severity={isDq ? "data_quality" : issue.band} size="xs" />
                       </td>
 
                       <!-- Rule & Mechanism -->
@@ -1508,7 +1477,7 @@
           </p>
           
           {#if result.shacl_error}
-            <div class="rounded-xl border border-red-800/60 bg-red-950/40 p-4 text-xs text-red-300">
+            <div class="rounded-xl border border-critical-border bg-critical-bg p-4 text-xs text-critical">
               <strong class="font-bold">Engine Error:</strong> {result.shacl_error}
             </div>
           {:else if result.shacl_issues}
