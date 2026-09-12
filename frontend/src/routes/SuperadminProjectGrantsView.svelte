@@ -436,7 +436,7 @@
               }
             }}
             aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
           >
             {#if isSuperadmin}
               <option value="all">All Organizations ({orgs.length})</option>
@@ -454,7 +454,7 @@
         <select
           bind:value={grantStatusFilter}
           aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
         >
           <option value="all">All Access</option>
           <option value="granted">Granted / Owned</option>
@@ -512,7 +512,7 @@
                 {sortField}
                 {sortAsc}
                 onSort={() => handleSort("country")}
-                customClass="min-w-[8rem] px-4 py-3"
+                customClass="min-w-32 px-4 py-3"
               >
                 Country
               </SortHeader>
@@ -520,7 +520,7 @@
               <!-- Superadmin Multi-Org Columns -->
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
-                  <th class="min-w-[11rem] px-4 py-3 text-center">
+                  <th class="min-w-44 px-4 py-3 text-center">
                     <div class="truncate font-semibold text-slate-100" title={org.name}>
                       {org.name}
                     </div>
@@ -537,8 +537,8 @@
                 {/each}
               {:else}
                 <!-- Organization Owner Columns: Ownership Type, Group Access, Manage -->
-                <th class="min-w-[8rem] px-4 py-3">Ownership</th>
-                <th class="min-w-[14rem] px-4 py-3">Group Access (RBAC)</th>
+                <th class="min-w-32 px-4 py-3">Ownership</th>
+                <th class="min-w-56 px-4 py-3">Group Access (RBAC)</th>
                 <th class="w-24 px-4 py-3 text-center">Manage</th>
               {/if}
               {#if isSuperadmin}
@@ -696,7 +696,7 @@
         <select
           bind:value={bulkTargetOrgId}
           aria-label="Target Organization for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-hidden"
         >
           <option value="all">All Organizations</option>
           {#each orgs as org (org.id)}
@@ -706,14 +706,14 @@
         <button
           type="button"
           onclick={handleBulkGrant}
-          class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-500"
+          class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500"
         >
           Grant Access
         </button>
         <button
           type="button"
           onclick={handleBulkRevoke}
-          class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-rose-500"
+          class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-500"
         >
           Revoke Access
         </button>
@@ -725,7 +725,7 @@
         <select
           bind:value={bulkTargetGroupId}
           aria-label="Target Group for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-hidden"
         >
           {#each groups as grp (grp.id)}
             <option value={grp.id}>{grp.name}</option>
@@ -734,7 +734,7 @@
         <button
           type="button"
           onclick={handleBulkAssignGroup}
-          class="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-violet-500"
+          class="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-violet-500"
         >
           Assign Group
         </button>

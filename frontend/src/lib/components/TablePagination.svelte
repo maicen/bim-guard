@@ -53,7 +53,7 @@
       <select
         value={pageSize}
         onchange={handlePageSizeChange}
-        class="cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
       >
         {#each pageSizeOptions as option (option)}
           <option value={option}>{option}</option>

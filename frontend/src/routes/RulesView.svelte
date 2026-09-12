@@ -835,7 +835,7 @@
         <button
           type="button"
           onclick={openCreateModal}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
           <Plus class="h-3.5 w-3.5" />
           <span>New Rule</span>
@@ -868,7 +868,7 @@
       onclick={() => switchMainTab("rules")}
       class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
       'rules'
-        ? 'bg-accent text-white shadow-sm'
+        ? 'bg-accent text-white shadow-xs'
         : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
     >
       <ListChecks class="h-3.5 w-3.5" />
@@ -879,7 +879,7 @@
       onclick={() => switchMainTab("snapshots")}
       class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {activeMainTab ===
       'snapshots'
-        ? 'bg-accent text-white shadow-sm'
+        ? 'bg-accent text-white shadow-xs'
         : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
     >
       <Camera class="h-3.5 w-3.5" />
@@ -903,7 +903,7 @@
         }}
         class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'all'
-          ? 'bg-accent text-white shadow-sm'
+          ? 'bg-accent text-white shadow-xs'
           : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
       >
         All Categories
@@ -916,7 +916,7 @@
         }}
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'Arch'
-          ? 'bg-blue-600 text-white shadow-sm'
+          ? 'bg-blue-600 text-white shadow-xs'
           : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
       >
         <span class="h-2 w-2 rounded-full bg-blue-400"></span>
@@ -931,7 +931,7 @@
         }}
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'Piping'
-          ? 'bg-amber-600 text-white shadow-sm'
+          ? 'bg-amber-600 text-white shadow-xs'
           : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
       >
         <span class="h-2 w-2 rounded-full bg-amber-400"></span>
@@ -946,7 +946,7 @@
         }}
         class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all {selectedCategory ===
         'seismic'
-          ? 'bg-purple-600 text-white shadow-sm'
+          ? 'bg-purple-600 text-white shadow-xs'
           : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
       >
         <span class="h-2 w-2 rounded-full bg-purple-400"></span>
@@ -1040,7 +1040,7 @@
             type="button"
             onclick={() => (selectedFolderId = null)}
             class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium transition-colors {!selectedFolderId
-              ? 'bg-accent text-white shadow-sm'
+              ? 'bg-accent text-white shadow-xs'
               : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
           >
             <div class="flex items-center gap-2">
@@ -1054,7 +1054,7 @@
             <div
               class="group/folder relative flex items-center justify-between rounded-xl text-xs font-medium transition-colors {selectedFolderId ===
               folder.ruleset_id
-                ? 'bg-accent text-white shadow-sm'
+                ? 'bg-accent text-white shadow-xs'
                 : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-50'}"
             >
               {#if isFolderSelectionMode || selectedFolderRulesetIds.length > 0}
@@ -1146,7 +1146,7 @@
         onpointerup={handleDividerPointerUp}
         onpointercancel={handleDividerPointerUp}
         onkeydown={handleDividerKeyDown}
-        class="group relative z-20 -mx-1.5 hidden w-3 cursor-col-resize select-none items-center justify-center transition-colors focus:outline-none md:flex"
+        class="group relative z-20 -mx-1.5 hidden w-3 cursor-col-resize select-none items-center justify-center transition-colors focus:outline-hidden md:flex"
         title="Drag to resize Ruleset Folders sidebar (or use Left/Right Arrow keys)"
       >
         <div
@@ -1157,7 +1157,7 @@
         <!-- Grip handle indicator in the middle -->
         <div
           class="pointer-events-none absolute top-1/2 flex h-7 w-4 -translate-y-1/2 items-center justify-center rounded-md border border-slate-700 bg-slate-900 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 {isDraggingDivider
-            ? 'border-accent bg-accent !opacity-100'
+            ? 'border-accent bg-accent opacity-100!'
             : ''}"
         >
           <GripVertical class="h-3 w-3 text-slate-400 {isDraggingDivider ? 'text-slate-50' : ''}" />
@@ -1176,13 +1176,13 @@
               type="text"
               bind:value={table.search}
               placeholder="Search rules by ID, description, property..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-1.5 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-1.5 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <select
             bind:value={selectedMechanism}
-            class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="all">All Mechanisms</option>
             <option value="CODE">Building Code</option>
@@ -1332,13 +1332,13 @@
                           <div class="space-y-2">
                             <p>{rule.description || "This rule carries no description."}</p>
 
-                            <dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-micro">
+                            <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
                               <dt class="uppercase tracking-wider text-slate-500">Checks</dt>
-                              <dd class="break-words font-mono text-slate-200">
+                              <dd class="wrap-break-word font-mono text-slate-200">
                                 {rule.property_set || "Pset_Compliance"}.{rule.property_name || "-"}
                               </dd>
                               <dt class="uppercase tracking-wider text-slate-500">Category</dt>
-                              <dd class="break-words font-mono text-slate-200">
+                              <dd class="wrap-break-word font-mono text-slate-200">
                                 {rule.rule_category || rule.category || "-"}
                               </dd>
                               <dt class="uppercase tracking-wider text-slate-500">Severity</dt>
@@ -1355,7 +1355,7 @@
                           {#snippet footer()}
                             <div class="space-y-1.5">
                               {#if rule.source_text}
-                                <span class="block break-words italic">
+                                <span class="block wrap-break-word italic">
                                   “{rule.source_text}”
                                 </span>
                               {/if}
@@ -1550,7 +1550,7 @@
             type="text"
             bind:value={snapshotTable.search}
             placeholder="Search snapshots by name, source folder, or notes..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-3.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-3.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>
@@ -1944,7 +1944,7 @@
             bind:value={folderRulesetId}
             disabled={isEditingFolder}
             placeholder="e.g. BUILDING-CODE-PART3 or GC-001"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
           />
           {#if !isEditingFolder}
             <p class="text-caption text-slate-500">
@@ -1962,7 +1962,7 @@
             type="text"
             bind:value={folderDisplayName}
             placeholder="e.g. Building Code Part 3 - Fire Protection & Safety"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -1974,7 +1974,7 @@
             <select
               id="folder-category"
               bind:value={folderCategory}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Arch">Arch (Architectural)</option>
               <option value="Piping">Piping (Corrosion)</option>
@@ -1989,7 +1989,7 @@
             <select
               id="folder-mechanism-scope"
               bind:value={folderMechanismScope}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="CODE">CODE (Building Code)</option>
               <option value="GC-001">GC-001 (Galvanic)</option>
@@ -2007,7 +2007,7 @@
             rows="3"
             bind:value={folderDescription}
             placeholder="Regulatory standard, scope notes, or compliance criteria..."
-            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
       </div>
@@ -2027,7 +2027,7 @@
           type="button"
           disabled={isSavingFolder || !folderRulesetId.trim()}
           onclick={handleSaveFolder}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span
             >{isSavingFolder
@@ -2094,7 +2094,7 @@
           <select
             id="bulk-rule-ruleset"
             bind:value={bulkRuleRulesetId}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current folder —</option>
             {#each folders as f (f)}
@@ -2111,7 +2111,7 @@
             <select
               id="bulk-rule-category"
               bind:value={bulkRuleCategory}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="Arch">Arch (Architectural)</option>
@@ -2127,7 +2127,7 @@
             <select
               id="bulk-rule-mechanism"
               bind:value={bulkRuleMechanism}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="CODE">CODE (Building Code)</option>
@@ -2147,7 +2147,7 @@
             <select
               id="bulk-rule-severity"
               bind:value={bulkRuleSeverity}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="Critical">Critical</option>
@@ -2164,7 +2164,7 @@
             <select
               id="bulk-rule-review"
               bind:value={bulkRuleNeedsReview}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="__keep__">— Keep current —</option>
               <option value="0">Mark as Approved (0)</option>
@@ -2188,7 +2188,7 @@
           type="button"
           disabled={isBulkUpdatingRules}
           onclick={handleBulkUpdateRules}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span>{isBulkUpdatingRules ? "Updating..." : `Update ${table.selectedCount} Rules`}</span>
         </button>
@@ -2238,7 +2238,7 @@
           <select
             id="bulk-folder-category"
             bind:value={bulkFolderCategory}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current —</option>
             <option value="Arch">Arch (Architectural)</option>
@@ -2254,7 +2254,7 @@
           <select
             id="bulk-folder-mechanism-scope"
             bind:value={bulkFolderMechanismScope}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="__keep__">— Keep current —</option>
             <option value="CODE">CODE (Building Code)</option>
@@ -2280,7 +2280,7 @@
           type="button"
           disabled={isBulkUpdatingFolders}
           onclick={handleBulkUpdateFolders}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span
             >{isBulkUpdatingFolders
@@ -2386,7 +2386,7 @@
             id="snapshot-name"
             type="text"
             bind:value={saveSnapshotName}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -2395,7 +2395,7 @@
           <select
             id="snapshot-mode"
             bind:value={saveSnapshotSourceMode}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="manual">Manual</option>
             <option value="pdf">PDF Extraction</option>
@@ -2411,7 +2411,7 @@
             rows="3"
             bind:value={saveSnapshotNotes}
             placeholder="Optional context for this configuration..."
-            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
       </div>
@@ -2430,7 +2430,7 @@
           type="button"
           disabled={isSavingSnapshot || !saveSnapshotName.trim()}
           onclick={handleSaveSnapshot}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span>{isSavingSnapshot ? "Saving..." : "Save Snapshot"}</span>
         </button>

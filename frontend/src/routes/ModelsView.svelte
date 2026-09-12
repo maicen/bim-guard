@@ -353,7 +353,7 @@
           type="button"
           onclick={() => (isUploadOpen = true)}
           disabled={!initialProjectId}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           <UploadCloud class="h-3.5 w-3.5" />
           <span>Attach Model</span>
@@ -375,7 +375,7 @@
           <select
             bind:value={selectedSource}
             onchange={handleSourceChange}
-            class="max-w-[240px] truncate rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-50 focus:border-blue-500 focus:outline-none"
+            class="max-w-[240px] truncate rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-50 focus:border-blue-500 focus:outline-hidden"
           >
             <option value="supabase">Supabase Database (Main Registry)</option>
             {#if repos.length > 0}
@@ -444,7 +444,7 @@
           type="text"
           bind:value={table.search}
           placeholder="Filter models by filename or role..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
         />
       </div>
     </div>
@@ -732,7 +732,7 @@
               type="text"
               bind:value={table.search}
               placeholder="Search repository IFC models by filename or path..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
             />
           </div>
 
@@ -740,7 +740,7 @@
             <div class="flex w-full items-center gap-2 md:w-auto">
               <select
                 bind:value={repoCategoryFilter}
-                class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
+                class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="all">All Category Folders</option>
                 {#each activeRepoStructure.categories as cat (cat)}
@@ -864,7 +864,7 @@
           type="button"
           onclick={handleAttachSelectedModels}
           disabled={!initialProjectId || isAttaching}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {#if isAttaching}
             <Loader2 class="h-3.5 w-3.5 animate-spin" />

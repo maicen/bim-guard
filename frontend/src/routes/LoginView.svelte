@@ -153,7 +153,7 @@
             autocomplete="email"
             bind:value={email}
             disabled={signingIn || !isAuthConfigured}
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-none disabled:opacity-60"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:opacity-60"
             placeholder="you@company.com"
           />
         </div>
@@ -171,7 +171,7 @@
             autocomplete={mode === "sign-in" ? "current-password" : "new-password"}
             bind:value={password}
             disabled={signingIn || !isAuthConfigured}
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-none disabled:opacity-60"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-accent focus:outline-hidden disabled:opacity-60"
             placeholder="••••••••"
           />
         </div>
@@ -180,7 +180,7 @@
       <button
         type="submit"
         disabled={signingIn || !isAuthConfigured}
-        class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+        class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {#if signingIn}
           {mode === "sign-in" ? "Signing in…" : "Creating account…"}

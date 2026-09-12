@@ -143,7 +143,7 @@
         {#if propDetail.definition && propDetail.description}
           <p class="text-micro italic text-slate-500">Note: {propDetail.description}</p>
         {/if}
-        <dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-micro">
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
           {#if propDetail.data_type}
             <dt class="uppercase tracking-wider text-slate-500">Type</dt>
             <dd class="font-mono text-slate-200">{propDetail.data_type}</dd>

@@ -49,7 +49,7 @@ export function cursorTooltip(node: Element, options: CursorTooltipOptions = {})
       tooltipEl = document.createElement("div");
       tooltipEl.setAttribute("role", "tooltip");
       tooltipEl.className =
-        "pointer-events-none fixed z-[70] max-w-64 whitespace-pre-line rounded-md border border-slate-800 bg-slate-900/95 px-2 py-1 text-micro text-slate-200 shadow-lg shadow-black/30 backdrop-blur-sm";
+        "pointer-events-none fixed z-70 max-w-64 whitespace-pre-line rounded-md border border-slate-800 bg-slate-900/95 px-2 py-1 text-micro text-slate-200 shadow-lg shadow-black/30 backdrop-blur-xs";
       destroyPortal = portal(tooltipEl).destroy;
     }
     tooltipEl.textContent = opts.text;

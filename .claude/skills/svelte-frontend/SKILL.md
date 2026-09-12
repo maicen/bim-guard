@@ -232,6 +232,7 @@ Read these only when the topic comes up — each is short and self-contained:
 | `references/render.md` | `{@render}` semantics, optional snippets |
 | `references/inspect.md` | Debugging reactivity (`$inspect`, `$inspect.trace`) |
 | `references/svelte-reactivity.md` | `createSubscriber`, `SvelteMap`/`SvelteSet`, reactive built-ins |
+| `references/bits-ui.md` | Building or reviewing anything on bits-ui — `Popover`/`DropdownMenu`/`Select` wrappers, child-snippet delegation, `Portal`, controlled state |
 | `references/await-expressions.md` | **Not usable at the pinned version** — only if `experimental.async` is turned on |
 | `references/hydratable.md` | **Not usable at the pinned version** — same caveat |
 
@@ -314,6 +315,9 @@ new markup, check whether one of these covers it:
 - `<LoadingState>` — spinner with configurable message
 - `<SeverityBadge>` / `<Badge>` / `<Alert>` — severity pills, tags, inline alerts
 - `<IsoGovernanceBadges>` — Suitability / Revision / CDE State tags
+- `<HoverCard>` — hover/focus-triggered rich preview popover (bits-ui `Popover`)
+- `<DropdownMenu>` — thin bits-ui `DropdownMenu` wrapper for triggered menus
+- `<OrgSwitcher>` — bits-ui `Select`-backed organization switcher
 - `<TableActions>`, `<ExportActions>`, `<IssueTable>`, `<PipelineProgress>`,
   `<Sidebar>`, `<TopHeader>`, `<ThemeToggle>`, `<IfcViewer>`
 

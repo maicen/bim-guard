@@ -487,7 +487,7 @@
 
 <a
   href="#main-content"
-  class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
+  class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-200 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
 >
   Skip to main content
 </a>
@@ -693,7 +693,7 @@
         >
           <span
             class="h-1.5 w-1.5 rounded-full {dbOk
-              ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
+              ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50'
               : 'bg-rose-400'}"
           ></span>
           DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}

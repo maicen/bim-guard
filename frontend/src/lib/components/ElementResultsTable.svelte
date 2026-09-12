@@ -103,7 +103,7 @@
       type="text"
       bind:value={search}
       placeholder="Filter by element, floor, room, or GUID…"
-      class="w-full bg-transparent text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none"
+      class="w-full bg-transparent text-xs text-slate-200 placeholder:text-slate-600 focus:outline-hidden"
     />
   </div>
   <div class="max-h-64 overflow-auto">

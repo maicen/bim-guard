@@ -298,7 +298,7 @@
         type="button"
         onclick={() => (inviteModalOpen = true)}
         disabled={!activeOrg}
-        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <UserPlus class="h-3.5 w-3.5" />
         Invite member
@@ -325,7 +325,7 @@
           type="search"
           bind:value={search}
           placeholder="Search members…"
-          class="w-56 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          class="w-56 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
@@ -392,7 +392,7 @@
                       value={member.role}
                       onchange={(e) =>
                         setRole(member.user_id, (e.target as HTMLSelectElement).value as OrganizationMember["role"])}
-                      class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs capitalize text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs capitalize text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="owner">Owner</option>
                       <option value="admin">Admin</option>
@@ -406,7 +406,7 @@
                         const v = (e.target as HTMLSelectElement).value;
                         setMemberGroup(member.user_id, v ? Number(v) : null);
                       }}
-                      class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="">Ungrouped</option>
                       {#each groups as group (group.id)}
@@ -562,7 +562,7 @@
         required
         bind:value={inviteEmail}
         placeholder="name@company.com"
-        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
       />
     </div>
     <div>
@@ -570,7 +570,7 @@
       <select
         id="invite-role"
         bind:value={inviteRole}
-        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 capitalize text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 capitalize text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
       >
         <option value="member">Member</option>
         <option value="admin">Admin</option>
@@ -653,7 +653,7 @@
         required
         bind:value={newGroupName}
         placeholder="e.g. Estimators"
-        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
       />
     </div>
     <div class="flex justify-end gap-2 pt-1">

@@ -62,7 +62,7 @@
       type="file"
       accept=".ids,.xml,.json"
       onchange={handleFileChange}
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-1 file:text-xs file:text-slate-50 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-1 file:text-xs file:text-slate-50 focus:border-accent focus:outline-hidden"
     />
     <p class="text-caption text-slate-500">
       Accepts a buildingSMART IDS (.ids/.xml) file or a BIM-Guard JSON ruleset (.json).
@@ -83,7 +83,7 @@
       type="text"
       bind:value={importRulesetId}
       placeholder="e.g. IMPORTED-RULES or an existing folder name"
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 font-mono text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
     />
     <p class="text-caption text-slate-500">
       Imported rules are saved under this folder and flagged for review (needs_review).
@@ -102,7 +102,7 @@
       type="button"
       disabled={isImporting || !importFile || !importRulesetId.trim()}
       onclick={handleImport}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isImporting ? "Importing..." : "Import Rules"}</span>
     </button>

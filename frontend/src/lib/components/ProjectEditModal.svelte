@@ -159,7 +159,7 @@
             type="text"
             bind:value={name}
             placeholder="e.g. Waterfront Commercial Tower"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -174,7 +174,7 @@
               bind:value={shortName}
               maxlength={SHORT_NAME_MAX_LENGTH}
               placeholder="e.g. Waterfront Tower"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1.5">
@@ -187,7 +187,7 @@
               bind:value={projectCode}
               maxlength={PROJECT_CODE_MAX_LENGTH}
               placeholder="e.g. WFT"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -201,7 +201,7 @@
             rows="3"
             bind:value={description}
             placeholder="Optional project scope or notes..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
@@ -213,7 +213,7 @@
             <select
               id="edit-proj-status"
               bind:value={status}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Active">Active</option>
               <option value="Draft">Draft</option>
@@ -228,7 +228,7 @@
             <select
               id="edit-proj-country"
               bind:value={country}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Canada">Canada (NBC)</option>
               <option value="US">United States (IBC)</option>
@@ -245,7 +245,7 @@
           <select
             id="edit-proj-domain"
             bind:value={analysisType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="Arch">Arch</option>
             <option value="Piping">Piping</option>
@@ -260,7 +260,7 @@
           <select
             id="edit-proj-type"
             bind:value={projectType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             {#each PROJECT_TYPES as type (type)}
               <option value={type}>{type}</option>
@@ -275,7 +275,7 @@
           <select
             id="edit-proj-classification"
             bind:value={classificationStandard}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="">Not set</option>
             {#each classificationStandards as std (std.uri)}
@@ -303,7 +303,7 @@
           type="button"
           disabled={isSaving || !!validationError()}
           onclick={handleSave}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
         >
           <Check class="h-3.5 w-3.5" />
           <span>{isSaving ? "Saving..." : "Save Changes"}</span>

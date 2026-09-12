@@ -204,7 +204,7 @@
             <select
               id="opencde-target-project"
               bind:value={selectedProjectId}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
             >
               {#each projects as p (p.id)}
                 <option value={p.id}>{p.name} (ISO: {p.cde_state || "WIP"})</option>
@@ -221,7 +221,7 @@
               <select
                 id="opencde-platform"
                 bind:value={externalCdeType}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="Autodesk Construction Cloud (ACC)"
                   >Autodesk Construction Cloud (ACC)</option
@@ -240,7 +240,7 @@
               <select
                 id="opencde-target-state"
                 bind:value={targetCdeState}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
               >
                 <option value="WIP">WIP (Work in Progress)</option>
                 <option value="SHARED">SHARED (Coordination &amp; Review)</option>
@@ -259,7 +259,7 @@
               type="text"
               bind:value={externalProjectId}
               placeholder="urn:adsk.wipprod:dm.lineage:prj-001"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-50 focus:border-blue-500 focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-50 focus:border-blue-500 focus:outline-hidden"
             />
           </div>
         </div>

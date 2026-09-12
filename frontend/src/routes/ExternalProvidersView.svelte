@@ -614,7 +614,7 @@
             <button
               type="button"
               onclick={() => (showAddEngineForm = !showAddEngineForm)}
-              class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+              class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
             >
               <Plus class="h-4 w-4" />
               <span>Add Instance</span>
@@ -661,7 +661,7 @@
                   <select
                     id="engine-strategy"
                     bind:value={newEngineStrategy}
-                    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
                   >
                     <option value="auto">auto</option>
                     <option value="fast">fast</option>
@@ -724,7 +724,7 @@
               showAddLlmForm = !showAddLlmForm;
               if (showAddLlmForm) resetLlmForm();
             }}
-            class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+            class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
           >
             <Plus class="h-4 w-4" />
             <span>Add Provider</span>

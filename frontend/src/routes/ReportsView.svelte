@@ -426,7 +426,7 @@
             <button
               type="button"
               onclick={() => (isTopicCreateModalOpen = true)}
-              class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-500"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-blue-500"
             >
               <Plus class="h-3.5 w-3.5" />
               <span>Create Topic</span>
@@ -463,14 +463,14 @@
               type="text"
               bind:value={topicTable.search}
               placeholder="Search topics by title, GUID, assignee, or description..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 
           <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <select
               bind:value={topicTable.filters.status}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All Statuses</option>
               <option value="Open">Open</option>
@@ -481,7 +481,7 @@
 
             <select
               bind:value={topicTable.filters.priority}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All Priorities</option>
               <option value="Critical">Critical</option>
@@ -492,7 +492,7 @@
 
             <select
               bind:value={topicTable.filters.cde}
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="ALL">All CDE States</option>
               <option value="WIP">WIP</option>
@@ -694,7 +694,7 @@
               type="text"
               bind:value={artifactTable.search}
               placeholder="Filter BCF archives by filename or project..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 

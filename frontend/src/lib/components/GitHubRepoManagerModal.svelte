@@ -117,7 +117,7 @@
 
 {#if isOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs"
   >
     <div
       class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
@@ -174,7 +174,7 @@
           <button
             type="button"
             onclick={() => (showAddForm = !showAddForm)}
-            class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-blue-500"
+            class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-blue-500"
           >
             <Plus class="h-4 w-4" />
             <span>Add GitHub Repository</span>
@@ -201,7 +201,7 @@
                 required
                 bind:value={newUrl}
                 placeholder="https://github.com/maicen/bimguard-test-models"
-                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
               />
             </div>
 
@@ -215,7 +215,7 @@
                   type="text"
                   bind:value={newName}
                   placeholder="bimguard-test-models"
-                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
                 />
               </div>
               <div>
@@ -228,7 +228,7 @@
                   type="text"
                   bind:value={newBranch}
                   placeholder="main"
-                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -242,7 +242,7 @@
                 type="text"
                 bind:value={newDescription}
                 placeholder="Repository containing OpenBIM test models..."
-                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-hidden"
               />
             </div>
 

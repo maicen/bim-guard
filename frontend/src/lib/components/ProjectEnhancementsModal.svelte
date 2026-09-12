@@ -127,7 +127,7 @@
               type="button"
               disabled={isRunning || !project.ifc_file_path}
               onclick={handleRunEnhancement}
-              class="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm shadow-purple-600/20 transition-all hover:scale-[1.02] hover:bg-purple-500 disabled:opacity-50 disabled:hover:scale-100"
+              class="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-xs shadow-purple-600/20 transition-all hover:scale-[1.02] hover:bg-purple-500 disabled:opacity-50 disabled:hover:scale-100"
             >
               <Sparkles class="h-4 w-4 {isRunning ? 'animate-spin' : ''}" />
               <span
@@ -240,7 +240,7 @@
 
 {#if selectedVersionForView}
   <div
-    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+    class="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
   >
     <div
       class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"

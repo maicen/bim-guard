@@ -195,7 +195,8 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 ### Frontend Guidelines (`frontend/`)
 
 - **Framework**: Svelte 5 using the modern runes syntax (`$state`, `$derived`, `$props`, `$effect`).
-- **Styling**: Tailwind CSS with custom theme variables matching BIM-Guard design tokens.
+- **Styling**: Tailwind CSS v4 (via `@tailwindcss/vite`, tokens in `frontend/src/app.css`'s `@theme` block — there is no `tailwind.config.js`) with custom theme variables matching BIM-Guard design tokens.
+- **bits-ui**: Reach for [bits-ui](https://www.bits-ui.com/) primitives (`Popover`, `DropdownMenu`, `Select`, …) for interaction/focus/positioning-heavy components rather than hand-rolling — see `.claude/skills/svelte-frontend/references/bits-ui.md` for the conventions in use (child-snippet delegation, `Portal`, data-attribute styling, controlled vs. uncontrolled state).
 - **Contract Parity**: When Pydantic schemas in `app/modules/contracts.py` change, immediately update corresponding TypeScript interfaces in `frontend/src/lib/types.ts`.
 - **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.
 - **API Client**: All HTTP calls go through `src/lib/api.ts`. Never use raw `fetch()` directly in components.
@@ -221,6 +222,9 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
   - `<LoadingState>`: Spinner loading container with configurable messages.
   - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
   - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
+  - `<HoverCard>`: Hover/focus-triggered rich preview popover (bits-ui `Popover`), for supplementary detail without a click or modal.
+  - `<DropdownMenu>`: Thin bits-ui `DropdownMenu` wrapper for triggered menus (Escape/outside-click dismissal, roving keyboard nav) — used by `IntegrationsMenu`, `ResourcesMenu`, `UserMenu`, and `RulesView`'s Import/Export menu.
+  - `<OrgSwitcher>`: bits-ui `Select`-backed organization switcher in the header, syncing to `authState.activeOrganizationId`.
   - `<CollapsiblePanel>`: Dockable panel with a collapsible header (chevron toggle, left/right/bottom docking, optional localStorage-persisted collapse state) — content stays mounted while collapsed (hidden via the `hidden` attribute, not `{#if}`) so children that hand DOM refs to external libraries keep a stable node.
   - Other established shared components also live here (e.g. `Navbar`, `Sidebar`, `TopHeader`, `PipelineProgress`, `ConfirmModal`, `Alert`, `Badge`, `TableActions`, `ThemeToggle`, `ExportActions`, `IssueTable`) — reuse them the same way rather than duplicating markup.
 

@@ -12,7 +12,7 @@
 <button
   type="button"
   onclick={toggleTheme}
-  class="group relative inline-flex items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 p-2 text-slate-400 transition-all duration-200 hover:bg-slate-800/70 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+  class="group relative inline-flex items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 p-2 text-slate-400 transition-all duration-200 hover:bg-slate-800/70 hover:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
   title={$resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
   aria-label={$resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
 >

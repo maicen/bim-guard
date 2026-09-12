@@ -105,7 +105,7 @@
           type="button"
           disabled={isSaving}
           onclick={handleSave}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
         >
           <Save class="h-3.5 w-3.5" />
           <span>{isSaving ? "Saving..." : "Save Settings"}</span>
@@ -184,7 +184,7 @@
               type="text"
               bind:value={profileFullName}
               placeholder={authState.user.email}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div>
@@ -196,7 +196,7 @@
               type="text"
               bind:value={profileTitle}
               placeholder="e.g. BIM Coordinator"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -335,7 +335,7 @@
               <select
                 id={`setting-${item.key}`}
                 bind:value={item.value}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 <option value="DEBUG">DEBUG</option>
                 <option value="INFO">INFO</option>
@@ -348,7 +348,7 @@
                 type="text"
                 bind:value={item.value}
                 placeholder={item.description || item.key}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
               />
             {/if}
           </div>

@@ -29,7 +29,7 @@
     <a
       href="/downloads/IFC_Export_Setting.json"
       download="IFC_Export_Setting.json"
-      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
     >
       <Download class="h-7 w-7" />
       <span>Download IFC Export Setting</span>
@@ -49,7 +49,7 @@
     <a
       href="/downloads/README.md"
       download="IFC_Export_Setting_README.md"
-      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+      class="inline-flex shrink-0 items-center gap-3 rounded-xl bg-accent px-8 py-4 text-2xl font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
     >
       <Download class="h-7 w-7" />
       <span>Download Setup Guide</span>

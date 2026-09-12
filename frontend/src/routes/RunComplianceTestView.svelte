@@ -198,7 +198,7 @@
               bind:value={selectedExistingProjectId}
               onchange={handleSelectExistingProject}
               disabled={isLoadingProjects}
-              class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none disabled:opacity-60"
+              class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
             >
               <option value={null}
                 >{isLoadingProjects ? "Loading…" : "-- Select a project --"}</option
@@ -299,7 +299,7 @@
           <select
             bind:value={selectedFolder}
             disabled={isFoldersLoading}
-            class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none disabled:opacity-60"
+            class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
           >
             <option value="">{isFoldersLoading ? "Loading…" : "-- Select a ruleset --"}</option>
             {#each ruleFolders as folder (folder.ruleset_id)}
@@ -333,7 +333,7 @@
         />
         <select
           bind:value={uploadDocType}
-          class="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           {#each DOCUMENT_TYPES as type (type)}
             <option value={type}>{type}</option>
@@ -378,7 +378,7 @@
       type="button"
       onclick={handleRunTest}
       disabled={!project || !hasModel || !hasRuleset || isRunning}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       {#if isRunning}
         <Loader2 class="h-4 w-4 animate-spin" />

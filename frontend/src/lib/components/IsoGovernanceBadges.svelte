@@ -48,7 +48,7 @@
   >
     {#snippet trigger()}
       <span
-        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-amber-400 shadow-sm"
+        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-amber-400 shadow-xs"
       >
         {suitabilityCode}
       </span>
@@ -73,7 +73,7 @@
   >
     {#snippet trigger()}
       <span
-        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-blue-400 shadow-sm"
+        class="cursor-help rounded border border-slate-700/60 bg-slate-800 px-1.5 py-0.5 font-semibold text-blue-400 shadow-xs"
       >
         {revisionCode}
       </span>
@@ -98,7 +98,7 @@
   >
     {#snippet trigger()}
       <span
-        class="cursor-help rounded border px-1.5 py-0.5 font-semibold shadow-sm {getCdeColor(
+        class="cursor-help rounded border px-1.5 py-0.5 font-semibold shadow-xs {getCdeColor(
           cdeCode,
         )}"
       >

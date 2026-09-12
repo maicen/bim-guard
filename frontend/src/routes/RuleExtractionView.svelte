@@ -587,7 +587,7 @@
         <select
           id="rule-doc-source"
           bind:value={selectedDocId}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value={null}>-- Select from Document Library --</option>
           {#each documents as doc (doc.id)}
@@ -619,7 +619,7 @@
           <select
             id="rule-ai-model"
             bind:value={selectedModel}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             {#each llmModels as model (model.id)}
               <option value={model.id}>{model.name} — {formatModelMeta(model)}</option>
@@ -707,7 +707,7 @@
           bind:value={rawText}
           rows="6"
           placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
         ></textarea>
       </div>
     {/if}
@@ -717,7 +717,7 @@
         type="button"
         disabled={isExtracting || !selectedModel}
         onclick={handleExtract}
-        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
       >
         <Sparkles class="h-4 w-4" />
         <span>
@@ -763,12 +763,12 @@
               type="text"
               bind:value={draftTable.search}
               placeholder="Search drafts by reference, description, property..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
           <select
             bind:value={draftTable.filters.status}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Statuses</option>
             <option value="pending_review">Pending Review</option>
@@ -986,7 +986,7 @@
               id="extraction-ruleset"
               type="text"
               bind:value={formRulesetId}
-              class="w-44 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-44 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
 
@@ -1003,7 +1003,7 @@
             type="button"
             disabled={isSaving || table.selectedCount === 0}
             onclick={handleSaveSelected}
-            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
           >
             <Save class="h-3.5 w-3.5" />
             <span
@@ -1023,14 +1023,14 @@
             type="text"
             bind:value={table.search}
             placeholder="Search draft rules by reference, description, property..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="flex w-full items-center gap-2 md:w-auto">
           <select
             bind:value={table.filters.severity}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Severities</option>
             <option value="Critical">Critical</option>
@@ -1145,28 +1145,28 @@
                     <input
                       type="text"
                       bind:value={rule.rule_id}
-                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-slate-50 hover:border-slate-700 focus:border-accent focus:outline-none"
+                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-slate-50 hover:border-slate-700 focus:border-accent focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3">
                     <input
                       type="text"
                       bind:value={rule.description}
-                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-none"
+                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3 font-mono text-slate-400">
                     <input
                       type="text"
                       bind:value={rule.property_set}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-400 hover:border-slate-700 focus:border-accent focus:outline-none"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-400 hover:border-slate-700 focus:border-accent focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3 font-mono text-slate-300">
                     <input
                       type="text"
                       bind:value={rule.property_name}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-none"
+                      class="w-28 border-b border-transparent bg-transparent text-xs text-slate-300 hover:border-slate-700 focus:border-accent focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3 font-mono text-slate-400">
@@ -1179,7 +1179,7 @@
                   <td class="px-3 py-3">
                     <select
                       bind:value={rule.severity}
-                      class="rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-none"
+                      class="rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-micro font-semibold text-slate-50 focus:outline-hidden"
                     >
                       <option value="Critical">Critical</option>
                       <option value="High">High</option>
@@ -1244,7 +1244,7 @@
     <button
       type="button"
       onclick={() => (showReturnPrompt = false)}
-      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover"
+      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
     >
       Got it
     </button>
@@ -1330,7 +1330,7 @@
             id="edit-draft-description"
             bind:value={editForm.description}
             rows="2"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-50 focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
@@ -1343,7 +1343,7 @@
               id="edit-draft-target"
               type="text"
               bind:value={editForm.target_ifc_class}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -1354,7 +1354,7 @@
               id="edit-draft-pset"
               type="text"
               bind:value={editForm.property_set}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -1363,7 +1363,7 @@
               id="edit-draft-prop"
               type="text"
               bind:value={editForm.property_name}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -1373,7 +1373,7 @@
             <select
               id="edit-draft-operator"
               bind:value={editForm.operator}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-hidden"
             >
               <option value="==">== (Equals)</option>
               <option value="!=">!= (Not equals)</option>
@@ -1393,7 +1393,7 @@
               id="edit-draft-value"
               type="text"
               bind:value={editForm.check_value}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -1403,7 +1403,7 @@
             <select
               id="edit-draft-severity"
               bind:value={editForm.severity}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:outline-hidden"
             >
               <option value="mandatory">Mandatory</option>
               <option value="recommended">Recommended</option>
@@ -1536,7 +1536,7 @@
           <select
             id="bulk-draft-severity"
             bind:value={bulkDraftSeverity}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Severity --</option>
             <option value="Critical">Critical</option>
@@ -1555,7 +1555,7 @@
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 placeholder-slate-600 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -1564,7 +1564,7 @@
           <select
             id="bulk-draft-op"
             bind:value={bulkDraftOperator}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Operator --</option>
             <option value="==">== (Equals)</option>

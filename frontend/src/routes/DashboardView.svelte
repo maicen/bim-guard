@@ -12,6 +12,7 @@
     Pencil,
     Trash2,
     Search,
+    Building2,
   } from "lucide-svelte";
   import { dashboardApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -171,6 +172,18 @@
     // of this effect, and the later write to `projects` re-fires it,
     // causing an unbounded refetch loop.
     untrack(() => {
+      // No organization selected: there is nothing org-scoped to fetch, and
+      // the UI renders a dedicated empty state instead of the registry. Skip
+      // the subscription/fetch entirely rather than forwarding `null` to the
+      // API layer.
+      if (orgId == null) {
+        unsubscribeProjects?.();
+        unsubscribeProjects = null;
+        isLoading = false;
+        isRefreshing = false;
+        return;
+      }
+
       // The cache subscription is keyed by org (see EntityCacheStore.subscribe
       // in lib/cache.ts) -- it must be re-created whenever the active org
       // changes, or it stays locked to whichever org was active when it was
@@ -187,6 +200,14 @@
   });
 
   async function refreshDashboard(force = false) {
+    // Defense-in-depth for callers other than the $effect above (e.g.
+    // handleBulkUpdated) — never fetch with no organization selected.
+    if (authState.activeOrganizationId == null) {
+      isLoading = false;
+      isRefreshing = false;
+      return;
+    }
+
     if (!cachedStats && !projects.length) {
       isLoading = true;
     } else {
@@ -243,6 +264,13 @@
     subtitle="High-level OpenBIM metrics and project compliance readiness."
   />
 
+  {#if authState.activeOrganizationId == null}
+    <EmptyState
+      icon={Building2}
+      title="No organization selected"
+      description="Select an organization to view its projects."
+    />
+  {:else}
   {#if !stats.db_ok}
     <div
       class="flex items-center gap-2.5 rounded-2xl border border-amber-800 bg-amber-950/40 p-4 text-xs text-amber-300"
@@ -282,14 +310,14 @@
           type="text"
           bind:value={table.search}
           placeholder="Filter projects by name or description..."
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
         />
       </div>
 
       <div class="flex w-full items-center gap-2 md:w-auto">
         <select
           bind:value={table.filters.status}
-          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="all">All Statuses</option>
           <option value="Active">Active</option>
@@ -299,7 +327,7 @@
 
         <select
           bind:value={table.filters.domain}
-          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
@@ -561,6 +589,7 @@
       {/if}
     </div>
   </div>
+  {/if}
 </div>
 
 <ProjectEditModal

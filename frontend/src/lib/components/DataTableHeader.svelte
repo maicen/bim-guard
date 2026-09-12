@@ -38,7 +38,7 @@
   <!-- Search & Filter Controls -->
   <div class="flex flex-1 flex-wrap items-center gap-3">
     <!-- Search Input Bar -->
-    <div class="relative min-w-[14rem] max-w-md flex-1">
+    <div class="relative min-w-56 max-w-md flex-1">
       <Search
         class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
       />
@@ -46,7 +46,7 @@
         type="text"
         bind:value={searchQuery}
         placeholder={searchPlaceholder}
-        class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-8 text-xs text-slate-200 placeholder-slate-500 transition-colors focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+        class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-8 text-xs text-slate-200 placeholder-slate-500 transition-colors focus:border-violet-500 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
       />
       {#if searchQuery}
         <button

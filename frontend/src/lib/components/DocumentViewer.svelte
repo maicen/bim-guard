@@ -1225,7 +1225,7 @@
                 bind:value={pageInputValue}
                 onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
                 onblur={handlePageInputSubmit}
-                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-none"
+                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-hidden"
                 aria-label="Page number"
               />
               <span class="text-xs text-slate-400">of {totalPageCount}</span>
@@ -1388,7 +1388,7 @@
                         src={block.src}
                         alt={block.alt || "Embedded document picture"}
                         loading="lazy"
-                        class="mx-auto max-h-[32rem] rounded-lg object-contain"
+                        class="mx-auto max-h-128 rounded-lg object-contain"
                         onerror={(e) => ((e.currentTarget as HTMLImageElement).classList.add("opacity-30"))}
                       />
                       {#if block.alt}
@@ -1480,7 +1480,7 @@
             <button
               type="button"
               onclick={zoomReset}
-              class="min-w-[3.5rem] rounded-lg px-1.5 py-1 text-center text-xs text-slate-300 hover:bg-slate-800"
+              class="min-w-14 rounded-lg px-1.5 py-1 text-center text-xs text-slate-300 hover:bg-slate-800"
               title="Reset zoom"
             >
               {Math.round((scale / DEFAULT_SCALE) * 100)}%
@@ -1598,7 +1598,7 @@
                 bind:value={pageInputValue}
                 onkeydown={(e) => e.key === "Enter" && handlePageInputSubmit()}
                 onblur={handlePageInputSubmit}
-                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-none"
+                class="w-12 rounded-lg border border-slate-700 bg-slate-950 px-1.5 py-1 text-center text-xs text-slate-100 focus:border-accent focus:outline-hidden"
                 aria-label="Page number"
               />
               <span class="text-xs text-slate-400">of {pageCount}</span>
@@ -1653,7 +1653,7 @@
                 class="pointer-events-none absolute rounded border-2 border-cyan-400 bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all duration-300 animate-pulse"
                 style="left: {activeBboxRect.left}px; top: {activeBboxRect.top}px; width: {activeBboxRect.width}px; height: {activeBboxRect.height}px;"
               >
-                <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow">
+                <span class="absolute -top-5 left-0 rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 shadow-sm">
                   Source Clause
                 </span>
               </div>

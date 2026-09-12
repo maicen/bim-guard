@@ -129,7 +129,7 @@
 </script>
 
 <div
-  class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur"
+  class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-sm"
 >
   <!-- Header -->
   <div class="flex flex-wrap items-center justify-between gap-4">
@@ -159,7 +159,7 @@
     <div class="flex min-w-[220px] items-center gap-3">
       <div class="h-2 flex-1 overflow-hidden rounded-full border border-slate-800 bg-slate-950">
         <div
-          class="h-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-sm transition-all duration-300"
+          class="h-2 rounded-full bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-xs transition-all duration-300"
           style="width: {avgProgress}%"
         ></div>
       </div>

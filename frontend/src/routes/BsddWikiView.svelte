@@ -145,7 +145,7 @@
     subtitle="Browse this app's local buildingSMART Data Dictionary cache -- the same classes and properties the rule builder's hover cards and autocomplete draw from"
   />
 
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px,1fr]">
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
     <!-- Class list -->
     <div class="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
       <div class="flex flex-wrap gap-1">
@@ -171,7 +171,7 @@
           type="text"
           bind:value={search}
           placeholder="Filter classes..."
-          class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
 
@@ -370,7 +370,7 @@
                 type="text"
                 bind:value={propertyFilter}
                 placeholder="Filter properties..."
-                class="w-48 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-nano text-slate-50 focus:border-accent focus:outline-none"
+                class="w-48 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-nano text-slate-50 focus:border-accent focus:outline-hidden"
               />
             </div>
             <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-800">

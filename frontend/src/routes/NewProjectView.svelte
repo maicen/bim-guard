@@ -465,13 +465,13 @@
           <button
             type="button"
             onclick={() => goToStep(step.num)}
-            class="group flex cursor-pointer items-center gap-2 rounded-lg p-1 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            class="group flex cursor-pointer items-center gap-2 rounded-lg p-1 text-left transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
             title="Go to step {step.num}: {step.title}"
           >
             <div
               class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 {currentStep ===
               step.num
-                ? 'scale-105 bg-accent text-white shadow-sm shadow-blue-500/50'
+                ? 'scale-105 bg-accent text-white shadow-xs shadow-blue-500/50'
                 : currentStep > step.num
                   ? 'bg-emerald-600 text-white group-hover:bg-emerald-500'
                   : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'}"
@@ -526,7 +526,7 @@
               type="text"
               bind:value={name}
               placeholder="e.g. BIM Headquarters Phase 1"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 
@@ -544,7 +544,7 @@
                 bind:value={shortName}
                 maxlength={SHORT_NAME_MAX_LENGTH}
                 placeholder="e.g. BG HQ Phase 1"
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
               />
               <p class="mt-1 text-caption text-slate-500">
                 Shown in the header and breadcrumbs instead of the full name ({SHORT_NAME_MIN_LENGTH}-{SHORT_NAME_MAX_LENGTH}
@@ -564,7 +564,7 @@
                 bind:value={projectCode}
                 maxlength={PROJECT_CODE_MAX_LENGTH}
                 placeholder="e.g. BGHQ1"
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm uppercase text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
               />
               <p class="mt-1 text-caption text-slate-500">
                 ISO 19650 container naming code: {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH}
@@ -585,7 +585,7 @@
               bind:value={description}
               rows="4"
               placeholder="Scope, regulatory framework, and notes..."
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             ></textarea>
           </div>
           <div>
@@ -598,7 +598,7 @@
             <select
               id="wizard-status"
               bind:value={status}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Draft">Draft</option>
               <option value="Active">Active</option>
@@ -616,7 +616,7 @@
             <select
               id="wizard-jurisdiction"
               bind:value={country}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
             >
               {#if options.countries.length}
                 {#each options.countries as c (c)}
@@ -680,7 +680,7 @@
                 step="any"
                 bind:value={projectSizeSqm}
                 placeholder="5000"
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
               />
             </div>
             <div>
@@ -697,7 +697,7 @@
                 step="1"
                 bind:value={buildingsCount}
                 placeholder="1"
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
               />
             </div>
             <div>
@@ -714,7 +714,7 @@
                 step="1"
                 bind:value={floorsCount}
                 placeholder="2"
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
               />
             </div>
           </div>
@@ -801,7 +801,7 @@
                       const select = event.currentTarget;
                       if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
                     }}
-                    class="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-caption text-slate-50 focus:border-accent focus:outline-none"
+                    class="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-caption text-slate-50 focus:border-accent focus:outline-hidden"
                   >
                     {#each IFC_FILE_ROLES as roleOption (roleOption)}
                       <option value={roleOption}>{roleOption}</option>
@@ -836,7 +836,7 @@
             <select
               id="wizard-type"
               bind:value={analysisType}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
               <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
@@ -867,7 +867,7 @@
               <select
                 id="wizard-building-code"
                 bind:value={buildingCode}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 <option value="">Not specified</option>
                 {#each buildingCodesForJurisdiction as code (code.id)}
@@ -915,7 +915,7 @@
             <select
               id="wizard-classification-standard"
               bind:value={classificationStandard}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="">Not set</option>
               {#each classificationStandards as std (std.uri)}
@@ -1136,7 +1136,7 @@
             errorMessage = "";
             currentStep += 1;
           }}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover"
         >
           <span>Next Step</span>
           <ArrowRight class="h-3.5 w-3.5" />
@@ -1146,7 +1146,7 @@
           type="button"
           disabled={isSubmitting}
           onclick={handleFinish}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-xs shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
         >
           <span>{isSubmitting ? "Creating & launching..." : "Create & Launch Audit"}</span>
           <Check class="h-3.5 w-3.5" />

@@ -39,6 +39,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { DropdownMenu as Menu } from "bits-ui";
+  import { cn } from "../utils/cn";
 
   type Align = "start" | "center" | "end";
   type Side = "top" | "bottom" | "left" | "right";
@@ -81,7 +82,11 @@
       {align}
       {side}
       {sideOffset}
-      class="{width} z-40 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 {contentClass}"
+      class={cn(
+        "z-40 space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-1.5 text-xs shadow-xl outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+        width,
+        contentClass,
+      )}
     >
       {@render children?.()}
     </Menu.Content>

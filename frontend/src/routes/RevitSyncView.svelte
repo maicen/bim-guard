@@ -276,7 +276,7 @@ print(response.read())
           type="button"
           disabled={isSendingTest}
           onclick={runSimulation}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <Send class="h-3.5 w-3.5" />
           <span>{isSendingTest ? "Auditing Payload..." : "Simulate Push"}</span>
@@ -349,14 +349,14 @@ print(response.read())
             type="text"
             bind:value={table.search}
             placeholder="Search rules by reference, target, property..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
         <div class="flex w-full items-center gap-2 sm:w-auto">
           <select
             bind:value={table.filters.status}
-            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Verdicts</option>
             <option value="PASS">PASS Only</option>

@@ -51,7 +51,7 @@
       type="text"
       bind:value={query}
       placeholder="Filter sections by number or title…"
-      class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+      class="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
     />
   </label>
 {/if}

@@ -122,7 +122,7 @@
             id="model-file-name"
             type="text"
             bind:value={fileName}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
         <div class="space-y-1.5">
@@ -130,7 +130,7 @@
           <select
             id="model-role"
             bind:value={role}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             {#each IFC_FILE_ROLES as r (r)}
               <option value={r}>{r}</option>
@@ -188,7 +188,7 @@
               id="model-project-code"
               type="text"
               bind:value={projectCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -199,7 +199,7 @@
               id="model-originator"
               type="text"
               bind:value={originator}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -210,7 +210,7 @@
               id="model-volume"
               type="text"
               bind:value={volumeSystem}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -221,7 +221,7 @@
               id="model-level"
               type="text"
               bind:value={level}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -232,7 +232,7 @@
               id="model-type"
               type="text"
               bind:value={type}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -243,7 +243,7 @@
               id="model-number"
               type="text"
               bind:value={number}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -254,7 +254,7 @@
               id="model-suitability"
               type="text"
               bind:value={suitabilityCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
@@ -265,7 +265,7 @@
               id="model-revision"
               type="text"
               bind:value={revisionCode}
-              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -286,7 +286,7 @@
       type="button"
       onclick={handleSave}
       disabled={isSaving || !projectId || file?.id == null}
-      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       {isSaving ? "Saving…" : "Save Changes"}
     </button>

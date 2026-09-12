@@ -98,7 +98,7 @@
       <select
         id="bulk-bcf-status"
         bind:value={topicStatus}
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
       >
         <option value="no_change">-- Keep Current Status --</option>
         <option value="Open">Open</option>
@@ -116,7 +116,7 @@
       <select
         id="bulk-bcf-priority"
         bind:value={priority}
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
       >
         <option value="no_change">-- Keep Current Priority --</option>
         <option value="Critical">Critical</option>
@@ -135,7 +135,7 @@
     <select
       id="bulk-bcf-cde"
       bind:value={cdeState}
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
     >
       <option value="no_change">-- Keep Current CDE State --</option>
       {#each CDE_STATE_CHOICES as state (state)}
@@ -156,7 +156,7 @@
       type="button"
       disabled={isSaving || !hasChanges}
       onclick={handleSave}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isSaving ? "Applying Changes..." : `Update ${selectedTopicGuids.length} Topics`}</span>
     </button>

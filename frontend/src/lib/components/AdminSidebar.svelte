@@ -87,7 +87,7 @@
 <!-- Scrim: only below md, and only while mobile drawer is open -->
 {#if mobileOpen}
   <div
-    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
     onclick={onCloseMobile}
     aria-hidden="true"
   ></div>
@@ -106,7 +106,7 @@
     {#if !collapsed}
       <div class="flex items-center gap-2.5 overflow-hidden">
         <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-sm font-bold text-white shadow-md shadow-violet-500/20"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-violet-600 to-indigo-500 text-sm font-bold text-white shadow-md shadow-violet-500/20"
         >
           <Shield class="h-4 w-4" />
         </div>
@@ -121,7 +121,7 @@
       </div>
     {:else}
       <div
-        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-sm font-bold text-white shadow-md shadow-violet-500/20"
+        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr from-violet-600 to-indigo-500 text-sm font-bold text-white shadow-md shadow-violet-500/20"
         title="Admin Portal"
       >
         <Shield class="h-4 w-4" />
@@ -198,7 +198,7 @@
         {/if}
 
         {#if collapsed && isActive}
-          <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
+          <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
         {/if}
       </button>
     {/each}

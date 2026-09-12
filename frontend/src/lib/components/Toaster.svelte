@@ -24,7 +24,7 @@
   register it before the first message arrives.
 -->
 <div
-  class="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2"
+  class="pointer-events-none fixed bottom-4 right-4 z-100 flex w-full max-w-sm flex-col gap-2"
   role="region"
   aria-label="Notifications"
 >
@@ -43,7 +43,7 @@
         {#if toast.title}
           <p class="text-xs font-bold tracking-tight">{toast.title}</p>
         {/if}
-        <p class="break-words text-xs leading-relaxed">{toast.message}</p>
+        <p class="wrap-break-word text-xs leading-relaxed">{toast.message}</p>
       </div>
       <button
         type="button"

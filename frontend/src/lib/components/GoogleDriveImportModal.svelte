@@ -62,7 +62,7 @@
       bind:value={urlsText}
       rows="5"
       placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
-      class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-accent focus:outline-none"
+      class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-accent focus:outline-hidden"
     ></textarea>
   </div>
 
@@ -71,7 +71,7 @@
     <select
       id="drive-doc-type"
       bind:value={docType}
-      class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-accent focus:outline-none"
+      class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-accent focus:outline-hidden"
     >
       {#each DOCUMENT_TYPES as type (type)}
         <option value={type}>{type}</option>

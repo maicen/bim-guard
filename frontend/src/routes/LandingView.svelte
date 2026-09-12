@@ -37,7 +37,7 @@
   <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
     <div class="flex items-center gap-2.5">
       <div
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
       >
         BG
       </div>

@@ -118,7 +118,7 @@
             <select
               id="bulk-proj-status"
               bind:value={status}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="no_change">-- Keep Current Status --</option>
               <option value="Active">Active</option>
@@ -135,7 +135,7 @@
             <select
               id="bulk-proj-country"
               bind:value={country}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="no_change">-- Keep Current Jurisdiction --</option>
               <option value="Canada">Canada (NBC)</option>
@@ -154,7 +154,7 @@
           <select
             id="bulk-proj-domain"
             bind:value={analysisType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Domain --</option>
             <option value="Arch">Arch</option>
@@ -171,7 +171,7 @@
           <select
             id="bulk-proj-type"
             bind:value={projectType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="no_change">-- Keep Current Project Type --</option>
             {#each PROJECT_TYPES as type (type)}
@@ -196,7 +196,7 @@
           type="button"
           disabled={isSaving || !hasChanges}
           onclick={handleSave}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
         >
           <Check class="h-3.5 w-3.5" />
           <span>{isSaving ? "Applying Changes..." : "Apply Bulk Update"}</span>

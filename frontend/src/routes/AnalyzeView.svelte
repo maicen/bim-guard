@@ -649,14 +649,14 @@
         <span
           class="inline-flex items-center rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold {activeCategory ===
           'seismic'
-            ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-sm'
-            : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-sm'}"
+            ? 'border-purple-800/80 bg-purple-950/60 text-purple-300 shadow-xs'
+            : 'border-amber-800/80 bg-amber-950/60 text-amber-300 shadow-xs'}"
         >
           Category: {formatAnalysisDomain(activeCategory)}
         </span>
         {#if result?.cached}
           <span
-            class="inline-flex items-center gap-1 rounded-md border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-sm"
+            class="inline-flex items-center gap-1 rounded-md border border-blue-800/80 bg-blue-950/80 px-2.5 py-0.5 text-caption font-semibold text-blue-300 shadow-xs"
           >
             <Sparkles class="h-3 w-3 text-blue-400" />
             Cached SHA-256
@@ -996,7 +996,7 @@
       <!-- Data Quality Doctrine Notice -->
       {#if dataQualityCount > 0}
         <div
-          class="flex items-start gap-3 rounded-2xl border border-blue-800/70 bg-blue-950/40 p-4 text-xs text-blue-200 shadow-sm"
+          class="flex items-start gap-3 rounded-2xl border border-blue-800/70 bg-blue-950/40 p-4 text-xs text-blue-200 shadow-xs"
         >
           <Info class="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
           <div>
@@ -1012,7 +1012,7 @@
 
       <!-- Executive KPI Statistics Grid -->
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-slate-400">
             Total Findings
           </div>
@@ -1021,7 +1021,7 @@
           </div>
           <div class="mt-0.5 text-micro text-slate-500">Non-compliant items</div>
         </div>
-        <div class="rounded-2xl border border-red-900/40 bg-red-950/30 p-4 shadow-sm">
+        <div class="rounded-2xl border border-red-900/40 bg-red-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-red-300">
             Critical
           </div>
@@ -1030,7 +1030,7 @@
           </div>
           <div class="mt-0.5 text-micro text-red-400/60">Immediate intervention</div>
         </div>
-        <div class="rounded-2xl border border-orange-900/40 bg-orange-950/30 p-4 shadow-sm">
+        <div class="rounded-2xl border border-orange-900/40 bg-orange-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-orange-300">
             High Risk
           </div>
@@ -1039,7 +1039,7 @@
           </div>
           <div class="mt-0.5 text-micro text-orange-400/60">Mandatory remediation</div>
         </div>
-        <div class="rounded-2xl border border-yellow-900/40 bg-yellow-950/30 p-4 shadow-sm">
+        <div class="rounded-2xl border border-yellow-900/40 bg-yellow-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-yellow-300">
             Medium Risk
           </div>
@@ -1048,7 +1048,7 @@
           </div>
           <div class="mt-0.5 text-micro text-yellow-400/60">Recommended mitigation</div>
         </div>
-        <div class="rounded-2xl border border-emerald-900/40 bg-emerald-950/30 p-4 shadow-sm">
+        <div class="rounded-2xl border border-emerald-900/40 bg-emerald-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-emerald-300">
             Low Risk
           </div>
@@ -1057,7 +1057,7 @@
           </div>
           <div class="mt-0.5 text-micro text-emerald-400/60">Minor tolerance variance</div>
         </div>
-        <div class="rounded-2xl border border-indigo-900/40 bg-indigo-950/30 p-4 shadow-sm">
+        <div class="rounded-2xl border border-indigo-900/40 bg-indigo-950/30 p-4 shadow-xs">
           <div class="text-caption font-semibold uppercase tracking-wider text-indigo-300">
             Data Quality
           </div>
@@ -1114,7 +1114,7 @@
                   bcfExportFilters.bands,
                   bcfExportFilters.includeDataQuality,
                 )}
-                class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-accent-hover"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:scale-[1.02] hover:bg-accent-hover"
                 title="Download standard OpenBIM BCF 2.1 archive for Revit, Solibri, and Navisworks"
               >
                 <Download class="h-3.5 w-3.5" />
@@ -1169,7 +1169,7 @@
                 reloadAfterFilterChange();
               }}
               placeholder="Search findings by rule, GUID, title, or citation (e.g. NASA-STD, EN 1998)…"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 
@@ -1181,7 +1181,7 @@
                 severityFilter = (e.currentTarget as HTMLSelectElement).value;
                 reloadAfterFilterChange();
               }}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="all">All Severities</option>
               <option value="critical">Critical</option>
@@ -1200,7 +1200,7 @@
                 mechanismFilter = (e.currentTarget as HTMLSelectElement).value;
                 reloadAfterFilterChange();
               }}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="all">All Mechanisms</option>
               {#if selectedSlug === "corrosion"}
@@ -1349,25 +1349,25 @@
                           </span>
                         {:else if issue.band === "critical"}
                           <span
-                            class="inline-block rounded-md border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-sm"
+                            class="inline-block rounded-md border border-red-800/80 bg-red-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-red-400 shadow-xs"
                           >
                             Critical
                           </span>
                         {:else if issue.band === "high"}
                           <span
-                            class="inline-block rounded-md border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-sm"
+                            class="inline-block rounded-md border border-orange-800/80 bg-orange-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-orange-400 shadow-xs"
                           >
                             High
                           </span>
                         {:else if issue.band === "medium"}
                           <span
-                            class="inline-block rounded-md border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-sm"
+                            class="inline-block rounded-md border border-yellow-800/80 bg-yellow-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-yellow-400 shadow-xs"
                           >
                             Medium
                           </span>
                         {:else}
                           <span
-                            class="inline-block rounded-md border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-sm"
+                            class="inline-block rounded-md border border-emerald-800/80 bg-emerald-950/80 px-2.5 py-0.5 text-micro font-semibold uppercase text-emerald-400 shadow-xs"
                           >
                             Low
                           </span>
@@ -1751,7 +1751,7 @@
 <!-- IFC Upload Modal -->
 {#if isUploadModalOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm duration-200 animate-in fade-in"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs duration-200 animate-in fade-in"
   >
     <div
       class="w-full max-w-md space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"

@@ -270,7 +270,7 @@
           bind:value={newCommentText}
           placeholder="Post a coordination reply or update..."
           onkeydown={(e) => e.key === "Enter" && handleAddComment()}
-          class="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+          class="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
         />
         <button
           type="button"

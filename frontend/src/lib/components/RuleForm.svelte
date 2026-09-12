@@ -224,7 +224,7 @@
           type="text"
           bind:value={formRuleId}
           placeholder="e.g. CODE-9.9.4.2"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
       <div>
@@ -236,7 +236,7 @@
         <select
           id="rule-sev-top"
           bind:value={formSeverity}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="mandatory">Mandatory</option>
           <option value="recommended">Recommended</option>
@@ -260,7 +260,7 @@
           type="text"
           bind:value={formRuleId}
           placeholder="e.g. CODE-9.9.4.2"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
       <div>
@@ -272,7 +272,7 @@
         <select
           id="rule-domain-category"
           bind:value={formDomainCategory}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="Arch">Arch</option>
           <option value="Piping">Piping</option>
@@ -288,7 +288,7 @@
         <select
           id="rule-mechanism"
           bind:value={formMechanism}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="CODE">CODE</option>
           <option value="GC-001">GC-001</option>
@@ -335,7 +335,7 @@
       id="rule-desc"
       bind:value={formDescription}
       rows="2"
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
     ></textarea>
   </div>
 
@@ -351,7 +351,7 @@
           id="rule-pset"
           type="text"
           bind:value={formPropertySet}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
     {/if}
@@ -366,7 +366,7 @@
           id="rule-pname-{formInstanceId}"
           bind:value={formPropertyName}
           onchange={applyPropertySuggestion}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="" disabled>Choose a property…</option>
           {#each propertySuggestions as prop (prop.name)}
@@ -395,7 +395,7 @@
           type="text"
           bind:value={formUnit}
           placeholder="e.g. mm, min, m²"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
     {/if}
@@ -411,7 +411,7 @@
       <select
         id="rule-op"
         bind:value={formOperator}
-        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
       >
         <option value="==">== (Exact match)</option>
         <option value="!=">!= (Not equal)</option>
@@ -441,12 +441,12 @@
             type="text"
             bind:value={formCheckValue}
             placeholder="e.g. 2.03"
-            class="min-w-0 flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="min-w-0 flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           />
           <select
             bind:value={formValueInputUnit}
             aria-label="Value unit"
-            class="shrink-0 rounded-xl border border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="shrink-0 rounded-xl border border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             <option value="mm">mm</option>
             <option value="cm">cm</option>
@@ -465,7 +465,7 @@
           type="text"
           bind:value={formCheckValue}
           placeholder="Literal value or threshold"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       {/if}
     </div>
@@ -492,7 +492,7 @@
             type="text"
             bind:value={formCompareProperty}
             placeholder="e.g. Cod_Object"
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
         <div>
@@ -506,7 +506,7 @@
             type="text"
             bind:value={formNamePattern}
             placeholder="e.g. ([A-Z]+)_.*_(\d+)$"
-            class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>
@@ -530,7 +530,7 @@
         <select
           id="rule-unique-scope"
           bind:value={formUniquenessScope}
-          class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="building">building (entire model)</option>
           <option value="storey">storey (same floor)</option>
@@ -565,13 +565,13 @@
               type="text"
               bind:value={formValueMinProperty}
               placeholder="e.g. TreadWidth"
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
             <input
               type="number"
               bind:value={formValueMinOffset}
               placeholder="Offset (0)"
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -585,13 +585,13 @@
               type="text"
               bind:value={formValueMaxProperty}
               placeholder="e.g. TreadWidth"
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
             <input
               type="number"
               bind:value={formValueMaxOffset}
               placeholder="Offset (+25)"
-              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -608,7 +608,7 @@
         <select
           id="rule-sev"
           bind:value={formSeverity}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         >
           <option value="mandatory">Mandatory</option>
           <option value="recommended">Recommended</option>
@@ -628,7 +628,7 @@
           id="rule-ruleset"
           type="text"
           bind:value={formRulesetId}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
     </div>

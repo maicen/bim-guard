@@ -488,7 +488,7 @@
         <select
           bind:value={selectedFolder}
           disabled={isFoldersLoading}
-          class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-none disabled:opacity-60"
+          class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800/60 py-1.5 pl-3 pr-8 text-xs font-medium text-slate-50 focus:border-accent focus:outline-hidden disabled:opacity-60"
         >
           <option value="">{isFoldersLoading ? "Loading folders…" : "All Rules"}</option>
           {#each ruleFolders as folder (folder)}
@@ -518,7 +518,7 @@
        instead of requiring a trip back to the top of the page. -->
   <div
     class="flex flex-wrap items-center justify-center gap-2.5 {result
-      ? 'sticky top-16 z-20 -mx-4 bg-slate-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8'
+      ? 'sticky top-16 z-20 -mx-4 bg-slate-950/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 md:-mx-8 md:px-8'
       : ''}"
   >
     {#if result && selectedProjectId}
@@ -549,7 +549,7 @@
       type="button"
       disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
       onclick={handleRunClick}
-      class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
     >
       <Play class="h-4 w-4" />
       {isRunning

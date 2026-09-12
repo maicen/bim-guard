@@ -54,7 +54,7 @@
     aria-labelledby={titleId}
     aria-describedby={bodyId}
     tabindex="-1"
-    class="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 px-4 backdrop-blur-xs"
     onclick={(e) => e.target === e.currentTarget && handleCancel()}
     {@attach dialog(handleCancel)}
   >

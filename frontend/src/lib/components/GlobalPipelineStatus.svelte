@@ -20,7 +20,7 @@
         title={`${run.projectName} — analysis running`}
       >
         <Activity class="h-3 w-3 animate-pulse" />
-        <span class="max-w-[9rem] truncate">{run.projectName}</span>
+        <span class="max-w-36 truncate">{run.projectName}</span>
         <span class="font-mono text-micro text-blue-400">{avgPipelineProgress(run.status)}%</span>
       </button>
     {/each}

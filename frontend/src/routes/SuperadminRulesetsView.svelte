@@ -376,7 +376,7 @@
           <select
             bind:value={selectedOrgFilter}
             aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+            class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
           >
             {#if isSuperadmin}
               <option value="all">All Organizations ({orgs.length})</option>
@@ -394,7 +394,7 @@
         <select
           bind:value={categoryFilter}
           aria-label="Filter by Category"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
         >
           <option value="all">All Categories</option>
           {#each categories as cat}
@@ -409,7 +409,7 @@
         <select
           bind:value={grantStatusFilter}
           aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2 pl-3 pr-8 text-xs font-medium text-slate-300 focus:border-violet-500 focus:outline-hidden"
         >
           <option value="all">All Statuses</option>
           <option value="granted">Granted Only</option>
@@ -461,7 +461,7 @@
                 {sortField}
                 {sortAsc}
                 onSort={() => handleSort("name")}
-                customClass="min-w-[14rem] px-4 py-3"
+                customClass="min-w-56 px-4 py-3"
               >
                 Ruleset Name
               </SortHeader>
@@ -472,7 +472,7 @@
                 {sortField}
                 {sortAsc}
                 onSort={() => handleSort("id")}
-                customClass="min-w-[12rem] px-4 py-3"
+                customClass="min-w-48 px-4 py-3"
               >
                 Ruleset ID
               </SortHeader>
@@ -483,7 +483,7 @@
                 {sortField}
                 {sortAsc}
                 onSort={() => handleSort("category")}
-                customClass="min-w-[9rem] px-4 py-3"
+                customClass="min-w-36 px-4 py-3"
               >
                 Category
               </SortHeader>
@@ -494,7 +494,7 @@
                 {sortField}
                 {sortAsc}
                 onSort={() => handleSort("count")}
-                customClass="min-w-[7rem] px-4 py-3 text-center"
+                customClass="min-w-28 px-4 py-3 text-center"
                 align="center"
               >
                 Rules
@@ -503,7 +503,7 @@
               <!-- Organization Grant Columns (Superadmin Multi-Org View) -->
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
-                  <th class="min-w-[11rem] px-4 py-3 text-center">
+                  <th class="min-w-44 px-4 py-3 text-center">
                     <div class="truncate font-semibold text-slate-100" title={org.name}>
                       {org.name}
                     </div>
@@ -521,7 +521,7 @@
               {:else}
                 <!-- Single Org Access Status Column (Org Owner View or Single-Filtered Superadmin) -->
                 {@const targetOrg = displayOrgs[0] || orgs[0]}
-                <th class="min-w-[12rem] px-4 py-3 text-center">
+                <th class="min-w-48 px-4 py-3 text-center">
                   <div class="font-semibold text-slate-100">
                     {targetOrg?.name || "Organization"} Access
                   </div>
@@ -710,7 +710,7 @@
         <select
           bind:value={bulkTargetOrgId}
           aria-label="Target Organization for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-none"
+          class="cursor-pointer appearance-none rounded-lg border border-slate-700 bg-slate-900 py-1 pl-2.5 pr-6 text-xs text-slate-200 focus:outline-hidden"
         >
           <option value="all">All Organizations</option>
           {#each orgs as org (org.id)}
@@ -720,14 +720,14 @@
         <button
           type="button"
           onclick={handleBulkGrant}
-          class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-emerald-500"
+          class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500"
         >
           Grant Access
         </button>
         <button
           type="button"
           onclick={handleBulkRevoke}
-          class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-rose-500"
+          class="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-500"
         >
           Revoke Access
         </button>

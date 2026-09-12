@@ -29,19 +29,31 @@ tool is not a product showcase:
 
 ## 1. Theme architecture (authoritative)
 
-**One palette, inverted.** `frontend/tailwind.config.js` maps the `slate` scale
-onto CSS custom properties, and `frontend/src/app.css` defines those properties
-twice — once for dark, once for light, with the ramp reversed:
+**Tailwind v4.** All theme tokens live in `frontend/src/app.css`'s `@theme` block —
+there is no `tailwind.config.js`. The build runs via `@tailwindcss/vite`.
+
+**One palette, inverted.** Each `@theme` color (e.g. `--color-slate-950`) resolves
+through a separate `-rgb` "channel" variable (`--slate-950-rgb`) that `app.css`
+redefines twice — once for dark, once for light, with the ramp reversed. The
+channel and the theme-color variable are deliberately named differently: a
+`@theme` variable name becomes a real, unlayered-cascade-winning CSS custom
+property the moment anything redefines it, so reusing the same name for the
+per-theme channel would silently replace the `rgb(...)` wrapper with a bare,
+invalid-as-a-color triplet.
 
 ```css
+@theme {
+  --color-slate-950: rgb(var(--slate-950-rgb));
+  --color-slate-50: rgb(var(--slate-50-rgb));
+}
 :root,
 html.dark {
-  --color-slate-950: 2 6 23;
-  --color-slate-50: 248 250 252;
+  --slate-950-rgb: 2 6 23;
+  --slate-50-rgb: 248 250 252;
 }
 html.light {
-  --color-slate-950: 248 250 252;
-  --color-slate-50: 2 6 23;
+  --slate-950-rgb: 248 250 252;
+  --slate-50-rgb: 2 6 23;
 }
 ```
 
@@ -224,6 +236,17 @@ The 3D viewport must not claim a fixed height taller than the viewport.
 4. Is it keyboard-reachable, with a visible focus ring and a label?
 5. If it is a table, does it meet §11 in full?
 6. Does it work at 375px wide?
+7. Is it interaction/focus/positioning-heavy (a menu, popover, select, combobox)? Build it on bits-ui rather than hand-rolling — see below.
+
+### bits-ui
+
+Interaction-heavy components (menus, popovers, selects) are built on
+[bits-ui](https://www.bits-ui.com/), not hand-rolled — see
+`.claude/skills/svelte-frontend/references/bits-ui.md` for the conventions
+(child-snippet delegation, `Portal`, data-attribute styling, controlled vs.
+uncontrolled state). The frontend runs **Tailwind v4** (`@tailwindcss/vite`;
+theme tokens live in `app.css`'s `@theme` block, not a JS config file), the
+same major version bits-ui's own docs and examples assume.
 
 ## 10. Decoupled Svelte SPA Component System
 
@@ -259,3 +282,6 @@ To maintain cohesive design patterns and avoid duplicate markup, all UI views mu
 - **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
 - **`<SeverityBadge.svelte>`**: Universal compact engineering badge (`rounded-md`) for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
 - **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).
+- **`<HoverCard.svelte>`**: Hover/focus-triggered rich preview popover (bits-ui `Popover`), used for supplementary detail without a click or modal.
+- **`<DropdownMenu.svelte>`**: Thin bits-ui `DropdownMenu` wrapper for triggered menus (Escape/outside-click dismissal, roving keyboard nav) — used by `IntegrationsMenu`, `ResourcesMenu`, `UserMenu`, and `RulesView`'s Import/Export menu.
+- **`<OrgSwitcher.svelte>`**: bits-ui `Select`-backed organization switcher in the header, syncing to `authState.activeOrganizationId`.

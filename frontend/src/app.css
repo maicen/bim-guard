@@ -1,6 +1,96 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /*
+    Each of these theme colors resolves through an `-rgb` "channel" variable
+    (e.g. `--slate-950-rgb: 2 6 23`) that gets *redefined* per theme below
+    (`:root, html.dark` vs `html.light`) — the same value, same name, wins in
+    both themes; only the channel numbers differ. Theme colors and channel
+    variables must NOT share a name: `@theme` variables become real custom
+    properties in the unlayered cascade the moment anything else redefines
+    them, so a same-named channel redefinition below would silently replace
+    the `rgb(...)` wrapper here with a bare, invalid-as-a-color triplet.
+  */
+  --color-accent: rgb(var(--accent-rgb));
+  --color-accent-hover: rgb(var(--accent-hover-rgb));
+
+  --color-slate-50: rgb(var(--slate-50-rgb));
+  --color-slate-100: rgb(var(--slate-100-rgb));
+  --color-slate-200: rgb(var(--slate-200-rgb));
+  --color-slate-300: rgb(var(--slate-300-rgb));
+  --color-slate-400: rgb(var(--slate-400-rgb));
+  --color-slate-500: rgb(var(--slate-500-rgb));
+  --color-slate-600: rgb(var(--slate-600-rgb));
+  --color-slate-700: rgb(var(--slate-700-rgb));
+  --color-slate-800: rgb(var(--slate-800-rgb));
+  --color-slate-900: rgb(var(--slate-900-rgb));
+  --color-slate-950: rgb(var(--slate-950-rgb));
+
+  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-display: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-nano: 0.5625rem;
+  --text-nano--line-height: 0.875rem;
+  --text-nano--letter-spacing: 0.01em;
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 0.9375rem;
+  --text-micro--letter-spacing: 0.005em;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--letter-spacing: 0;
+
+  --animate-fade-in: fade-in 200ms ease-out;
+  --animate-scale-up: scale-up 200ms ease-out;
+
+  --radius-sm: 5px;
+  --radius: 8px;
+  --radius-md: 8px;
+  --radius-lg: 11px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scale-up {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 :root,
 html.dark {
@@ -9,25 +99,25 @@ html.dark {
   color-scheme: dark;
 
   /* Dark Theme Palette (Default) */
-  --color-slate-950: 2 6 23;      /* #020617 - app background */
-  --color-slate-900: 15 23 42;    /* #0f172a - cards & surfaces */
-  --color-slate-800: 30 41 59;    /* #1e293b - borders & dividers */
-  --color-slate-700: 51 65 85;    /* #334155 - interactive borders & hover states */
-  --color-slate-600: 71 85 105;   /* #475569 - subtle muted elements */
-  --color-slate-500: 100 116 139; /* #64748b - labels & metadata */
-  --color-slate-400: 148 163 184; /* #94a3b8 - secondary text */
-  --color-slate-300: 203 213 225; /* #cbd5e1 - primary readable body */
-  --color-slate-200: 226 232 240; /* #e2e8f0 - bright text */
-  --color-slate-100: 241 245 249; /* #f1f5f9 - primary headline text */
-  --color-slate-50: 248 250 252;  /* #f8fafc - pure contrast text */
+  --slate-950-rgb: 2 6 23;      /* #020617 - app background */
+  --slate-900-rgb: 15 23 42;    /* #0f172a - cards & surfaces */
+  --slate-800-rgb: 30 41 59;    /* #1e293b - borders & dividers */
+  --slate-700-rgb: 51 65 85;    /* #334155 - interactive borders & hover states */
+  --slate-600-rgb: 71 85 105;   /* #475569 - subtle muted elements */
+  --slate-500-rgb: 100 116 139; /* #64748b - labels & metadata */
+  --slate-400-rgb: 148 163 184; /* #94a3b8 - secondary text */
+  --slate-300-rgb: 203 213 225; /* #cbd5e1 - primary readable body */
+  --slate-200-rgb: 226 232 240; /* #e2e8f0 - bright text */
+  --slate-100-rgb: 241 245 249; /* #f1f5f9 - primary headline text */
+  --slate-50-rgb: 248 250 252;  /* #f8fafc - pure contrast text */
 
   --bg-dark: #020617;
   --surface-dark-1: #090d16;
   --surface-dark-2: #0f172a;
   --surface-dark-3: #1e293b;
   --border-dark: #334155;
-  --color-accent: 0 113 227;        /* #0071e3 - the one chromatic accent */
-  --color-accent-hover: 0 119 237;  /* #0077ed */
+  --accent-rgb: 0 113 227;        /* #0071e3 - the one chromatic accent */
+  --accent-hover-rgb: 0 119 237;  /* #0077ed */
   --focus-ring: #0071e3;            /* resolved accent, for plain-CSS use */
 
   /* Retained for the handful of plain-CSS rules below that cannot use a
@@ -41,17 +131,17 @@ html:not(.dark) {
   color-scheme: light;
 
   /* Light Theme Palette - Apple / Modern SaaS Light Palette */
-  --color-slate-950: 248 250 252;  /* #f8fafc - app background (slate-50) */
-  --color-slate-900: 255 255 255;  /* #ffffff - cards & surfaces (crisp white) */
-  --color-slate-800: 226 232 240;  /* #e2e8f0 - borders & dividers (slate-200) */
-  --color-slate-700: 203 213 225;  /* #cbd5e1 - interactive borders & hover states (slate-300) */
-  --color-slate-600: 148 163 184;  /* #94a3b8 - subtle muted elements (slate-400) */
-  --color-slate-500: 100 116 139;  /* #64748b - labels & metadata (slate-500) */
-  --color-slate-400: 71 85 105;    /* #475569 - secondary text (slate-600) */
-  --color-slate-300: 51 65 85;     /* #334155 - primary readable body (slate-700) */
-  --color-slate-200: 30 41 59;     /* #1e293b - bold dark text (slate-800) */
-  --color-slate-100: 15 23 42;     /* #0f172a - primary headline text (slate-900) */
-  --color-slate-50: 2 6 23;        /* #020617 - ultra dark contrast (slate-950) */
+  --slate-950-rgb: 248 250 252;  /* #f8fafc - app background (slate-50) */
+  --slate-900-rgb: 255 255 255;  /* #ffffff - cards & surfaces (crisp white) */
+  --slate-800-rgb: 226 232 240;  /* #e2e8f0 - borders & dividers (slate-200) */
+  --slate-700-rgb: 203 213 225;  /* #cbd5e1 - interactive borders & hover states (slate-300) */
+  --slate-600-rgb: 148 163 184;  /* #94a3b8 - subtle muted elements (slate-400) */
+  --slate-500-rgb: 100 116 139;  /* #64748b - labels & metadata (slate-500) */
+  --slate-400-rgb: 71 85 105;    /* #475569 - secondary text (slate-600) */
+  --slate-300-rgb: 51 65 85;     /* #334155 - primary readable body (slate-700) */
+  --slate-200-rgb: 30 41 59;     /* #1e293b - bold dark text (slate-800) */
+  --slate-100-rgb: 15 23 42;     /* #0f172a - primary headline text (slate-900) */
+  --slate-50-rgb: 2 6 23;        /* #020617 - ultra dark contrast (slate-950) */
 
   --bg-dark: #f8fafc;
   --surface-dark-1: #f1f5f9;
@@ -59,8 +149,8 @@ html:not(.dark) {
   --surface-dark-3: #e2e8f0;
   --border-dark: #cbd5e1;
 
-  --color-accent: 0 102 204;        /* #0066cc - AA on white (DESIGN.md link blue) */
-  --color-accent-hover: 0 113 227;  /* #0071e3 */
+  --accent-rgb: 0 102 204;        /* #0066cc - AA on white (DESIGN.md link blue) */
+  --accent-hover-rgb: 0 113 227;  /* #0071e3 */
   --focus-ring: #0066cc;
   --bimguard-blue: #0066cc;
   --bimguard-blue-hover: #0071e3;
@@ -378,8 +468,8 @@ html.light textarea:focus,
 html:not(.dark) input:focus,
 html:not(.dark) select:focus,
 html:not(.dark) textarea:focus {
-  border-color: rgb(var(--color-accent)) !important;
-  box-shadow: 0 0 0 2px rgb(var(--color-accent) / 0.15) !important;
+  border-color: rgb(var(--accent-rgb)) !important;
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.15) !important;
 }
 
 /* Light mode dialogs / modals */

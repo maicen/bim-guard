@@ -164,7 +164,7 @@
           id="naming-project-code"
           bind:value={config.project_code}
           placeholder="A1234"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
       <div>
@@ -175,7 +175,7 @@
           id="naming-originator"
           bind:value={config.originator_code}
           placeholder="BIM01"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         />
       </div>
       <div>
@@ -185,7 +185,7 @@
         <select
           id="naming-type"
           bind:value={config.type_code}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         >
           {#each [...(catalog?.codes?.types ?? []), ...(config.type_codes ?? [])] as t (t)}
             <option value={t.code}>{t.code} — {t.label}</option>
@@ -202,7 +202,7 @@
         <select
           id="naming-suitability"
           bind:value={config.suitability}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         >
           {#each selectableStatuses as s (s)}
             <option value={s.code}>{s.code} — {s.label}</option>
@@ -217,7 +217,7 @@
           id="naming-revision"
           bind:value={config.revision}
           placeholder="01"
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         />
         <p class="mt-1 text-micro text-slate-500">P01 preliminary · C01 contract</p>
       </div>
@@ -231,7 +231,7 @@
         <select
           id="naming-date-format"
           bind:value={config.date_format}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         >
           {#each catalog?.date_formats ?? ["YYMMDD"] as f (f)}
             <option value={f}>{f}</option>
@@ -245,7 +245,7 @@
         <select
           id="naming-separator"
           bind:value={config.separator}
-          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+          class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
         >
           {#each catalog?.separators ?? ["_"] as sep (sep)}
             <option value={sep}>{sep}</option>
@@ -266,7 +266,7 @@
             id="naming-class-a"
             bind:value={config.class_a}
             placeholder="Ss_25"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
         <div>
@@ -277,7 +277,7 @@
             id="naming-class-b"
             bind:value={config.class_b}
             placeholder="Pr_20"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>
@@ -349,7 +349,7 @@
             id="naming-custom-code"
             bind:value={customCode}
             placeholder="DR"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
         <div class="flex-1">
@@ -363,7 +363,7 @@
             id="naming-custom-label"
             bind:value={customLabel}
             placeholder="Drawing"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-50 focus:border-accent focus:outline-hidden"
           />
         </div>
         <button

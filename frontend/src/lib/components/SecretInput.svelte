@@ -33,7 +33,7 @@
     {required}
     bind:value
     {placeholder}
-    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 pr-9 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none {className}"
+    class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 pr-9 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden {className}"
   />
   <button
     type="button"

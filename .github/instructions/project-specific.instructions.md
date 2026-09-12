@@ -87,7 +87,8 @@ The frontend signs in via Google OAuth only (`frontend/src/lib/auth.svelte.ts`).
 2. **TypeScript & Type Safety**: Always use `<script lang="ts">`. All API responses and model data must be typed via `src/lib/types.ts`.
 3. **API Client Integration**: Make all backend calls through `src/lib/api.ts`. Never write ad hoc `fetch()` calls in individual components.
 4. **Real-Time Updates via SSE**: Connect to `/api/events/{project_id}` using `subscribeToEvents()` from `src/lib/sse.ts` to stream analysis progress without polling.
-5. **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.
+5. **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`. Frontend is Tailwind v4 (`@tailwindcss/vite`, tokens in `frontend/src/app.css`'s `@theme` block — no `tailwind.config.js`).
+5a. **bits-ui**: Reach for bits-ui primitives (`Popover`, `DropdownMenu`, `Select`, …) for interaction/focus/positioning-heavy components rather than hand-rolling; see `.claude/skills/svelte-frontend/references/bits-ui.md`.
 6. **3D Viewport**: Reuse or extend `src/lib/components/IfcViewer.svelte` for IFC 3D visualization and BCF camera viewpoints.
 7. **Views & Routing**: All UI views (projects, dashboards, analysis, rule editors) live in `frontend/src/routes/` or `frontend/src/lib/components/`.
 8. **Universal Data Table UX Standards**: Every data table in the repository (Projects, Documents, Reports & BCF Topics/Artifacts, Rules Catalog, Extracted Rules, Audit Findings/Issues, Revit Sync, etc.) MUST provide rich, interactive, user-friendly features:
@@ -109,6 +110,9 @@ The frontend signs in via Google OAuth only (`frontend/src/lib/auth.svelte.ts`).
    - `<LoadingState>`: Spinner loading container with configurable messages.
    - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
    - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
+   - `<HoverCard>`: Hover/focus-triggered rich preview popover (bits-ui `Popover`).
+   - `<DropdownMenu>`: Thin bits-ui `DropdownMenu` wrapper for triggered menus.
+   - `<OrgSwitcher>`: bits-ui `Select`-backed organization switcher in the header.
 
 ---
 

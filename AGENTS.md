@@ -94,6 +94,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
   - **Search & Multi-Criteria Filtering**: Real-time client/server multi-attribute search and dropdown filters with zero-state reset actions.
   - **Column Sorting**: Interactive column headers with ascending/descending direction indicators.
   - **Empty States & Accessibility**: High-polish zero-state placeholders with actionable reset buttons, loading skeletons/spinners, responsive horizontal scroll, and keyboard accessibility.
+- **bits-ui**: Reach for bits-ui primitives (`Popover`, `DropdownMenu`, `Select`, …) for interaction/focus/positioning-heavy components rather than hand-rolling; see `.claude/skills/svelte-frontend/references/bits-ui.md`. Frontend is Tailwind v4 (`@tailwindcss/vite`, tokens in `frontend/src/app.css`'s `@theme` block — no `tailwind.config.js`).
 - **Reusable Frontend Component Architecture**: Always utilize shared UI building blocks from `frontend/src/lib/components/` instead of duplicating ad-hoc markup:
   - `<PageHeader>`: Top view header with category breadcrumbs, icon, title, subtitle, and action slots.
   - `<Modal>`: Standard modal dialog with backdrop blur, keyboard `Escape` handler, header with icon, and slot-based layout.
@@ -105,6 +106,9 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
   - `<LoadingState>`: Spinner loading container with configurable messages.
   - `<SeverityBadge>`: Unified pill badge for severity levels and verdicts.
   - `<IsoGovernanceBadges>`: Standard ISO 19650 metadata tags (Suitability, Revision, CDE State).
+  - `<HoverCard>`: Hover/focus-triggered rich preview popover (bits-ui `Popover`).
+  - `<DropdownMenu>`: Thin bits-ui `DropdownMenu` wrapper for triggered menus.
+  - `<OrgSwitcher>`: bits-ui `Select`-backed organization switcher in the header.
 
 ## Documentation map
 

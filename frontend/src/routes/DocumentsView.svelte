@@ -441,7 +441,7 @@
         <button
           type="button"
           onclick={() => openUploadModal()}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
         >
           <Upload class="h-3.5 w-3.5" />
           <span>Upload Specification</span>
@@ -488,7 +488,7 @@
           <select
             bind:value={table.filters.docType}
             aria-label="Filter by document type"
-            class="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-xs text-slate-300 focus:border-accent focus:outline-none"
+            class="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-xs text-slate-300 focus:border-accent focus:outline-hidden"
           >
             <option value="ALL">All Types</option>
             {#each DOCUMENT_TYPES as type (type)}
@@ -719,7 +719,7 @@
             <select
               id="upload-doc-type"
               bind:value={uploadDocType}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               {#each DOCUMENT_TYPES as type (type)}
                 <option value={type}>{type}</option>
@@ -738,7 +738,7 @@
               <select
                 id="upload-parser"
                 bind:value={uploadParser}
-                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 <option value="auto">Auto (configured engine, falls back to local)</option>
                 <option value="unstructured" disabled={parsingEngines.length === 0}
@@ -815,7 +815,7 @@
                         type="text"
                         inputmode="numeric"
                         bind:value={uploadStartPage}
-                        class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                        class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
                       />
                     </label>
                     <span class="mt-4 text-slate-600">–</span>
@@ -825,7 +825,7 @@
                         type="text"
                         inputmode="numeric"
                         bind:value={uploadEndPage}
-                        class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                        class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
                       />
                     </label>
                   </div>
@@ -844,7 +844,7 @@
                 <select
                   id="upload-instance"
                   bind:value={uploadInstance}
-                  class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                  class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
                 >
                   <option value="">Default</option>
                   {#each parsingEngines as engine (engine.id)}
@@ -977,7 +977,7 @@
             type="text"
             bind:value={editFilename}
             placeholder="e.g. BuildingCode_Part9_Specifications.pdf"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -988,7 +988,7 @@
           <select
             id="edit-doc-type"
             bind:value={editDocType}
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
           >
             {#each DOCUMENT_TYPES as type (type)}
               <option value={type}>{type}</option>
@@ -1012,7 +1012,7 @@
           type="button"
           disabled={isSavingEdit || !editFilename.trim()}
           onclick={handleSaveEdit}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
         >
           <span>{isSavingEdit ? "Saving..." : "Save Changes"}</span>
         </button>

@@ -143,7 +143,7 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none {dragging
+      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>
@@ -210,7 +210,7 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none {dragging
+      class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>
@@ -226,7 +226,7 @@
       aria-label="Resize {title} panel"
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
-      class="group relative h-1 w-full shrink-0 cursor-row-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none {dragging
+      class="group relative h-1 w-full shrink-0 cursor-row-resize touch-none select-none bg-slate-800/60 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
         ? 'bg-accent'
         : ''}"
     ></div>

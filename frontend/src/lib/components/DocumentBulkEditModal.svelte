@@ -84,7 +84,7 @@
     <select
       id="bulk-doc-type"
       bind:value={docType}
-      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
     >
       <option value="no_change">-- Keep Current Type --</option>
       {#each DOCUMENT_TYPES as type (type)}
@@ -105,7 +105,7 @@
       type="button"
       disabled={isSaving || !hasChanges}
       onclick={handleSave}
-      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50"
     >
       <span>{isSaving ? "Applying Changes..." : `Update ${selectedDocIds.length} Documents`}</span>
     </button>

@@ -82,7 +82,7 @@
         required
         bind:value={name}
         placeholder="local, hosted-1, hosted-2..."
-        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
       />
     </div>
     <div>
@@ -92,7 +92,7 @@
       <select
         id="provider-instance-kind"
         bind:value={kind}
-        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+        class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
       >
         {#each kinds as kindOption (kindOption.kind)}
           <option value={kindOption.kind}>{kindOption.display_name}</option>
@@ -114,7 +114,7 @@
       required={urlRequired}
       bind:value={url}
       placeholder={selectedKindInfo?.url_placeholder || "https://..."}
-      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
     />
   </div>
 
@@ -141,7 +141,7 @@
       type="text"
       bind:value={notes}
       placeholder="e.g. EU region hosted account"
-      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+      class="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
     />
   </div>
 

@@ -30,6 +30,7 @@
   import type { Snippet } from "svelte";
   import type { ComponentType } from "svelte";
   import { Popover } from "bits-ui";
+  import { cn } from "../utils/cn";
 
   type Side = "top" | "bottom" | "left" | "right";
   type Align = "start" | "center" | "end";
@@ -170,7 +171,7 @@
 </script>
 
 {#if disabled}
-  <span class="inline-flex text-left {triggerClass}" role="presentation">
+  <span class={cn("inline-flex text-left", triggerClass)} role="presentation">
     {@render trigger?.()}
   </span>
 {:else}
@@ -186,11 +187,11 @@
     >
       {#snippet child({ props })}
         {#if focusable}
-          <button type="button" {...props} class="inline-flex text-left {triggerClass}">
+          <button type="button" {...props} class={cn("inline-flex text-left", triggerClass)}>
             {@render trigger?.()}
           </button>
         {:else}
-          <span {...props} class="inline-flex text-left {triggerClass}" role="presentation">
+          <span {...props} class={cn("inline-flex text-left", triggerClass)} role="presentation">
             {@render trigger?.()}
           </span>
         {/if}
@@ -204,7 +205,11 @@
         {sideOffset}
         onmouseenter={cancelClose}
         onmouseleave={scheduleClose}
-        class="z-[60] {width} max-w-[calc(100vw-1rem)] rounded-xl border border-slate-800 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur-md outline-none origin-(--bits-popover-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 {contentClass}"
+        class={cn(
+          "z-60 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-800 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur-md outline-hidden origin-(--bits-popover-content-transform-origin) duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          width,
+          contentClass,
+        )}
       >
         {#if showArrow}
           <Popover.Arrow
@@ -226,12 +231,12 @@
             {/if}
             <div class="min-w-0">
               {#if title}
-                <div class="break-words text-xs font-bold tracking-tight text-slate-100">
+                <div class="wrap-break-word text-xs font-bold tracking-tight text-slate-100">
                   {title}
                 </div>
               {/if}
               {#if subtitle}
-                <div class="mt-0.5 break-words text-micro text-slate-400">
+                <div class="mt-0.5 wrap-break-word text-micro text-slate-400">
                   {subtitle}
                 </div>
               {/if}

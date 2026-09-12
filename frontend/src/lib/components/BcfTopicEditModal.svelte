@@ -180,7 +180,7 @@
             type="text"
             bind:value={title}
             placeholder="e.g. Non-compliant Door Clear Width at Level 1"
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           />
         </div>
 
@@ -193,7 +193,7 @@
             <select
               id="topic-type"
               bind:value={topicType}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Issue">Issue</option>
               <option value="Clash / Compliance">Clash / Compliance</option>
@@ -210,7 +210,7 @@
             <select
               id="topic-status"
               bind:value={topicStatus}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
@@ -227,7 +227,7 @@
             <select
               id="topic-priority"
               bind:value={priority}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
             >
               <option value="Critical">Critical</option>
               <option value="High">High</option>
@@ -247,7 +247,7 @@
             bind:value={description}
             rows="3"
             placeholder="Detailed description of the architectural or engineering non-compliance..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
           ></textarea>
         </div>
 
@@ -262,7 +262,7 @@
               type="text"
               bind:value={assignedTo}
               placeholder="e.g. Lead Architect / BIM Coordinator"
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
 
@@ -274,7 +274,7 @@
               id="topic-due"
               type="date"
               bind:value={dueDate}
-              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-none"
+              class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-slate-50 placeholder-slate-500 focus:border-accent focus:outline-hidden"
             />
           </div>
         </div>
@@ -296,7 +296,7 @@
               <select
                 id="topic-cde"
                 bind:value={cdeState}
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 {#each CDE_STATE_CHOICES as state (state)}
                   <option value={state}>{state}</option>
@@ -311,7 +311,7 @@
               <select
                 id="topic-suitability"
                 bind:value={suitabilityCode}
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-50 focus:border-accent focus:outline-hidden"
               >
                 {#each SUITABILITY_CODES as code (code)}
                   <option value={code}>{code}</option>
@@ -328,7 +328,7 @@
                 type="text"
                 bind:value={revisionCode}
                 placeholder="P01.01"
-                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-none"
+                class="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono text-xs text-slate-50 focus:border-accent focus:outline-hidden"
               />
             </div>
           </div>
@@ -344,7 +344,7 @@
             type="text"
             bind:value={componentGuidsText}
             placeholder="e.g. 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d, 2b3c4d5e-..."
-            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 font-mono text-xs text-cyan-300 placeholder-slate-600 focus:border-accent focus:outline-none"
+            class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 font-mono text-xs text-cyan-300 placeholder-slate-600 focus:border-accent focus:outline-hidden"
           />
         </div>
       </div>

@@ -267,7 +267,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Search by email, name, or organization…"
-          class="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+          class="w-full max-w-xs rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
         />
       </div>
 
@@ -399,7 +399,7 @@
             type="text"
             bind:value={newOrgName}
             placeholder="e.g. Acme Engineering"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
           />
         </label>
         <label class="block space-y-1.5" for="new-org-code">
@@ -410,7 +410,7 @@
             bind:value={newOrgCode}
             maxlength={PROJECT_CODE_MAX_LENGTH}
             placeholder="e.g. ACME"
-            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm uppercase text-slate-200 placeholder:text-slate-500 focus:border-violet-500 focus:outline-hidden"
           />
           <span class="block text-caption text-slate-500">
             ISO 19650 Originator code, {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH} alphanumeric
@@ -452,7 +452,7 @@
         <select
           id="assign-org"
           bind:value={assignOrgId}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-none"
+          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-hidden"
         >
           {#each orgs as org (org.id)}
             <option value={org.id}>{org.name}</option>
@@ -464,7 +464,7 @@
         <select
           id="assign-role"
           bind:value={assignRole}
-          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-none"
+          class="w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-violet-500 focus:outline-hidden"
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>

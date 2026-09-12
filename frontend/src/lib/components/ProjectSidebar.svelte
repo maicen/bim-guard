@@ -88,7 +88,7 @@
 <!-- Scrim: only below md, and only while the drawer is open. -->
 {#if mobileOpen}
   <div
-    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
     onclick={onCloseMobile}
     aria-hidden="true"
   ></div>
@@ -107,7 +107,7 @@
     {#if !collapsed}
       <div class="flex items-center gap-2.5 overflow-hidden">
         <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
         >
           BG
         </div>
@@ -122,7 +122,7 @@
       </div>
     {:else}
       <div
-        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
       >
         BG
       </div>
@@ -193,7 +193,7 @@
             class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
               ? 'font-bold'
               : 'font-medium'} {isActive
-              ? 'bg-accent text-white shadow-sm shadow-blue-600/30'
+              ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
               : item.highlight
                 ? 'text-accent hover:bg-slate-900/60'
                 : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-100'}"
@@ -211,7 +211,7 @@
             {/if}
 
             {#if collapsed && isActive}
-              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r bg-white"></span>
+              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
             {/if}
           </a>
         {/each}
