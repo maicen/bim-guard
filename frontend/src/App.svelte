@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import { router, push, replace } from "svelte-spa-router";
+  import { Tooltip } from "bits-ui";
   import OrgSidebar from "./lib/components/OrgSidebar.svelte";
   import ProjectSidebar from "./lib/components/ProjectSidebar.svelte";
   import AdminSidebar from "./lib/components/AdminSidebar.svelte";
@@ -486,6 +487,7 @@
   }
 </script>
 
+<Tooltip.Provider delayDuration={200} skipDelayDuration={300}>
 <a
   href="#main-content"
   class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-200 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
@@ -652,10 +654,10 @@
         {#snippet failed(error, reset)}
           <div
             role="alert"
-            class="mx-auto mt-10 max-w-lg space-y-4 rounded-xl border border-rose-800/80 bg-rose-950/40 p-6 text-center"
+            class="mx-auto mt-10 max-w-lg space-y-4 rounded-xl border border-critical-border bg-critical-bg p-6 text-center"
           >
-            <h2 class="text-base font-bold text-rose-200">This view failed to render</h2>
-            <p class="text-xs leading-relaxed text-rose-300/90">
+            <h2 class="text-base font-bold text-critical">This view failed to render</h2>
+            <p class="text-xs leading-relaxed text-critical/90">
               {error instanceof Error ? error.message : String(error)}
             </p>
             <button
@@ -682,22 +684,22 @@
       <div class="flex flex-wrap items-center gap-2.5">
         <span
           class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {apiOnline
-            ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
-            : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
+            ? 'border-success-border bg-success-bg text-success'
+            : 'border-critical-border bg-critical-bg text-critical'}"
         >
-          <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-emerald-400' : 'bg-rose-400'}"
+          <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-success' : 'bg-critical'}"
           ></span>
           {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
         </span>
         <span
           class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {dbOk
-            ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-400'
-            : 'border-rose-800/60 bg-rose-950/40 text-rose-400'}"
+            ? 'border-success-border bg-success-bg text-success'
+            : 'border-critical-border bg-critical-bg text-critical'}"
         >
           <span
             class="h-1.5 w-1.5 rounded-full {dbOk
-              ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50'
-              : 'bg-rose-400'}"
+              ? 'bg-success shadow-xs shadow-success/50'
+              : 'bg-critical'}"
           ></span>
           DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}
         </span>
@@ -733,3 +735,4 @@
 {#if !authGateBlocking && authState.needsOrgSelection}
   <OrgPickerGate />
 {/if}
+</Tooltip.Provider>
