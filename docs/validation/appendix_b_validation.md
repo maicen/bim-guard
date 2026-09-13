@@ -13,7 +13,8 @@ no value is transcribed by hand.
 - Piping elements: **116,006**, of which **38,012** (32.8%) carry raw material text
 - Of those, only **2,403** (2.07%) normalise to a `CANONICAL_MATERIALS` key the engines can score — see §B.1.1
 - BCF 2.1 archives: **37 valid of 37 readable models** (every archive parsed, every topic folder complete, zero malformed XML). The remaining 1 of 38 is absent rather than invalid — a model that could not be read produces no archive.
-- Clearance: EN 1998-1:2020 + DIN 4149:2022, angle_fire, 200 mm
+- Clearance: BIMGUARD SB-001 screening calibration (authored thresholds, not code values), angle_fire, 200 mm
+- Run executed 23 August 2026 against SB-001 ruleset v1.0.0. Citations corrected on 13 September 2026 following a provenance audit (`docs/planning/sb001_provenance_2026-09-13.md`); the threshold values this run used are unchanged.
 
 ### Failures
 
@@ -188,9 +189,9 @@ _Source: `docs\validation/table5_bcf_validity.csv`_
 | 50.0 | — | 48952 | 46975 | 1903 | 74 | 0.47x |
 | 100.0 | — | 69307 | 67658 | 1611 | 38 | 0.67x |
 | 150.0 | — | 85034 | 83838 | 1162 | 34 | 0.82x |
-| 200.0 | EN 1998-1 + DIN 4149 | 104144 | 102972 | 1141 | 31 | 1.00x |
+| 200.0 | BIMGUARD SB-001 screening calibration (authored thresholds, not code values) | 104144 | 102972 | 1141 | 31 | 1.00x |
 | 300.0 | — | 133739 | 132665 | 1048 | 26 | 1.28x |
-| 457.2 | ASCE 7-22 + NFPA 13 | 172812 | 171868 | 928 | 16 | 1.66x |
+| 457.2 | — | 172812 | 171868 | 928 | 16 | 1.66x |
 | 600.0 | — | 212870 | 211982 | 877 | 11 | 2.04x |
 
 _Source: `docs\validation/table6_standards_sensitivity.csv`_
@@ -231,9 +232,10 @@ _Source: `docs\validation/table7b_schema_twins.csv`_
 - **Severity banding is a spatial heuristic**, not a standards-derived threshold
   (overlap fraction of halo volume: >=25% critical, >=5% major). Table B.6 shows how
   sensitive the totals are to the clearance input.
-- **One brace variant was evaluated.** The EN+DIN config assigns every variant the
-  same clearance, a documented data gap in that config, so variant choice does not
-  change these numbers — but a jurisdiction that differentiates would.
+- **One brace variant was evaluated.** In the SB-001 config, all four brace_types
+  variants share the same spacing and clearance values; no source held distinguishes
+  them, so variant choice does not change these numbers — but a config that
+  differentiates would.
 - **Corrosion coverage is measured on the recompute subset**
   (116,006 elements across 24 models), not the full corpus.
 - **The clearance sensitivity sweep (Table B.6) covers rows [5, 9, 12, 14, 15] only**,
