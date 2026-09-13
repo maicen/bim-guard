@@ -23,15 +23,17 @@ Scope (Phase 3 constraints):
     decision. Timestamps appear in dataclass fields but are never compared
     or asserted on.
 
-Real-config caveat: most of the config's thresholds are authored
+Shipped-config caveat: most of the config's thresholds are authored
 screening calibration, not standard values — its per-threshold provenance
 blocks say which (see docs/planning/sb001_provenance_2026-09-13.md). It
 does not differentiate clearance per brace-hardware variant, and it has
 no hospital clearance addition. Until 2026-09-13 this script read
 hermes_case_study_and_config.json, a copy of the same ruleset that cited
-standard editions which do not exist; that copy was removed.
+standard editions which do not exist; the data/rulesets/ copy was
+removed, and the one kept under docs/validation/data/ is marked
+AI-generated and unverified.
 The validation checks below are written to hold for ANY loaded config
-(this real one, or a future mock/other-jurisdiction one) rather than
+(the shipped one, or a future mock/other-jurisdiction one) rather than
 asserting the specific numbers only the old synthetic mock config had —
 see each check's comment for how it adapts to what the config actually
 contains, including the documented degenerate cases above.
@@ -89,11 +91,11 @@ def _out(line: str = "") -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# REAL CONFIG — the SB-001 config the engine loads (phase_6d_seismic
-# DEFAULT_CONFIG_PATH), in HERMES_CONTEXT.md's CONFIG TEMPLATE OUTPUT FORMAT.
+# SHIPPED CONFIG — the SB-001 config the engine loads (phase_6d_seismic
+# DEFAULT_CONFIG_PATH), in the shape halo_volume_generator.load_clearance_config reads.
 # ═══════════════════════════════════════════════════════════════════════════
 
-REAL_CONFIG_PATH = "data/rulesets/sb001_seismic_clearance.json"
+SHIPPED_CONFIG_PATH = "data/rulesets/sb001_seismic_clearance.json"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -483,7 +485,7 @@ def run_validation_checks(
 
     # 1. Config loads correctly: compare the loaded ClearanceConfig against
     #    the source JSON file itself (not a hardcoded expectation), so this
-    #    check holds for whichever config is loaded — real or mock.
+    #    check holds for whichever config is loaded — shipped or mock.
     with open(config_path, encoding="utf-8") as f:
         raw_config = json.load(f)
     config_ok = (
@@ -560,8 +562,8 @@ def run_validation_checks(
     # 6. Brace-type halo sizes track the config's own clearance values.
     #    When the config differentiates clearance per brace type (e.g. a
     #    mock config), halo volume must increase monotonically with it. When
-    #    the config's source data does NOT differentiate (as in the real
-    #    EN 1998-1 + DIN 4149 config — a documented data gap), every variant
+    #    the config does NOT differentiate (as in the shipped SB-001
+    #    config, whose four variants share one authored clearance), every variant
     #    shares one clearance and volumes are expected to be identical, not
     #    "wrong" — this check accepts either case, but not a mismatch
     #    between what the config says and what the algorithm produced.
@@ -635,10 +637,10 @@ def run_validation_checks(
 
 if __name__ == "__main__":
     _out("=" * 70)
-    _out("  Blue Halo Phase 3 — validation harness (REAL CONFIG)")
+    _out("  Blue Halo Phase 3 — validation harness (shipped SB-001 config)")
     _out("=" * 70)
 
-    config_path = REAL_CONFIG_PATH
+    config_path = SHIPPED_CONFIG_PATH
     config = load_clearance_config(config_path)
     _out(f"\nLoaded config: {config.jurisdiction}  ({config_path})")
     _out(f"Brace type variants: {sorted(config.rules.keys())}")
