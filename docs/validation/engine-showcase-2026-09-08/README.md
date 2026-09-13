@@ -123,8 +123,10 @@ rather than suppressed.
 Three cross-checks against the frozen demo, which the offline path reproduces
 exactly: the synthetic control's five-engine run gives **1,988 findings, bands
 10 / 168 / 1,206 / 322**; 1540's model gives **29,181, all data-quality**; the
-1542 federation gives **2,937 clashes at 783 / 314 / 1,840**. All three match
-`docs/demo/RUNBOOK.md`.
+1542 federation gives **2,937 findings at 783 / 314 / 1,840**. All three match
+`docs/demo/RUNBOOK.md`. The 2,937 is an unscoped count and most of it is not a
+clash between services or with structure — see the composition under SB-001
+below.
 
 ---
 
@@ -276,6 +278,26 @@ Its verdicts, again from the synthetic control and **labelled as synthetic**:
 The one engine that worked fully on real models, because it needs geometry rather
 than materials: **2,937 verdicts on the 1542 federation, 783 Critical / 314 High
 / 1,840 Medium, zero data-quality notes.**
+
+The federation is two models, plumbing (`west_riverside_hospital_plumb_ifc4`)
+and structural (`west_riverside_hospital_str_ifc4`); there is no architectural
+model and no ductwork. Every halo is a pipe's, and the 2,937 counts everything
+that intrudes into one. Measured 13 September 2026, that is:
+
+| What intrudes into the pipe's clearance halo | Verdicts | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+Most of the count is same-system adjacency, and it is all High (190) or Medium
+(1,679): **none of the 783 Critical verdicts is a pipe against its own
+fittings.** Scoped to piping, SB-001 returns **1,068 seismic clearance
+intrusions into braced pipework (886 by structural members, 182 by unclassified
+model objects), 783 of them Critical** (124 High, 161 Medium), with same-system
+pipe-fitting adjacency excluded — measured on `feat/blue-halo-federated` at
+`15a72dd`, since the scope is not on the build this showcase ran. The ten rows
+below are all Critical, and all fall outside the adjacency set.
 
 | GUID | Element name (joined) | IFC type | Material (joined) | material_source | System | Band | Score | ruleset_version | Explanation (verbatim from findings.json) |
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |

@@ -392,12 +392,33 @@ Switch to the **Seismic** tab, project *FINAL AUDIT Seismic WR Federated*. It
 loads its stored result on mount once the cache is warm; on a cold backend it
 shows Run Audit — this is why pre-warm precedes the demo.
 
-Expect: **2,937 clashes** — 783 Critical, 314 High, 1,840 Medium. The federation
+Expect: **2,937 findings** — 783 Critical, 314 High, 1,840 Medium. The federation
 is two models, `west_riverside_hospital_plumb_ifc4.ifc` and
-`west_riverside_hospital_str_ifc4.ifc`: **2,051** clashes are within the
+`west_riverside_hospital_str_ifc4.ifc` — plumbing and structural only; there is
+no architectural model and no ductwork. **2,051** findings are within the
 plumbing model and **886** are cross-model, pipework against structure. Each
 cross-model finding names both files in `source_model` and
 `clashing_source_model`, so a coordinator knows which model to open.
+
+Do not present the 2,937 as clashes between services or with structure. Most of
+it is a pipe against its own fittings. Measured 13 September 2026:
+
+| What intrudes into the pipe's clearance halo | Findings | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+So of the 2,051 within the plumbing model, 1,869 are same-system adjacency and
+182 are unclassified objects. The same-system findings are all High (190) or
+Medium (1,679); **every one of the 783 Critical findings is structure or an
+unclassified object**. The figure to quote as clash detection is the scoped one:
+**1,068 seismic clearance intrusions into braced pipework (886 by structural
+members, 182 by unclassified model objects), 783 of them Critical** — 124 High,
+161 Medium — with same-system pipe-fitting adjacency excluded. That count comes
+from SB-001 scoped to piping (`service_scope=piping`), measured on
+`feat/blue-halo-federated` at `15a72dd`; the demo build does not offer the
+scope, so the page shows the unscoped 2,937.
 
 Each row carries the real measured overlap volume and the clearance that was
 applied (200.0 mm, EN 1998-1:2020 + DIN 4149:2022).
@@ -405,7 +426,9 @@ applied (200.0 mm, EN 1998-1:2020 + DIN 4149:2022).
 ### 4. Export and validate
 
 CSV from the Seismic page: **2,937 rows**, every one carrying
-`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**.
+`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**. Both exports
+carry the whole unscoped set, so 1,869 of those rows and topics are pipes
+against their own fittings — see the breakdown in §3.
 
 Validate the archive in front of the audience if it helps:
 
@@ -479,7 +502,7 @@ every recorded audit number and every BCF topic id.
    appends; it does not replace. Running it against a project whose models are
    already attached leaves 1540 holding two copies of the plumbing model and
    1542 holding four — and because a seismic cache key is a SHA-256 over *all*
-   of a project's models, that silently moves 1542 off its 2,937 clashes. If
+   of a project's models, that silently moves 1542 off its 2,937 findings. If
    the models are already there, verify rather than re-post: download each one
    back through `GET /api/projects/{id}/files/{file_id}/ifc` and compare its
    SHA-256 with the local file. Confirmed byte-identical on 2026-09-10 —
