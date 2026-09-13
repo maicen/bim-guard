@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { Combobox as ComboboxPrimitive } from "bits-ui";
   import { bsddApi } from "../api";
   import type { BSDDClassItem, BSDDPropertyItem } from "../types";
+  import { cn } from "../utils/cn";
 
   type BsddSuggestion = BSDDClassItem | BSDDPropertyItem;
 
@@ -30,10 +32,8 @@
   let suggestions = $state<BsddSuggestion[]>([]);
   let open = $state(false);
   let loading = $state(false);
-  let highlighted = $state(-1);
   let debounceHandle: ReturnType<typeof setTimeout> | undefined;
   let requestToken = 0;
-  const listboxId = `bsdd-listbox-${Math.random().toString(36).slice(2, 8)}`;
 
   function itemKey(item: BsddSuggestion): string {
     return "code" in item ? item.code : item.uri;
@@ -56,10 +56,9 @@
         mode === "class"
           ? (await bsddApi.searchClasses(query, dictionaryUri)).classes
           : (await bsddApi.searchProperties(query, dictionaryUri)).properties;
-      if (token !== requestToken) return; // a newer keystroke superseded this request
+      if (token !== requestToken) return;
       suggestions = result.slice(0, 10);
       open = suggestions.length > 0;
-      highlighted = -1;
     } catch {
       if (token !== requestToken) return;
       suggestions = [];
@@ -69,7 +68,9 @@
     }
   }
 
-  function handleInput() {
+  function handleInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    value = target.value;
     clearTimeout(debounceHandle);
     const query = value.trim();
     if (query.length < 2) {
@@ -77,7 +78,6 @@
       loading = false;
       suggestions = [];
       open = false;
-      highlighted = -1;
       return;
     }
     debounceHandle = setTimeout(() => runSearch(query), 300);
@@ -88,71 +88,49 @@
     suggestions = [];
     onSelect(item);
   }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (!open || suggestions.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      highlighted = (highlighted + 1) % suggestions.length;
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
-    } else if (e.key === "Enter" && highlighted >= 0) {
-      e.preventDefault();
-      pick(suggestions[highlighted]);
-    } else if (e.key === "Escape") {
-      open = false;
-    }
-  }
 </script>
 
-<div class="relative">
-  <input
-    {id}
-    type="text"
-    bind:value
-    {placeholder}
-    autocomplete="off"
-    role="combobox"
-    aria-expanded={open}
-    aria-controls={listboxId}
-    aria-autocomplete="list"
-    oninput={handleInput}
-    onkeydown={handleKeydown}
-    onfocus={() => {
-      if (suggestions.length > 0) open = true;
-    }}
-    onblur={() => setTimeout(() => (open = false), 150)}
-    class={`w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden ${className}`}
-  />
-  {#if loading}
-    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-nano text-fg-muted">…</span>
-  {/if}
-  {#if open}
-    <ul
-      id={listboxId}
-      role="listbox"
-      class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-border-default bg-surface-card shadow-lg shadow-black/40"
+<ComboboxPrimitive.Root
+  bind:open
+  type="single"
+  inputValue={value}
+  onValueChange={(val) => {
+    const found = suggestions.find((s) => itemKey(s) === val);
+    if (found) pick(found);
+  }}
+>
+  <div class="relative w-full">
+    <ComboboxPrimitive.Input
+      {id}
+      oninput={handleInput}
+      {placeholder}
+      class={cn(
+        "w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden",
+        className,
+      )}
+    />
+    {#if loading}
+      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-nano text-fg-muted">…</span>
+    {/if}
+  </div>
+
+  <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Content
+      class="z-50 max-h-56 min-w-[240px] overflow-hidden rounded-xl border border-border-default bg-surface-card p-1 shadow-xl duration-150 animate-in fade-in zoom-in-95"
+      sideOffset={4}
     >
-      {#each suggestions as item, i (itemKey(item))}
-        <li role="presentation">
-          <button
-            type="button"
-            role="option"
-            aria-selected={i === highlighted}
-            onmousedown={(e) => {
-              e.preventDefault();
-              pick(item);
-            }}
-            class={`w-full px-3 py-1.5 text-left text-xs hover:bg-surface-hover ${
-              i === highlighted ? "bg-surface-overlay" : ""
-            }`}
+      <ComboboxPrimitive.Viewport class="p-1">
+        {#each suggestions as item (itemKey(item))}
+          <ComboboxPrimitive.Item
+            value={itemKey(item)}
+            label={labelFor(item)}
+            class="flex cursor-pointer select-none items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-fg-secondary outline-hidden transition-colors data-[highlighted]:bg-surface-hover data-[highlighted]:text-fg-primary"
           >
             <span class="font-medium text-fg-primary">{labelFor(item)}</span>
-            <span class="ml-2 text-fg-muted">{subLabelFor(item)}</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</div>
+            <span class="ml-2 text-nano text-fg-muted">{subLabelFor(item)}</span>
+          </ComboboxPrimitive.Item>
+        {/each}
+      </ComboboxPrimitive.Viewport>
+    </ComboboxPrimitive.Content>
+  </ComboboxPrimitive.Portal>
+</ComboboxPrimitive.Root>

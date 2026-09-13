@@ -211,9 +211,10 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
   - Reactive search, multi-field dropdown filters, and reset actions.
   - Interactive column header sorting (ascending/descending indicators).
   - Rich zero-state placeholders, loading skeletons, responsive horizontal scroll, and keyboard accessibility.
-- **Reusable Frontend Component Architecture**: Always use established shared UI components from `src/lib/components/` instead of duplicating markup:
+- **Reusable Frontend Component Architecture & bits-ui**: Always use established shared UI components from `src/lib/components/` and headless primitives from `src/lib/components/ui/` instead of duplicating markup:
   - `<PageHeader>`: Top view header with category breadcrumbs, icon, title, subtitle, and action slots.
-  - `<Modal>`: Standard modal dialog with backdrop blur, keyboard `Escape` closing, header with icon, and slot layout.
+  - `<Modal>`: Standard modal dialog backed by bits-ui `Dialog` (`Dialog.Root`, `Dialog.Content`, etc.) with backdrop blur and keyboard escape.
+  - `<ConfirmModal>`: Destructive action confirmation dialog backed by bits-ui `AlertDialog`.
   - `<SortHeader>`: Sortable table column header with automatic sort direction indicators and ARIA attributes.
   - `<TableCheckbox>`: Accessible checkbox supporting indeterminate master toggle and row selection.
   - `<TablePagination>`: Dedicated table pagination component with page size selection.
@@ -225,8 +226,9 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
   - `<HoverCard>`: Hover/focus-triggered rich preview popover (bits-ui `Popover`), for supplementary detail without a click or modal.
   - `<DropdownMenu>`: Thin bits-ui `DropdownMenu` wrapper for triggered menus (Escape/outside-click dismissal, roving keyboard nav) — used by `IntegrationsMenu`, `ResourcesMenu`, `UserMenu`, and `RulesView`'s Import/Export menu.
   - `<OrgSwitcher>`: bits-ui `Select`-backed organization switcher in the header, syncing to `authState.activeOrganizationId`.
-  - `<CollapsiblePanel>`: Dockable panel with a collapsible header (chevron toggle, left/right/bottom docking, optional localStorage-persisted collapse state) — content stays mounted while collapsed (hidden via the `hidden` attribute, not `{#if}`) so children that hand DOM refs to external libraries keep a stable node.
-  - Other established shared components also live here (e.g. `Navbar`, `Sidebar`, `TopHeader`, `PipelineProgress`, `ConfirmModal`, `Alert`, `Badge`, `TableActions`, `ThemeToggle`, `ExportActions`, `IssueTable`) — reuse them the same way rather than duplicating markup.
+  - `<CollapsiblePanel>`: Dockable panel with a collapsible header (chevron toggle, left/right/bottom docking, optional localStorage-persisted collapse state).
+  - **Strict Ban on Raw HTML Controls**: Never use `<select>`, `<input type="checkbox">`, `<input type="radio">`, `<input type="range">`, `<input type="date">`, `<details>`, or unstyled `title="..."` attributes. Always use the corresponding `bits-ui` primitives from `ui/` (`Select`, `Checkbox`, `RadioGroup`, `Slider`, `DatePicker`, `Accordion`, `Tooltip`, etc.).
+  - Other established shared components also live here (e.g. `Navbar`, `Sidebar`, `TopHeader`, `PipelineProgress`, `Alert`, `Badge`, `TableActions`, `ThemeToggle`, `ExportActions`, `IssueTable`) — reuse them the same way rather than duplicating markup.
 
 ### API & Backend Guidelines (`app/api/`)
 

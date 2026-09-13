@@ -24,7 +24,7 @@
   import PdfElementOverlay from "./PdfElementOverlay.svelte";
   import type { ElementLayer, ArrowStyle } from "./PdfElementOverlay.svelte";
   import { Popover } from "bits-ui";
-  import { Switch } from "./ui";
+  import { Switch, Checkbox, Slider, Select } from "./ui";
 
   interface Props {
     documentId: number;
@@ -1177,38 +1177,33 @@
     {#if doclangXml}
       <div class="flex shrink-0 items-center justify-between border-b border-border-default bg-surface-canvas px-4 py-2">
         <div class="flex items-center gap-3">
-          <div class="relative">
-            <button
-              type="button"
-              onclick={(e) => (e.stopPropagation(), (viewsMenuOpen = !viewsMenuOpen))}
-              aria-expanded={viewsMenuOpen}
-              aria-haspopup="true"
+          <Popover.Root bind:open={viewsMenuOpen}>
+            <Popover.Trigger
               class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-card px-2.5 py-1 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
             >
               <span>Views</span>
               <ChevronDown class="h-3 w-3" />
-            </button>
-            {#if viewsMenuOpen}
-              <div
-                role="none"
-                onclick={(e) => e.stopPropagation()}
-                class="absolute left-0 top-full z-40 mt-2 w-48 space-y-1 rounded-xl border border-border-default bg-surface-card p-1.5 text-xs shadow-xl"
-              >
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
-                  <span class="text-fg-secondary">Original Page</span>
-                  <input type="checkbox" bind:checked={showOriginalPage} />
-                </label>
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
-                  <span class="text-fg-secondary">DocLang</span>
-                  <input type="checkbox" bind:checked={showDoclangPane} />
-                </label>
-                <label class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
-                  <span class="text-fg-secondary">Reading View</span>
-                  <input type="checkbox" bind:checked={showReadingPane} />
-                </label>
-              </div>
-            {/if}
-          </div>
+            </Popover.Trigger>
+            <Popover.Content
+              side="bottom"
+              align="start"
+              sideOffset={6}
+              class="z-40 w-48 space-y-1 rounded-xl border border-border-default bg-surface-card p-1.5 text-xs shadow-xl"
+            >
+              <label class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                <span class="text-fg-secondary">Original Page</span>
+                <Checkbox bind:checked={showOriginalPage} />
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                <span class="text-fg-secondary">DocLang</span>
+                <Checkbox bind:checked={showDoclangPane} />
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
+                <span class="text-fg-secondary">Reading View</span>
+                <Checkbox bind:checked={showReadingPane} />
+              </label>
+            </Popover.Content>
+          </Popover.Root>
 
           {#if totalPageCount > 1}
             <div class="flex items-center gap-1.5">
@@ -1555,25 +1550,43 @@
                           <span class="text-fg-muted">Color</span>
                           <input type="color" bind:value={arrowColor} class="h-6 w-10 cursor-pointer rounded border border-border-interactive bg-surface-canvas" />
                         </label>
-                        <label class="flex items-center justify-between gap-2">
-                          <span class="text-fg-muted">Thickness</span>
-                          <input type="range" min="0.5" max="6" step="0.5" bind:value={arrowWidth} class="w-28 accent-accent" />
-                        </label>
-                        <label class="flex items-center justify-between gap-2">
-                          <span class="text-fg-muted">Head size</span>
-                          <input type="range" min="3" max="14" step="1" bind:value={arrowHead} class="w-28 accent-accent" />
-                        </label>
-                        <label class="flex items-center justify-between gap-2">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-fg-muted">Thickness ({arrowWidth}px)</span>
+                          <div class="w-28">
+                            <Slider
+                              min={0.5}
+                              max={6}
+                              step={0.5}
+                              value={arrowWidth}
+                              onValueChange={(val) => (arrowWidth = val)}
+                            />
+                          </div>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-fg-muted">Head size ({arrowHead}px)</span>
+                          <div class="w-28">
+                            <Slider
+                              min={3}
+                              max={14}
+                              step={1}
+                              value={arrowHead}
+                              onValueChange={(val) => (arrowHead = val)}
+                            />
+                          </div>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
                           <span class="text-fg-muted">Line</span>
-                          <select
-                            bind:value={arrowLineStyle}
-                            class="rounded-lg border border-border-interactive bg-surface-canvas px-2 py-1 text-fg-secondary focus:outline-hidden focus:ring-1 focus:ring-accent"
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                          </select>
-                        </label>
+                          <div class="w-28">
+                            <Select
+                              options={[
+                                { value: "solid", label: "Solid" },
+                                { value: "dashed", label: "Dashed" },
+                                { value: "dotted", label: "Dotted" },
+                              ]}
+                              bind:value={arrowLineStyle}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </Popover.Content>
@@ -1735,34 +1748,29 @@
             <div class="flex shrink-0 items-center justify-between border-b border-border-default bg-surface-canvas px-3 py-1.5">
               <span class="text-caption font-semibold uppercase tracking-wide text-fg-muted">Reading View</span>
               {#if documentBlocks.some((b) => "layer" in b && b.layer !== "body")}
-                <div class="relative">
-                  <button
-                    type="button"
-                    onclick={(e) => (e.stopPropagation(), (layersMenuOpen = !layersMenuOpen))}
-                    aria-expanded={layersMenuOpen}
-                    aria-haspopup="true"
+                <Popover.Root bind:open={layersMenuOpen}>
+                  <Popover.Trigger
                     class="inline-flex items-center gap-1 rounded-lg bg-surface-overlay px-2 py-1 text-[11px] text-fg-secondary hover:bg-surface-hover hover:text-white"
                   >
                     <span>Layers</span>
                     <ChevronDown class="h-3 w-3" />
-                  </button>
-                  {#if layersMenuOpen}
-                    <div
-                      role="none"
-                      onclick={(e) => e.stopPropagation()}
-                      class="absolute right-0 top-full z-40 mt-2 w-44 space-y-1 rounded-xl border border-border-default bg-surface-card p-2 text-xs shadow-xl"
-                    >
-                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
-                        <span class="text-fg-secondary">Furniture</span>
-                        <input type="checkbox" bind:checked={showReadingFurniture} />
-                      </label>
-                      <label class="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
-                        <span class="text-fg-secondary">Background</span>
-                        <input type="checkbox" bind:checked={showReadingBackground} />
-                      </label>
-                    </div>
-                  {/if}
-                </div>
+                  </Popover.Trigger>
+                  <Popover.Content
+                    side="bottom"
+                    align="end"
+                    sideOffset={6}
+                    class="z-40 w-44 space-y-1 rounded-xl border border-border-default bg-surface-card p-2 text-xs shadow-xl"
+                  >
+                    <label class="flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
+                      <span class="text-fg-secondary">Furniture</span>
+                      <Checkbox bind:checked={showReadingFurniture} />
+                    </label>
+                    <label class="flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-1 hover:bg-surface-hover">
+                      <span class="text-fg-secondary">Background</span>
+                      <Checkbox bind:checked={showReadingBackground} />
+                    </label>
+                  </Popover.Content>
+                </Popover.Root>
               {/if}
             </div>
             <div bind:this={readingViewBodyEl} class="flex-1 overflow-y-auto p-4">

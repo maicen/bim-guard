@@ -1,6 +1,8 @@
 <script lang="ts">
   import { UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Tooltip from "./Tooltip.svelte";
+  import { RadioGroupRoot, RadioGroupItem, Select, type SelectOption } from "./ui";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
 
@@ -61,6 +63,7 @@
     reset();
     onClose();
   }
+  const roleOptions: SelectOption[] = IFC_FILE_ROLES.map((r) => ({ value: r, label: r }));
 </script>
 
 <Modal
@@ -82,36 +85,33 @@
 
     {#if selectedFiles.length > 0}
       <div class="space-y-2">
-        {#each selectedFiles as file, i (file.name + i)}
-          <div
-            class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-canvas/40 p-2.5"
-          >
-            <input
-              type="radio"
-              name="primary-file"
-              checked={primaryIndex === i}
-              onchange={() => (primaryIndex = i)}
-              title="Set as primary model"
-            />
-            <span class="min-w-0 flex-1 truncate text-xs text-fg-secondary">{file.name}</span>
-            <select
-              bind:value={roles[i]}
-              class="rounded-md border border-border-interactive bg-surface-card px-1.5 py-1 text-micro text-fg-secondary"
+        <RadioGroupRoot
+          value={String(primaryIndex)}
+          onValueChange={(val) => (primaryIndex = Number(val))}
+          class="space-y-2"
+        >
+          {#each selectedFiles as file, i (file.name + i)}
+            <div
+              class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-canvas/40 p-2.5"
             >
-              {#each IFC_FILE_ROLES as role (role)}
-                <option value={role}>{role}</option>
-              {/each}
-            </select>
-            <button
-              type="button"
-              onclick={() => removeFile(i)}
-              class="rounded p-1 text-fg-muted hover:bg-critical-bg hover:text-critical"
-              aria-label="Remove file"
-            >
-              <XIcon class="h-3.5 w-3.5" />
-            </button>
-          </div>
-        {/each}
+              <Tooltip content="Set as primary model">
+                <RadioGroupItem value={String(i)} aria-label="Set as primary model" />
+              </Tooltip>
+              <span class="min-w-0 flex-1 truncate text-xs text-fg-secondary">{file.name}</span>
+              <div class="w-32 shrink-0">
+                <Select options={roleOptions} bind:value={roles[i]} />
+              </div>
+              <button
+                type="button"
+                onclick={() => removeFile(i)}
+                class="rounded p-1 text-fg-muted hover:bg-critical-bg hover:text-critical"
+                aria-label="Remove file"
+              >
+                <XIcon class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          {/each}
+        </RadioGroupRoot>
         <p class="text-micro text-fg-muted">
           Select the radio button to mark which file is the primary model.
         </p>

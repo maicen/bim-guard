@@ -5,6 +5,7 @@
   import { authState } from "../auth.svelte";
   import { isAuthConfigured } from "../supabaseClient";
   import DropdownMenu from "./DropdownMenu.svelte";
+  import { Avatar } from "./ui";
 
   let displayName = $derived(authState.profile?.profile.full_name || authState.user?.email || "");
   let avatarUrl = $derived(authState.profile?.profile.avatar_url || "");
@@ -59,14 +60,10 @@
       <button
         type="button"
         {...props}
-        class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-border-interactive bg-surface-card text-xs font-semibold text-fg-secondary transition-colors hover:border-border-interactive"
+        class="rounded-full transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-accent"
         aria-label="Account menu"
       >
-        {#if avatarUrl}
-          <img src={avatarUrl} alt="" class="h-full w-full object-cover" referrerpolicy="no-referrer" />
-        {:else}
-          {initials}
-        {/if}
+        <Avatar src={avatarUrl} fallback={initials} size="sm" />
       </button>
     {/snippet}
 

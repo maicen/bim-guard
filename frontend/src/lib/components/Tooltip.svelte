@@ -28,6 +28,7 @@
   interface Props {
     /** Tooltip text. Omit (or pass empty) when nothing's worth showing. */
     text?: string;
+    content?: string;
     /** Preferred side of the trigger to render on. Flips when space is tight. */
     side?: Side;
     /** Alignment along the trigger's cross axis. */
@@ -39,27 +40,33 @@
     /** Extra classes on the inline trigger wrapper. */
     triggerClass?: string;
     trigger?: Snippet;
+    children?: Snippet;
   }
 
   let {
     text = "",
+    content = "",
     side = "top",
     align = "center",
     sideOffset = 6,
     disabled = false,
     triggerClass = "",
     trigger,
+    children,
   }: Props = $props();
+
+  let displayText = $derived(text || content);
+  let renderTrigger = $derived(trigger || children);
 </script>
 
-{#if disabled || !text}
-  {@render trigger?.()}
+{#if disabled || !displayText}
+  {@render renderTrigger?.()}
 {:else}
   <TooltipPrimitive.Root>
     <TooltipPrimitive.Trigger>
       {#snippet child({ props })}
         <span {...props} class="inline-flex {triggerClass}">
-          {@render trigger?.()}
+          {@render renderTrigger?.()}
         </span>
       {/snippet}
     </TooltipPrimitive.Trigger>
@@ -76,7 +83,7 @@
           height={7}
           class="rotate-45 border-border-default bg-surface-card data-[side=top]:border-b data-[side=top]:border-r data-[side=bottom]:border-l data-[side=bottom]:border-t data-[side=left]:border-r data-[side=left]:border-t data-[side=right]:border-b data-[side=right]:border-l"
         />
-        {text}
+        {displayText}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   </TooltipPrimitive.Root>

@@ -6,6 +6,7 @@
   import { analyzeApi } from "../api";
   import { subscribeToPipelineEvents } from "../sse";
   import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-svelte";
+  import { Progress } from "./ui";
 
   interface Props {
     projectId?: number | null;
@@ -156,14 +157,12 @@
     </div>
 
     <!-- Overall Progress Bar -->
-    <div class="flex min-w-[220px] items-center gap-3">
-      <div class="h-2 flex-1 overflow-hidden rounded-full border border-border-subtle bg-surface-canvas">
-        <div
-          class="h-2 rounded-full bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-xs transition-all duration-300"
-          style="width: {avgProgress}%"
-        ></div>
-      </div>
-      <span class="font-mono text-xs font-bold text-fg-primary">{avgProgress}%</span>
+    <div class="min-w-[220px]">
+      <Progress
+        value={avgProgress}
+        showLabel={true}
+        indicatorClass="bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-xs"
+      />
     </div>
   </div>
 

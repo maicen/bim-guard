@@ -41,7 +41,38 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
+  import TabStrip, { type TabStripItem } from "../lib/components/TabStrip.svelte";
+  import { Select, type SelectOption } from "../lib/components/ui";
   import { createTableState } from "../lib/tableState.svelte";
+
+  const reportTabs: TabStripItem[] = [
+    { id: "live_bcf", label: "Live BCF 2.1 Topics" },
+    { id: "artifacts", label: "BCF Zip Artifacts" },
+  ];
+
+  const statusFilterOptions: SelectOption[] = [
+    { value: "ALL", label: "All Statuses" },
+    { value: "Open", label: "Open" },
+    { value: "In Progress", label: "In Progress" },
+    { value: "Resolved", label: "Resolved" },
+    { value: "Closed", label: "Closed" },
+  ];
+
+  const priorityFilterOptions: SelectOption[] = [
+    { value: "ALL", label: "All Priorities" },
+    { value: "Critical", label: "Critical" },
+    { value: "High", label: "High" },
+    { value: "Normal", label: "Normal" },
+    { value: "Low", label: "Low" },
+  ];
+
+  const cdeFilterOptions: SelectOption[] = [
+    { value: "ALL", label: "All CDE States" },
+    { value: "WIP", label: "WIP" },
+    { value: "SHARED", label: "SHARED" },
+    { value: "PUBLISHED", label: "PUBLISHED" },
+    { value: "ARCHIVED", label: "ARCHIVED" },
+  ];
 
   interface Props {
     initialProjectId?: number | null;
@@ -399,28 +430,12 @@
 
         <!-- Tab & Action Controls -->
         <div class="flex shrink-0 flex-wrap items-center gap-2.5">
-          <div
-            class="flex items-center rounded-xl border border-border-default bg-surface-canvas p-1 text-xs"
-          >
-            <button
-              type="button"
-              onclick={() => (activeTab = "live_bcf")}
-              class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'live_bcf'
-                ? 'bg-blue-600 text-white'
-                : 'text-fg-muted hover:text-fg-primary'}"
-            >
-              Live BCF 2.1 Topics
-            </button>
-            <button
-              type="button"
-              onclick={() => (activeTab = "artifacts")}
-              class="rounded-lg px-3 py-1 font-medium transition-colors {activeTab === 'artifacts'
-                ? 'bg-surface-overlay text-fg-primary'
-                : 'text-fg-muted hover:text-fg-primary'}"
-            >
-              BCF Zip Artifacts
-            </button>
-          </div>
+          <TabStrip
+            tabs={reportTabs}
+            active={activeTab}
+            onSelect={(id) => (activeTab = id as any)}
+            ariaLabel="Deliverables Views"
+          />
 
           {#if activeTab === "live_bcf"}
             <button
@@ -468,38 +483,15 @@
           </div>
 
           <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
-            <select
-              bind:value={topicTable.filters.status}
-              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Resolved">Resolved</option>
-              <option value="Closed">Closed</option>
-            </select>
-
-            <select
-              bind:value={topicTable.filters.priority}
-              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Normal">Normal</option>
-              <option value="Low">Low</option>
-            </select>
-
-            <select
-              bind:value={topicTable.filters.cde}
-              class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="ALL">All CDE States</option>
-              <option value="WIP">WIP</option>
-              <option value="SHARED">SHARED</option>
-              <option value="PUBLISHED">PUBLISHED</option>
-              <option value="ARCHIVED">ARCHIVED</option>
-            </select>
+            <div class="w-36">
+              <Select options={statusFilterOptions} bind:value={topicTable.filters.status} />
+            </div>
+            <div class="w-36">
+              <Select options={priorityFilterOptions} bind:value={topicTable.filters.priority} />
+            </div>
+            <div class="w-36">
+              <Select options={cdeFilterOptions} bind:value={topicTable.filters.cde} />
+            </div>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Component, ComponentType, Snippet } from "svelte";
+  import { Dialog as DialogPrimitive } from "bits-ui";
   import { X } from "lucide-svelte";
-  import { dialog, dialogId } from "../utils/dialog.svelte";
   import { cn } from "../utils/cn";
 
   let {
@@ -30,33 +30,22 @@
     footer?: Snippet;
   } = $props();
 
-  // Per-instance so two dialogs of the same type never collide on one DOM id.
-  const titleId = dialogId("modal-title");
   const Icon = $derived(icon);
 
-  function handleBackdropClick(event: MouseEvent) {
-    // Only a click that both starts and ends on the backdrop dismisses, so a
-    // drag that began inside the card does not close it.
-    if (closeOnBackdrop && event.target === event.currentTarget) onClose();
+  function handleOpenChange(open: boolean) {
+    if (!open) onClose();
   }
 </script>
 
-{#if isOpen}
-  <!-- The backdrop is a click target, not a control: keyboard users dismiss with
-       Escape, which the `dialog` attachment handles. -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md duration-200 animate-in fade-in"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby={titleId}
-    tabindex="-1"
-    onclick={handleBackdropClick}
-    {@attach dialog(onClose)}
-  >
-    <div
+<DialogPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
+  <DialogPrimitive.Portal>
+    <DialogPrimitive.Overlay
+      class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md transition-all duration-200 animate-in fade-in"
+    />
+    <DialogPrimitive.Content
+      interactOutsideBehavior={closeOnBackdrop ? "close" : "ignore"}
       class={cn(
-        "flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl duration-200 animate-in zoom-in-95",
+        "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95 focus:outline-hidden",
         maxWidth,
       )}
     >
@@ -72,29 +61,30 @@
             </div>
           {/if}
           <div class="min-w-0">
-            <h3 id={titleId} class="truncate text-base font-bold tracking-tight text-fg-primary">
+            <DialogPrimitive.Title class="truncate text-base font-bold tracking-tight text-fg-primary">
               {title}
-            </h3>
+            </DialogPrimitive.Title>
             {#if subtitle}
-              <p class="mt-0.5 truncate text-xs text-fg-muted">{subtitle}</p>
+              <DialogPrimitive.Description class="mt-0.5 truncate text-xs text-fg-muted">
+                {subtitle}
+              </DialogPrimitive.Description>
             {/if}
           </div>
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
           {@render headerExtra?.()}
-          <button
-            type="button"
+          <DialogPrimitive.Close
             onclick={onClose}
-            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary focus-visible:outline-2 focus-visible:outline-accent"
             aria-label="Close dialog"
           >
             <X class="h-4 w-4" />
-          </button>
+          </DialogPrimitive.Close>
         </div>
       </div>
 
-      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
+      <div class="flex-1 space-y-4 overflow-y-auto p-6 text-xs text-fg-secondary">
         {@render children?.()}
       </div>
 
@@ -105,6 +95,6 @@
           {@render footer()}
         </div>
       {/if}
-    </div>
-  </div>
-{/if}
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+</DialogPrimitive.Root>

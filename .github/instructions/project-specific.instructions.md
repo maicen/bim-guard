@@ -208,7 +208,7 @@ All frontend UI code across `frontend/src/` must adhere to the semantic design t
 - **Semantic Status Bands**: Use `bg-critical-bg text-critical border-critical-border`, `bg-warning-bg text-warning border-warning-border`, `bg-caution-bg text-caution border-caution-border`, `bg-success-bg text-success border-success-border`, `bg-info-bg text-info border-info-border`.
 - **Document & NLP Structure Overlays**: Reference CSS variables `var(--color-doc-heading)`, `var(--color-doc-paragraph)`, `var(--color-doc-list)`, `var(--color-doc-table)`, `var(--color-doc-picture)`.
 - **Table Selections**: Always use `bg-surface-selected` (never `bg-blue-950/*`).
-- **Reusable Primitives**: Always prefer `<Button>`, `<Input>`, `<FormField>`, `<Card>`, and `<Alert>` from `frontend/src/lib/components/ui/` and `frontend/src/lib/components/`.
+- **Reusable Primitives & bits-ui**: Always prefer `<Button>`, `<Input>`, `<FormField>`, `<Card>`, and `<Alert>` from `frontend/src/lib/components/ui/` and `frontend/src/lib/components/`. All interactive controls (dialogs, autocompletes, toggles, dropdowns, sliders, date pickers) must use headless `bits-ui` primitives.
 
 ---
 
@@ -219,6 +219,7 @@ Never use any of the following:
 | Forbidden | Reason / Use instead |
 |---|---|
 | Creating UI in Python / FastHTML | Build all UI in `frontend/` using Svelte 5 + Tailwind CSS. |
+| Raw HTML controls (`<select>`, `<input type="checkbox">`, `<input type="radio">`, `<input type="range">`, `<input type="date">`, `<details>`, unstyled `title="..."`) | Use headless `bits-ui` primitives from `frontend/src/lib/components/ui/`. |
 | Hardcoding hex, RGB, or raw dark-only color classes in frontend | Use semantic design tokens from `frontend/src/app.css` (`@theme`). |
 | Hardcoding engineering cutoffs or scoring weights | Rules must be DB-driven. Read from database via `RuleService`. |
 | Returning raw unvalidated dicts from `app/api/**` | Return typed Pydantic models from `app/modules/contracts.py`. |

@@ -36,6 +36,8 @@
   import EditModelModal from "../lib/components/EditModelModal.svelte";
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import Tooltip from "../lib/components/Tooltip.svelte";
+  import { RadioGroupRoot, RadioGroupItem } from "../lib/components/ui";
   import { createTableState } from "../lib/tableState.svelte";
 
   interface Props {
@@ -758,94 +760,107 @@
               No OpenBIM models found matching your search or category filter.
             </div>
           {:else}
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-fg-secondary">
-                <thead
-                  class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
-                >
-                  <tr>
-                    <th class="w-10 px-4 py-3">
-                      <TableCheckbox
-                        checked={selectedRepoPaths.size > 0 &&
-                          selectedRepoPaths.size === filteredRepoItems.length}
-                        indeterminate={selectedRepoPaths.size > 0 &&
-                          selectedRepoPaths.size < filteredRepoItems.length}
-                        onchange={toggleAllRepoPaths}
-                        title="Select or deselect all visible models"
-                      />
-                    </th>
-                    <th class="px-4 py-3">IFC Model Name</th>
-                    <th class="px-4 py-3">Repository Path</th>
-                    <th class="px-4 py-3">Category</th>
-                    <th class="px-4 py-3">Size</th>
-                    <th class="px-4 py-3 text-center">Primary</th>
-                    <th class="px-4 py-3 text-right">Download</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border-subtle">
-                  {#each filteredRepoItems as item (item.path)}
-                    {@const isSelected = selectedRepoPaths.has(item.path)}
-                    <tr
-                      class="transition-colors hover:bg-surface-hover {isSelected
-                        ? 'bg-surface-selected'
-                        : ''}"
-                    >
-                      <td class="w-10 px-4 py-3">
+            <RadioGroupRoot
+              value={primaryRepoPath}
+              onValueChange={(val) => (primaryRepoPath = val)}
+            >
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-fg-secondary">
+                  <thead
+                    class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                  >
+                    <tr>
+                      <th class="w-10 px-4 py-3">
                         <TableCheckbox
-                          checked={isSelected}
-                          onchange={() => toggleRepoPath(item.path)}
-                          ariaLabel={`Select ${item.name}`}
+                          checked={selectedRepoPaths.size > 0 &&
+                            selectedRepoPaths.size === filteredRepoItems.length}
+                          indeterminate={selectedRepoPaths.size > 0 &&
+                            selectedRepoPaths.size < filteredRepoItems.length}
+                          onchange={toggleAllRepoPaths}
+                          title="Select or deselect all visible models"
                         />
-                      </td>
-                      <td class="px-4 py-3 font-semibold text-fg-primary">
-                        <div class="flex items-center gap-2">
-                          <Box class="h-4 w-4 shrink-0 text-blue-400" />
-                          <span class="text-sm">{item.name}</span>
-                        </div>
-                      </td>
-                      <td
-                        class="max-w-xs truncate px-4 py-3 font-mono text-caption text-fg-muted"
-                        title={item.path}
-                      >
-                        {item.path}
-                      </td>
-                      <td class="px-4 py-3">
-                        <span
-                          class="inline-block rounded border border-border-interactive bg-surface-overlay px-2 py-0.5 font-mono text-micro font-semibold uppercase text-fg-secondary"
-                        >
-                          {item.category}
-                        </span>
-                      </td>
-                      <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
-                        {formatBytes(item.size)}
-                      </td>
-                      <td class="px-4 py-3 text-center">
-                        {#if isSelected}
-                          <input
-                            type="radio"
-                            name="primary-repo-model"
-                            checked={primaryRepoPath === item.path}
-                            onchange={() => (primaryRepoPath = item.path)}
-                            title="Set as this project's primary model"
-                          />
-                        {/if}
-                      </td>
-                      <td class="whitespace-nowrap px-4 py-3 text-right">
-                        <a
-                          href={item.download_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                          title="Direct download raw IFC"
-                        >
-                          <Download class="h-3.5 w-3.5" />
-                        </a>
-                      </td>
+                      </th>
+                      <th class="px-4 py-3">IFC Model Name</th>
+                      <th class="px-4 py-3">Repository Path</th>
+                      <th class="px-4 py-3">Category</th>
+                      <th class="px-4 py-3">Size</th>
+                      <th class="px-4 py-3 text-center">Primary</th>
+                      <th class="px-4 py-3 text-right">Download</th>
                     </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody class="divide-y divide-border-subtle">
+                    {#each filteredRepoItems as item (item.path)}
+                      {@const isSelected = selectedRepoPaths.has(item.path)}
+                      <tr
+                        class="transition-colors hover:bg-surface-hover {isSelected
+                          ? 'bg-surface-selected'
+                          : ''}"
+                      >
+                        <td class="w-10 px-4 py-3">
+                          <TableCheckbox
+                            checked={isSelected}
+                            onchange={() => toggleRepoPath(item.path)}
+                            ariaLabel={`Select ${item.name}`}
+                          />
+                        </td>
+                        <td class="px-4 py-3 font-semibold text-fg-primary">
+                          <div class="flex items-center gap-2">
+                            <Box class="h-4 w-4 shrink-0 text-blue-400" />
+                            <span class="text-sm">{item.name}</span>
+                          </div>
+                        </td>
+                        <td
+                          class="max-w-xs truncate px-4 py-3 font-mono text-caption text-fg-muted"
+                          title={item.path}
+                        >
+                          {item.path}
+                        </td>
+                        <td class="px-4 py-3">
+                          <span
+                            class="inline-block rounded border border-border-interactive bg-surface-overlay px-2 py-0.5 font-mono text-micro font-semibold uppercase text-fg-secondary"
+                          >
+                            {item.category}
+                          </span>
+                        </td>
+                        <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
+                          {formatBytes(item.size)}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                          {#if isSelected}
+                            <div class="flex justify-center">
+                              <Tooltip content="Set as this project's primary model">
+                                <RadioGroupItem
+                                  value={item.path}
+                                  aria-label="Set as this project's primary model"
+                                  class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-interactive bg-surface-canvas transition-colors focus-visible:outline-2 focus-visible:outline-accent data-[state=checked]:border-accent data-[state=checked]:bg-accent"
+                                >
+                                  {#snippet children({ checked })}
+                                    {#if checked}
+                                      <span class="h-1.5 w-1.5 rounded-full bg-white"></span>
+                                    {/if}
+                                  {/snippet}
+                                </RadioGroupItem>
+                              </Tooltip>
+                            </div>
+                          {/if}
+                        </td>
+                        <td class="whitespace-nowrap px-4 py-3 text-right">
+                          <a
+                            href={item.download_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                            title="Direct download raw IFC"
+                          >
+                            <Download class="h-3.5 w-3.5" />
+                          </a>
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </RadioGroupRoot>
           {/if}
         </div>
       {/if}

@@ -300,32 +300,87 @@ Every data table across the application (Projects, Documents, Reports & BCF, Rul
 - **Column Sorting**: Interactive header buttons with ascending/descending arrow indicators.
 - **CRUD Modals & Confirmations**: Modals for creation, editing, inspecting full details, and deleting with explicit confirmation dialogs.
 
-## 12. Reusable UI Component Building Blocks
+## 12. Reusable UI Component Building Blocks & bits-ui Primitive System
 
-To maintain cohesive design patterns and avoid duplicate markup, all UI views must compose with the established core component building blocks from `frontend/src/lib/components/`:
+To maintain cohesive design patterns, rock-solid accessibility (WAI-ARIA compliance), and consistent styling, all UI views must compose with established component building blocks from `frontend/src/lib/components/` and headless primitives from `frontend/src/lib/components/ui/`.
+
+### Strict Rule Against Raw HTML Controls (MANDATORY)
+
+**NEVER use raw, unstyled HTML interactive controls or browser defaults in UI views.** Browser defaults lack design-token integration, break dark-mode contrast, and offer poor accessibility:
+- **No raw `<select>`**: Always use `<Select>` from `ui/Select.svelte` (backed by bits-ui `Select`).
+- **No raw `<input type="checkbox">`**: Always use `<Checkbox>` or `<TableCheckbox>` (backed by bits-ui `Checkbox`).
+- **No raw `<input type="radio">`**: Always use `<RadioGroup>` (backed by bits-ui `RadioGroup`).
+- **No raw `<input type="range">`**: Always use `<Slider>` (backed by bits-ui `Slider`).
+- **No raw `<input type="date">`**: Always use `<DatePicker>` or `<DateRangePicker>` (backed by bits-ui `DatePicker`/`DateRangePicker`).
+- **No raw `<details>`/`<summary>`**: Always use `<Accordion>` or `<Collapsible>`.
+- **No raw browser `title="..."` tooltips**: Always use `<Tooltip>` from `lib/components/Tooltip.svelte` (backed by bits-ui `Tooltip`).
+- **No hand-rolled dialog/modal attachments**: Always use `<Modal>` or `ui/Dialog` / `ui/AlertDialog` (backed by bits-ui `Dialog`/`AlertDialog`).
+
+### bits-ui Primitives Suite (`frontend/src/lib/components/ui/`)
+
+All 41 headless bits-ui primitives are integrated and styled to match BIM-Guard's semantic tokens (`bg-surface-canvas`, `bg-surface-card`, `bg-surface-overlay`, `border-border-default`, `text-fg-primary`, etc.):
+
+1. **Overlay & Dialogs**:
+   - `Dialog` (`Dialog.svelte`): Full modal dialog with backdrop blur, focus trap, portal, and smooth exit/entry.
+   - `AlertDialog` (`AlertDialog.svelte`): Destructive / alert confirmation dialog with default focus on Cancel.
+   - `Popover` (`HoverCard.svelte`): Non-modal floating popover anchored to trigger elements.
+   - `Tooltip` (`Tooltip.svelte`): High-contrast hover/focus helper label with floating-UI positioning.
+   - `ContextMenu` (`ContextMenu.svelte`): Right-click contextual action menus for 3D viewer canvas, PDF text, and data table rows.
+2. **Navigation & Menus**:
+   - `DropdownMenu` (`DropdownMenu.svelte`): Triggered menu with items, checkboxes, radio items, and separators.
+   - `Command` (`Command.svelte`): Fast filterable command palette (`Cmd+K`) for global view and action navigation.
+   - `Menubar` (`Menubar.svelte`): Desktop-grade application menu bar for CAD/BIM viewports and document studios.
+   - `NavigationMenu` (`NavigationMenu.svelte`): Accessible top-level application navigation with delayed hover-intent.
+   - `Tabs` (`Tabs.svelte` / `TabStrip.svelte`): WAI-ARIA tab list with keyboard arrow switching and tab panels.
+   - `Pagination` (`TablePagination.svelte`): Accessible page indexer and per-page size selector.
+3. **Form Controls & Inputs**:
+   - `Button` (`Button.svelte`): Standard polymorphic button with loading states, sizes, and color intents.
+   - `Input` (`Input.svelte`): Themed text input with icon prefix/suffix slots.
+   - `FormField` (`FormField.svelte`): Accessible field wrapper with label, hints, and error alerts.
+   - `Checkbox` (`Checkbox.svelte`): Custom checked/indeterminate checkbox with design-token rings.
+   - `RadioGroup` (`RadioGroup.svelte`): Accessible single-choice group with custom indicator dots.
+   - `Switch` (`Switch.svelte`): Boolean toggle switch with smooth sliding thumb.
+   - `Select` (`Select.svelte`): Custom select dropdown with search filtering and option groups.
+   - `Combobox` (`Combobox.svelte`): Auto-complete combobox with async/sync query matching.
+   - `Slider` (`Slider.svelte`): Continuous and stepped numeric slider with draggable thumb.
+   - `Label` (`Label.svelte`): Accessible label preventing double-click selection.
+   - `PinInput` (`PinInput.svelte`): Segmented code input for 2FA, OTP, or classification codes.
+4. **Date & Time Primitives**:
+   - `DatePicker` / `Calendar` / `DateField`: Accessible date picker with styled calendar grid.
+   - `DateRangePicker` / `RangeCalendar` / `DateRangeField`: Multi-day date range selector for table filters.
+   - `TimeField` / `TimeRangeField`: Accessible time formatting inputs for schedules and logs.
+5. **Layout, Disclosure & Structure**:
+   - `Accordion` (`Accordion.svelte`): Single or multi-expanded vertical disclosures.
+   - `Collapsible` (`Collapsible.svelte`): Single panel collapsible container.
+   - `ScrollArea` (`ScrollArea.svelte`): Custom cross-platform scroll container preventing layout shifts.
+   - `Separator` (`Separator.svelte`): Accessible horizontal/vertical dividing line.
+   - `AspectRatio` (`AspectRatio.svelte`): Guaranteed aspect ratio container for 3D viewports and BCF snapshots.
+6. **Data Display & Progress**:
+   - `Progress` (`Progress.svelte`): WAI-ARIA progress bar for multi-stage pipelines and uploads.
+   - `Meter` (`Meter.svelte`): Scalar measurement gauge for compliance rates and storage quotas.
+   - `Avatar` (`Avatar.svelte`): Profile picture with automatic fallback to initials or icon on error.
+   - `RatingGroup` (`RatingGroup.svelte`): Interactive star/score rating for AI rule extraction confidence.
+   - `LinkPreview` (`LinkPreview.svelte`): Rich hover card preview for building standards and external URLs.
+7. **Toolbars & Toggles**:
+   - `Toolbar` (`Toolbar.svelte`): Accessible ribbon/toolbar with roving keyboard focus.
+   - `Toggle` (`Toggle.svelte`) & `ToggleGroup` (`ToggleGroup.svelte`): Two-state toggles and multi-choice button groups.
+
+### Shared Platform Components (`frontend/src/lib/components/`)
 
 - **`<PageHeader.svelte>`**: Standard page hero header with category breadcrumbs, icon, title, subtitle, and action slots.
-- **`<Modal.svelte>`**: Reusable modal dialog wrapper with backdrop blur (`backdrop-blur-md`), keyboard `Escape` closing, header with icon, scrollable body, and `slot="footer"` button layout.
+- **`<Modal.svelte>`**: Modal dialog wrapper backed by bits-ui `Dialog` (`Dialog.Root`, `Dialog.Content`, etc.).
+- **`<ConfirmModal.svelte>`**: Destructive confirmation modal backed by bits-ui `AlertDialog`.
 - **`<SortHeader.svelte>`**: Interactive sortable table column header with automatic ascending/descending/inactive sort icons and ARIA attributes.
 - **`<TableCheckbox.svelte>`**: Unified checkbox supporting indeterminate master toggle, row-level selection, and accessibility labels.
 - **`<TablePagination.svelte>`**: Dedicated table pagination component with page size selection (10, 25, 50, 100).
 - **`<BulkActionBar.svelte>`**: Floating/inline bulk action toolbar when rows are selected.
 - **`<EmptyState.svelte>`**: Standardized zero-state card with icon, title, description, and primary CTA button.
 - **`<LoadingState.svelte>`**: Spinner loading container with configurable message and sub-message.
-- **`<SeverityBadge.svelte>`**: Universal compact engineering badge (`rounded-md`) for severity levels and verdicts (`critical`, `high`, `medium`, `low`, `data_quality`, `pass`, `fail`).
+- **`<SeverityBadge.svelte>`**: Universal compact engineering badge (`rounded-md`) for severity levels and verdicts.
 - **`<IsoGovernanceBadges.svelte>`**: Standard ISO 19650 metadata tags (Suitability `S0`–`S7`, Revision `P01.01`, CDE State `WIP`/`SHARED`/`PUBLISHED`/`ARCHIVED`).
-- **`<HoverCard.svelte>`**: Hover/focus-triggered rich preview popover (bits-ui `Popover`), used for supplementary detail without a click or modal.
-- **`<DropdownMenu.svelte>`**: Thin bits-ui `DropdownMenu` wrapper for triggered menus (Escape/outside-click dismissal, roving keyboard nav) — used by `IntegrationsMenu`, `ResourcesMenu`, `UserMenu`, and `RulesView`'s Import/Export menu.
-- **`<OrgSwitcher.svelte>`**: bits-ui `Select`-backed organization switcher in the header, syncing to `authState.activeOrganizationId`.
-
-### Core Atomic Primitives (`frontend/src/lib/components/ui/`)
-
-To eliminate bespoke, duplicated button and input markup across views, always prefer these shared base primitives:
-
-- **`<Button.svelte>`**: Standardized button primitive supporting 5 variants (`primary`, `secondary`, `outline`, `ghost`, `destructive`), 5 sizes (`xs`, `sm`, `md`, `lg`, `icon`), built-in SVG loading spinner, and keyboard accessibility.
-- **`<Input.svelte>`**: Form input with prefix/suffix icon slots, semantic focus rings, and reactive error border styling.
-- **`<FormField.svelte>`**: Form field layout wrapper with label, required asterisk, helper text hint, and validation error messages.
-- **`<Card.svelte>` / `<CardHeader.svelte>` / `<CardTitle.svelte>` / `<CardContent.svelte>`**: Semantic card container set wrapping standard background, border, and padding tokens.
+- **`<HoverCard.svelte>`**: Hover/focus-triggered rich preview popover (bits-ui `Popover`).
+- **`<DropdownMenu.svelte>`**: Thin bits-ui `DropdownMenu` wrapper for triggered menus.
+- **`<OrgSwitcher.svelte>`**: bits-ui `Select`-backed organization switcher in the header.
 
 ## 13. Living Design System & UI Kit Showcase
 
@@ -334,7 +389,8 @@ A dedicated interactive showcase is available in-app at **`#/design-system`** (r
 The showcase allows live inspection of:
 - Semantic color tokens, surface elevations, and foreground contrast levels.
 - Real-time dark, light, and system theme switching side-by-side.
-- The button primitive matrix across all variants, sizes, and states (including dynamic loading spinner tests).
+- The button primitive matrix across all variants, sizes, and states.
 - Form inputs, icon slot positioning, and validation error states.
+- All headless bits-ui primitives (Checkbox, Switch, Accordion, Select, Tabs, Dialog, Slider, Progress, Tooltip, etc.).
 - OpenBIM compliance severity badges (`critical`, `high`, `medium`, `low`, `data_quality`) and pipeline execution status chips.
 

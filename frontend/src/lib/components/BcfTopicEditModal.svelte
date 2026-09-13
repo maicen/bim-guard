@@ -14,6 +14,28 @@
   import { bcfApi } from "../api";
   import type { BCFTopicResponse, BCFTopicCreatePayload, BCFTopicUpdatePayload } from "../types";
   import { CDE_STATE_CHOICES, SUITABILITY_CODES } from "../types";
+  import { DatePicker, Select, type SelectOption } from "./ui";
+
+  const typeOptions: SelectOption[] = [
+    { value: "Issue", label: "Issue" },
+    { value: "Clash / Compliance", label: "Clash / Compliance" },
+    { value: "Remark", label: "Remark" },
+    { value: "Request", label: "Request" },
+  ];
+  const statusOptions: SelectOption[] = [
+    { value: "Open", label: "Open" },
+    { value: "In Progress", label: "In Progress" },
+    { value: "Resolved", label: "Resolved" },
+    { value: "Closed", label: "Closed" },
+  ];
+  const priorityOptions: SelectOption[] = [
+    { value: "Critical", label: "Critical" },
+    { value: "High", label: "High" },
+    { value: "Normal", label: "Normal" },
+    { value: "Low", label: "Low" },
+  ];
+  const cdeOptions: SelectOption[] = CDE_STATE_CHOICES.map((s) => ({ value: s, label: s }));
+  const suitabilityOptions: SelectOption[] = SUITABILITY_CODES.map((s) => ({ value: s, label: s }));
 
   interface Props {
     isOpen?: boolean;
@@ -190,16 +212,7 @@
             <label for="topic-type" class="block text-xs font-semibold text-fg-secondary">
               Type
             </label>
-            <select
-              id="topic-type"
-              bind:value={topicType}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Issue">Issue</option>
-              <option value="Clash / Compliance">Clash / Compliance</option>
-              <option value="Remark">Remark</option>
-              <option value="Request">Request</option>
-            </select>
+            <Select options={typeOptions} bind:value={topicType} />
           </div>
 
           <!-- Status -->
@@ -207,16 +220,7 @@
             <label for="topic-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
-            <select
-              id="topic-status"
-              bind:value={topicStatus}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Resolved">Resolved</option>
-              <option value="Closed">Closed</option>
-            </select>
+            <Select options={statusOptions} bind:value={topicStatus} />
           </div>
 
           <!-- Priority -->
@@ -224,16 +228,7 @@
             <label for="topic-priority" class="block text-xs font-semibold text-fg-secondary">
               Priority
             </label>
-            <select
-              id="topic-priority"
-              bind:value={priority}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Normal">Normal</option>
-              <option value="Low">Low</option>
-            </select>
+            <Select options={priorityOptions} bind:value={priority} />
           </div>
         </div>
 
@@ -270,12 +265,7 @@
             <label for="topic-due" class="block text-xs font-semibold text-fg-secondary">
               Due Date
             </label>
-            <input
-              id="topic-due"
-              type="date"
-              bind:value={dueDate}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-            />
+            <DatePicker bind:value={dueDate} placeholder="Select due date" />
           </div>
         </div>
 
@@ -293,30 +283,14 @@
               <label for="topic-cde" class="block text-caption font-semibold text-fg-muted"
                 >CDE State</label
               >
-              <select
-                id="topic-cde"
-                bind:value={cdeState}
-                class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                {#each CDE_STATE_CHOICES as state (state)}
-                  <option value={state}>{state}</option>
-                {/each}
-              </select>
+              <Select options={cdeOptions} bind:value={cdeState} />
             </div>
 
             <div class="space-y-1">
               <label for="topic-suitability" class="block text-caption font-semibold text-fg-muted"
                 >Suitability</label
               >
-              <select
-                id="topic-suitability"
-                bind:value={suitabilityCode}
-                class="w-full rounded-lg border border-border-default bg-surface-card px-2.5 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                {#each SUITABILITY_CODES as code (code)}
-                  <option value={code}>{code}</option>
-                {/each}
-              </select>
+              <Select options={suitabilityOptions} bind:value={suitabilityCode} />
             </div>
 
             <div class="space-y-1">
