@@ -44,6 +44,7 @@ class BIMGuard_App:
         rules_service=None,
         analysis_service=None,
         triplestore_service=None,
+        graph_service=None,
     ) -> None:
         """Initialize with explicit dependency injection, defaulting to real instances."""
         self._projects_service = projects_service
@@ -52,6 +53,7 @@ class BIMGuard_App:
         self._rules_service = rules_service
         self._analysis_service = analysis_service
         self._triplestore_service = triplestore_service
+        self._graph_service = graph_service
 
     def orchestrate_workflow(
         self,
@@ -166,7 +168,9 @@ class BIMGuard_App:
         )
 
         graph_summary, graph_engine_issues, graph_engine_error = (
-            self._run_graph_intelligence(ifc.get("m2_reader"), project_id)
+            self._run_graph_intelligence(
+                ifc.get("m2_reader"), project_id, graph_service=self._graph_service
+            )
             if enable_graph
             else (None, [], None)
         )
@@ -719,21 +723,29 @@ class BIMGuard_App:
 
     @staticmethod
     def _run_graph_intelligence(
-        m2_reader: Any, project_id: int
+        m2_reader: Any, project_id: int, *, graph_service: Any = None
     ) -> tuple[dict[str, Any] | None, list[dict], str | None]:
         """Opt-in graph intelligence: summary/centrality plus an orphan-element check.
 
         Runs the GRAPH-TOPOLOGY-001 RuleEvaluator
         (``app.engines.bimguard_graph_engine.GraphTopologyEngine``) over orphan
-        elements found in the same graph build.
+        elements found in the same graph build, and -- when ``graph_service``
+        is injected (see ``BIMGuard_App.__init__``'s ``graph_service`` param,
+        wired from ``app.bootstrap``'s Neo4j/Kùzu-backed ``GraphService``) --
+        persists the same graph into it via ``ingest_ifc_to_graph``, so an
+        analysis run with ``enable_graph=True`` populates the real graph
+        database rather than only building an in-memory one. Persistence is
+        best-effort: a Neo4j/Kùzu hiccup is logged and skipped, never costing
+        the orphan-element findings below, which need only the in-memory graph.
 
-        Builds the relationship graph once and reuses it for both, rather than
-        the two independent graph builds ``_run_shacl_compliance`` and this used
-        to each do. Wraps its own ``tracking(project_id, run_key="graph")``
-        context -- separate from the corrosion pipeline's ``"default"`` run key
-        -- so GRAPH-001 can report real progress via the existing pipeline
-        tracker without resetting an in-flight corrosion run for the same
-        project (see CLAUDE.md's `PipelineTracker` per-run-key note).
+        Builds the relationship graph once and reuses it for the summary, the
+        persistence step, and the engine, rather than the independent graph
+        builds ``_run_shacl_compliance`` and this used to each do. Wraps its
+        own ``tracking(project_id, run_key="graph")`` context -- separate from
+        the corrosion pipeline's ``"default"`` run key -- so GRAPH-001 can
+        report real progress via the existing pipeline tracker without
+        resetting an in-flight corrosion run for the same project (see
+        CLAUDE.md's `PipelineTracker` per-run-key note).
 
         Returns ``(graph_summary, graph_engine_issues, graph_engine_error)``.
         Never raises: any failure is caught, logged, and reported as
@@ -758,11 +770,33 @@ class BIMGuard_App:
                     build_ifc_graph,
                     build_ifc_graph_summary,
                     find_orphan_elements,
+                    ingest_ifc_to_graph,
                 )
 
                 track_emit(GRAPH_ENGINE, Stage.IFC_PARSING)
                 graph = build_ifc_graph(m2_reader.ifc_file)
                 summary = build_ifc_graph_summary(graph)
+
+                if graph_service is not None:
+                    try:
+                        ingest_stats = ingest_ifc_to_graph(
+                            m2_reader.ifc_file,
+                            graph_service,
+                            project_id=str(project_id),
+                            graph=graph,
+                        )
+                        track_emit(
+                            GRAPH_ENGINE,
+                            None,
+                            persisted_nodes=ingest_stats.get("nodes", 0),
+                            persisted_edges=ingest_stats.get("edges", 0),
+                        )
+                    except Exception as ingest_exc:
+                        logger.warning(
+                            "Graph persistence skipped project_id=%d: %s",
+                            project_id,
+                            ingest_exc,
+                        )
 
                 orphans = find_orphan_elements(graph)
                 track_emit(GRAPH_ENGINE, Stage.ENGINE_EXECUTION, records=len(orphans))

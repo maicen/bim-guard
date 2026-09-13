@@ -179,3 +179,74 @@ def test_run_graph_intelligence_returns_nothing_without_a_reader():
     summary, issues, error = BIMGuard_App._run_graph_intelligence(None, project_id=1)
 
     assert (summary, issues, error) == (None, [], None)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator wiring: graph_service persistence
+# ---------------------------------------------------------------------------
+
+
+class _FakeGraphService:
+    """Records ingest_ifc_to_graph's batch calls instead of touching a real DB."""
+
+    def __init__(self):
+        self.node_batches: list[tuple[str, list[dict]]] = []
+        self.edge_batches: list[tuple[str, list[dict]]] = []
+
+    def add_nodes_batch(self, label, nodes):
+        self.node_batches.append((label, list(nodes)))
+
+    def add_edges_batch(self, rel_type, edges, *, from_label=None, to_label=None):
+        self.edge_batches.append((rel_type, list(edges)))
+
+
+def test_run_graph_intelligence_persists_into_the_injected_graph_service(monkeypatch):
+    from app.modules.orchestrator import BIMGuard_App
+
+    graph = _graph_with(
+        nodes=[
+            ("storey-1", {"ifc_type": "IfcBuildingStorey", "label": "Level 1"}),
+            ("wall-1", {"ifc_type": "IfcWall", "label": "Wall 1"}),
+        ],
+        edges=[("storey-1", "wall-1")],
+    )
+    monkeypatch.setattr(
+        "app.modules.ifc_reader.ifc_graph.build_ifc_graph", lambda model: graph
+    )
+
+    reader = _FakeReader(ifc_file=object())
+    fake_service = _FakeGraphService()
+
+    summary, issues, error = BIMGuard_App._run_graph_intelligence(
+        reader, project_id=999, graph_service=fake_service
+    )
+
+    assert error is None
+    assert issues == []  # the wall is connected -- no orphan finding
+    assert sum(len(nodes) for _, nodes in fake_service.node_batches) == 2
+    assert sum(len(edges) for _, edges in fake_service.edge_batches) == 1
+
+
+def test_graph_persistence_failure_does_not_break_orphan_findings(monkeypatch):
+    from app.modules.orchestrator import BIMGuard_App
+
+    graph = _graph_with(
+        nodes=[("wall-1", {"ifc_type": "IfcWall", "label": "Wall 1"})],
+        edges=[],
+    )
+    monkeypatch.setattr(
+        "app.modules.ifc_reader.ifc_graph.build_ifc_graph", lambda model: graph
+    )
+
+    class _BrokenGraphService:
+        def add_nodes_batch(self, label, nodes):
+            raise ConnectionError("Neo4j is unreachable")
+
+    reader = _FakeReader(ifc_file=object())
+    summary, issues, error = BIMGuard_App._run_graph_intelligence(
+        reader, project_id=999, graph_service=_BrokenGraphService()
+    )
+
+    assert error is None
+    assert len(issues) == 1
+    assert issues[0]["element_id"] == "wall-1"

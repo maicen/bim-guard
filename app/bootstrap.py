@@ -691,6 +691,7 @@ def build_default_container() -> ApplicationContainer:
         rules_service=rules_service,
         analysis_service=analysis_service,
         triplestore_service=graph_triplestore_service,
+        graph_service=graph_service,
     )
 
     # 6. Background Cache Pre-warming (MTR-03)

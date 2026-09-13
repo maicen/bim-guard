@@ -300,6 +300,7 @@ def ingest_ifc_to_graph(
     *,
     project_id: str | None = None,
     include_psets: bool = False,
+    graph: nx.DiGraph | None = None,
 ) -> dict[str, int]:
     """Extract IFC entities and relationships and ingest them in batch into GraphService.
 
@@ -308,19 +309,25 @@ def ingest_ifc_to_graph(
         graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
         project_id: Optional project identifier to associate with all ingested nodes.
         include_psets: Whether to flatten and attach property set values to element nodes.
+        graph: An already-built graph for ``model_or_path`` (from
+            ``build_ifc_graph``), reused instead of building a second one --
+            for a caller (e.g. the orchestrator's graph intelligence
+            side-channel) that already built the graph for its own summary or
+            engine pass over the same model.
 
     Returns:
         Dict with total counts of ingested nodes and relationships.
     """
-    if not _IFCOPENSHELL_AVAILABLE:
-        raise ImportError("ifcopenshell is not installed.")
+    if graph is None:
+        if not _IFCOPENSHELL_AVAILABLE:
+            raise ImportError("ifcopenshell is not installed.")
 
-    if isinstance(model_or_path, (str, Path)):
-        model = ifcopenshell.open(str(model_or_path))
-    else:
-        model = model_or_path
+        if isinstance(model_or_path, (str, Path)):
+            model = ifcopenshell.open(str(model_or_path))
+        else:
+            model = model_or_path
 
-    graph = build_ifc_graph(model)
+        graph = build_ifc_graph(model)
 
     # Group nodes by label (ifc_type)
     nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
