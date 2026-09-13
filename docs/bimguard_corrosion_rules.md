@@ -3,10 +3,10 @@
 Corrosion slice of the BIMGUARD AI OpenBIM compliance application: the GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media and XM-001 cross-material rule logic, their catalogs and rule packs, plus the shared platform architecture. Compiled for analysis against corrosion standards (ISO 9223, ISO 12944, ASTM G82).
 
 - **NotebookLM workspace:** FMP: BIMGUARD AI - Corrosion
-- **Generated:** 2026-09-13 15:22 UTC
-- **Source repository:** `bim-guard-hermesfix`
+- **Generated:** 2026-09-13 18:10 UTC
+- **Source repository:** `bim-guard-merge`
 - **File types included:** `.csv`, `.json`, `.md`, `.py`, `.txt`, `.xml`
-- **Files included:** 345 (101 corrosion-specific, 244 shared architecture files also present in the companion notebook)
+- **Files included:** 347 (102 corrosion-specific, 245 shared architecture files also present in the companion notebook)
 
 ---
 
@@ -1951,7 +1951,14 @@ JOINT_TYPES = _CC_CATALOG["joint_type_library"]["types"]
 
 def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
     """
-    Map a joint description string to a joint type and geometry class.
+    Intended to map a joint description string to a joint type and geometry class.
+
+    Known defect: the match never succeeds in the current build. The catalogue
+    loader stores each type's keywords under ``ifc_keywords`` but this function
+    reads ``ifc_types``, and the pipeline passes a joint code such as
+    ``"JT-012"`` rather than descriptive text. Every call therefore returns
+    JT-014 / Tight. See docs/defects/CC-001-scoring-inputs-inert.md.
+
     Returns (joint_type_code, geometry_class, risk_score).
     """
     desc_lower = (joint_description or "").lower().strip()
@@ -2055,7 +2062,14 @@ ZONE_TO_SEVERITY = {
 
 
 def classify_environment_severity(zone_category: str, system_type: str = "") -> tuple[str, dict]:
-    """Map zone category and system type to environment severity class."""
+    """Map zone category and system type to environment severity class.
+
+    The pipeline passes the parser's environment code (``interior_conditioned``,
+    ``urban_exterior``, ``interior_dry`` ...) as ``zone_category``, which none of
+    the English phrases in ``ZONE_TO_SEVERITY`` match; only ``coastal``,
+    ``marine_splash``, ``swimming_pool`` or a matching system name leave
+    BUILDING_SERVICES. See docs/defects/CC-001-scoring-inputs-inert.md.
+    """
     text = (zone_category + " " + system_type).lower()
     for keyword, sev_key in ZONE_TO_SEVERITY.items():
         if keyword in text:
@@ -2076,6 +2090,12 @@ def calculate_cct_adequacy(
     Score = 1.00 if operating temp >= CCT (at immediate risk)
     Linear interpolation in between.
     Returns (score, explanation).
+
+    The analysis pipeline never supplies ``operating_temp_c``: ``_cc_element``
+    in ``phase_6c_corrosion_ui`` omits it, so ``CCElement``'s 20 °C default is
+    used for every element whatever temperature the model states, and this
+    score varies only with material grade. "Operating temp" in the notes below
+    means that default. See docs/defects/CC-001-scoring-inputs-inert.md.
     """
     if material_key is None:
         return 0.05, "Non-stainless material — CCT adequacy check not applicable (low base risk)"
@@ -4859,6 +4879,14 @@ RULE_TYPE_REQUIRED_FIELDS = {
     "spatial_clearance": ["target", "property_name", "operator", "check_value"],
     "tiered": ["target", "desc"],
 }
+
+# ── Graph Database (Neo4j) ───────────────────────────────────────────────────
+# Optional graph database connection for GraphRAG and topological queries.
+# Connects to either hosted instances (AuraDB / remote) or Docker-launched instances.
+NEO4J_URI = os.environ.get("NEO4J_URI", "")
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "")
+NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 ```
 
 ---
@@ -4936,6 +4964,68 @@ class ReportPayloadContract(BaseModel):
     bcf_topics: list[dict[str, Any]] = Field(
         default_factory=list, description="BCF topic structures"
     )
+
+
+# ---------------------------------------------------------------------------
+# Explainability Proof Graph & Graph Intelligence Contracts
+# ---------------------------------------------------------------------------
+
+ProofNodeType = Literal["asserted_fact", "rule_axiom", "inference_step", "verdict"]
+ProofEdgeType = Literal["satisfies", "violates", "infers", "applies"]
+
+
+class ProofNodeContract(BaseModel):
+    """A node in an explainable compliance proof DAG."""
+
+    id: str = Field(..., description="Unique node identifier in proof graph")
+    label: str = Field(..., description="Human-readable node description")
+    node_type: ProofNodeType = Field(..., description="Classification of proof node")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Supporting node properties/values"
+    )
+
+
+class ProofEdgeContract(BaseModel):
+    """A directed edge in an explainable compliance proof DAG."""
+
+    source: str = Field(..., description="Source node ID")
+    target: str = Field(..., description="Target node ID")
+    label: ProofEdgeType = Field("infers", description="Semantic relationship type")
+
+
+class IssueProofGraphContract(BaseModel):
+    """An explainable Directed Acyclic Graph proving why an issue was flagged."""
+
+    issue_id: str = Field(..., description="Unique issue identifier")
+    rule_id: str = Field(..., description="Target rule or check identifier")
+    element_id: str = Field(..., description="Target element GUID")
+    nodes: list[ProofNodeContract] = Field(default_factory=list, description="Proof DAG nodes")
+    edges: list[ProofEdgeContract] = Field(default_factory=list, description="Proof DAG edges")
+    explanation: str = Field(..., description="Concise textual derivation summary")
+
+
+class GraphStatusContract(BaseModel):
+    """Operational status and intelligence metrics for a project's graph."""
+
+    project_id: int = Field(..., description="Project database ID")
+    node_count: int = Field(0, description="Total nodes in relationship graph")
+    edge_count: int = Field(0, description="Total edges in relationship graph")
+    has_spatial_boundaries: bool = Field(False, description="Whether spatial boundaries are mapped")
+    is_geometric_fallback: bool = Field(False, description="Whether boundaries used geometric fallback")
+    centrality_summary: dict[str, Any] = Field(
+        default_factory=dict, description="Top centrality metrics and distribution"
+    )
+
+
+class GraphHealResponse(BaseModel):
+    """Response from reconciling and synthesizing missing spatial boundaries."""
+
+    project_id: int = Field(..., description="Project database ID")
+    healed_spaces: int = Field(0, description="Spaces with healed boundaries")
+    created_boundaries: int = Field(0, description="Synthesized boundary relationships")
+    total_boundaries: int = Field(0, description="Total boundaries in model post-heal")
+    status: str = Field("success", description="Status code (success, already_healed, no_op)")
+    message: str = Field(..., description="Human-readable operation summary")
 
 
 # ---------------------------------------------------------------------------
@@ -7622,7 +7712,10 @@ defaulting to a real instance when omitted so ``BIMGuard_App()`` still works
 standalone (tests, ad-hoc scripts) without reaching for the container.
 """
 
+from __future__ import annotations
+
 import time
+from typing import Any
 
 from app.logging_config import get_logger
 
@@ -7664,6 +7757,7 @@ class BIMGuard_App:
         include_type_definitions: bool = False,
         enable_shacl: bool = False,
         enable_arch_engines: bool = False,
+        enable_graph: bool = False,
     ) -> dict:
         """
         Run the full analysis pipeline for a project:
@@ -7835,6 +7929,12 @@ class BIMGuard_App:
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
+            # Opt-in graph intelligence side-channel (see enable_graph)
+            "graph_summary": (
+                BIMGuard_App._run_optional_graph_summary(ifc["m2_reader"])
+                if enable_graph and ifc.get("m2_reader")
+                else None
+            ),
         }
 
     @staticmethod
@@ -7860,7 +7960,7 @@ class BIMGuard_App:
             documents.append(
                 {
                     "filename": doc.get("filename", ""),
-                    "section_count": len([l for l in text.splitlines() if l.strip()]),
+                    "section_count": len([line for line in text.splitlines() if line.strip()]),
                 }
             )
         log_progress(10, "documents-loaded", loaded=len(documents), requested=len(doc_ids))
@@ -8295,6 +8395,23 @@ class BIMGuard_App:
             "shacl_issues": shacl_issues,
             "shacl_error": shacl_error,
         }
+
+    @staticmethod
+    def _run_optional_graph_summary(m2_reader: Any) -> dict[str, Any] | None:
+        """Opt-in graph intelligence summary extraction."""
+        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
+            return None
+        try:
+            from app.modules.ifc_reader.ifc_graph import (
+                build_ifc_graph,
+                build_ifc_graph_summary,
+            )
+
+            graph = build_ifc_graph(m2_reader.ifc_file)
+            return build_ifc_graph_summary(graph)
+        except Exception as exc:
+            logger.debug("Optional graph summary generation skipped: %s", exc)
+            return None
 
     @staticmethod
     def _run_arch_engine_compliance(
@@ -12181,6 +12298,145 @@ def summarise(issues: list[Issue]) -> dict[str, int]:
     return counts
 
 
+def build_issue_proof_graph(issue: Issue | dict[str, Any]) -> dict[str, Any]:
+    """Construct an explainable Directed Acyclic Graph proving why an issue was flagged.
+
+    Inspired by TopologicPy / Semantic Web explainability proof graphs:
+    Decomposes the finding into 4 explicit reasoning tiers:
+    1. Asserted Facts: Observable properties extracted from the BIM model.
+    2. Rule Axioms: Normative standards, building code requirements, and threshold limits.
+    3. Inference Steps: Logical evaluations connecting facts and axioms.
+    4. Verdict: Final compliance classification and risk band assignment.
+    """
+    data = to_dict(issue) if isinstance(issue, Issue) else dict(issue)
+
+    issue_id = str(data.get("id") or "ISSUE-UNKNOWN")
+    rule_id = str(data.get("rule_id") or "RULE-UNKNOWN")
+    element_id = str(data.get("element_id") or "ELEM-UNKNOWN")
+    title = str(data.get("title") or "Compliance Issue")
+    raw_band = data.get("band")
+    band = raw_band.value if hasattr(raw_band, "value") else str(raw_band or "medium")
+    score = float(data.get("score") or 0.0)
+    metadata = data.get("metadata") or {}
+    citations = data.get("citations") or []
+    mitigation = str(data.get("mitigation") or "")
+
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+    # 1. Asserted Fact Nodes
+    fact_elem_id = f"fact_elem_{element_id[:8]}"
+    nodes.append(
+        {
+            "id": fact_elem_id,
+            "label": f"Model Element: {element_id}",
+            "node_type": "asserted_fact",
+            "metadata": {"element_id": element_id},
+        }
+    )
+
+    fact_nodes: list[str] = [fact_elem_id]
+    for k, v in metadata.items():
+        if (
+            v is not None
+            and not isinstance(v, (dict, list))
+            and k not in ("guid", "element_id")
+        ):
+            f_id = f"fact_{k}"
+            nodes.append(
+                {
+                    "id": f_id,
+                    "label": f"Measured {k}: {v}",
+                    "node_type": "asserted_fact",
+                    "metadata": {k: v},
+                }
+            )
+            fact_nodes.append(f_id)
+
+    # 2. Rule Axiom Nodes
+    axiom_id = f"axiom_{rule_id}"
+    axiom_label = f"Rule Criterion: {rule_id}"
+    if citations:
+        c = citations[0]
+        std = c.get("standard")
+        cl = c.get("clause")
+        if std and cl:
+            axiom_label = f"Standard {std} §{cl}"
+        elif std:
+            axiom_label = f"Standard {std}"
+
+    nodes.append(
+        {
+            "id": axiom_id,
+            "label": axiom_label,
+            "node_type": "rule_axiom",
+            "metadata": {"rule_id": rule_id, "citations": citations},
+        }
+    )
+
+    # 3. Inference Step Node
+    inf_id = f"inf_{issue_id}"
+    inf_label = title if title else f"Violation of {rule_id}"
+    nodes.append(
+        {
+            "id": inf_id,
+            "label": f"Deduction: {inf_label}",
+            "node_type": "inference_step",
+            "metadata": {"score": score, "mitigation": mitigation},
+        }
+    )
+
+    for fn in fact_nodes:
+        edges.append(
+            {
+                "source": fn,
+                "target": inf_id,
+                "label": "applies",
+            }
+        )
+
+    edges.append(
+        {
+            "source": axiom_id,
+            "target": inf_id,
+            "label": "applies",
+        }
+    )
+
+    # 4. Verdict Node
+    verdict_id = f"verdict_{issue_id}"
+    nodes.append(
+        {
+            "id": verdict_id,
+            "label": f"Verdict: FAIL ({band.upper()}, Score: {score:.2f})",
+            "node_type": "verdict",
+            "metadata": {"band": band, "score": score},
+        }
+    )
+
+    edges.append(
+        {
+            "source": inf_id,
+            "target": verdict_id,
+            "label": "infers",
+        }
+    )
+
+    explanation = (
+        f"Element {element_id} was evaluated against {axiom_label}. "
+        f"Based on asserted model parameters, the check concluded: '{title}' with a risk score of {score:.2f} ({band})."
+    )
+
+    return {
+        "issue_id": issue_id,
+        "rule_id": rule_id,
+        "element_id": element_id,
+        "nodes": nodes,
+        "edges": edges,
+        "explanation": explanation,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Smoke test
 # ---------------------------------------------------------------------------
@@ -14232,12 +14488,56 @@ class DoclingExtractor:
         if not xml_content or not xml_content.strip():
             return False
         import tempfile
+        import sys
         from pathlib import Path
         try:
             import doclang
-            with tempfile.NamedTemporaryFile(suffix=".xml", delete=False, mode="w", encoding="utf-8") as f:
+            import os
+            if sys.platform == "win32":
+                try:
+                    import doclang.backends.saxonche as sc
+                    if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
+                        def _patched_saxon_validate(self, xml_path, *, schema_path, allow_empty_namespace=False, verbose=False):
+                            from lxml import etree
+                            from saxonche import PySaxonProcessor
+                            from doclang.backends.saxonche import (
+                                _require_saxonche_backend,
+                                _parse_doclang_document,
+                                _ensure_namespace,
+                                _write_xml_without_dtd,
+                                _transpile_schematron_to_xslt,
+                                _svrl_failed_asserts_to_violations,
+                            )
+                            _require_saxonche_backend()
+                            with open(xml_path, "rb") as f:
+                                xml_doc = _parse_doclang_document(f)
+                            if allow_empty_namespace:
+                                xml_doc = _ensure_namespace(xml_doc)
+                            fd_saxon, tmp_saxon_path = tempfile.mkstemp(suffix=".xml")
+                            os.close(fd_saxon)
+                            with open(tmp_saxon_path, "wb") as tmp:
+                                _write_xml_without_dtd(xml_doc, tmp)
+                            try:
+                                with PySaxonProcessor(license=False) as proc:
+                                    xslt_proc = proc.new_xslt30_processor()
+                                    xslt_text = _transpile_schematron_to_xslt(schema_path, verbose=verbose)
+                                    xslt_executable = xslt_proc.compile_stylesheet(stylesheet_text=xslt_text)
+                                    result = xslt_executable.transform_to_string(source_file=tmp_saxon_path)
+                                    if not result:
+                                        return []
+                                    result_doc = etree.fromstring(result.encode("utf-8"))
+                                    return _svrl_failed_asserts_to_violations(result_doc)
+                            finally:
+                                Path(tmp_saxon_path).unlink(missing_ok=True)
+                        sc.SaxoncheValidator.validate = _patched_saxon_validate
+                        sc.SaxoncheValidator._win32_patched = True
+                except Exception:
+                    pass
+
+            fd, tmp_path = tempfile.mkstemp(suffix=".xml")
+            os.close(fd)
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(xml_content)
-                tmp_path = f.name
             try:
                 doclang.validate(tmp_path, allow_empty_namespace=True)
                 return True
@@ -21515,13 +21815,26 @@ def dn_to_od_m(dn: int) -> float:
 ### app/modules/ifc_reader/ifc_graph.py
 
 ```python
-"""Build IFC relationship graphs and render them as PyVis HTML."""
+"""Build IFC relationship graphs and ingest them into GraphService (Neo4j / KùzuDB).
 
-from html import escape
+Provides:
+- `build_ifc_graph(model) -> nx.DiGraph`: Builds a NetworkX directed relationship graph.
+- `ingest_ifc_to_graph(...) -> dict[str, int]`: Streamlines IFC entities and relationships
+  directly into a GraphService backend using batch Cypher / provider operations.
+- `build_ifc_graph_summary(...) -> dict`: Returns structured metadata and statistics.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
-from pyvis.network import Network
+
+if TYPE_CHECKING:
+    from app.services.graph_database import GraphService
 
 try:
     import ifcopenshell
@@ -21529,42 +21842,25 @@ try:
 
     _IFCOPENSHELL_AVAILABLE = True
 except ImportError:
+    ifcopenshell = None
     _IFCOPENSHELL_AVAILABLE = False
 
+logger = logging.getLogger(__name__)
 
 _SPATIAL_TYPES = {"IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcSpace"}
-_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2}
+_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2, "HasMaterial": 3}
 
 
-def _safe_label(entity) -> str:
+def _safe_label(entity: Any) -> str:
     name = getattr(entity, "Name", None)
     return name or entity.is_a()
 
 
-def _node_title(guid: str, label: str, ifc_type: str, psets: dict) -> str:
-    pset_names = list(psets.keys())[:6]
-    pset_suffix = ""
-    if pset_names:
-        joined = ", ".join(escape(name) for name in pset_names)
-        extra = len(psets) - len(pset_names)
-        more = f" (+{extra} more)" if extra > 0 else ""
-        pset_suffix = f"<br/><b>Psets:</b> {joined}{more}"
-    return (
-        f"<b>{escape(label)}</b>"
-        f"<br/><b>Type:</b> {escape(ifc_type)}"
-        f"<br/><b>GUID:</b> {escape(guid)}"
-        f"{pset_suffix}"
-    )
-
-
-def build_ifc_graph(model) -> nx.DiGraph:
-    """Build a directed IFC relationship graph from products and key relations."""
+def build_ifc_graph(model: Any) -> nx.DiGraph:
+    """Build a directed IFC relationship graph from products, spaces, and relations."""
     graph = nx.DiGraph()
 
-    # IfcProject is IfcContext, not IfcProduct, so it is added explicitly --
-    # the IfcProduct loop below would otherwise never see it, leaving the
-    # BOT graph (app.modules.ifc_reader.bot_graph) without a root bot:Zone
-    # node even though IfcRelAggregates links it to every IfcSite.
+    # IfcProject is an IfcContext, so add it explicitly as the root zone
     for project in model.by_type("IfcProject"):
         guid = getattr(project, "GlobalId", None)
         if not guid:
@@ -21576,12 +21872,13 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets={},
         )
 
+    # Physical products and spatial structures
     for product in model.by_type("IfcProduct"):
         guid = getattr(product, "GlobalId", None)
         if not guid:
             continue
         try:
-            psets = ifcopenshell.util.element.get_psets(product)
+            psets = ifcopenshell.util.element.get_psets(product) if ifcopenshell else {}
         except Exception:
             psets = {}
         graph.add_node(
@@ -21591,6 +21888,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets=psets,
         )
 
+    # Spatial containment: (:Structure)-[:ContainedIn]->(:Element)
     for rel in model.by_type("IfcRelContainedInSpatialStructure"):
         container = getattr(rel, "RelatingStructure", None)
         container_guid = getattr(container, "GlobalId", None)
@@ -21606,6 +21904,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#4CAF50",
                 )
 
+    # Spatial aggregation: (:Whole)-[:Aggregates]->(:Part)
     for rel in model.by_type("IfcRelAggregates"):
         whole = getattr(rel, "RelatingObject", None)
         whole_guid = getattr(whole, "GlobalId", None)
@@ -21621,6 +21920,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#2196F3",
                 )
 
+    # Physical connection: (:Element)-[:Connects]->(:Element)
     for rel in model.by_type("IfcRelConnectsElements"):
         source = getattr(rel, "RelatingElement", None)
         target = getattr(rel, "RelatedElement", None)
@@ -21634,150 +21934,259 @@ def build_ifc_graph(model) -> nx.DiGraph:
                 color="#FF9800",
             )
 
+    # Material association: (:Element)-[:HasMaterial]->(:Material)
+    for rel in model.by_type("IfcRelAssociatesMaterial"):
+        material_select = getattr(rel, "RelatingMaterial", None)
+        if not material_select:
+            continue
+        material_name = (
+            getattr(material_select, "Name", None)
+            or getattr(material_select, "Material", None)
+            or material_select.is_a()
+        )
+        if not isinstance(material_name, str):
+            material_name = str(material_name)
+        material_id = f"Material_{material_name}"
+        if material_id not in graph:
+            graph.add_node(
+                material_id,
+                label=material_name,
+                ifc_type="IfcMaterial",
+                psets={},
+            )
+        for element in getattr(rel, "RelatedObjects", []):
+            element_guid = getattr(element, "GlobalId", None)
+            if element_guid and element_guid in graph:
+                graph.add_edge(
+                    element_guid,
+                    material_id,
+                    rel_type="HasMaterial",
+                    color="#9C27B0",
+                )
+
     return graph
 
 
-def _select_nodes(graph: nx.DiGraph, max_nodes: int) -> set[str]:
-    if graph.number_of_nodes() <= max_nodes:
-        return set(graph.nodes())
+def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
+    """Compute closeness, degree, and betweenness centralities on an IFC relationship graph.
 
-    ranked = sorted(
-        graph.nodes(),
-        key=lambda node_id: (
-            graph.nodes[node_id].get("ifc_type") in _SPATIAL_TYPES,
-            graph.degree(node_id),
-            graph.in_degree(node_id),
-        ),
-        reverse=True,
-    )
-    return set(ranked[:max_nodes])
+    Inspired by TopologicPy network centrality analytics for BIM graphs:
+    identifies central structural conduits, key spatial hubs, and critical circulation nodes.
+    """
+    if len(graph) == 0:
+        return {}
+
+    # Convert to undirected graph for structural reachability
+    undirected = graph.to_undirected()
+
+    try:
+        closeness = nx.closeness_centrality(undirected)
+    except Exception:
+        closeness = {}
+
+    try:
+        degree = nx.degree_centrality(undirected)
+    except Exception:
+        degree = {}
+
+    # Betweenness is computationally heavier; cap at moderate sized graphs for interactive response
+    betweenness = {}
+    if len(graph) <= 1000:
+        try:
+            betweenness = nx.betweenness_centrality(undirected)
+        except Exception:
+            betweenness = {}
+
+    results: dict[str, dict[str, float]] = {}
+    for node in graph.nodes():
+        node_str = str(node)
+        results[node_str] = {
+            "closeness": round(float(closeness.get(node, 0.0)), 4),
+            "degree": round(float(degree.get(node, 0.0)), 4),
+            "betweenness": round(float(betweenness.get(node, 0.0)), 4) if betweenness else 0.0,
+        }
+    return results
 
 
-def build_pyvis_graph(
-    graph: nx.DiGraph, violations: list[dict], max_nodes: int = 220, max_edges: int = 600
-):
-    """Render a PyVis HTML graph from the IFC relationship graph."""
+def get_centrality_consequence_multiplier(
+    guid: str,
+    centralities: dict[str, dict[str, float]],
+    base_multiplier: float = 1.0,
+    max_multiplier: float = 1.5,
+) -> float:
+    """Calculate a consequence multiplier (1.0 to 1.5x) based on element network centrality."""
+    metrics = centralities.get(guid)
+    if not metrics:
+        return base_multiplier
+
+    score = float(metrics.get("degree", 0.0))
+    boost = score * (max_multiplier - base_multiplier)
+    return round(base_multiplier + boost, 3)
+
+
+def build_ifc_graph_summary(
+    graph: nx.DiGraph,
+    violations: list[dict[str, Any]] | None = None,
+    include_centrality: bool = True,
+) -> dict[str, Any]:
+    """Generate structured summary metadata and centrality analytics for an IFC relationship graph."""
     violation_ids = {
         entry.get("element")
-        for entry in violations
+        for entry in (violations or [])
         if isinstance(entry, dict) and entry.get("element")
     }
 
-    selected_nodes = _select_nodes(graph, max_nodes)
-    selected_graph = graph.subgraph(selected_nodes).copy()
-
-    edge_rows = sorted(
-        selected_graph.edges(data=True),
-        key=lambda edge: (
-            _EDGE_PRIORITY.get(edge[2].get("rel_type", "Connects"), 99),
-            edge[0],
-            edge[1],
-        ),
-    )
-    limited_edges = edge_rows[:max_edges]
-
-    net = Network(
-        height="700px",
-        width="100%",
-        directed=True,
-        bgcolor="#0f172a",
-        font_color="#e5e7eb",
-        select_menu=True,
-        filter_menu=True,
-        # Served directly as an HTTP response (no sibling lib/ folder on disk
-        # like pyvis's own write_html() creates), so assets must load from a
-        # CDN rather than pyvis's default local-relative-path scripts.
-        cdn_resources="remote",
-    )
-    net.barnes_hut(
-        gravity=-18000,
-        central_gravity=0.16,
-        spring_length=150,
-        spring_strength=0.04,
-        damping=0.1,
-    )
-
-    for node_id, attrs in selected_graph.nodes(data=True):
-        ifc_type = attrs.get("ifc_type", "IfcProduct")
-        label = attrs.get("label", ifc_type)
-        highlighted = node_id in violation_ids
-        is_spatial = ifc_type in _SPATIAL_TYPES
-        color = "#ef4444" if highlighted else "#22c55e" if is_spatial else "#60a5fa"
-        size = 24 if highlighted else 20 if is_spatial else 14
-        net.add_node(
-            node_id,
-            label=label[:36],
-            title=_node_title(node_id, label, ifc_type, attrs.get("psets", {})),
-            color=color,
-            shape="dot",
-            size=size,
-            group=ifc_type,
-        )
-        # pyvis's own add_node() silently drops the color= kwarg whenever
-        # group= is also passed (it falls back to group-based auto-coloring
-        # instead) — set it directly on the stored node options to override.
-        net.nodes[-1]["color"] = color
-
-    for source, target, attrs in limited_edges:
-        net.add_edge(
-            source,
-            target,
-            color=attrs.get("color", "#94a3b8"),
-            title=attrs.get("rel_type", "Relation"),
-            arrows="to",
-        )
-
-    net.set_options(
-        """
-        const options = {
-          "interaction": {"hover": true, "navigationButtons": true, "keyboard": true},
-          "nodes": {"borderWidth": 1, "borderWidthSelected": 2, "font": {"size": 14}},
-          "edges": {"smooth": {"type": "dynamic"}, "width": 2},
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -18000,
-              "centralGravity": 0.16,
-              "springLength": 150,
-              "springConstant": 0.04,
-              "damping": 0.1
-            },
-            "minVelocity": 0.75
-          }
-        }
-        """
-    )
-
-    relationship_counts = {
-        "ContainedIn": 0,
-        "Aggregates": 0,
-        "Connects": 0,
-    }
+    relationship_counts: dict[str, int] = defaultdict(int)
     for _, _, attrs in graph.edges(data=True):
-        rel_type = attrs.get("rel_type")
-        if rel_type in relationship_counts:
-            relationship_counts[rel_type] += 1
+        rel_type = attrs.get("rel_type", "Other")
+        relationship_counts[rel_type] += 1
+
+    type_counts: dict[str, int] = defaultdict(int)
+    for _, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        type_counts[ifc_type] += 1
+
+    centrality_summary: dict[str, Any] = {}
+    top_central_elements: list[dict[str, Any]] = []
+
+    if include_centrality and len(graph) > 0:
+        centralities = compute_graph_centrality(graph)
+        sorted_nodes = sorted(
+            centralities.items(),
+            key=lambda item: max(item[1].get("degree", 0.0), item[1].get("closeness", 0.0)),
+            reverse=True,
+        )
+        for guid, metrics in sorted_nodes[:5]:
+            node_attrs = graph.nodes.get(guid, {})
+            top_central_elements.append(
+                {
+                    "guid": guid,
+                    "label": node_attrs.get("label", guid),
+                    "ifc_type": node_attrs.get("ifc_type", "Unknown"),
+                    "degree": metrics.get("degree", 0.0),
+                    "closeness": metrics.get("closeness", 0.0),
+                }
+            )
+        centrality_summary = {
+            "evaluated_nodes": len(centralities),
+            "max_degree": max((m.get("degree", 0.0) for m in centralities.values()), default=0.0),
+            "max_closeness": max((m.get("closeness", 0.0) for m in centralities.values()), default=0.0),
+        }
 
     return {
-        "html": net.generate_html(notebook=False),
         "node_count": graph.number_of_nodes(),
         "edge_count": graph.number_of_edges(),
-        "displayed_node_count": selected_graph.number_of_nodes(),
-        "displayed_edge_count": len(limited_edges),
-        "truncated": selected_graph.number_of_nodes() < graph.number_of_nodes()
-        or len(limited_edges) < graph.number_of_edges(),
         "violation_count": len(violation_ids & set(graph.nodes())),
-        "relationship_counts": relationship_counts,
+        "relationship_counts": dict(relationship_counts),
+        "type_counts": dict(type_counts),
+        "centrality_summary": centrality_summary,
+        "top_central_elements": top_central_elements,
     }
 
 
-def render_ifc_graph(ifc_path: Path | str, violations: list[dict] | None = None):
-    """Open an IFC file, build its relationship graph, and return rendered HTML metadata."""
+def ingest_ifc_to_graph(
+    model_or_path: Any,
+    graph_service: GraphService,
+    *,
+    project_id: str | None = None,
+    include_psets: bool = False,
+) -> dict[str, int]:
+    """Extract IFC entities and relationships and ingest them in batch into GraphService.
+
+    Args:
+        model_or_path: An open ifcopenshell.file or a Path/str to an IFC file.
+        graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
+        project_id: Optional project identifier to associate with all ingested nodes.
+        include_psets: Whether to flatten and attach property set values to element nodes.
+
+    Returns:
+        Dict with total counts of ingested nodes and relationships.
+    """
+    if not _IFCOPENSHELL_AVAILABLE:
+        raise ImportError("ifcopenshell is not installed.")
+
+    if isinstance(model_or_path, (str, Path)):
+        model = ifcopenshell.open(str(model_or_path))
+    else:
+        model = model_or_path
+
+    graph = build_ifc_graph(model)
+
+    # Group nodes by label (ifc_type)
+    nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for node_id, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "IfcProduct")
+        node_props: dict[str, Any] = {
+            "id": node_id,
+            "guid": node_id,
+            "name": attrs.get("label", node_id),
+            "ifc_type": ifc_type,
+        }
+        if project_id:
+            node_props["project_id"] = project_id
+
+        if include_psets and attrs.get("psets"):
+            # Flatten top property set keys if requested
+            for pset_name, pset_vals in attrs["psets"].items():
+                if isinstance(pset_vals, dict):
+                    for k, v in list(pset_vals.items())[:10]:
+                        safe_key = f"pset_{pset_name}_{k}".replace(" ", "_")
+                        if isinstance(v, (str, int, float, bool)):
+                            node_props[safe_key[:40]] = v
+
+        nodes_by_label[ifc_type].append(node_props)
+
+    total_nodes = 0
+    for label, nodes in nodes_by_label.items():
+        graph_service.add_nodes_batch(label, nodes)
+        total_nodes += len(nodes)
+
+    # Group edges by rel_type
+    edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for source_id, target_id, attrs in graph.edges(data=True):
+        rel_type = attrs.get("rel_type", "CONNECTS").upper()
+        # Normalise relationship names to standard Cypher convention
+        if rel_type == "CONTAINEDIN":
+            rel_type = "CONTAINS"
+        edges_by_type[rel_type].append(
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "properties": {"project_id": project_id} if project_id else {},
+            }
+        )
+
+    total_edges = 0
+    for rel_type, edges in edges_by_type.items():
+        graph_service.add_edges_batch(rel_type, edges)
+        total_edges += len(edges)
+
+    logger.info(
+        "Ingested IFC model to graph: %d nodes across %d labels, %d edges across %d types",
+        total_nodes,
+        len(nodes_by_label),
+        total_edges,
+        len(edges_by_type),
+    )
+
+    return {
+        "nodes": total_nodes,
+        "edges": total_edges,
+        "labels": len(nodes_by_label),
+        "rel_types": len(edges_by_type),
+    }
+
+
+def render_ifc_graph(
+    ifc_path: Path | str, violations: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Open an IFC file and return structured graph summary metrics without PyVis."""
     if not _IFCOPENSHELL_AVAILABLE:
         raise ImportError("ifcopenshell is not installed.")
 
     model = ifcopenshell.open(str(ifc_path))
     graph = build_ifc_graph(model)
-    return build_pyvis_graph(graph, violations or [])
+    return build_ifc_graph_summary(graph, violations or [])
 ```
 
 ---
@@ -23532,6 +23941,7 @@ Both return lists of result dicts compatible with the Module 4 report format.
 """
 
 import logging
+from typing import Any
 
 logger = logging.getLogger("bimguard.spatial")
 
@@ -23634,13 +24044,103 @@ def _is_exterior_door(element) -> bool | None:
     return None
 
 
-def _element_matches_location(element, location: str) -> bool:
-    """True if an element's IsExternal classification matches an
-    applies_when.location condition ("interior" or "exterior"). An element
-    with no verifiable IsExternal data (_is_exterior_door returns None) is
-    excluded — never guessed into either bucket.
+def classify_envelope_elements(ifc_file) -> dict[str, str]:
+    """Classify building elements into directional envelope face roles from 3D geometry.
+
+    Inspired by TopologicPy/IFC4-RV face decomposition:
+    - 'exterior_wall': External vertical faces bounding the building perimeter
+    - 'interior_wall': Internal vertical partitions
+    - 'roof': Topmost horizontal faces
+    - 'ground_slab': Bottommost horizontal ground/foundation slabs
+    - 'intermediate_slab': Intermediate floor slabs
     """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {}
+
+    try:
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+        extractor = IFCGeometryExtractor(ifc_file)
+    except Exception:
+        return {}
+
+    # Collect elements
+    try:
+        walls = ifc_file.by_type("IfcWall") + ifc_file.by_type("IfcWallStandardCase")
+        slabs = ifc_file.by_type("IfcSlab")
+        roofs = ifc_file.by_type("IfcRoof") if hasattr(ifc_file, "by_type") else []
+        elements = walls + slabs + roofs
+    except Exception:
+        elements = []
+
+    if not elements:
+        return {}
+
+    bboxes: dict[str, tuple[Any, dict[str, float]]] = {}
+    for el in elements:
+        try:
+            bbox = extractor.get_bounding_box(el)
+            if bbox:
+                bboxes[getattr(el, "GlobalId", str(id(el)))] = (el, bbox)
+        except Exception:
+            continue
+
+    if not bboxes:
+        return {}
+
+    min_x = min(b["min_x"] for _, b in bboxes.values())
+    max_x = max(b["max_x"] for _, b in bboxes.values())
+    min_y = min(b["min_y"] for _, b in bboxes.values())
+    max_y = max(b["max_y"] for _, b in bboxes.values())
+    min_z = min(b["min_z"] for _, b in bboxes.values())
+    max_z = max(b["max_z"] for _, b in bboxes.values())
+
+    span_x = max(max_x - min_x, 1.0)
+    span_y = max(max_y - min_y, 1.0)
+    span_z = max(max_z - min_z, 1.0)
+
+    margin_xy = max(min(span_x, span_y) * 0.08, 300.0)
+    margin_z = max(span_z * 0.1, 400.0)
+
+    result: dict[str, str] = {}
+    for guid, (el, b) in bboxes.items():
+        is_wall = el.is_a() in ("IfcWall", "IfcWallStandardCase")
+        is_slab = el.is_a() in ("IfcSlab", "IfcRoof")
+
+        if is_wall:
+            touches_x = (b["min_x"] <= min_x + margin_xy) or (b["max_x"] >= max_x - margin_xy)
+            touches_y = (b["min_y"] <= min_y + margin_xy) or (b["max_y"] >= max_y - margin_xy)
+            result[guid] = "exterior_wall" if (touches_x or touches_y) else "interior_wall"
+        elif is_slab:
+            if b["max_z"] >= max_z - margin_z or el.is_a() == "IfcRoof":
+                result[guid] = "roof"
+            elif b["min_z"] <= min_z + margin_z:
+                result[guid] = "ground_slab"
+            else:
+                result[guid] = "intermediate_slab"
+
+    return result
+
+
+def is_exterior_element(element, ifc_file: Any = None) -> bool | None:
+    """Determine if an element is exterior, using Psets first, then geometric envelope fallback."""
     is_ext = _is_exterior_door(element)
+    if is_ext is not None:
+        return is_ext
+    if ifc_file is not None:
+        classification = classify_envelope_elements(ifc_file)
+        elem_role = classification.get(getattr(element, "GlobalId", None))
+        if elem_role in ("exterior_wall", "roof"):
+            return True
+        elif elem_role in ("interior_wall", "intermediate_slab"):
+            return False
+    return None
+
+
+def _element_matches_location(element, location: str, ifc_file: Any = None) -> bool:
+    """True if an element's IsExternal classification matches an
+    applies_when.location condition ("interior" or "exterior").
+    """
+    is_ext = is_exterior_element(element, ifc_file=ifc_file)
     if is_ext is None:
         return False
     return is_ext if location == "exterior" else not is_ext
@@ -23649,21 +24149,23 @@ def _element_matches_location(element, location: str) -> bool:
 # ── Core adjacency builder ────────────────────────────────────────────────────
 
 class IFCSpatialAdjacency:
-    """
-    Builds a spatial adjacency map from IfcRelSpaceBoundary relationships.
+    """Build a spatial adjacency map from IfcRelSpaceBoundary with geometric fallback.
 
     Attributes populated after build():
       _space_data  : {space_guid -> {space, boundaries: [{element, type, physical}]}}
       _wall_spaces : {wall_guid  -> [space_guid, ...]}   -- party wall detection
-      has_boundaries : bool  -- False if the file has no IfcRelSpaceBoundary data
+      has_boundaries : bool  -- True if space boundaries are mapped
+      is_geometric_fallback : bool -- True if populated via geometric proximity
     """
 
-    def __init__(self, ifc_file):
+    def __init__(self, ifc_file, fallback_to_geometric: bool = True):
         self.ifc_file = ifc_file
+        self.fallback_to_geometric = fallback_to_geometric
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
         self._door_to_spaces: dict[str, list[str]] | None = None
         self.has_boundaries = False
+        self.is_geometric_fallback = False
         self._built = False
 
     def build(self) -> "IFCSpatialAdjacency":
@@ -23717,16 +24219,123 @@ class IFCSpatialAdjacency:
                 continue
 
         self.has_boundaries = len(self._space_data) > 0
+
+        # Geometric fallback when IfcRelSpaceBoundary is absent or incomplete
+        if not self.has_boundaries and self.fallback_to_geometric:
+            self._build_geometric_fallback()
+
         self._built = True
 
         if not self.has_boundaries:
             logger.warning(
-                "No IfcRelSpaceBoundary data found. "
+                "No IfcRelSpaceBoundary data found and geometric fallback found no candidates. "
                 "Daylight and fire separation checks will be skipped. "
                 "Export your model with Space Boundaries enabled."
             )
 
         return self
+
+    def _build_geometric_fallback(self, tolerance_mm: float = 200.0) -> None:
+        """Derive spatial boundaries geometrically from bounding box contact."""
+        if not _IFC_AVAILABLE or self.ifc_file is None:
+            return
+
+        try:
+            spaces = self.ifc_file.by_type("IfcSpace")
+        except Exception:
+            spaces = []
+
+        if not spaces:
+            return
+
+        try:
+            from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+            extractor = IFCGeometryExtractor(self.ifc_file)
+        except Exception:
+            extractor = None
+
+        try:
+            walls = self.ifc_file.by_type("IfcWall") + self.ifc_file.by_type("IfcWallStandardCase")
+            doors = self.ifc_file.by_type("IfcDoor")
+            windows = self.ifc_file.by_type("IfcWindow")
+            slabs = self.ifc_file.by_type("IfcSlab")
+            candidates = walls + doors + windows + slabs
+        except Exception:
+            candidates = []
+
+        if not candidates:
+            return
+
+        # Cache bounding boxes
+        space_boxes: dict[str, tuple[Any, dict[str, float] | None]] = {}
+        for sp in spaces:
+            guid = getattr(sp, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(sp) if extractor else None
+            space_boxes[guid] = (sp, box)
+
+        cand_boxes: list[tuple[Any, str, str, dict[str, float] | None]] = []
+        for c in candidates:
+            guid = getattr(c, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(c) if extractor else None
+            cand_boxes.append((c, guid, c.is_a(), box))
+
+        def _boxes_intersect(a: dict[str, float], b: dict[str, float], tol: float) -> bool:
+            return not (
+                a["max_x"] + tol < b["min_x"]
+                or a["min_x"] - tol > b["max_x"]
+                or a["max_y"] + tol < b["min_y"]
+                or a["min_y"] - tol > b["max_y"]
+                or a["max_z"] + tol < b["min_z"]
+                or a["min_z"] - tol > b["max_z"]
+            )
+
+        found_any = False
+        for s_guid, (sp, s_box) in space_boxes.items():
+            for c_elem, c_guid, c_type, c_box in cand_boxes:
+                is_contact = False
+                if s_box is not None and c_box is not None:
+                    is_contact = _boxes_intersect(s_box, c_box, tolerance_mm)
+                else:
+                    # Spatial container fallback: if element is contained in space's storey
+                    s_storey = getattr(sp, "Decomposes", None)
+                    c_storey = getattr(c_elem, "ContainedInStructure", None)
+                    if s_storey and c_storey and s_storey == c_storey:
+                        is_contact = True
+
+                if is_contact:
+                    if s_guid not in self._space_data:
+                        self._space_data[s_guid] = {
+                            "space": sp,
+                            "boundaries": [],
+                        }
+                    if any(b["element_guid"] == c_guid for b in self._space_data[s_guid]["boundaries"]):
+                        continue
+                    self._space_data[s_guid]["boundaries"].append(
+                        {
+                            "element": c_elem,
+                            "element_guid": c_guid,
+                            "element_type": c_type,
+                            "physical": True,
+                        }
+                    )
+                    if c_type in ("IfcWall", "IfcWallStandardCase"):
+                        if c_guid not in self._wall_spaces:
+                            self._wall_spaces[c_guid] = []
+                        if s_guid not in self._wall_spaces[c_guid]:
+                            self._wall_spaces[c_guid].append(s_guid)
+                    found_any = True
+
+        if found_any:
+            self.has_boundaries = True
+            self.is_geometric_fallback = True
+            logger.info(
+                "Populated %d space boundaries via 3D geometric contact fallback.",
+                len(self._space_data),
+            )
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
@@ -23790,6 +24399,89 @@ class IFCSpatialAdjacency:
             dguid: sorted(sguids) for dguid, sguids in mapping.items()
         }
         return self._door_to_spaces
+
+
+def heal_spatial_boundaries(ifc_file, tolerance_mm: float = 200.0) -> dict[str, Any]:
+    """Reconcile and synthesize missing IfcRelSpaceBoundary entities from geometric adjacency.
+
+    Inspired by TopologicPy's IFC healing workflow: detects spaces and bounding
+    elements (walls, slabs, doors, windows) that lack explicit boundary relationships
+    and generates IfcRelSpaceBoundary records directly in the IFC model memory.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {
+            "healed_spaces": 0,
+            "created_boundaries": 0,
+            "total_boundaries": 0,
+            "status": "no_op",
+            "message": "IFC engine unavailable or empty model",
+        }
+
+    try:
+        existing_rels = ifc_file.by_type("IfcRelSpaceBoundary")
+    except Exception:
+        existing_rels = []
+
+    existing_pairs: set[tuple[str, str]] = set()
+    for r in existing_rels:
+        try:
+            sp = getattr(r, "RelatingSpace", None)
+            el = getattr(r, "RelatedBuildingElement", None)
+            if sp and el:
+                existing_pairs.add((sp.GlobalId, el.GlobalId))
+        except Exception:
+            continue
+
+    adj = IFCSpatialAdjacency(ifc_file, fallback_to_geometric=True).build()
+
+    created_count = 0
+    healed_spaces: set[str] = set()
+
+    for s_guid, s_info in adj._space_data.items():
+        space = s_info.get("space")
+        if not space:
+            continue
+        for b in s_info.get("boundaries", []):
+            elem = b.get("element")
+            if not elem:
+                continue
+            e_guid = b.get("element_guid")
+            if (s_guid, e_guid) not in existing_pairs:
+                try:
+                    import ifcopenshell.guid
+
+                    new_guid = ifcopenshell.guid.new()
+                    ifc_file.create_entity(
+                        "IfcRelSpaceBoundary",
+                        GlobalId=new_guid,
+                        RelatingSpace=space,
+                        RelatedBuildingElement=elem,
+                        PhysicalOrVirtualBoundary="PHYSICAL",
+                        InternalOrExternalBoundary="INTERNAL",
+                    )
+                    existing_pairs.add((s_guid, e_guid))
+                    created_count += 1
+                    healed_spaces.add(s_guid)
+                except Exception as exc:
+                    logger.debug(f"Failed to synthesize IfcRelSpaceBoundary: {exc}")
+                    continue
+
+    try:
+        total = len(ifc_file.by_type("IfcRelSpaceBoundary"))
+    except Exception:
+        total = created_count
+
+    return {
+        "healed_spaces": len(healed_spaces),
+        "created_boundaries": created_count,
+        "total_boundaries": total,
+        "status": "success" if created_count > 0 else "already_healed",
+        "message": (
+            f"Successfully synthesized {created_count} space boundaries across {len(healed_spaces)} spaces."
+            if created_count > 0
+            else "Model already contains full space boundary coverage."
+        ),
+    }
 
 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────
@@ -30145,8 +30837,11 @@ class PipingSystem(str, Enum):
 # ---------------------------------------------------------------------------
 # Joint type classification
 # ---------------------------------------------------------------------------
-# Keys match JT-001 through JT-014 in crevice_corrosion_ruleset.json.
-# See that file for geometry class assignment (open, moderate, tight, critical).
+# A separate vocabulary from the JT-001 to JT-014 joint_type_library in
+# crevice_corrosion_ruleset.json, with different numbering: here JT-003 is
+# threaded and JT-014 a dielectric union; there JT-003 is a slip-on flange and
+# JT-014 is Unknown. The codes do not correspond and must not be mapped by
+# number. See docs/defects/CC-001-scoring-inputs-inert.md.
 
 
 class JointType(str, Enum):
@@ -31973,10 +32668,12 @@ def _describe_cc(issue, catalog, m: Mapping[str, Any]) -> str:
     cct = _num(m.get("cct_value_c"), "°C", places=1)
     temp = _num(m.get("operating_temp_c"), "°C", places=1)
     if cct and temp:
+        # _cc_element passes no temperature, so this is always CCElement's
+        # 20 °C default. See docs/defects/CC-001-scoring-inputs-inert.md.
         cct_txt = (
             f"{material or 'the specified grade'} has a critical crevice "
-            f"temperature of {cct} against an operating temperature of {temp} "
-            f"(ASTM G48 Method B)"
+            f"temperature of {cct}, assessed at the engine's default {temp}, not "
+            f"the element's stated temperature (ASTM G48 Method B)"
         )
     else:
         cct_txt = (
@@ -47851,6 +48548,11 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     EnvVarSpec("DOCLING_SERVICE_URL", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_API_KEY", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_LOCAL_URL", "Document Parsing", "Seeds a self-hosted Docling parsing_engine_instances row on first boot."),
+    # ── Graph Database (Neo4j) ───────────────────────────────────────────────
+    EnvVarSpec("NEO4J_URI", "Graph Database", "Bolt or Neo4j URI for hosted or Docker-launched Neo4j instance."),
+    EnvVarSpec("NEO4J_USERNAME", "Graph Database", "Username for Neo4j basic auth (default: neo4j)."),
+    EnvVarSpec("NEO4J_PASSWORD", "Graph Database", "Password for Neo4j basic auth."),
+    EnvVarSpec("NEO4J_DATABASE", "Graph Database", "Neo4j target database name (default: neo4j)."),
     # ── Integrations ─────────────────────────────────────────────────────────
     EnvVarSpec("GOOGLE_DRIVE_API_KEY", "Integrations", "API-key-only access to public Google Drive file imports."),
     EnvVarSpec("GITHUB_TOKEN", "Integrations", "Token for GitHub repository sync/import."),
@@ -48622,6 +49324,10 @@ class GraphDatabaseProvider(Protocol):
     def add_node(self, label: str, properties: Dict[str, Any]) -> None:
         """Add a node to the graph."""
         ...
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single batch transaction."""
+        ...
         
     def add_edge(
         self,
@@ -48638,6 +49344,21 @@ class GraphDatabaseProvider(Protocol):
         from_label/to_label identify each endpoint's node type -- required by
         providers (e.g. Kùzu) whose graph is strictly typed; a provider that
         doesn't need them may ignore both.
+        """
+        ...
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single batch transaction.
+
+        Each edge dict in `edges` must contain 'source_id' and 'target_id', and
+        an optional 'properties' dict.
         """
         ...
         
@@ -48663,7 +49384,71 @@ class GraphService:
         if not self.provider:
             raise NotImplementedError("No Graph Database provider configured.")
         return self.provider.execute_query(query, parameters)
-        
+
+    def add_node(self, label: str, properties: Dict[str, Any]) -> None:
+        """Add a node via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_node(label, properties)
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch via the configured provider."""
+        if not self.provider or not nodes:
+            return
+        if hasattr(self.provider, "add_nodes_batch"):
+            self.provider.add_nodes_batch(label, nodes)
+        else:
+            for node in nodes:
+                self.provider.add_node(label, node)
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add an edge via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_edge(
+            source_id,
+            target_id,
+            rel_type,
+            properties,
+            from_label=from_label,
+            to_label=to_label,
+        )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch via the configured provider."""
+        if not self.provider or not edges:
+            return
+        if hasattr(self.provider, "add_edges_batch"):
+            self.provider.add_edges_batch(
+                rel_type, edges, from_label=from_label, to_label=to_label
+            )
+        else:
+            for edge in edges:
+                self.provider.add_edge(
+                    edge["source_id"],
+                    edge["target_id"],
+                    rel_type,
+                    edge.get("properties"),
+                    from_label=from_label,
+                    to_label=to_label,
+                )
+
     def insert_document_node(self, node_id: str, text: str, metadata: Dict[str, Any]) -> None:
         """Insert an extracted NLP document node for GraphRAG."""
         if not self.provider:
@@ -48695,10 +49480,13 @@ class GraphService:
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-import pyoxigraph
+try:
+    import pyoxigraph
+except ImportError:
+    pyoxigraph = None
+
 import rdflib
 
 from app.logging_config import get_logger
@@ -48722,6 +49510,10 @@ class GraphTriplestoreService:
                 the store is kept in-memory.
             max_in_memory_graphs: How many project graphs to keep if in-memory.
         """
+        if pyoxigraph is None:
+            raise ImportError(
+                "pyoxigraph is not installed. Please install it with `uv sync --group triplestore`."
+            )
         self.is_in_memory = not bool(store_path)
         self.max_in_memory_graphs = max_in_memory_graphs
         self._lru: list[int] = []
@@ -49375,6 +50167,7 @@ from typing import Dict, Optional
 
 class ISO19650ValidationError(ValueError):
     """Exception raised for ISO 19650 naming convention violations."""
+
     pass
 
 
@@ -49441,9 +50234,9 @@ def validate_and_parse_filename(
     if not re.match(r"^[A-Za-z0-9]{2}$", level):
         raise ISO19650ValidationError(f"Level code '{level}' must be exactly 2 alphanumeric characters.")
 
-    # Field 5: Type (2 Alphabetic)
-    if not re.match(r"^[A-Za-z]{2}$", type_code):
-        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphabetic characters.")
+    # Field 5: Type (2 Alphanumeric, e.g. M3 for 3D model, DR, RP)
+    if not re.match(r"^[A-Za-z0-9]{2}$", type_code):
+        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphanumeric characters.")
 
     # Field 6: Role/Discipline (1-2 Alphabetic)
     if not re.match(r"^[A-Za-z]{1,2}$", role):
@@ -49799,6 +50592,30 @@ class KuzuDatabaseProvider:
         safe_params["__source_id"] = source_id
         safe_params["__target_id"] = target_id
         self.execute_query(query, safe_params)
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch to the graph."""
+        for node in nodes:
+            self.add_node(label, node)
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch to the graph."""
+        for edge in edges:
+            self.add_edge(
+                edge["source_id"],
+                edge["target_id"],
+                rel_type,
+                edge.get("properties"),
+                from_label=from_label,
+                to_label=to_label,
+            )
 
     def clear(self) -> None:
         """Clear all data from the graph by dropping every table (rels first, then nodes)."""
@@ -51429,7 +52246,7 @@ class ModelsService:
             "file_path": file_path,
             "file_name": (file_name or "").strip() or Path(file_path.replace("\\", "/")).name,
             "is_primary": bool(is_primary),
-            "role": role_iso or (role or "").strip() or "context",
+            "role": (role or "").strip() or role_iso or "context",
             "uploaded_at": now_iso_utc(),
             "project_code": project_code or "",
             "originator": originator or "",
@@ -52411,6 +53228,320 @@ class NamingConfigService:
         if not separator or separator == authored:
             return str(convention["format"])
         return str(convention["format"]).replace(authored, separator)
+```
+
+---
+
+### app/services/neo4j_provider.py
+
+```python
+"""Neo4j implementation of the GraphDatabaseProvider protocol.
+
+Supports connecting to either hosted (Neo4j Aura, remote clusters) or local
+Docker-launched Neo4j instances via Bolt or Neo4j routing protocols.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import uuid
+from typing import Any, Dict, List, Optional
+
+try:
+    import neo4j
+    from neo4j import Driver, GraphDatabase
+except ImportError:
+    neo4j = None
+    Driver = None
+    GraphDatabase = None
+
+logger = logging.getLogger(__name__)
+
+#: Neo4j label/property/relationship-type names are interpolated into Cypher
+#: queries, so every identifier is validated against this pattern before use.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+#: Property keys checked, in order, as the primary key when a node's
+#: properties don't declare one explicitly.
+_PK_CANDIDATES = ("id", "guid", "node_id", "rule_id", "global_id")
+
+
+class Neo4jDatabaseProvider:
+    """Neo4j graph database provider implementing GraphDatabaseProvider."""
+
+    def __init__(
+        self,
+        uri: str = "bolt://localhost:7687",
+        username: Optional[str] = "neo4j",
+        password: Optional[str] = None,
+        database: Optional[str] = "neo4j",
+        *,
+        driver: Optional[Any] = None,
+        verify_connectivity: bool = False,
+    ):
+        """Initialize the Neo4j database driver connection.
+
+        Args:
+            uri: Connection URI (e.g. ``bolt://localhost:7687``,
+                ``neo4j+s://<db-id>.databases.neo4j.io``).
+            username: Username for basic auth (defaults to ``neo4j``).
+            password: Password for basic auth. If empty or None, connects
+                without authentication.
+            database: Target database name (defaults to ``neo4j``).
+            driver: Optional pre-configured Neo4j driver instance (useful for
+                testing/mocking).
+            verify_connectivity: Whether to verify connection immediately during
+                initialization.
+
+        Raises:
+            ImportError: If the ``neo4j`` python package is not installed.
+        """
+        if driver is not None:
+            self.driver = driver
+        else:
+            if GraphDatabase is None:
+                raise ImportError(
+                    "The `neo4j` package is not installed. Please install it with `uv add neo4j`."
+                )
+
+            auth = (username, password) if (username and password) else None
+            self.driver = GraphDatabase.driver(uri, auth=auth)
+
+        self.uri = uri
+        self.username = username
+        self.database = database
+        self._node_label_by_id: Dict[Any, str] = {}
+        self._node_pk_by_label: Dict[str, str] = {}
+
+        if verify_connectivity and self.driver:
+            self.verify_connectivity()
+
+    @staticmethod
+    def _validate_identifier(name: str) -> str:
+        """Reject any label/rel-type/property name unsafe for Cypher clauses."""
+        if not isinstance(name, str) or not _IDENTIFIER_RE.match(name):
+            raise ValueError(
+                f"Invalid Neo4j identifier {name!r}: must start with a letter or "
+                "underscore and contain only letters, digits, and underscores."
+            )
+        return name
+
+    def verify_connectivity(self) -> bool:
+        """Verify driver connectivity to the Neo4j server."""
+        try:
+            if hasattr(self.driver, "verify_connectivity"):
+                self.driver.verify_connectivity()
+            return True
+        except Exception as exc:
+            logger.warning("Neo4j connectivity check failed: %s", exc)
+            return False
+
+    def execute_query(
+        self, query: str, parameters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Execute a Cypher query and return the results as a list of dictionaries."""
+        results: List[Dict[str, Any]] = []
+        try:
+            with self.driver.session(database=self.database) as session:
+                records = session.run(query, parameters or {})
+                for record in records:
+                    if hasattr(record, "data"):
+                        results.append(record.data())
+                    else:
+                        results.append(dict(record))
+        except Exception as exc:
+            logger.error("Neo4j query failed: %s -> %s", query, exc)
+            raise
+        return results
+
+    def _pick_primary_key(self, properties: Dict[str, Any]) -> str:
+        """Choose or generate a primary key property for a node."""
+        for candidate in _PK_CANDIDATES:
+            if candidate in properties:
+                return candidate
+        fallback_value = str(uuid.uuid4())
+        properties["id"] = fallback_value
+        return "id"
+
+    def add_node(self, label: str, properties: Dict[str, Any]) -> None:
+        """Add or update a node in the Neo4j graph."""
+        self._validate_identifier(label)
+        for key in properties:
+            self._validate_identifier(key)
+
+        props = dict(properties)
+        pk = self._pick_primary_key(props)
+        self._node_pk_by_label[label] = pk
+        self._node_label_by_id[props[pk]] = label
+
+        query = (
+            f"MERGE (n:{label} {{{pk}: $pk_val}}) "
+            f"SET n += $props"
+        )
+        self.execute_query(query, {"pk_val": props[pk], "props": props})
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single UNWIND batch query."""
+        if not nodes:
+            return
+        self._validate_identifier(label)
+
+        # Determine PK property key (from cache or first node)
+        sample = dict(nodes[0])
+        pk = self._node_pk_by_label.get(label) or self._pick_primary_key(sample)
+        self._node_pk_by_label[label] = pk
+
+        prepared_batch = []
+        for node in nodes:
+            props = dict(node)
+            for key in props:
+                self._validate_identifier(key)
+            if pk not in props:
+                props[pk] = str(uuid.uuid4())
+            self._node_label_by_id[props[pk]] = label
+            prepared_batch.append(props)
+
+        query = (
+            f"UNWIND $batch AS item "
+            f"MERGE (n:{label} {{{pk}: item.{pk}}}) "
+            f"SET n += item"
+        )
+        self.execute_query(query, {"batch": prepared_batch})
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
+    ) -> None:
+        """Add or update a directed relationship between two nodes."""
+        self._validate_identifier(rel_type)
+        if from_label:
+            self._validate_identifier(from_label)
+        if to_label:
+            self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
+
+        edge_props = properties or {}
+        for key in edge_props:
+            self._validate_identifier(key)
+
+        resolved_from = from_label or self._node_label_by_id.get(source_id)
+        resolved_to = to_label or self._node_label_by_id.get(target_id)
+
+        from_clause = f":{resolved_from}" if resolved_from else ""
+        to_clause = f":{resolved_to}" if resolved_to else ""
+
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
+
+        query = (
+            f"MATCH (a{from_clause} {{{pk_a}: $source_id}}), "
+            f"(b{to_clause} {{{pk_b}: $target_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += $props"
+        )
+        self.execute_query(
+            query,
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "props": edge_props,
+            },
+        )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single UNWIND batch query."""
+        if not edges:
+            return
+        self._validate_identifier(rel_type)
+        if from_label:
+            self._validate_identifier(from_label)
+        if to_label:
+            self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
+
+        first_source = edges[0].get("source_id")
+        first_target = edges[0].get("target_id")
+        resolved_from = from_label or self._node_label_by_id.get(first_source)
+        resolved_to = to_label or self._node_label_by_id.get(first_target)
+
+        from_clause = f":{resolved_from}" if resolved_from else ""
+        to_clause = f":{resolved_to}" if resolved_to else ""
+
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
+
+        prepared_edges = []
+        for edge in edges:
+            props = dict(edge.get("properties") or {})
+            for key in props:
+                self._validate_identifier(key)
+            prepared_edges.append(
+                {
+                    "source_id": edge["source_id"],
+                    "target_id": edge["target_id"],
+                    "props": props,
+                }
+            )
+
+        query = (
+            f"UNWIND $batch AS edge "
+            f"MATCH (a{from_clause} {{{pk_a}: edge.source_id}}), "
+            f"(b{to_clause} {{{pk_b}: edge.target_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += edge.props"
+        )
+        self.execute_query(query, {"batch": prepared_edges})
+
+    def ensure_index(self, label: str, property_name: str) -> None:
+        """Create an index on a node property if it does not already exist."""
+        self._validate_identifier(label)
+        self._validate_identifier(property_name)
+        index_name = f"idx_{label}_{property_name}".lower()
+        query = f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{property_name})"
+        self.execute_query(query)
+
+    def clear(self) -> None:
+        """Clear all nodes and relationships from the database."""
+        self.execute_query("MATCH (n) DETACH DELETE n")
+        self._node_label_by_id.clear()
+        self._node_pk_by_label.clear()
+
+    def close(self) -> None:
+        """Close the underlying driver connection."""
+        if self.driver is not None and hasattr(self.driver, "close"):
+            self.driver.close()
+
+    def __enter__(self) -> Neo4jDatabaseProvider:
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager and close driver."""
+        self.close()
 ```
 
 ---
@@ -58874,6 +60005,8 @@ def _seed_cc001(svc: RuleService) -> int:
         )
 
     # ── Joint types (JT-001 … JT-014) ────────────────────────────────────────
+    # Seeded, but not matched by the engine: every element scores JT-014.
+    # See docs/defects/CC-001-scoring-inputs-inert.md.
     for jt_code, jt in cc["joint_type_library"]["types"].items():
         _r(
             reference=f"CC-001.JT.{jt_code}",
@@ -60661,7 +61794,7 @@ BIM-Guard enforces strict Dependency Inversion across engines, repositories, and
 ### 6.2 Evaluator Scope Boundary: Custom Python vs. buildingSMART IDS
 - **Custom Python Evaluators**: Strictly limited to evaluations that declarative buildingSMART Information Delivery Specification (IDS) cannot express:
   - Multiphysics calculations (galvanic voltage gaps, anodic/cathodic area ratios, PREN adequacy).
-  - Joint crevice geometries and critical crevice temperatures (CCT).
+  - Joint crevice geometries and critical crevice temperatures (CCT). (CC-001 as implemented does not yet receive joint type, operating temperature or most environment classes from the pipeline; see [`defects/CC-001-scoring-inputs-inert.md`](defects/CC-001-scoring-inputs-inert.md).)
   - Microbiological growth kinetics, flow velocity classes, and topological dead-leg length-to-diameter ratios.
   - NetworkX topological space-connectivity graph traversal (habitable space to exterior exit shortest paths via `IfcRelSpaceBoundary`).
   - Spatial boundary daylight calculations (window glazing area vs. room floor area).
@@ -63608,7 +64741,7 @@ Equipment subtypes (valve, pump, tank, etc) use `bbox` + `orientation_vector` + 
 
 ## Joints and connectivity
 
-`joint_type` identifies the joint at the element's connection (if the element is itself a joint, like a flange or union). Values match `JT-001` through `JT-014` in `crevice_corrosion_ruleset.json`. See that file for the geometry class (open / moderate / tight / critical) of each.
+`joint_type` identifies the joint at the element's connection (if the element is itself a joint, like a flange or union). Values come from the `JointType` enum, which is a **separate vocabulary** from the `JT-001` to `JT-014` joint library in `crevice_corrosion_ruleset.json`, with different numbering (here `JT-003` is threaded and `JT-014` a dielectric union; in the crevice library `JT-003` is a slip-on flange and `JT-014` is Unknown). The codes do not correspond and must not be mapped by number; neither carries the other's geometry class. See [the CC-001 joint library defect](defects/CC-001-scoring-inputs-inert.md).
 
 `joined_to` is a list of GUIDs of directly-connected neighbouring elements. A pipe segment typically has two entries (upstream and downstream). A tee has three. A dead-end blind flange has one.
 
@@ -64554,7 +65687,10 @@ Five engines run. Three of them assess **individual elements**. **GC-001**
 by anode-to-cathode area ratio and electrolyte severity. **CC-001** (crevice)
 scores the geometry that traps stagnant electrolyte — flanges, gaskets, threaded
 joints, lap joints — against the critical crevice temperature of the alloy
-specified. **MC-001** (microbially influenced) scores flow velocity, operating
+specified. (In the current build CC-001 does not read the joint type, the
+operating temperature or most environment classes from the model, so its score
+varies mainly with the stainless grade; see the
+[defect record](../defects/CC-001-scoring-inputs-inert.md).) **MC-001** (microbially influenced) scores flow velocity, operating
 temperature, dead-leg length and material susceptibility against the Legionella
 and biofilm control regime in CIBSE TM13 and HSE HSG274. The other two assess
 the **network as a whole**. **MM-001** (material-media) scores how aggressively
@@ -64894,7 +66030,7 @@ and the metadata distinguishes them.
 | Engine | Question it answers | Needs a second material? | Scope |
 | --- | --- | --- | --- |
 | GC-001 | Two metals in contact — which one sacrifices? | Yes | Element |
-| CC-001 | Does this geometry trap electrolyte above the alloy's CCT? | No | Element |
+| CC-001 | Does this geometry trap electrolyte above the alloy's CCT? (Today scored at a fixed joint class, a 20 °C default temperature and mostly one environment class — [defect record](../defects/CC-001-scoring-inputs-inert.md).) | No | Element |
 | MC-001 | Will biofilm establish here? | No | Element |
 | **MM-001** | **Is this material right for this fluid?** | **No** | **Network** |
 | XM-001 | Are dissimilar metals coupled across the network graph? | Yes | Network |
@@ -66565,7 +67701,7 @@ The five split into two kinds, and the selector labels them as such:
 | Engine | Kind | What it scores |
 | --- | --- | --- |
 | **GC-001 Galvanic** | Element | Dissimilar metals in contact, scored per element |
-| **CC-001 Crevice** | Element | Joint geometry and trapped electrolyte, per element |
+| **CC-001 Crevice** | Element | Crevice risk from alloy, environment and joint geometry, per element — joint type is not yet classified (every joint scores as Unknown / Tight), operating temperature is not passed (20 °C is assumed) and most environments fall to one default class ([defect record](../defects/CC-001-scoring-inputs-inert.md)) |
 | **MC-001 Microbiological** | Element | Flow, temperature and dead legs, per element |
 | **MM-001 Material-Media** | Network | The medium each pipe carries against its material, scored across the system |
 | **XM-001 Cross-Material** | Network | Dissimilar metals joined across the network — cannot be scored one element at a time |
@@ -67108,6 +68244,430 @@ chain back to the source stays auditable.
 ---
 
 ## docs/defects
+
+### docs/defects/CC-001-scoring-inputs-inert.md
+
+```markdown
+# Defect: CC-001's three scoring inputs are inert
+
+**Status:** Open. Recorded, not fixed. The decision was to document the defect, withdraw or correct the claims, and correct one factual error in the findings text. The scoring was not changed (section 12).
+**Engine:** BIMGUARD-CC-001 (crevice corrosion), ruleset version 1.0.0
+**Recorded:** 13 September 2026. First recorded as the joint-library defect (`docs/defects/CC-001-joint-library-inert.md`), then widened and renamed on the same day when measurement showed that the temperature and environment inputs are inert as well.
+**Found by:** Read-only impact analyses carried out on 13 September 2026. No code, data or database row was changed to find or measure the defect.
+**Code references:** `main` at `2e25cf5` unless stated. The frozen demo build `1450960` was checked separately (section 11).
+
+---
+
+## Summary
+
+**On project 1917, CC-001's three scoring inputs collapse into a single discriminator: the engine tells SS316 apart from everything else, and does nothing more.**
+
+CC-001 is specified to combine three separate judgements about each element: how tight the joint is, whether the alloy can resist crevice attack at the operating temperature, and how severe the environment is. In the current software none of the three reads what the model says about the element:
+
+| Term | Weight | Specified input | What the pipeline actually gives it | Value on all 378 findings in 1917 |
+|---|---|---|---|---|
+| Geometry | 0.35 | Joint type, classified from the joint description | A joint code that never matches, so the type is always JT-014 "Unknown / unclassified" | Tight / 0.75 → constant **0.2625** |
+| CCT adequacy | 0.40 | Alloy's critical crevice temperature against the element's operating temperature | The alloy, but always a 20 °C default temperature | 0.733 for SS316, 0.05 for any ungraded material → **0.2932 or 0.0200** |
+| Environment | 0.25 | Environment severity class | A parser code the engine's English phrases never match | BUILDING_SERVICES / 0.35 → constant **0.0875** |
+
+There are three independent causes:
+
+1. **The joint type library never executes** (section 3). The loader writes `ifc_keywords` but the engine reads `ifc_types`, and the pipeline passes a joint code rather than descriptive text.
+2. **The operating temperature is dropped** (section 4). The parser reads it and `ServiceElement` carries it, but `_cc_element` does not pass it, so the engine uses its 20 °C default.
+3. **The environment vocabularies do not match** (section 5). The parser emits codes such as `interior_conditioned`, while the engine searches for phrases such as "plant room".
+
+The consequence is that **CC-001 produces exactly two scores on project 1917: 0.370 (Medium) and 0.643 (High).** 60% of the weight is constant. The remaining 40% acts as a switch between stainless steel and not stainless steel.
+
+The findings themselves stated a temperature that was not read from the model. That sentence has been corrected (section 13). No score, band, count or mitigation changes as a result.
+
+## 1. The score as specified
+
+    score = 0.35 × geometry risk + 0.40 × CCT adequacy + 0.25 × environment severity
+
+Composite: `app/engines/bimguard_crevice_engine.py:301`. Bands (`:307-317`): below 0.30 Low, 0.30 to 0.55 Medium, 0.55 to 0.80 High, 0.80 and above Critical.
+
+- **Geometry risk** comes from a 14-type joint library. Each type has a geometry class: Open 0.10, Moderate, Tight 0.75, Critical 1.00.
+- **CCT adequacy** (`calculate_cct_adequacy`, `:246-284`) compares the alloy's critical crevice temperature (ASTM G48 Method B) with the operating temperature. It is 0.00 when the element runs more than 20 °C below the CCT, rises linearly to 0.60 at the CCT, and reaches 1.00 at 30 °C above it. Material without a CCT entry scores 0.05 (`:258-259`), or 0.10 if the grade resolves but is not in the table.
+- **Environment severity** (`classify_environment_severity`, `:235-242`, table `ZONE_TO_SEVERITY` `:213-232`) maps a zone category and system name to a class from T0_DRY to T5_IMMERSION. Anything unmatched becomes BUILDING_SERVICES at 0.35.
+
+The specification's defining example is "SS316 flanges in a pool plant room score Critical; the same flanges in a dry void score Low". It needs all three terms to respond to the element.
+
+## 2. What CC-001 actually produces
+
+### Project 1917
+
+All 378 CC-001 findings on project 1917 share the same geometry value (JT-014 / Tight / 0.75) and the same environment value (BUILDING_SERVICES / 0.35). Only the CCT term differs, and only by material:
+
+| Material | Geometry | CCT (at 20 °C) | Environment | Composite | Band | Findings |
+|---|---|---|---|---|---|---|
+| SS316 | 0.35 × 0.75 = 0.2625 | 0.40 × 0.733 = 0.2932 | 0.25 × 0.35 = 0.0875 | **0.643** | High | 70 |
+| Any ungraded material | 0.2625 | 0.40 × 0.05 = 0.0200 | 0.0875 | **0.370** | Medium | 308 |
+
+The engine-showcase record for this model shows the same split: 0 Critical, 70 High, 308 Medium, 0 Low (`docs/validation/engine-showcase-2026-09-08/README.md:91`).
+
+### Reachable range on any model
+
+Through the current pipeline, geometry is always 0.2625 and the CCT term is always taken at 20 °C. The only open questions are the alloy and whether the environment code happens to contain a matching word (section 5):
+
+- **Any model: 0.350 to 0.886.** The minimum is a grade 20 °C or more below its CCT (Super Duplex 2507, titanium, Hastelloy C: CCT term 0) in BUILDING_SERVICES. The maximum is SS304 (CCT −5 °C, term 0.933) with the `swimming_pool` code (T5_IMMERSION, 1.0).
+- **Within BUILDING_SERVICES: 0.350 to 0.723.**
+
+**No element can score Low through a parser environment code.** The constant geometry term and the lowest environment any parser code reaches (BUILDING_SERVICES) already sum to 0.350, above the 0.30 Low boundary. The specified "dry void → Low" outcome cannot occur from a space name. **Critical is reachable only with the `swimming_pool`, `coastal` or `marine_splash` codes.**
+
+These ranges exclude one side route. The engine also searches the element's *system name*, so a system name that happens to contain an engine phrase changes the class. "office" or "normal" gives T1_OCCASIONAL (0.20), and "cleanroom" or "controlled" gives T0_DRY (0.05). That can lower the floor to 0.275 (Low) or raise an element to Critical. It is incidental matching on a name, not a reading of the environment. It did not occur on 1917, where every finding is BUILDING_SERVICES.
+
+These figures use the database catalogue, which classifies Tight at 0.75. The hardcoded offline fallback catalogue in `app/services/corrosion_rule_catalog.py` classifies Tight at 0.80. A run with no database would therefore produce different numbers (SS316 in BUILDING_SERVICES: 0.661), but the same structure.
+
+### A consequence for mitigations
+
+Mitigations are chosen by `select_cc_mitigation` (`bimguard_crevice_engine.py:335-356`). Every High CC-001 finding receives MIT-CC-002, "Change joint type to reduce geometry class — specify butt weld instead of flanged or threaded connection". The trigger is the Tight geometry class, which is the unclassified-joint constant, so the advice is given without the joint having been identified. MIT-CC-006, "Lower operating temperature below material CCT", is defined but never emitted.
+
+## 3. Cause one: the joint type library never executes
+
+CC-001's 14-type joint library is specified, seeded into the database, described in the documentation and claimed in the user interface, but it never runs. Two separate faults stop it: the engine looks up a key the catalogue does not supply, and the pipeline gives the engine a joint code instead of the descriptive text the lookup searches. So every element CC-001 has ever scored was given joint type JT-014, "Unknown / unclassified", Tight geometry, geometry risk 0.75, whatever its real joint. The findings show this: every CC-001 explanation says "Joint Unknown / unclassified classifies as Tight geometry".
+
+### 3.1 What the library is specified to do
+
+Each of the 14 joint types has a label, a geometry class (Open, Moderate, Tight, Critical) and a list of text keywords. For example, JT-001 is a butt weld (Open, 0.10), JT-005 threaded NPT (Critical, 1.00), JT-012 a pipe clamp under insulation (Critical, 1.00), and JT-014 is "Unknown / unclassified" (Tight, 0.75), used only when nothing else matches. The engine should search the element's joint description for those keywords and use the geometry class of the first type that matches. Seeded definition: `supabase/migrations/20260806180500_seed_static_data_assets.sql:800-817`. Inline copy of the same payload: `:736`.
+
+The seeded description of the library (`:801`) says it maps "IFC element types and joint descriptions to geometry class". It does not.
+
+### 3.2 Break one: the key names do not match
+
+| Side | Location | Key |
+|---|---|---|
+| Seeded data | `supabase/migrations/20260806180500_seed_static_data_assets.sql:803-816` (and inline at `:736`) | `ifc_keywords` |
+| Catalogue loader (output) | `app/services/corrosion_rule_catalog.py:845` | `ifc_keywords` (it reads `ifc_keywords` or `ifc_types` and always writes `ifc_keywords`) |
+| Engine (reader) | `app/engines/bimguard_crevice_engine.py:139` | `ifc_types` |
+
+No code path makes the two sides agree. The loader turns every source into `ifc_keywords`, and that includes the hardcoded offline fallback at `corrosion_rule_catalog.py:162`, which is written with `ifc_types`. The engine then reads `jt.get("ifc_types")`, gets `None`, falls back to an empty list, and skips every type. `classify_joint_type` (`bimguard_crevice_engine.py:130-147`) always reaches its last line and returns `("JT-014", "Tight", GEOMETRY_CLASSES["Tight"]["risk"])`.
+
+This also applies to the engine's own built-in examples (`bimguard_crevice_engine.py:829-855`). Descriptive strings such as `"weld neck flange"` and `"butt weld"` fall through to JT-014 as well.
+
+### 3.3 Break two: the engine gets a code, not a description
+
+Even with the key corrected, matching would still fail. The keyword search is a substring test against the joint description, but the pipeline never passes a description:
+
+- `app/modules/ifc_reader/ifc_parser.py:628` sets `joint = IFC_TO_JOINT.get(ifc_type, "JT-005")`. The table at `:160-170` assigns a bare code by IFC class, e.g. `IfcPipeSegment` → `"JT-012"`. The synthetic-model generator (`ifc_parser.py:897-1209`) also assigns bare codes.
+- That code is stored as `ServiceElement.joint_type` (`ifc_parser.py:645`, `:1238`).
+- `app/modules/phase_6/phase_6c_corrosion_ui.py:307` passes it straight through: `joint_description=element.joint_type`.
+
+None of the 41 seeded keywords appears inside any of the 14 strings `JT-001` … `JT-014`. This was checked by direct substring comparison against the seeded payload.
+
+**Measured:** renaming the key alone changes no verdicts. In project 1917, 378 of 378 CC-001 elements still fall through to JT-014.
+
+### 3.4 Evidence on live results
+
+- Working backwards from every frozen project 1917 CC-001 score gives a geometry sub-score of 0.749.
+- All 378 CC-001 scores in 1917 can be rebuilt exactly with geometry fixed at the Tight value (section 10).
+- The defect is visible in the findings. Each explanation reads "Joint Unknown / unclassified classifies as Tight geometry …". See the verbatim rows in `docs/validation/engine-showcase-2026-09-08/README.md:169-181`, where 6,630 curtain-wall members got Medium on exactly this basis.
+
+A flange, a butt weld and a pipe segment all get the same geometry value.
+
+### 3.5 Three incompatible JT vocabularies
+
+The repository uses "JT-nnn" codes in three different senses. A code means different things depending on where it appears.
+
+| Vocabulary | Where | JT-001 | JT-003 | JT-014 |
+|---|---|---|---|---|
+| CC-001 joint library | seeded ruleset (migration `:803-816`) | Butt weld | Slip-on flange | Unknown / unclassified |
+| Piping schema `JointType` enum | `app/modules/ifc_reader/piping_schema.py:161-175` | Plain welded | Threaded | Dielectric union |
+| Parser `IFC_TO_JOINT` comments | `app/modules/ifc_reader/ifc_parser.py:160-170` | "Flanged connections most common" | — | (assigned to `IfcPlate`) |
+
+- Before the first version of this record, `piping_schema.py:158` and `docs/piping_schema_spec.md:118` said the enum keys "match JT-001 through JT-014" in the crevice ruleset. They do not: the numbering is different. Both now say the enum is a separate vocabulary.
+- XM-001 uses `JT-014` to mean a dielectric union and gives it a 0.10 mitigation multiplier (`data/rulesets/xm_001_cross_material.json:149`; explained in `docs/client-qa/Q04_XM001_Cross_Material_Composite_Score.md:47`). CC-001 uses `JT-014` to mean Unknown. So JT-014 means both "we do not know the joint" and "the joint is isolated".
+- The parser's `IFC_TO_JOINT` comments `JT-001` as "Flanged". In the CC-001 catalogue JT-001 is a butt weld, the least severe type, while a flange is JT-003, JT-004, JT-010 or JT-011.
+
+The enum is filled by a separate keyword classifier, `piping_producer.classify_joint_type` (`app/modules/ifc_reader/piping_producer.py:997`). That output goes onto `PipingElement` and does not reach CC-001. It is the only joint classifier with tests (`tests/test_piping_producer.py:196-200`).
+
+### 3.6 Other joint-library gaps
+
+- **`ifc_data_sources.joint_type` is never read.** The seeded payload lists where the joint type should come from: `IfcPipeFitting.PredefinedType`, `Pset_PipeFittingOccurrence.ConnectionType`, `IfcPipeSegmentType.ObjectType` (migration `:901`). No code reads `ifc_data_sources`.
+- **No test covers the engine's classifier.** No test calls `bimguard_crevice_engine.classify_joint_type`, and neither `ifc_keywords` nor `ifc_types` appears in any test that touches CC-001.
+
+## 4. Cause two: the operating temperature is dropped
+
+CCT adequacy is the heaviest term (0.40), and it is always evaluated at 20 °C.
+
+| Step | Location | What happens |
+|---|---|---|
+| Parser reads the property | `app/modules/ifc_reader/ifc_parser.py:376-382` (property names, first being `OperatingTemperature`), `:485` (read), `:500` (returned as `operating_temp_c`) | The model's value is read |
+| Element carries it | `ifc_parser.py:129` (`ServiceElement.operating_temp_c`), splatted in at `:655` (`**read_hydraulics(el)`) | The value is on the element |
+| CC-001 input is built | `app/modules/phase_6/phase_6c_corrosion_ui.py:301-311` (`_cc_element`) | **`operating_temp_c` is not passed** |
+| Engine default | `app/engines/bimguard_crevice_engine.py:380` (`operating_temp_c: float = 20.0`) | 20 °C is used |
+| Engine use | `bimguard_crevice_engine.py:462` (`calculate_cct_adequacy(mat_key, element.operating_temp_c, …)`) | Every element is assessed at 20 °C |
+
+So the CCT term depends only on the material grade. On 1917 it is 0.733 for SS316 and 0.05 for any ungraded material (`:258-259`).
+
+**What the 1917 model states.** 294 of its 420 elements carry `Pset_PipeSegmentOccurrence.OperatingTemperature`. There are six distinct values, 6, 12, 15, 30, 60 and 80, with 49 elements each. The IFC does not declare units. They are °C according to the generator's own table (`scripts/generate_demo_mep_model.py`) and the parser's assumption (`ifc_parser.py:374-375`).
+
+The findings text also stated this default as though it were the element's temperature (section 13).
+
+## 5. Cause three: the environment vocabularies do not match
+
+This is a third break of the same kind as the joint library. Two components that must agree on vocabulary use different words.
+
+- **The parser emits environment codes.** `SPACE_TO_ENV` (`app/modules/ifc_reader/ifc_parser.py:173-188`) maps space names to `swimming_pool`, `interior_conditioned`, `urban_exterior`, `coastal`, `marine_splash`, `industrial` or `interior_dry`. When no space name matches, it uses `DEFAULT_ENVIRONMENT = "interior_dry"` (`:71`, returned at `:329`). The code is stored as `ServiceElement.location_tag` (`:642`).
+- **The pipeline passes the code as the zone.** `_cc_element` sets `zone_category=element.location_tag` and `system_type=element.system` (`phase_6c_corrosion_ui.py:308-309`).
+- **The engine matches English phrases.** `classify_environment_severity` (`bimguard_crevice_engine.py:235-242`) joins zone and system name, then searches for the phrases in `ZONE_TO_SEVERITY` (`:213-232`): "pool", "coastal", "marine", "external", "roof", "plant room", "boiler room", "pump room", "mechanical room", "cleanroom", "controlled", "normal", "office", "pharmaceutical", "laboratory" and others.
+
+The parser's own mapping loses the words the engine is looking for. A plant room becomes `interior_conditioned`, a roof or external space becomes `urban_exterior`, and an office becomes `interior_dry`. None of those codes contains any engine phrase.
+
+Every parser code, checked against the engine function:
+
+| Parser code | Engine class | Severity |
+|---|---|---|
+| `swimming_pool` | T5_IMMERSION (matches "pool") | 1.00 |
+| `coastal` | T4_PERSISTENT | 0.80 |
+| `marine_splash` | T4_PERSISTENT (matches "marine") | 0.80 |
+| `interior_conditioned` | BUILDING_SERVICES (no match) | 0.35 |
+| `urban_exterior` | BUILDING_SERVICES (no match) | 0.35 |
+| `industrial` | BUILDING_SERVICES (no match) | 0.35 |
+| `interior_dry` (also the default) | BUILDING_SERVICES (no match) | 0.35 |
+
+Only the `swimming_pool`, `coastal` and `marine_splash` codes, or a system name that happens to contain an engine phrase, can reach a class other than BUILDING_SERVICES. T0_DRY, T1_OCCASIONAL, T2_INTERMITTENT and T3_FREQUENT cannot be reached from a space name. On 1917, all 378 findings are BUILDING_SERVICES / 0.35.
+
+## 6. Measured impact if the temperature were passed
+
+The impact of passing `operating_temp_c` through `_cc_element`, with nothing else changed, was measured on project 1917:
+
+| Measure | Current | With temperature | Change |
+|---|---|---|---|
+| CC-001 findings whose CCT term changes | — | 47 | 47 |
+| CC-001 findings that change band | — | 17 | all **High → Medium**. These are Chilled Water elements at 6 °C: SS316 CCT term 0.733 → 0.480, composite 0.643 → 0.542. |
+| CC-001 findings that rise a band | — | 0 | none |
+| Critical findings | 0 | 0 | none appear or disappear |
+| CC-001 High / Medium | 70 / 308 | 53 / 325 | −17 / +17 |
+| Project 1917 total findings | **1,988** | **1,988** | unchanged |
+| Project 1917 High | 168 | 151 | −17 |
+| Project 1917 Medium | 1,206 | 1,223 | +17 |
+| Findings carrying MIT-CC-001 (grade upgrade) | 70 | 53 | −17 |
+
+Why the changes are so limited:
+
+- An ungraded material scores 0.05 at any temperature.
+- SS316 at 12 °C (0.627), 15 °C (0.667), 30 °C (0.867), 60 °C and 80 °C (1.000) all stay High. The maximum is 0.2625 + 0.40 + 0.0875 = 0.750, below the 0.80 Critical boundary, because geometry and environment are still constant.
+- Only 6 °C moves SS316 below 0.55.
+- MIT-CC-001 is triggered when the CCT term exceeds 0.60 (`select_cc_mitigation`, `:344`), so the 17 elements at 6 °C lose it. Being no longer High, they also lose MIT-CC-002, -003 and -004.
+
+Passing the temperature therefore corrects the CCT term, but on its own it does not restore discrimination. Geometry and environment would still be constant.
+
+## 7. Which projects are affected
+
+| Project | Affected? | Reason |
+|---|---|---|
+| **1917** | **Yes** | 378 CC-001 scores. All three causes apply to every one of them (section 2). |
+| 1540 | No change possible | The model carries no temperature property at all. Every CC-001 row (29,183 findings, all `data_quality`) is a `material_unresolved` note, so no banded crevice score exists for any of the three terms to reach. |
+| 1542 | No change possible | The model carries no temperature property at all, and only SB-001 (seismic clearance) was run. CC-001 was not run. |
+
+No frozen figure changes because of this record. Every CC-001 number already reported was produced with these defects in place, so it can be reproduced exactly from both `1450960` and `main`. Those numbers measure the software as it is, not the specified engine.
+
+## 8. Which engines receive a temperature
+
+| Engine | Temperature input | Where |
+|---|---|---|
+| **CC-001** | **None: the 20 °C default** | `_cc_element`, `phase_6c_corrosion_ui.py:301-311` (section 4) |
+| MC-001 | The parser's value. `None` is preserved rather than defaulted, and an absent temperature is reported as missing. | Passed at `phase_6c_corrosion_ui.py:345`, classified at `app/engines/bimguard_mic_engine.py:302` |
+| MM-001 | A resolved value: the IFC property, or a system-name inference recorded with source `system_inference` and low confidence | Resolved at `app/modules/ifc_reader/piping_producer.py:1882-1883`, read at `app/modules/comparator/material_media.py:308` |
+| GC-001 | No temperature input | — |
+| XM-001 | None, by design | `app/modules/comparator/cross_material.py:422` |
+
+CC-001 is the only engine whose specification uses operating temperature but whose pipeline input omits it.
+
+Two other places build a `CCElement` with a temperature. Neither is the analysis pipeline, and neither writes the findings text:
+
+- `app/modules/comparator/compliance_runner.py:33` passes `info["operating_temp_c"]` or the element attribute, falling back to 20.0.
+- `app/engines/demo_data.py:572` passes the demo data's own `temp` value.
+
+## 9. Test coverage
+
+**No test covers a temperature reaching CC-001 through `_cc_element`.** Four tests build `CCElement(operating_temp_c=…)` directly and so bypass the defect:
+
+- `tests/test_engine_bcf_export.py:188` and `:198`
+- `tests/test_corrosion_fallback_catalog.py:97`
+- `tests/test_pipeline_tracker.py:210`
+
+No test calls `classify_joint_type` or `classify_environment_severity` with the inputs the real pipeline produces: a `JT-nnn` code, or a parser environment code. All three breaks have therefore gone undetected by the test suite.
+
+## 10. Verification method
+
+- The 1917 model was rebuilt in memory from `scripts/generate_demo_mep_model.py` using the locked ifcopenshell 0.8.5.
+- The rebuilt file hashes to SHA-256 `302dcad174e8b94d7196527365d95aae1596861f90457473ca7d74e451f30b54` (717,766 bytes, CRLF line endings).
+- All 378 CC-001 scores were reconstructed from the formula in section 1 with geometry fixed at Tight 0.75, environment at BUILDING_SERVICES 0.35, and the CCT term at the material's 20 °C value. The maximum deviation from the stored scores was 0.000000, with 0 band mismatches.
+- The same inputs were then re-evaluated with each element's stated `OperatingTemperature` in place of 20 °C to produce the figures in section 6.
+- The joint-library measurements (section 3) were made by substring comparison against the seeded payload and by re-running classification with the key renamed.
+- The environment table in section 5 was produced by calling `classify_environment_severity` on every value in `SPACE_TO_ENV` and on `DEFAULT_ENVIRONMENT`.
+
+No backend was started, restarted or queried to produce any of these figures, and no database row was changed.
+
+## 11. Demo build
+
+The demo build `1450960` has all three defects, line for line:
+
+- The engine reads `ifc_types` at `bimguard_crevice_engine.py:139`, and the loader writes `ifc_keywords` at `corrosion_rule_catalog.py:845`.
+- `_cc_element` (`phase_6c_corrosion_ui.py:301-311`) is identical to `main`. It passes `joint_description=element.joint_type`, `zone_category=element.location_tag`, and no temperature.
+- `CCElement.operating_temp_c` defaults to 20.0 at `bimguard_crevice_engine.py:380`.
+- `SPACE_TO_ENV` (`ifc_parser.py:173-188`) and `ZONE_TO_SEVERITY` are identical to `main`.
+- `finding_narrative.py:237` prints "against an operating temperature of {temp}".
+
+Every CC-001 result shown in the demo was scored at JT-014 / Tight, 20 °C, and (on 1917) BUILDING_SERVICES. Every CC-001 finding shown there states the 20 °C default as the operating temperature. The demo build is frozen and was not changed.
+
+## 12. Decision: document, do not fix
+
+The scoring defects are recorded, not fixed. The reasons:
+
+- **Passing the temperature alone would not restore the engine.** Geometry and environment would remain constant, so CC-001 would still not discriminate by joint or by environment (section 6).
+- **A partial fix would move frozen, reported figures for little gain.** Passing the temperature would:
+  - move 17 findings from High to Medium;
+  - change the CC-001 showcase row from 70/308 to 53/325;
+  - alter 47 finding descriptions and 17 mitigation lists;
+  - change the export digests;
+  - require a backend restart and a full re-warm of the demo cache, measured at about 2.5 hours from cold.
+
+  All of that for an unchanged project total of 1,988.
+- **A full fix would move all 378 scores** and needs design decisions that have not been made, notably an unvalidated joint code → geometry mapping (section 14).
+
+**One factual error was corrected** rather than documented: the findings text asserted a model-derived operating temperature (section 13).
+
+## 13. Correction made: the findings no longer claim a model temperature
+
+`app/modules/phase_6/finding_narrative.py:237` (in `_describe_cc`) wrote every CC-001 finding's explanation as:
+
+> "{material} has a critical crevice temperature of {cct} against an operating temperature of {temp} (ASTM G48 Method B)"
+
+`{temp}` is always 20.0 °C (section 4), including for elements the IFC states at 6, 12, 15, 30, 60 or 80 °C. This was not an unexercised feature. It was a factual statement in every CC-001 finding, in exports and in BCF topics, and the source model contradicts it.
+
+It now reads:
+
+> "{material} has a critical crevice temperature of {cct}, assessed at the engine's default {temp}, not the element's stated temperature (ASTM G48 Method B)"
+
+**This changes output text only.** The narrative is built in `_finding_issue` (`phase_6c_corrosion_ui.py:1128`), after the Issue's score, band and mitigation string have been set from the engine result. The narrative's return value is assigned only to `issue.description`, and no code derives a count, band, identifier or mitigation from `description`. `build_mitigations` reads `issue.mitigation`. The change was verified by an AST comparison of every changed Python file: the only executable difference is this string. Docstrings and comments were stripped before comparing.
+
+Deliberately unchanged:
+
+- **`compliance_runner.py:33` and `demo_data.py:572`** pass a real or demo temperature and do not produce this sentence (section 8).
+- **`calculate_cct_adequacy`'s notes** ("Operating temp {operating_temp_c}°C …", `bimguard_crevice_engine.py:270`, `:275`, `:282`) are runtime strings, so they were not edited. They reach only `CCResult.cct_note`. That field is written by the engine's own CLI exporters (`_cc_bcf_issue`, `export_cc_asset_register`, called from its `__main__` demo at `:990-991`), not by the analysis pipeline. The function's docstring now states that the value is the default.
+- **MC-001's and MM-001's temperature sentences** (`finding_narrative.py:143`, `:274`) state values those engines actually receive.
+
+## 14. What a full fix would require
+
+A fix is not being made. For the record, restoring the specified behaviour would need all of the following:
+
+1. **Make the joint-library key names agree.** Change either the loader output or the engine reader so both use the same key. Renaming alone does nothing (section 3.3).
+2. **Give the engine real joint evidence.** There are two options:
+   - (a) Pass descriptive text (element name, type name, `PredefinedType`, `Pset_PipeFittingOccurrence.ConnectionType`, as `ifc_data_sources` specifies) and let the keyword search run.
+   - (b) Look up the type directly by code. This depends on a code → geometry mapping that **has never been validated**. `IFC_TO_JOINT` assigns codes by IFC class, with comments from a different vocabulary. Read literally against the catalogue, it would classify every `IfcPipeFitting` as a butt weld (Open) and every `IfcPipeSegment` as a pipe clamp under insulation (Critical). Neither assignment is supported by any source or measurement.
+3. **Agree one JT vocabulary,** or rename two of the three so that a code has only one meaning (section 3.5), including XM-001's use of JT-014.
+4. **Pass `operating_temp_c` through `_cc_element`,** and decide what an absent temperature means. MC-001 preserves `None` and reports the gap. CC-001 would need an equivalent rather than a silent 20 °C.
+5. **Reconcile the environment vocabularies.** Either the engine maps the parser's codes, or the parser passes the space text the engine searches. Then decide whether BUILDING_SERVICES should remain the silent fallback.
+6. **Add tests** that run `classify_joint_type`, `classify_environment_severity` and `_cc_element` on the inputs the real pipeline produces, including a temperature reaching the engine.
+7. **Correct the seeded database descriptions** with a new migration (section 15).
+8. **Re-baseline.** Any of steps 1, 2, 4 or 5 moves CC-001 scores, and for 1917, steps 1 to 5 together would move all 378. Every CC-001 figure already reported would then describe the old build. A fix must produce new, separately dated figures and must not overwrite the frozen ones.
+
+## 15. Inaccurate database descriptions: corrective migration (not written)
+
+The applied migration `supabase/migrations/20260806180500_seed_static_data_assets.sql` is not edited. Its seeded text for asset `ruleset:BIMGUARD-CC-001` is inaccurate in the places below.
+
+A corrective migration, `supabase/migrations/<UTCYYYYMMDDHHMMSS>_correct_cc001_scoring_input_descriptions.sql`, would need to:
+
+- Update each field in both `content_json` and `content_text` of the `ruleset:BIMGUARD-CC-001` row in `public.static_data_assets`.
+- Recompute `content_sha256` so it matches the new `content_text`.
+- Change descriptive strings only. No key, value, weight, threshold, `risk`, `expected_score` or `typical_temp_c` figure may change, so that every frozen CC-001 score stays reproducible.
+- Decide in that migration, and record there, whether to change `ruleset_version` (findings currently record `BIMGUARD-CC-001 v1.0.0`).
+
+### 15.1 Joint library
+
+| Line | Field | Current text | Proposed text |
+|---|---|---|---|
+| `:801` (formatted `content_text`), `:736` (inline `content_json` copy) | `joint_type_library.description` | "14-type joint library mapping IFC element types and joint descriptions to geometry class. JT-014 (unknown) defaults to Tight — conservative fallback when joint data is absent from IFC model." | "14-type joint library specifying a geometry class per joint type. Not currently executed: the engine reads `ifc_types` while this library stores `ifc_keywords`, and the pipeline supplies a joint code rather than descriptive text, so every element is classified JT-014 (Unknown / unclassified, Tight). See docs/defects/CC-001-scoring-inputs-inert.md." |
+| `:885` | `pset_definition` property `CC001_JointTypeCode`, `description` | "Joint type code JT-001 through JT-014" | "Joint type code. In the current build this is always JT-014; JT-001 to JT-013 are specified but never assigned. See docs/defects/CC-001-scoring-inputs-inert.md." |
+
+The `rules` table rows for joint types (`CC-001.JT.*`, written by `app/services/ruleset_seeder.py:543-552`) describe each type's label, geometry and risk. They make no claim about matching and do not need correcting.
+
+### 15.2 Operating temperature and environment
+
+| Line | Field | Current text | Proposed text |
+|---|---|---|---|
+| `:740` | ruleset `description` | "… Checks Critical Crevice Corrosion Temperature (CCT) adequacy of stainless steel grades against operating temperature, joint geometry class, and environment severity. The defining finding of CC-001: SS316 in a pool plant room scores 0.00 galvanic (GC-001) but 0.89 Critical on CC-001 — demonstrating that galvanic checking alone is insufficient." | "… Specified to check CCT adequacy of stainless steel grades against operating temperature, joint geometry class and environment severity. In the current build the analysis pipeline supplies none of the three from the model: CCT adequacy is assessed at a 20 °C default, joint geometry is always JT-014 (Tight), and environment severity is BUILDING_SERVICES unless the environment code is swimming_pool, coastal or marine_splash. The specified pool-plant-room example (SS316, 0.89 Critical) is not what the pipeline produces; through the pipeline SS316 with the swimming_pool code scores 0.806 Critical and in BUILDING_SERVICES 0.643 High. See docs/defects/CC-001-scoring-inputs-inert.md." |
+| `:769` | `scoring_model.rationale` | "CCT adequacy receives highest weight (0.40) as it is the most material-specific determinant — whether the specified grade can resist crevice attack at the operating temperature is the central question. …" | Keep the text and append: "In the current build the pipeline does not pass the operating temperature, so this term is evaluated at a 20 °C default and varies only with material grade." |
+| `:770` | `scoring_model.cct_adequacy_calculation` | "Linear interpolation: score 0.00 when operating temp is 20+ degrees below CCT (fully adequate). Score 0.60 when at CCT. Score 1.00 when 30+ degrees above CCT. …" | Keep the formula and append: "The analysis pipeline currently supplies no operating temperature; the engine's 20 °C default is used." |
+| `:845`, `:852`, `:859`, `:866` | high-risk configuration `note` entries CC-HRC-002 to CC-HRC-005, each with a `typical_temp_c` of 25, 40, 15 or 45 °C | e.g. "Threaded joint (Critical geometry) combined with operating above CCT"; "CCT +50°C — only 5°C margin at 45°C operating temperature" | Keep each note and append: "(Engine-level scenario. Not reproducible through the analysis pipeline, which passes neither this temperature nor this joint type.)" |
+| `:875` | `mitigation_catalogue["MIT-CC-006"]` | "Lower operating temperature below material CCT — review system temperature setpoints" | Keep the text and append: "(Not emitted by the current engine; CC-001 does not assess the element's actual operating temperature.)" |
+| `:888` | `pset_definition` property `CC001_OperatingTemp_C`, `description` | "Operating temperature in degrees C" | "Temperature CC-001 assessed at, in degrees C. In the current build this is always the 20 °C default, not the model's operating temperature. See docs/defects/CC-001-scoring-inputs-inert.md." |
+| `:902` | `ifc_data_sources.operating_temp` | `["Pset_PipeSegmentOccurrence.OperatingTemperature", "Pset_ZoneCommon.SetPointTemperature"]` | Keep the list and record alongside it: "Specified source. `ifc_data_sources` is not read by any code; the parser reads `OperatingTemperature` into `ServiceElement` but CC-001 does not receive it." |
+
+## 16. Live claims corrected
+
+In each case below, the claim was corrected to describe what the software actually does. Joint type, operating temperature and environment all remain part of CC-001's specification. The correction is that the pipeline does not supply them.
+
+### First version of this record (joint library)
+
+- `frontend/src/lib/components/PipingChecksExplainer.svelte` (CC-001 "What it needs from the model")
+- `docs/demo/piping-checks-plain-english.md` (same text)
+- `frontend/src/lib/glossary.ts` (CC-001 description)
+- `docs/client-qa/Q18_Selecting_Which_Corrosion_Engines_Run.md` (engine table row)
+- `scripts/build/build_deck_d.py` (Engine B "Specified" column; the deck file was not rebuilt)
+- `app/modules/ifc_reader/piping_schema.py` (joint enum header comment)
+- `docs/piping_schema_spec.md` ("Joints and connectivity")
+- `app/engines/bimguard_crevice_engine.py` (`classify_joint_type` docstring)
+- `app/services/ruleset_seeder.py` (joint-type seeding comment)
+
+### This widening (temperature and environment)
+
+- `app/modules/phase_6/finding_narrative.py:237`: findings text (section 13). This is the only executable change.
+- `frontend/src/lib/glossary.ts:215`: the CC-001 description now also says the pipe is assumed to run at 20 °C and most spaces fall into one default environment class.
+- `frontend/src/lib/components/PipingChecksExplainer.svelte` ("What the check asks", "What it needs from the model", "Example") and `docs/demo/piping-checks-plain-english.md:49-53` (same text):
+  - the check is described as *designed to* compare CCT with operating temperature and environment;
+  - the inputs actually used are stated;
+  - the dry-void example now says the specified outcome is Low but the flanges score High today, since standard stainless grades score High in BUILDING_SERVICES (section 2).
+- `docs/client-qa/Q01_What_Is_Piping_Corrosion_Analysis.md:29`: CC-001 sentence annotated.
+- `docs/client-qa/Q03_MM001_Material_Media_Versus_Other_Engines.md:67`: CC-001 table row annotated.
+- `docs/client-qa/Q18_Selecting_Which_Corrosion_Engines_Run.md:25`: row extended to temperature and environment.
+- `scripts/build/build_deck_d.py:51` ("0.40 × CCT margin"): annotated with a code comment only. The slide text and the deck file were not changed or rebuilt; the next deck rebuild should carry the caveat.
+- `app/engines/bimguard_crevice_engine.py`: docstrings only. `calculate_cct_adequacy` now states that the temperature is the default, and `classify_environment_severity` states the vocabulary mismatch. The runtime note strings at `:270`, `:275` and `:282` were not changed (section 13).
+- `docs/architecture.md:171`: the "Joint crevice geometries and critical crevice temperatures (CCT)" evaluator bullet annotated.
+- `docs/planning/post-fmp-backlog.md:28-31`: the backlog line now names the temperature and environment inputs as well as the joint type.
+
+Evidence records dated before this change that already describe the joint-library defect accurately were left as they are: `docs/validation/engine-showcase-2026-09-08/README.md:169-181` and `docs/validation/data/CC-001_validation_demo_asset_register.csv`.
+
+## 17. Not remediated here
+
+The files below contain inaccurate or incomplete claims about CC-001's inputs. They are left unchanged on purpose: the thesis is out of scope for this change, and the other files are historical records, planning documents or generated output. They are listed so that nobody treats them as describing working behaviour.
+
+### Thesis: `docs/thesis/MAICEN_M10_Final_Thesis_Mark_Shane_Haines.docx`
+
+- **§9.3 "Joint type library"**: "CC-001 includes a library of 14 joint types (JT-001 through JT-014) mapping IFC element type classifications to geometry classes. This library provides the mechanism by which the engine assigns a geometry risk multiplier … The IFC element type — IfcPipeFitting.PredefinedType, valve classification, or connection type — is used as the key to look up the corresponding joint type and geometry class." This is inaccurate. No lookup takes place, and `PredefinedType` is never read.
+- **Input list**: "Joint type — from element type classification mapped to the GC-001 and CC-001 joint type library". This is inaccurate. The mapped code never reaches a geometry class.
+- **Pset description**: "GeometryClass — the joint type library classification (string: JT-001 through JT-014)". In practice this is always JT-014 / Tight.
+- **Three-engine discussion**: "Low on CC-001 (butt-welded joints, no crevice geometry)" and "CC-001 will not flag it because butt-welded carbon steel joints do not present significant crevice geometry". CC-001 cannot tell a butt weld from any other joint, and through a parser environment code no CC-001 element can score Low (section 2).
+- **Engine summary table**: "Data-quality issues dominant; risk bands only where joint type can be inferred from fitting class". Joint type is never inferred into a geometry class.
+- The thesis does describe accurately that "CC-001 reported a crevice geometry of "Tight" and a joint type of JT-014 for an element that declared no joint." What it leaves out is that JT-014 is also given to elements that do declare a joint.
+- Wherever the thesis describes CC-001's CCT term as comparing the alloy against the element's operating temperature, or the environment term as distinguishing plant rooms, roofs or dry voids, that describes the specification, not the pipeline (sections 4 and 5).
+
+### Second thesis copy: `docs/MAICEN_M10_Final_Thesis_Mark_Shane_Haines.docx`
+
+An earlier copy with the same §9.3 text, the same input-list line, the same "GeometryClass … JT-001 through JT-014" line and the same butt-weld examples. Not remediated.
+
+### Project memory, case study, planning and validation records
+
+- `docs/BIMGuard_Project_Memory_v2.md:87`: gives the CC-001 formula `0.35 × geometry_risk + 0.40 × CCT_adequacy + 0.25 × environment_severity` without noting that geometry and environment are constant and CCT is taken at 20 °C. The worked-example placeholder at `:158` asks for "actual component scores"; any such example produced through the pipeline will show these constants.
+- `docs/ss316_feedback_loop_case_study.md:150-176`: scores the SS316 plant-room element with `operating_temperature_c` 28.0, `environment_class` T3_CHLORIDE and joint `JT004_FLANGED_FULL_GASKET` on a `PipingElement` fixture, and cites the engine-level scenario CC-VAL-001 (35 °C, Critical). The analysis pipeline does not pass that temperature, joint or environment to CC-001, so the pipeline would not reproduce the case study's inputs.
+- `docs/planning/integration_plan_mm_xm.md:275`: lists CC-001 outputs `crevice_geometry`, `cct_adequate` and `joint_type` as meaningful fields. In the current build the first and last are constant, and the second is taken at 20 °C.
+- `docs/validation/engine-showcase-2026-09-08/` (README and run records): the CC-001 rows and every `sample_50.csv` explanation under `runs/test_hospital_mep_demo/CC-001/` and `ALL5/` carry the old sentence "against an operating temperature of 20.0 °C". These are dated evidence of the output at the time and are left as recorded.
+- `docs/validation/appendix_b_validation.md:131`: lists CC-001's required inputs as `material+joint_type+operating_temperature_c`. The pipeline reads the material only.
+
+### Archived, experimental and submission files
+
+- `docs/archive/index.html:604-605`: "CC-001: implement CCT table …, 14-type joint library (JT-001 to JT-014), 7 environment severity classes" and the weighted composite, shown as planned tasks. They imply completion; in behaviour, neither the joint library nor the environment classes (beyond three codes) are reached.
+- `docs/experimental/bimguard-frontend-prototype-v1.html:916`: ruleset table lists CC-001 with "14 joint types".
+- `docs/submissions/BIMGuard_3rd_Submission_REVISED.md:187`: gives the CC-001 formula as if every term were live. `:198` says "a 14-member `JointType` enum matching a dedicated `JT-001`–`JT-014` ruleset", which is false (section 3.5).
+
+### Generated corpora
+
+`docs/bimguard_corrosion_rules.md` (e.g. `:24047`, `:48425`, `:51156`) and the other `docs/bimguard_*_rules.md` corpora contain copies of the pre-correction source text, including the false "Keys match JT-001 through JT-014" claim and the old findings sentence. They are generated output from `scripts/compile_for_notebooklm.py` and were not hand-edited or rebuilt. They will pick up the corrections the next time they are generated.
+```
+
+---
 
 ### docs/defects/defect_report_anode_convention.md
 
@@ -67944,11 +69504,11 @@ Every result also shows its working: which rule was applied, which published eng
 
 **The everyday version.** Think of a tiny gap — under a washer, inside a threaded joint, between a flange and its gasket. Water gets into the gap and can't get out. The trapped water goes stale, turns slightly acidic, and starts attacking the metal from inside the gap where nobody can see it. Stainless steel, which people assume never rusts, is especially vulnerable to this — it's fine in open air and in flowing water, but it hates stagnant water in a tight gap.
 
-**What the check asks.** Two things. How tight is the gap? (An open, smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the water it's sitting in? Each grade of stainless steel has a published temperature above which crevice corrosion starts in salty water. The check compares that temperature against what the environment demands. A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
+**What the check asks.** Two things. How tight is the gap? (An open, smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the water it's sitting in? Each grade of stainless steel has a published temperature above which crevice corrosion starts in salty water. The check is designed to compare that temperature with the pipe's operating temperature and the environment. A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
 
-**What it needs from the model.** The joint type (which the check works out from what kind of component it is — flange, threaded fitting, welded joint), the material grade, and the environment.
+**What it needs from the model.** The joint type, the operating temperature, the material grade, and the environment. Today only the material grade is actually used: every joint is scored as unknown and tight (the finding says "Unknown / unclassified"), every pipe is assumed to run at 20 °C whatever the model says, and most rooms are scored as ordinary indoor building services. In practice the score depends almost entirely on which stainless grade is specified. (Details: [CC-001 scoring inputs defect](../defects/CC-001-scoring-inputs-inert.md).)
 
-**Example.** Standard stainless flanges in a pool plant room: **Critical** — the failure mode the galvanic check can't see at all, because there's no second metal involved. The same flanges in a dry ceiling void: **Low**.
+**Example.** Standard stainless flanges in a pool plant room: **Critical** — the failure mode the galvanic check can't see at all, because there's no second metal involved. The same flanges in a dry ceiling void should be **Low**; today they score High.
 
 ---
 
@@ -68407,12 +69967,33 @@ Switch to the **Seismic** tab, project *FINAL AUDIT Seismic WR Federated*. It
 loads its stored result on mount once the cache is warm; on a cold backend it
 shows Run Audit — this is why pre-warm precedes the demo.
 
-Expect: **2,937 clashes** — 783 Critical, 314 High, 1,840 Medium. The federation
+Expect: **2,937 findings** — 783 Critical, 314 High, 1,840 Medium. The federation
 is two models, `west_riverside_hospital_plumb_ifc4.ifc` and
-`west_riverside_hospital_str_ifc4.ifc`: **2,051** clashes are within the
+`west_riverside_hospital_str_ifc4.ifc` — plumbing and structural only; there is
+no architectural model and no ductwork. **2,051** findings are within the
 plumbing model and **886** are cross-model, pipework against structure. Each
 cross-model finding names both files in `source_model` and
 `clashing_source_model`, so a coordinator knows which model to open.
+
+Do not present the 2,937 as clashes between services or with structure. Most of
+it is a pipe against its own fittings. Measured 13 September 2026:
+
+| What intrudes into the pipe's clearance halo | Findings | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+So of the 2,051 within the plumbing model, 1,869 are same-system adjacency and
+182 are unclassified objects. The same-system findings are all High (190) or
+Medium (1,679); **every one of the 783 Critical findings is structure or an
+unclassified object**. The figure to quote as clash detection is the scoped one:
+**1,068 seismic clearance intrusions into braced pipework (886 by structural
+members, 182 by unclassified model objects), 783 of them Critical** — 124 High,
+161 Medium — with same-system pipe-fitting adjacency excluded. That count comes
+from SB-001 scoped to piping (`service_scope=piping`), measured on
+`feat/blue-halo-federated` at `15a72dd`; the demo build does not offer the
+scope, so the page shows the unscoped 2,937.
 
 Each row carries the real measured overlap volume and the clearance that was
 applied (200.0 mm). A build from before 2026-09-13 labels that clearance with an
@@ -68423,7 +70004,9 @@ exists, and from schema 1.1.0 it reads as SB-001 authored screening calibration
 ### 4. Export and validate
 
 CSV from the Seismic page: **2,937 rows**, every one carrying
-`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**.
+`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**. Both exports
+carry the whole unscoped set, so 1,869 of those rows and topics are pipes
+against their own fittings — see the breakdown in §3.
 
 Validate the archive in front of the audience if it helps:
 
@@ -68497,7 +70080,7 @@ every recorded audit number and every BCF topic id.
    appends; it does not replace. Running it against a project whose models are
    already attached leaves 1540 holding two copies of the plumbing model and
    1542 holding four — and because a seismic cache key is a SHA-256 over *all*
-   of a project's models, that silently moves 1542 off its 2,937 clashes. If
+   of a project's models, that silently moves 1542 off its 2,937 findings. If
    the models are already there, verify rather than re-post: download each one
    back through `GET /api/projects/{id}/files/{file_id}/ifc` and compare its
    SHA-256 with the local file. Confirmed byte-identical on 2026-09-10 —
@@ -86775,7 +88358,10 @@ elements, so the corrosion engines score them as if they were pipework.
 `IfcMember` and 2,211 `IfcPlate`, containing no pipes at all — produced **27,999
 findings** on the five-engine run, including 6,630 GC-001 verdicts scoring
 aluminium curtain-wall mullions against themselves (0 V self-couple) and 6,630
-CC-001 Mediums on an unclassified joint type. Separately, MM-001's only
+CC-001 Mediums on an unclassified joint type (that joint type is given to every
+CC-001 element, not only these, and CC-001's temperature and environment inputs
+are equally inert — see
+[`docs/defects/CC-001-scoring-inputs-inert.md`](../defects/CC-001-scoring-inputs-inert.md)). Separately, MM-001's only
 real-model verdicts in the whole corpus are **10 fire-extinguisher cabinets** on
 `Clinic_Architectural.ifc`, scored against a `GalvanisedSteel` that was not read
 from the model at all but inferred from the system name — `material_source:
@@ -106437,8 +108023,10 @@ rather than suppressed.
 Three cross-checks against the frozen demo, which the offline path reproduces
 exactly: the synthetic control's five-engine run gives **1,988 findings, bands
 10 / 168 / 1,206 / 322**; 1540's model gives **29,181, all data-quality**; the
-1542 federation gives **2,937 clashes at 783 / 314 / 1,840**. All three match
-`docs/demo/RUNBOOK.md`.
+1542 federation gives **2,937 findings at 783 / 314 / 1,840**. All three match
+`docs/demo/RUNBOOK.md`. The 2,937 is an unscoped count and most of it is not a
+clash between services or with structure — see the composition under SB-001
+below.
 
 ---
 
@@ -106590,6 +108178,26 @@ Its verdicts, again from the synthetic control and **labelled as synthetic**:
 The one engine that worked fully on real models, because it needs geometry rather
 than materials: **2,937 verdicts on the 1542 federation, 783 Critical / 314 High
 / 1,840 Medium, zero data-quality notes.**
+
+The federation is two models, plumbing (`west_riverside_hospital_plumb_ifc4`)
+and structural (`west_riverside_hospital_str_ifc4`); there is no architectural
+model and no ductwork. Every halo is a pipe's, and the 2,937 counts everything
+that intrudes into one. Measured 13 September 2026, that is:
+
+| What intrudes into the pipe's clearance halo | Verdicts | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+Most of the count is same-system adjacency, and it is all High (190) or Medium
+(1,679): **none of the 783 Critical verdicts is a pipe against its own
+fittings.** Scoped to piping, SB-001 returns **1,068 seismic clearance
+intrusions into braced pipework (886 by structural members, 182 by unclassified
+model objects), 783 of them Critical** (124 High, 161 Medium), with same-system
+pipe-fitting adjacency excluded — measured on `feat/blue-halo-federated` at
+`15a72dd`, since the scope is not on the build this showcase ran. The ten rows
+below are all Critical, and all fall outside the adjacency set.
 
 | GUID | Element name (joined) | IFC type | Material (joined) | material_source | System | Band | Score | ruleset_version | Explanation (verbatim from findings.json) |
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |

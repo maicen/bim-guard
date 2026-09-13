@@ -3,10 +3,10 @@
 Seismic slice of the BIMGUARD AI OpenBIM compliance application: the SB-001 (Blue Halo) bracing-clearance engine, its clearance config (authored screening calibration with per-threshold provenance), halo volume generation and clash logic, plus the shared platform architecture. Compiled for analysis against seismic restraint guidance (FEMA E-74, ASCE/SEI 7-10 §13.6, EN 1998-1:2004+A1:2013 §4.3.5, NFPA 13, SMACNA).
 
 - **NotebookLM workspace:** FMP: BIMGUARD AI - Seismic
-- **Generated:** 2026-09-13 15:22 UTC
-- **Source repository:** `bim-guard-hermesfix`
+- **Generated:** 2026-09-13 18:10 UTC
+- **Source repository:** `bim-guard-merge`
 - **File types included:** `.csv`, `.json`, `.md`, `.py`, `.txt`, `.xml`
-- **Files included:** 269 (25 seismic-specific, 244 shared architecture files also present in the companion notebook)
+- **Files included:** 270 (25 seismic-specific, 245 shared architecture files also present in the companion notebook)
 
 ---
 
@@ -616,6 +616,14 @@ RULE_TYPE_REQUIRED_FIELDS = {
     "spatial_clearance": ["target", "property_name", "operator", "check_value"],
     "tiered": ["target", "desc"],
 }
+
+# ── Graph Database (Neo4j) ───────────────────────────────────────────────────
+# Optional graph database connection for GraphRAG and topological queries.
+# Connects to either hosted instances (AuraDB / remote) or Docker-launched instances.
+NEO4J_URI = os.environ.get("NEO4J_URI", "")
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "")
+NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 ```
 
 ---
@@ -693,6 +701,68 @@ class ReportPayloadContract(BaseModel):
     bcf_topics: list[dict[str, Any]] = Field(
         default_factory=list, description="BCF topic structures"
     )
+
+
+# ---------------------------------------------------------------------------
+# Explainability Proof Graph & Graph Intelligence Contracts
+# ---------------------------------------------------------------------------
+
+ProofNodeType = Literal["asserted_fact", "rule_axiom", "inference_step", "verdict"]
+ProofEdgeType = Literal["satisfies", "violates", "infers", "applies"]
+
+
+class ProofNodeContract(BaseModel):
+    """A node in an explainable compliance proof DAG."""
+
+    id: str = Field(..., description="Unique node identifier in proof graph")
+    label: str = Field(..., description="Human-readable node description")
+    node_type: ProofNodeType = Field(..., description="Classification of proof node")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Supporting node properties/values"
+    )
+
+
+class ProofEdgeContract(BaseModel):
+    """A directed edge in an explainable compliance proof DAG."""
+
+    source: str = Field(..., description="Source node ID")
+    target: str = Field(..., description="Target node ID")
+    label: ProofEdgeType = Field("infers", description="Semantic relationship type")
+
+
+class IssueProofGraphContract(BaseModel):
+    """An explainable Directed Acyclic Graph proving why an issue was flagged."""
+
+    issue_id: str = Field(..., description="Unique issue identifier")
+    rule_id: str = Field(..., description="Target rule or check identifier")
+    element_id: str = Field(..., description="Target element GUID")
+    nodes: list[ProofNodeContract] = Field(default_factory=list, description="Proof DAG nodes")
+    edges: list[ProofEdgeContract] = Field(default_factory=list, description="Proof DAG edges")
+    explanation: str = Field(..., description="Concise textual derivation summary")
+
+
+class GraphStatusContract(BaseModel):
+    """Operational status and intelligence metrics for a project's graph."""
+
+    project_id: int = Field(..., description="Project database ID")
+    node_count: int = Field(0, description="Total nodes in relationship graph")
+    edge_count: int = Field(0, description="Total edges in relationship graph")
+    has_spatial_boundaries: bool = Field(False, description="Whether spatial boundaries are mapped")
+    is_geometric_fallback: bool = Field(False, description="Whether boundaries used geometric fallback")
+    centrality_summary: dict[str, Any] = Field(
+        default_factory=dict, description="Top centrality metrics and distribution"
+    )
+
+
+class GraphHealResponse(BaseModel):
+    """Response from reconciling and synthesizing missing spatial boundaries."""
+
+    project_id: int = Field(..., description="Project database ID")
+    healed_spaces: int = Field(0, description="Spaces with healed boundaries")
+    created_boundaries: int = Field(0, description="Synthesized boundary relationships")
+    total_boundaries: int = Field(0, description="Total boundaries in model post-heal")
+    status: str = Field("success", description="Status code (success, already_healed, no_op)")
+    message: str = Field(..., description="Human-readable operation summary")
 
 
 # ---------------------------------------------------------------------------
@@ -3379,7 +3449,10 @@ defaulting to a real instance when omitted so ``BIMGuard_App()`` still works
 standalone (tests, ad-hoc scripts) without reaching for the container.
 """
 
+from __future__ import annotations
+
 import time
+from typing import Any
 
 from app.logging_config import get_logger
 
@@ -3421,6 +3494,7 @@ class BIMGuard_App:
         include_type_definitions: bool = False,
         enable_shacl: bool = False,
         enable_arch_engines: bool = False,
+        enable_graph: bool = False,
     ) -> dict:
         """
         Run the full analysis pipeline for a project:
@@ -3592,6 +3666,12 @@ class BIMGuard_App:
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
+            # Opt-in graph intelligence side-channel (see enable_graph)
+            "graph_summary": (
+                BIMGuard_App._run_optional_graph_summary(ifc["m2_reader"])
+                if enable_graph and ifc.get("m2_reader")
+                else None
+            ),
         }
 
     @staticmethod
@@ -3617,7 +3697,7 @@ class BIMGuard_App:
             documents.append(
                 {
                     "filename": doc.get("filename", ""),
-                    "section_count": len([l for l in text.splitlines() if l.strip()]),
+                    "section_count": len([line for line in text.splitlines() if line.strip()]),
                 }
             )
         log_progress(10, "documents-loaded", loaded=len(documents), requested=len(doc_ids))
@@ -4052,6 +4132,23 @@ class BIMGuard_App:
             "shacl_issues": shacl_issues,
             "shacl_error": shacl_error,
         }
+
+    @staticmethod
+    def _run_optional_graph_summary(m2_reader: Any) -> dict[str, Any] | None:
+        """Opt-in graph intelligence summary extraction."""
+        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
+            return None
+        try:
+            from app.modules.ifc_reader.ifc_graph import (
+                build_ifc_graph,
+                build_ifc_graph_summary,
+            )
+
+            graph = build_ifc_graph(m2_reader.ifc_file)
+            return build_ifc_graph_summary(graph)
+        except Exception as exc:
+            logger.debug("Optional graph summary generation skipped: %s", exc)
+            return None
 
     @staticmethod
     def _run_arch_engine_compliance(
@@ -8232,6 +8329,145 @@ def summarise(issues: list[Issue]) -> dict[str, int]:
     return counts
 
 
+def build_issue_proof_graph(issue: Issue | dict[str, Any]) -> dict[str, Any]:
+    """Construct an explainable Directed Acyclic Graph proving why an issue was flagged.
+
+    Inspired by TopologicPy / Semantic Web explainability proof graphs:
+    Decomposes the finding into 4 explicit reasoning tiers:
+    1. Asserted Facts: Observable properties extracted from the BIM model.
+    2. Rule Axioms: Normative standards, building code requirements, and threshold limits.
+    3. Inference Steps: Logical evaluations connecting facts and axioms.
+    4. Verdict: Final compliance classification and risk band assignment.
+    """
+    data = to_dict(issue) if isinstance(issue, Issue) else dict(issue)
+
+    issue_id = str(data.get("id") or "ISSUE-UNKNOWN")
+    rule_id = str(data.get("rule_id") or "RULE-UNKNOWN")
+    element_id = str(data.get("element_id") or "ELEM-UNKNOWN")
+    title = str(data.get("title") or "Compliance Issue")
+    raw_band = data.get("band")
+    band = raw_band.value if hasattr(raw_band, "value") else str(raw_band or "medium")
+    score = float(data.get("score") or 0.0)
+    metadata = data.get("metadata") or {}
+    citations = data.get("citations") or []
+    mitigation = str(data.get("mitigation") or "")
+
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+    # 1. Asserted Fact Nodes
+    fact_elem_id = f"fact_elem_{element_id[:8]}"
+    nodes.append(
+        {
+            "id": fact_elem_id,
+            "label": f"Model Element: {element_id}",
+            "node_type": "asserted_fact",
+            "metadata": {"element_id": element_id},
+        }
+    )
+
+    fact_nodes: list[str] = [fact_elem_id]
+    for k, v in metadata.items():
+        if (
+            v is not None
+            and not isinstance(v, (dict, list))
+            and k not in ("guid", "element_id")
+        ):
+            f_id = f"fact_{k}"
+            nodes.append(
+                {
+                    "id": f_id,
+                    "label": f"Measured {k}: {v}",
+                    "node_type": "asserted_fact",
+                    "metadata": {k: v},
+                }
+            )
+            fact_nodes.append(f_id)
+
+    # 2. Rule Axiom Nodes
+    axiom_id = f"axiom_{rule_id}"
+    axiom_label = f"Rule Criterion: {rule_id}"
+    if citations:
+        c = citations[0]
+        std = c.get("standard")
+        cl = c.get("clause")
+        if std and cl:
+            axiom_label = f"Standard {std} §{cl}"
+        elif std:
+            axiom_label = f"Standard {std}"
+
+    nodes.append(
+        {
+            "id": axiom_id,
+            "label": axiom_label,
+            "node_type": "rule_axiom",
+            "metadata": {"rule_id": rule_id, "citations": citations},
+        }
+    )
+
+    # 3. Inference Step Node
+    inf_id = f"inf_{issue_id}"
+    inf_label = title if title else f"Violation of {rule_id}"
+    nodes.append(
+        {
+            "id": inf_id,
+            "label": f"Deduction: {inf_label}",
+            "node_type": "inference_step",
+            "metadata": {"score": score, "mitigation": mitigation},
+        }
+    )
+
+    for fn in fact_nodes:
+        edges.append(
+            {
+                "source": fn,
+                "target": inf_id,
+                "label": "applies",
+            }
+        )
+
+    edges.append(
+        {
+            "source": axiom_id,
+            "target": inf_id,
+            "label": "applies",
+        }
+    )
+
+    # 4. Verdict Node
+    verdict_id = f"verdict_{issue_id}"
+    nodes.append(
+        {
+            "id": verdict_id,
+            "label": f"Verdict: FAIL ({band.upper()}, Score: {score:.2f})",
+            "node_type": "verdict",
+            "metadata": {"band": band, "score": score},
+        }
+    )
+
+    edges.append(
+        {
+            "source": inf_id,
+            "target": verdict_id,
+            "label": "infers",
+        }
+    )
+
+    explanation = (
+        f"Element {element_id} was evaluated against {axiom_label}. "
+        f"Based on asserted model parameters, the check concluded: '{title}' with a risk score of {score:.2f} ({band})."
+    )
+
+    return {
+        "issue_id": issue_id,
+        "rule_id": rule_id,
+        "element_id": element_id,
+        "nodes": nodes,
+        "edges": edges,
+        "explanation": explanation,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Smoke test
 # ---------------------------------------------------------------------------
@@ -9799,12 +10035,56 @@ class DoclingExtractor:
         if not xml_content or not xml_content.strip():
             return False
         import tempfile
+        import sys
         from pathlib import Path
         try:
             import doclang
-            with tempfile.NamedTemporaryFile(suffix=".xml", delete=False, mode="w", encoding="utf-8") as f:
+            import os
+            if sys.platform == "win32":
+                try:
+                    import doclang.backends.saxonche as sc
+                    if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
+                        def _patched_saxon_validate(self, xml_path, *, schema_path, allow_empty_namespace=False, verbose=False):
+                            from lxml import etree
+                            from saxonche import PySaxonProcessor
+                            from doclang.backends.saxonche import (
+                                _require_saxonche_backend,
+                                _parse_doclang_document,
+                                _ensure_namespace,
+                                _write_xml_without_dtd,
+                                _transpile_schematron_to_xslt,
+                                _svrl_failed_asserts_to_violations,
+                            )
+                            _require_saxonche_backend()
+                            with open(xml_path, "rb") as f:
+                                xml_doc = _parse_doclang_document(f)
+                            if allow_empty_namespace:
+                                xml_doc = _ensure_namespace(xml_doc)
+                            fd_saxon, tmp_saxon_path = tempfile.mkstemp(suffix=".xml")
+                            os.close(fd_saxon)
+                            with open(tmp_saxon_path, "wb") as tmp:
+                                _write_xml_without_dtd(xml_doc, tmp)
+                            try:
+                                with PySaxonProcessor(license=False) as proc:
+                                    xslt_proc = proc.new_xslt30_processor()
+                                    xslt_text = _transpile_schematron_to_xslt(schema_path, verbose=verbose)
+                                    xslt_executable = xslt_proc.compile_stylesheet(stylesheet_text=xslt_text)
+                                    result = xslt_executable.transform_to_string(source_file=tmp_saxon_path)
+                                    if not result:
+                                        return []
+                                    result_doc = etree.fromstring(result.encode("utf-8"))
+                                    return _svrl_failed_asserts_to_violations(result_doc)
+                            finally:
+                                Path(tmp_saxon_path).unlink(missing_ok=True)
+                        sc.SaxoncheValidator.validate = _patched_saxon_validate
+                        sc.SaxoncheValidator._win32_patched = True
+                except Exception:
+                    pass
+
+            fd, tmp_path = tempfile.mkstemp(suffix=".xml")
+            os.close(fd)
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(xml_content)
-                tmp_path = f.name
             try:
                 doclang.validate(tmp_path, allow_empty_namespace=True)
                 return True
@@ -17082,13 +17362,26 @@ def dn_to_od_m(dn: int) -> float:
 ### app/modules/ifc_reader/ifc_graph.py
 
 ```python
-"""Build IFC relationship graphs and render them as PyVis HTML."""
+"""Build IFC relationship graphs and ingest them into GraphService (Neo4j / KùzuDB).
 
-from html import escape
+Provides:
+- `build_ifc_graph(model) -> nx.DiGraph`: Builds a NetworkX directed relationship graph.
+- `ingest_ifc_to_graph(...) -> dict[str, int]`: Streamlines IFC entities and relationships
+  directly into a GraphService backend using batch Cypher / provider operations.
+- `build_ifc_graph_summary(...) -> dict`: Returns structured metadata and statistics.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
-from pyvis.network import Network
+
+if TYPE_CHECKING:
+    from app.services.graph_database import GraphService
 
 try:
     import ifcopenshell
@@ -17096,42 +17389,25 @@ try:
 
     _IFCOPENSHELL_AVAILABLE = True
 except ImportError:
+    ifcopenshell = None
     _IFCOPENSHELL_AVAILABLE = False
 
+logger = logging.getLogger(__name__)
 
 _SPATIAL_TYPES = {"IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcSpace"}
-_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2}
+_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2, "HasMaterial": 3}
 
 
-def _safe_label(entity) -> str:
+def _safe_label(entity: Any) -> str:
     name = getattr(entity, "Name", None)
     return name or entity.is_a()
 
 
-def _node_title(guid: str, label: str, ifc_type: str, psets: dict) -> str:
-    pset_names = list(psets.keys())[:6]
-    pset_suffix = ""
-    if pset_names:
-        joined = ", ".join(escape(name) for name in pset_names)
-        extra = len(psets) - len(pset_names)
-        more = f" (+{extra} more)" if extra > 0 else ""
-        pset_suffix = f"<br/><b>Psets:</b> {joined}{more}"
-    return (
-        f"<b>{escape(label)}</b>"
-        f"<br/><b>Type:</b> {escape(ifc_type)}"
-        f"<br/><b>GUID:</b> {escape(guid)}"
-        f"{pset_suffix}"
-    )
-
-
-def build_ifc_graph(model) -> nx.DiGraph:
-    """Build a directed IFC relationship graph from products and key relations."""
+def build_ifc_graph(model: Any) -> nx.DiGraph:
+    """Build a directed IFC relationship graph from products, spaces, and relations."""
     graph = nx.DiGraph()
 
-    # IfcProject is IfcContext, not IfcProduct, so it is added explicitly --
-    # the IfcProduct loop below would otherwise never see it, leaving the
-    # BOT graph (app.modules.ifc_reader.bot_graph) without a root bot:Zone
-    # node even though IfcRelAggregates links it to every IfcSite.
+    # IfcProject is an IfcContext, so add it explicitly as the root zone
     for project in model.by_type("IfcProject"):
         guid = getattr(project, "GlobalId", None)
         if not guid:
@@ -17143,12 +17419,13 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets={},
         )
 
+    # Physical products and spatial structures
     for product in model.by_type("IfcProduct"):
         guid = getattr(product, "GlobalId", None)
         if not guid:
             continue
         try:
-            psets = ifcopenshell.util.element.get_psets(product)
+            psets = ifcopenshell.util.element.get_psets(product) if ifcopenshell else {}
         except Exception:
             psets = {}
         graph.add_node(
@@ -17158,6 +17435,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets=psets,
         )
 
+    # Spatial containment: (:Structure)-[:ContainedIn]->(:Element)
     for rel in model.by_type("IfcRelContainedInSpatialStructure"):
         container = getattr(rel, "RelatingStructure", None)
         container_guid = getattr(container, "GlobalId", None)
@@ -17173,6 +17451,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#4CAF50",
                 )
 
+    # Spatial aggregation: (:Whole)-[:Aggregates]->(:Part)
     for rel in model.by_type("IfcRelAggregates"):
         whole = getattr(rel, "RelatingObject", None)
         whole_guid = getattr(whole, "GlobalId", None)
@@ -17188,6 +17467,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#2196F3",
                 )
 
+    # Physical connection: (:Element)-[:Connects]->(:Element)
     for rel in model.by_type("IfcRelConnectsElements"):
         source = getattr(rel, "RelatingElement", None)
         target = getattr(rel, "RelatedElement", None)
@@ -17201,150 +17481,259 @@ def build_ifc_graph(model) -> nx.DiGraph:
                 color="#FF9800",
             )
 
+    # Material association: (:Element)-[:HasMaterial]->(:Material)
+    for rel in model.by_type("IfcRelAssociatesMaterial"):
+        material_select = getattr(rel, "RelatingMaterial", None)
+        if not material_select:
+            continue
+        material_name = (
+            getattr(material_select, "Name", None)
+            or getattr(material_select, "Material", None)
+            or material_select.is_a()
+        )
+        if not isinstance(material_name, str):
+            material_name = str(material_name)
+        material_id = f"Material_{material_name}"
+        if material_id not in graph:
+            graph.add_node(
+                material_id,
+                label=material_name,
+                ifc_type="IfcMaterial",
+                psets={},
+            )
+        for element in getattr(rel, "RelatedObjects", []):
+            element_guid = getattr(element, "GlobalId", None)
+            if element_guid and element_guid in graph:
+                graph.add_edge(
+                    element_guid,
+                    material_id,
+                    rel_type="HasMaterial",
+                    color="#9C27B0",
+                )
+
     return graph
 
 
-def _select_nodes(graph: nx.DiGraph, max_nodes: int) -> set[str]:
-    if graph.number_of_nodes() <= max_nodes:
-        return set(graph.nodes())
+def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
+    """Compute closeness, degree, and betweenness centralities on an IFC relationship graph.
 
-    ranked = sorted(
-        graph.nodes(),
-        key=lambda node_id: (
-            graph.nodes[node_id].get("ifc_type") in _SPATIAL_TYPES,
-            graph.degree(node_id),
-            graph.in_degree(node_id),
-        ),
-        reverse=True,
-    )
-    return set(ranked[:max_nodes])
+    Inspired by TopologicPy network centrality analytics for BIM graphs:
+    identifies central structural conduits, key spatial hubs, and critical circulation nodes.
+    """
+    if len(graph) == 0:
+        return {}
+
+    # Convert to undirected graph for structural reachability
+    undirected = graph.to_undirected()
+
+    try:
+        closeness = nx.closeness_centrality(undirected)
+    except Exception:
+        closeness = {}
+
+    try:
+        degree = nx.degree_centrality(undirected)
+    except Exception:
+        degree = {}
+
+    # Betweenness is computationally heavier; cap at moderate sized graphs for interactive response
+    betweenness = {}
+    if len(graph) <= 1000:
+        try:
+            betweenness = nx.betweenness_centrality(undirected)
+        except Exception:
+            betweenness = {}
+
+    results: dict[str, dict[str, float]] = {}
+    for node in graph.nodes():
+        node_str = str(node)
+        results[node_str] = {
+            "closeness": round(float(closeness.get(node, 0.0)), 4),
+            "degree": round(float(degree.get(node, 0.0)), 4),
+            "betweenness": round(float(betweenness.get(node, 0.0)), 4) if betweenness else 0.0,
+        }
+    return results
 
 
-def build_pyvis_graph(
-    graph: nx.DiGraph, violations: list[dict], max_nodes: int = 220, max_edges: int = 600
-):
-    """Render a PyVis HTML graph from the IFC relationship graph."""
+def get_centrality_consequence_multiplier(
+    guid: str,
+    centralities: dict[str, dict[str, float]],
+    base_multiplier: float = 1.0,
+    max_multiplier: float = 1.5,
+) -> float:
+    """Calculate a consequence multiplier (1.0 to 1.5x) based on element network centrality."""
+    metrics = centralities.get(guid)
+    if not metrics:
+        return base_multiplier
+
+    score = float(metrics.get("degree", 0.0))
+    boost = score * (max_multiplier - base_multiplier)
+    return round(base_multiplier + boost, 3)
+
+
+def build_ifc_graph_summary(
+    graph: nx.DiGraph,
+    violations: list[dict[str, Any]] | None = None,
+    include_centrality: bool = True,
+) -> dict[str, Any]:
+    """Generate structured summary metadata and centrality analytics for an IFC relationship graph."""
     violation_ids = {
         entry.get("element")
-        for entry in violations
+        for entry in (violations or [])
         if isinstance(entry, dict) and entry.get("element")
     }
 
-    selected_nodes = _select_nodes(graph, max_nodes)
-    selected_graph = graph.subgraph(selected_nodes).copy()
-
-    edge_rows = sorted(
-        selected_graph.edges(data=True),
-        key=lambda edge: (
-            _EDGE_PRIORITY.get(edge[2].get("rel_type", "Connects"), 99),
-            edge[0],
-            edge[1],
-        ),
-    )
-    limited_edges = edge_rows[:max_edges]
-
-    net = Network(
-        height="700px",
-        width="100%",
-        directed=True,
-        bgcolor="#0f172a",
-        font_color="#e5e7eb",
-        select_menu=True,
-        filter_menu=True,
-        # Served directly as an HTTP response (no sibling lib/ folder on disk
-        # like pyvis's own write_html() creates), so assets must load from a
-        # CDN rather than pyvis's default local-relative-path scripts.
-        cdn_resources="remote",
-    )
-    net.barnes_hut(
-        gravity=-18000,
-        central_gravity=0.16,
-        spring_length=150,
-        spring_strength=0.04,
-        damping=0.1,
-    )
-
-    for node_id, attrs in selected_graph.nodes(data=True):
-        ifc_type = attrs.get("ifc_type", "IfcProduct")
-        label = attrs.get("label", ifc_type)
-        highlighted = node_id in violation_ids
-        is_spatial = ifc_type in _SPATIAL_TYPES
-        color = "#ef4444" if highlighted else "#22c55e" if is_spatial else "#60a5fa"
-        size = 24 if highlighted else 20 if is_spatial else 14
-        net.add_node(
-            node_id,
-            label=label[:36],
-            title=_node_title(node_id, label, ifc_type, attrs.get("psets", {})),
-            color=color,
-            shape="dot",
-            size=size,
-            group=ifc_type,
-        )
-        # pyvis's own add_node() silently drops the color= kwarg whenever
-        # group= is also passed (it falls back to group-based auto-coloring
-        # instead) — set it directly on the stored node options to override.
-        net.nodes[-1]["color"] = color
-
-    for source, target, attrs in limited_edges:
-        net.add_edge(
-            source,
-            target,
-            color=attrs.get("color", "#94a3b8"),
-            title=attrs.get("rel_type", "Relation"),
-            arrows="to",
-        )
-
-    net.set_options(
-        """
-        const options = {
-          "interaction": {"hover": true, "navigationButtons": true, "keyboard": true},
-          "nodes": {"borderWidth": 1, "borderWidthSelected": 2, "font": {"size": 14}},
-          "edges": {"smooth": {"type": "dynamic"}, "width": 2},
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -18000,
-              "centralGravity": 0.16,
-              "springLength": 150,
-              "springConstant": 0.04,
-              "damping": 0.1
-            },
-            "minVelocity": 0.75
-          }
-        }
-        """
-    )
-
-    relationship_counts = {
-        "ContainedIn": 0,
-        "Aggregates": 0,
-        "Connects": 0,
-    }
+    relationship_counts: dict[str, int] = defaultdict(int)
     for _, _, attrs in graph.edges(data=True):
-        rel_type = attrs.get("rel_type")
-        if rel_type in relationship_counts:
-            relationship_counts[rel_type] += 1
+        rel_type = attrs.get("rel_type", "Other")
+        relationship_counts[rel_type] += 1
+
+    type_counts: dict[str, int] = defaultdict(int)
+    for _, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        type_counts[ifc_type] += 1
+
+    centrality_summary: dict[str, Any] = {}
+    top_central_elements: list[dict[str, Any]] = []
+
+    if include_centrality and len(graph) > 0:
+        centralities = compute_graph_centrality(graph)
+        sorted_nodes = sorted(
+            centralities.items(),
+            key=lambda item: max(item[1].get("degree", 0.0), item[1].get("closeness", 0.0)),
+            reverse=True,
+        )
+        for guid, metrics in sorted_nodes[:5]:
+            node_attrs = graph.nodes.get(guid, {})
+            top_central_elements.append(
+                {
+                    "guid": guid,
+                    "label": node_attrs.get("label", guid),
+                    "ifc_type": node_attrs.get("ifc_type", "Unknown"),
+                    "degree": metrics.get("degree", 0.0),
+                    "closeness": metrics.get("closeness", 0.0),
+                }
+            )
+        centrality_summary = {
+            "evaluated_nodes": len(centralities),
+            "max_degree": max((m.get("degree", 0.0) for m in centralities.values()), default=0.0),
+            "max_closeness": max((m.get("closeness", 0.0) for m in centralities.values()), default=0.0),
+        }
 
     return {
-        "html": net.generate_html(notebook=False),
         "node_count": graph.number_of_nodes(),
         "edge_count": graph.number_of_edges(),
-        "displayed_node_count": selected_graph.number_of_nodes(),
-        "displayed_edge_count": len(limited_edges),
-        "truncated": selected_graph.number_of_nodes() < graph.number_of_nodes()
-        or len(limited_edges) < graph.number_of_edges(),
         "violation_count": len(violation_ids & set(graph.nodes())),
-        "relationship_counts": relationship_counts,
+        "relationship_counts": dict(relationship_counts),
+        "type_counts": dict(type_counts),
+        "centrality_summary": centrality_summary,
+        "top_central_elements": top_central_elements,
     }
 
 
-def render_ifc_graph(ifc_path: Path | str, violations: list[dict] | None = None):
-    """Open an IFC file, build its relationship graph, and return rendered HTML metadata."""
+def ingest_ifc_to_graph(
+    model_or_path: Any,
+    graph_service: GraphService,
+    *,
+    project_id: str | None = None,
+    include_psets: bool = False,
+) -> dict[str, int]:
+    """Extract IFC entities and relationships and ingest them in batch into GraphService.
+
+    Args:
+        model_or_path: An open ifcopenshell.file or a Path/str to an IFC file.
+        graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
+        project_id: Optional project identifier to associate with all ingested nodes.
+        include_psets: Whether to flatten and attach property set values to element nodes.
+
+    Returns:
+        Dict with total counts of ingested nodes and relationships.
+    """
+    if not _IFCOPENSHELL_AVAILABLE:
+        raise ImportError("ifcopenshell is not installed.")
+
+    if isinstance(model_or_path, (str, Path)):
+        model = ifcopenshell.open(str(model_or_path))
+    else:
+        model = model_or_path
+
+    graph = build_ifc_graph(model)
+
+    # Group nodes by label (ifc_type)
+    nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for node_id, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "IfcProduct")
+        node_props: dict[str, Any] = {
+            "id": node_id,
+            "guid": node_id,
+            "name": attrs.get("label", node_id),
+            "ifc_type": ifc_type,
+        }
+        if project_id:
+            node_props["project_id"] = project_id
+
+        if include_psets and attrs.get("psets"):
+            # Flatten top property set keys if requested
+            for pset_name, pset_vals in attrs["psets"].items():
+                if isinstance(pset_vals, dict):
+                    for k, v in list(pset_vals.items())[:10]:
+                        safe_key = f"pset_{pset_name}_{k}".replace(" ", "_")
+                        if isinstance(v, (str, int, float, bool)):
+                            node_props[safe_key[:40]] = v
+
+        nodes_by_label[ifc_type].append(node_props)
+
+    total_nodes = 0
+    for label, nodes in nodes_by_label.items():
+        graph_service.add_nodes_batch(label, nodes)
+        total_nodes += len(nodes)
+
+    # Group edges by rel_type
+    edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for source_id, target_id, attrs in graph.edges(data=True):
+        rel_type = attrs.get("rel_type", "CONNECTS").upper()
+        # Normalise relationship names to standard Cypher convention
+        if rel_type == "CONTAINEDIN":
+            rel_type = "CONTAINS"
+        edges_by_type[rel_type].append(
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "properties": {"project_id": project_id} if project_id else {},
+            }
+        )
+
+    total_edges = 0
+    for rel_type, edges in edges_by_type.items():
+        graph_service.add_edges_batch(rel_type, edges)
+        total_edges += len(edges)
+
+    logger.info(
+        "Ingested IFC model to graph: %d nodes across %d labels, %d edges across %d types",
+        total_nodes,
+        len(nodes_by_label),
+        total_edges,
+        len(edges_by_type),
+    )
+
+    return {
+        "nodes": total_nodes,
+        "edges": total_edges,
+        "labels": len(nodes_by_label),
+        "rel_types": len(edges_by_type),
+    }
+
+
+def render_ifc_graph(
+    ifc_path: Path | str, violations: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Open an IFC file and return structured graph summary metrics without PyVis."""
     if not _IFCOPENSHELL_AVAILABLE:
         raise ImportError("ifcopenshell is not installed.")
 
     model = ifcopenshell.open(str(ifc_path))
     graph = build_ifc_graph(model)
-    return build_pyvis_graph(graph, violations or [])
+    return build_ifc_graph_summary(graph, violations or [])
 ```
 
 ---
@@ -20248,6 +20637,7 @@ Both return lists of result dicts compatible with the Module 4 report format.
 """
 
 import logging
+from typing import Any
 
 logger = logging.getLogger("bimguard.spatial")
 
@@ -20350,13 +20740,103 @@ def _is_exterior_door(element) -> bool | None:
     return None
 
 
-def _element_matches_location(element, location: str) -> bool:
-    """True if an element's IsExternal classification matches an
-    applies_when.location condition ("interior" or "exterior"). An element
-    with no verifiable IsExternal data (_is_exterior_door returns None) is
-    excluded — never guessed into either bucket.
+def classify_envelope_elements(ifc_file) -> dict[str, str]:
+    """Classify building elements into directional envelope face roles from 3D geometry.
+
+    Inspired by TopologicPy/IFC4-RV face decomposition:
+    - 'exterior_wall': External vertical faces bounding the building perimeter
+    - 'interior_wall': Internal vertical partitions
+    - 'roof': Topmost horizontal faces
+    - 'ground_slab': Bottommost horizontal ground/foundation slabs
+    - 'intermediate_slab': Intermediate floor slabs
     """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {}
+
+    try:
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+        extractor = IFCGeometryExtractor(ifc_file)
+    except Exception:
+        return {}
+
+    # Collect elements
+    try:
+        walls = ifc_file.by_type("IfcWall") + ifc_file.by_type("IfcWallStandardCase")
+        slabs = ifc_file.by_type("IfcSlab")
+        roofs = ifc_file.by_type("IfcRoof") if hasattr(ifc_file, "by_type") else []
+        elements = walls + slabs + roofs
+    except Exception:
+        elements = []
+
+    if not elements:
+        return {}
+
+    bboxes: dict[str, tuple[Any, dict[str, float]]] = {}
+    for el in elements:
+        try:
+            bbox = extractor.get_bounding_box(el)
+            if bbox:
+                bboxes[getattr(el, "GlobalId", str(id(el)))] = (el, bbox)
+        except Exception:
+            continue
+
+    if not bboxes:
+        return {}
+
+    min_x = min(b["min_x"] for _, b in bboxes.values())
+    max_x = max(b["max_x"] for _, b in bboxes.values())
+    min_y = min(b["min_y"] for _, b in bboxes.values())
+    max_y = max(b["max_y"] for _, b in bboxes.values())
+    min_z = min(b["min_z"] for _, b in bboxes.values())
+    max_z = max(b["max_z"] for _, b in bboxes.values())
+
+    span_x = max(max_x - min_x, 1.0)
+    span_y = max(max_y - min_y, 1.0)
+    span_z = max(max_z - min_z, 1.0)
+
+    margin_xy = max(min(span_x, span_y) * 0.08, 300.0)
+    margin_z = max(span_z * 0.1, 400.0)
+
+    result: dict[str, str] = {}
+    for guid, (el, b) in bboxes.items():
+        is_wall = el.is_a() in ("IfcWall", "IfcWallStandardCase")
+        is_slab = el.is_a() in ("IfcSlab", "IfcRoof")
+
+        if is_wall:
+            touches_x = (b["min_x"] <= min_x + margin_xy) or (b["max_x"] >= max_x - margin_xy)
+            touches_y = (b["min_y"] <= min_y + margin_xy) or (b["max_y"] >= max_y - margin_xy)
+            result[guid] = "exterior_wall" if (touches_x or touches_y) else "interior_wall"
+        elif is_slab:
+            if b["max_z"] >= max_z - margin_z or el.is_a() == "IfcRoof":
+                result[guid] = "roof"
+            elif b["min_z"] <= min_z + margin_z:
+                result[guid] = "ground_slab"
+            else:
+                result[guid] = "intermediate_slab"
+
+    return result
+
+
+def is_exterior_element(element, ifc_file: Any = None) -> bool | None:
+    """Determine if an element is exterior, using Psets first, then geometric envelope fallback."""
     is_ext = _is_exterior_door(element)
+    if is_ext is not None:
+        return is_ext
+    if ifc_file is not None:
+        classification = classify_envelope_elements(ifc_file)
+        elem_role = classification.get(getattr(element, "GlobalId", None))
+        if elem_role in ("exterior_wall", "roof"):
+            return True
+        elif elem_role in ("interior_wall", "intermediate_slab"):
+            return False
+    return None
+
+
+def _element_matches_location(element, location: str, ifc_file: Any = None) -> bool:
+    """True if an element's IsExternal classification matches an
+    applies_when.location condition ("interior" or "exterior").
+    """
+    is_ext = is_exterior_element(element, ifc_file=ifc_file)
     if is_ext is None:
         return False
     return is_ext if location == "exterior" else not is_ext
@@ -20365,21 +20845,23 @@ def _element_matches_location(element, location: str) -> bool:
 # ── Core adjacency builder ────────────────────────────────────────────────────
 
 class IFCSpatialAdjacency:
-    """
-    Builds a spatial adjacency map from IfcRelSpaceBoundary relationships.
+    """Build a spatial adjacency map from IfcRelSpaceBoundary with geometric fallback.
 
     Attributes populated after build():
       _space_data  : {space_guid -> {space, boundaries: [{element, type, physical}]}}
       _wall_spaces : {wall_guid  -> [space_guid, ...]}   -- party wall detection
-      has_boundaries : bool  -- False if the file has no IfcRelSpaceBoundary data
+      has_boundaries : bool  -- True if space boundaries are mapped
+      is_geometric_fallback : bool -- True if populated via geometric proximity
     """
 
-    def __init__(self, ifc_file):
+    def __init__(self, ifc_file, fallback_to_geometric: bool = True):
         self.ifc_file = ifc_file
+        self.fallback_to_geometric = fallback_to_geometric
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
         self._door_to_spaces: dict[str, list[str]] | None = None
         self.has_boundaries = False
+        self.is_geometric_fallback = False
         self._built = False
 
     def build(self) -> "IFCSpatialAdjacency":
@@ -20433,16 +20915,123 @@ class IFCSpatialAdjacency:
                 continue
 
         self.has_boundaries = len(self._space_data) > 0
+
+        # Geometric fallback when IfcRelSpaceBoundary is absent or incomplete
+        if not self.has_boundaries and self.fallback_to_geometric:
+            self._build_geometric_fallback()
+
         self._built = True
 
         if not self.has_boundaries:
             logger.warning(
-                "No IfcRelSpaceBoundary data found. "
+                "No IfcRelSpaceBoundary data found and geometric fallback found no candidates. "
                 "Daylight and fire separation checks will be skipped. "
                 "Export your model with Space Boundaries enabled."
             )
 
         return self
+
+    def _build_geometric_fallback(self, tolerance_mm: float = 200.0) -> None:
+        """Derive spatial boundaries geometrically from bounding box contact."""
+        if not _IFC_AVAILABLE or self.ifc_file is None:
+            return
+
+        try:
+            spaces = self.ifc_file.by_type("IfcSpace")
+        except Exception:
+            spaces = []
+
+        if not spaces:
+            return
+
+        try:
+            from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+            extractor = IFCGeometryExtractor(self.ifc_file)
+        except Exception:
+            extractor = None
+
+        try:
+            walls = self.ifc_file.by_type("IfcWall") + self.ifc_file.by_type("IfcWallStandardCase")
+            doors = self.ifc_file.by_type("IfcDoor")
+            windows = self.ifc_file.by_type("IfcWindow")
+            slabs = self.ifc_file.by_type("IfcSlab")
+            candidates = walls + doors + windows + slabs
+        except Exception:
+            candidates = []
+
+        if not candidates:
+            return
+
+        # Cache bounding boxes
+        space_boxes: dict[str, tuple[Any, dict[str, float] | None]] = {}
+        for sp in spaces:
+            guid = getattr(sp, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(sp) if extractor else None
+            space_boxes[guid] = (sp, box)
+
+        cand_boxes: list[tuple[Any, str, str, dict[str, float] | None]] = []
+        for c in candidates:
+            guid = getattr(c, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(c) if extractor else None
+            cand_boxes.append((c, guid, c.is_a(), box))
+
+        def _boxes_intersect(a: dict[str, float], b: dict[str, float], tol: float) -> bool:
+            return not (
+                a["max_x"] + tol < b["min_x"]
+                or a["min_x"] - tol > b["max_x"]
+                or a["max_y"] + tol < b["min_y"]
+                or a["min_y"] - tol > b["max_y"]
+                or a["max_z"] + tol < b["min_z"]
+                or a["min_z"] - tol > b["max_z"]
+            )
+
+        found_any = False
+        for s_guid, (sp, s_box) in space_boxes.items():
+            for c_elem, c_guid, c_type, c_box in cand_boxes:
+                is_contact = False
+                if s_box is not None and c_box is not None:
+                    is_contact = _boxes_intersect(s_box, c_box, tolerance_mm)
+                else:
+                    # Spatial container fallback: if element is contained in space's storey
+                    s_storey = getattr(sp, "Decomposes", None)
+                    c_storey = getattr(c_elem, "ContainedInStructure", None)
+                    if s_storey and c_storey and s_storey == c_storey:
+                        is_contact = True
+
+                if is_contact:
+                    if s_guid not in self._space_data:
+                        self._space_data[s_guid] = {
+                            "space": sp,
+                            "boundaries": [],
+                        }
+                    if any(b["element_guid"] == c_guid for b in self._space_data[s_guid]["boundaries"]):
+                        continue
+                    self._space_data[s_guid]["boundaries"].append(
+                        {
+                            "element": c_elem,
+                            "element_guid": c_guid,
+                            "element_type": c_type,
+                            "physical": True,
+                        }
+                    )
+                    if c_type in ("IfcWall", "IfcWallStandardCase"):
+                        if c_guid not in self._wall_spaces:
+                            self._wall_spaces[c_guid] = []
+                        if s_guid not in self._wall_spaces[c_guid]:
+                            self._wall_spaces[c_guid].append(s_guid)
+                    found_any = True
+
+        if found_any:
+            self.has_boundaries = True
+            self.is_geometric_fallback = True
+            logger.info(
+                "Populated %d space boundaries via 3D geometric contact fallback.",
+                len(self._space_data),
+            )
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
@@ -20506,6 +21095,89 @@ class IFCSpatialAdjacency:
             dguid: sorted(sguids) for dguid, sguids in mapping.items()
         }
         return self._door_to_spaces
+
+
+def heal_spatial_boundaries(ifc_file, tolerance_mm: float = 200.0) -> dict[str, Any]:
+    """Reconcile and synthesize missing IfcRelSpaceBoundary entities from geometric adjacency.
+
+    Inspired by TopologicPy's IFC healing workflow: detects spaces and bounding
+    elements (walls, slabs, doors, windows) that lack explicit boundary relationships
+    and generates IfcRelSpaceBoundary records directly in the IFC model memory.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {
+            "healed_spaces": 0,
+            "created_boundaries": 0,
+            "total_boundaries": 0,
+            "status": "no_op",
+            "message": "IFC engine unavailable or empty model",
+        }
+
+    try:
+        existing_rels = ifc_file.by_type("IfcRelSpaceBoundary")
+    except Exception:
+        existing_rels = []
+
+    existing_pairs: set[tuple[str, str]] = set()
+    for r in existing_rels:
+        try:
+            sp = getattr(r, "RelatingSpace", None)
+            el = getattr(r, "RelatedBuildingElement", None)
+            if sp and el:
+                existing_pairs.add((sp.GlobalId, el.GlobalId))
+        except Exception:
+            continue
+
+    adj = IFCSpatialAdjacency(ifc_file, fallback_to_geometric=True).build()
+
+    created_count = 0
+    healed_spaces: set[str] = set()
+
+    for s_guid, s_info in adj._space_data.items():
+        space = s_info.get("space")
+        if not space:
+            continue
+        for b in s_info.get("boundaries", []):
+            elem = b.get("element")
+            if not elem:
+                continue
+            e_guid = b.get("element_guid")
+            if (s_guid, e_guid) not in existing_pairs:
+                try:
+                    import ifcopenshell.guid
+
+                    new_guid = ifcopenshell.guid.new()
+                    ifc_file.create_entity(
+                        "IfcRelSpaceBoundary",
+                        GlobalId=new_guid,
+                        RelatingSpace=space,
+                        RelatedBuildingElement=elem,
+                        PhysicalOrVirtualBoundary="PHYSICAL",
+                        InternalOrExternalBoundary="INTERNAL",
+                    )
+                    existing_pairs.add((s_guid, e_guid))
+                    created_count += 1
+                    healed_spaces.add(s_guid)
+                except Exception as exc:
+                    logger.debug(f"Failed to synthesize IfcRelSpaceBoundary: {exc}")
+                    continue
+
+    try:
+        total = len(ifc_file.by_type("IfcRelSpaceBoundary"))
+    except Exception:
+        total = created_count
+
+    return {
+        "healed_spaces": len(healed_spaces),
+        "created_boundaries": created_count,
+        "total_boundaries": total,
+        "status": "success" if created_count > 0 else "already_healed",
+        "message": (
+            f"Successfully synthesized {created_count} space boundaries across {len(healed_spaces)} spaces."
+            if created_count > 0
+            else "Model already contains full space boundary coverage."
+        ),
+    }
 
 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────
@@ -25247,10 +25919,12 @@ def _describe_cc(issue, catalog, m: Mapping[str, Any]) -> str:
     cct = _num(m.get("cct_value_c"), "°C", places=1)
     temp = _num(m.get("operating_temp_c"), "°C", places=1)
     if cct and temp:
+        # _cc_element passes no temperature, so this is always CCElement's
+        # 20 °C default. See docs/defects/CC-001-scoring-inputs-inert.md.
         cct_txt = (
             f"{material or 'the specified grade'} has a critical crevice "
-            f"temperature of {cct} against an operating temperature of {temp} "
-            f"(ASTM G48 Method B)"
+            f"temperature of {cct}, assessed at the engine's default {temp}, not "
+            f"the element's stated temperature (ASTM G48 Method B)"
         )
     else:
         cct_txt = (
@@ -39425,6 +40099,11 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     EnvVarSpec("DOCLING_SERVICE_URL", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_API_KEY", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_LOCAL_URL", "Document Parsing", "Seeds a self-hosted Docling parsing_engine_instances row on first boot."),
+    # ── Graph Database (Neo4j) ───────────────────────────────────────────────
+    EnvVarSpec("NEO4J_URI", "Graph Database", "Bolt or Neo4j URI for hosted or Docker-launched Neo4j instance."),
+    EnvVarSpec("NEO4J_USERNAME", "Graph Database", "Username for Neo4j basic auth (default: neo4j)."),
+    EnvVarSpec("NEO4J_PASSWORD", "Graph Database", "Password for Neo4j basic auth."),
+    EnvVarSpec("NEO4J_DATABASE", "Graph Database", "Neo4j target database name (default: neo4j)."),
     # ── Integrations ─────────────────────────────────────────────────────────
     EnvVarSpec("GOOGLE_DRIVE_API_KEY", "Integrations", "API-key-only access to public Google Drive file imports."),
     EnvVarSpec("GITHUB_TOKEN", "Integrations", "Token for GitHub repository sync/import."),
@@ -40196,6 +40875,10 @@ class GraphDatabaseProvider(Protocol):
     def add_node(self, label: str, properties: Dict[str, Any]) -> None:
         """Add a node to the graph."""
         ...
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single batch transaction."""
+        ...
         
     def add_edge(
         self,
@@ -40212,6 +40895,21 @@ class GraphDatabaseProvider(Protocol):
         from_label/to_label identify each endpoint's node type -- required by
         providers (e.g. Kùzu) whose graph is strictly typed; a provider that
         doesn't need them may ignore both.
+        """
+        ...
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single batch transaction.
+
+        Each edge dict in `edges` must contain 'source_id' and 'target_id', and
+        an optional 'properties' dict.
         """
         ...
         
@@ -40237,7 +40935,71 @@ class GraphService:
         if not self.provider:
             raise NotImplementedError("No Graph Database provider configured.")
         return self.provider.execute_query(query, parameters)
-        
+
+    def add_node(self, label: str, properties: Dict[str, Any]) -> None:
+        """Add a node via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_node(label, properties)
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch via the configured provider."""
+        if not self.provider or not nodes:
+            return
+        if hasattr(self.provider, "add_nodes_batch"):
+            self.provider.add_nodes_batch(label, nodes)
+        else:
+            for node in nodes:
+                self.provider.add_node(label, node)
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add an edge via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_edge(
+            source_id,
+            target_id,
+            rel_type,
+            properties,
+            from_label=from_label,
+            to_label=to_label,
+        )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch via the configured provider."""
+        if not self.provider or not edges:
+            return
+        if hasattr(self.provider, "add_edges_batch"):
+            self.provider.add_edges_batch(
+                rel_type, edges, from_label=from_label, to_label=to_label
+            )
+        else:
+            for edge in edges:
+                self.provider.add_edge(
+                    edge["source_id"],
+                    edge["target_id"],
+                    rel_type,
+                    edge.get("properties"),
+                    from_label=from_label,
+                    to_label=to_label,
+                )
+
     def insert_document_node(self, node_id: str, text: str, metadata: Dict[str, Any]) -> None:
         """Insert an extracted NLP document node for GraphRAG."""
         if not self.provider:
@@ -40269,10 +41031,13 @@ class GraphService:
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-import pyoxigraph
+try:
+    import pyoxigraph
+except ImportError:
+    pyoxigraph = None
+
 import rdflib
 
 from app.logging_config import get_logger
@@ -40296,6 +41061,10 @@ class GraphTriplestoreService:
                 the store is kept in-memory.
             max_in_memory_graphs: How many project graphs to keep if in-memory.
         """
+        if pyoxigraph is None:
+            raise ImportError(
+                "pyoxigraph is not installed. Please install it with `uv sync --group triplestore`."
+            )
         self.is_in_memory = not bool(store_path)
         self.max_in_memory_graphs = max_in_memory_graphs
         self._lru: list[int] = []
@@ -40949,6 +41718,7 @@ from typing import Dict, Optional
 
 class ISO19650ValidationError(ValueError):
     """Exception raised for ISO 19650 naming convention violations."""
+
     pass
 
 
@@ -41015,9 +41785,9 @@ def validate_and_parse_filename(
     if not re.match(r"^[A-Za-z0-9]{2}$", level):
         raise ISO19650ValidationError(f"Level code '{level}' must be exactly 2 alphanumeric characters.")
 
-    # Field 5: Type (2 Alphabetic)
-    if not re.match(r"^[A-Za-z]{2}$", type_code):
-        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphabetic characters.")
+    # Field 5: Type (2 Alphanumeric, e.g. M3 for 3D model, DR, RP)
+    if not re.match(r"^[A-Za-z0-9]{2}$", type_code):
+        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphanumeric characters.")
 
     # Field 6: Role/Discipline (1-2 Alphabetic)
     if not re.match(r"^[A-Za-z]{1,2}$", role):
@@ -41373,6 +42143,30 @@ class KuzuDatabaseProvider:
         safe_params["__source_id"] = source_id
         safe_params["__target_id"] = target_id
         self.execute_query(query, safe_params)
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch to the graph."""
+        for node in nodes:
+            self.add_node(label, node)
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch to the graph."""
+        for edge in edges:
+            self.add_edge(
+                edge["source_id"],
+                edge["target_id"],
+                rel_type,
+                edge.get("properties"),
+                from_label=from_label,
+                to_label=to_label,
+            )
 
     def clear(self) -> None:
         """Clear all data from the graph by dropping every table (rels first, then nodes)."""
@@ -43003,7 +43797,7 @@ class ModelsService:
             "file_path": file_path,
             "file_name": (file_name or "").strip() or Path(file_path.replace("\\", "/")).name,
             "is_primary": bool(is_primary),
-            "role": role_iso or (role or "").strip() or "context",
+            "role": (role or "").strip() or role_iso or "context",
             "uploaded_at": now_iso_utc(),
             "project_code": project_code or "",
             "originator": originator or "",
@@ -43985,6 +44779,320 @@ class NamingConfigService:
         if not separator or separator == authored:
             return str(convention["format"])
         return str(convention["format"]).replace(authored, separator)
+```
+
+---
+
+### app/services/neo4j_provider.py
+
+```python
+"""Neo4j implementation of the GraphDatabaseProvider protocol.
+
+Supports connecting to either hosted (Neo4j Aura, remote clusters) or local
+Docker-launched Neo4j instances via Bolt or Neo4j routing protocols.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import uuid
+from typing import Any, Dict, List, Optional
+
+try:
+    import neo4j
+    from neo4j import Driver, GraphDatabase
+except ImportError:
+    neo4j = None
+    Driver = None
+    GraphDatabase = None
+
+logger = logging.getLogger(__name__)
+
+#: Neo4j label/property/relationship-type names are interpolated into Cypher
+#: queries, so every identifier is validated against this pattern before use.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+#: Property keys checked, in order, as the primary key when a node's
+#: properties don't declare one explicitly.
+_PK_CANDIDATES = ("id", "guid", "node_id", "rule_id", "global_id")
+
+
+class Neo4jDatabaseProvider:
+    """Neo4j graph database provider implementing GraphDatabaseProvider."""
+
+    def __init__(
+        self,
+        uri: str = "bolt://localhost:7687",
+        username: Optional[str] = "neo4j",
+        password: Optional[str] = None,
+        database: Optional[str] = "neo4j",
+        *,
+        driver: Optional[Any] = None,
+        verify_connectivity: bool = False,
+    ):
+        """Initialize the Neo4j database driver connection.
+
+        Args:
+            uri: Connection URI (e.g. ``bolt://localhost:7687``,
+                ``neo4j+s://<db-id>.databases.neo4j.io``).
+            username: Username for basic auth (defaults to ``neo4j``).
+            password: Password for basic auth. If empty or None, connects
+                without authentication.
+            database: Target database name (defaults to ``neo4j``).
+            driver: Optional pre-configured Neo4j driver instance (useful for
+                testing/mocking).
+            verify_connectivity: Whether to verify connection immediately during
+                initialization.
+
+        Raises:
+            ImportError: If the ``neo4j`` python package is not installed.
+        """
+        if driver is not None:
+            self.driver = driver
+        else:
+            if GraphDatabase is None:
+                raise ImportError(
+                    "The `neo4j` package is not installed. Please install it with `uv add neo4j`."
+                )
+
+            auth = (username, password) if (username and password) else None
+            self.driver = GraphDatabase.driver(uri, auth=auth)
+
+        self.uri = uri
+        self.username = username
+        self.database = database
+        self._node_label_by_id: Dict[Any, str] = {}
+        self._node_pk_by_label: Dict[str, str] = {}
+
+        if verify_connectivity and self.driver:
+            self.verify_connectivity()
+
+    @staticmethod
+    def _validate_identifier(name: str) -> str:
+        """Reject any label/rel-type/property name unsafe for Cypher clauses."""
+        if not isinstance(name, str) or not _IDENTIFIER_RE.match(name):
+            raise ValueError(
+                f"Invalid Neo4j identifier {name!r}: must start with a letter or "
+                "underscore and contain only letters, digits, and underscores."
+            )
+        return name
+
+    def verify_connectivity(self) -> bool:
+        """Verify driver connectivity to the Neo4j server."""
+        try:
+            if hasattr(self.driver, "verify_connectivity"):
+                self.driver.verify_connectivity()
+            return True
+        except Exception as exc:
+            logger.warning("Neo4j connectivity check failed: %s", exc)
+            return False
+
+    def execute_query(
+        self, query: str, parameters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Execute a Cypher query and return the results as a list of dictionaries."""
+        results: List[Dict[str, Any]] = []
+        try:
+            with self.driver.session(database=self.database) as session:
+                records = session.run(query, parameters or {})
+                for record in records:
+                    if hasattr(record, "data"):
+                        results.append(record.data())
+                    else:
+                        results.append(dict(record))
+        except Exception as exc:
+            logger.error("Neo4j query failed: %s -> %s", query, exc)
+            raise
+        return results
+
+    def _pick_primary_key(self, properties: Dict[str, Any]) -> str:
+        """Choose or generate a primary key property for a node."""
+        for candidate in _PK_CANDIDATES:
+            if candidate in properties:
+                return candidate
+        fallback_value = str(uuid.uuid4())
+        properties["id"] = fallback_value
+        return "id"
+
+    def add_node(self, label: str, properties: Dict[str, Any]) -> None:
+        """Add or update a node in the Neo4j graph."""
+        self._validate_identifier(label)
+        for key in properties:
+            self._validate_identifier(key)
+
+        props = dict(properties)
+        pk = self._pick_primary_key(props)
+        self._node_pk_by_label[label] = pk
+        self._node_label_by_id[props[pk]] = label
+
+        query = (
+            f"MERGE (n:{label} {{{pk}: $pk_val}}) "
+            f"SET n += $props"
+        )
+        self.execute_query(query, {"pk_val": props[pk], "props": props})
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single UNWIND batch query."""
+        if not nodes:
+            return
+        self._validate_identifier(label)
+
+        # Determine PK property key (from cache or first node)
+        sample = dict(nodes[0])
+        pk = self._node_pk_by_label.get(label) or self._pick_primary_key(sample)
+        self._node_pk_by_label[label] = pk
+
+        prepared_batch = []
+        for node in nodes:
+            props = dict(node)
+            for key in props:
+                self._validate_identifier(key)
+            if pk not in props:
+                props[pk] = str(uuid.uuid4())
+            self._node_label_by_id[props[pk]] = label
+            prepared_batch.append(props)
+
+        query = (
+            f"UNWIND $batch AS item "
+            f"MERGE (n:{label} {{{pk}: item.{pk}}}) "
+            f"SET n += item"
+        )
+        self.execute_query(query, {"batch": prepared_batch})
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
+    ) -> None:
+        """Add or update a directed relationship between two nodes."""
+        self._validate_identifier(rel_type)
+        if from_label:
+            self._validate_identifier(from_label)
+        if to_label:
+            self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
+
+        edge_props = properties or {}
+        for key in edge_props:
+            self._validate_identifier(key)
+
+        resolved_from = from_label or self._node_label_by_id.get(source_id)
+        resolved_to = to_label or self._node_label_by_id.get(target_id)
+
+        from_clause = f":{resolved_from}" if resolved_from else ""
+        to_clause = f":{resolved_to}" if resolved_to else ""
+
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
+
+        query = (
+            f"MATCH (a{from_clause} {{{pk_a}: $source_id}}), "
+            f"(b{to_clause} {{{pk_b}: $target_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += $props"
+        )
+        self.execute_query(
+            query,
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "props": edge_props,
+            },
+        )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single UNWIND batch query."""
+        if not edges:
+            return
+        self._validate_identifier(rel_type)
+        if from_label:
+            self._validate_identifier(from_label)
+        if to_label:
+            self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
+
+        first_source = edges[0].get("source_id")
+        first_target = edges[0].get("target_id")
+        resolved_from = from_label or self._node_label_by_id.get(first_source)
+        resolved_to = to_label or self._node_label_by_id.get(first_target)
+
+        from_clause = f":{resolved_from}" if resolved_from else ""
+        to_clause = f":{resolved_to}" if resolved_to else ""
+
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
+
+        prepared_edges = []
+        for edge in edges:
+            props = dict(edge.get("properties") or {})
+            for key in props:
+                self._validate_identifier(key)
+            prepared_edges.append(
+                {
+                    "source_id": edge["source_id"],
+                    "target_id": edge["target_id"],
+                    "props": props,
+                }
+            )
+
+        query = (
+            f"UNWIND $batch AS edge "
+            f"MATCH (a{from_clause} {{{pk_a}: edge.source_id}}), "
+            f"(b{to_clause} {{{pk_b}: edge.target_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += edge.props"
+        )
+        self.execute_query(query, {"batch": prepared_edges})
+
+    def ensure_index(self, label: str, property_name: str) -> None:
+        """Create an index on a node property if it does not already exist."""
+        self._validate_identifier(label)
+        self._validate_identifier(property_name)
+        index_name = f"idx_{label}_{property_name}".lower()
+        query = f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{property_name})"
+        self.execute_query(query)
+
+    def clear(self) -> None:
+        """Clear all nodes and relationships from the database."""
+        self.execute_query("MATCH (n) DETACH DELETE n")
+        self._node_label_by_id.clear()
+        self._node_pk_by_label.clear()
+
+    def close(self) -> None:
+        """Close the underlying driver connection."""
+        if self.driver is not None and hasattr(self.driver, "close"):
+            self.driver.close()
+
+    def __enter__(self) -> Neo4jDatabaseProvider:
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager and close driver."""
+        self.close()
 ```
 
 ---
@@ -50448,6 +51556,8 @@ def _seed_cc001(svc: RuleService) -> int:
         )
 
     # ── Joint types (JT-001 … JT-014) ────────────────────────────────────────
+    # Seeded, but not matched by the engine: every element scores JT-014.
+    # See docs/defects/CC-001-scoring-inputs-inert.md.
     for jt_code, jt in cc["joint_type_library"]["types"].items():
         _r(
             reference=f"CC-001.JT.{jt_code}",
@@ -52038,7 +53148,7 @@ BIM-Guard enforces strict Dependency Inversion across engines, repositories, and
 ### 6.2 Evaluator Scope Boundary: Custom Python vs. buildingSMART IDS
 - **Custom Python Evaluators**: Strictly limited to evaluations that declarative buildingSMART Information Delivery Specification (IDS) cannot express:
   - Multiphysics calculations (galvanic voltage gaps, anodic/cathodic area ratios, PREN adequacy).
-  - Joint crevice geometries and critical crevice temperatures (CCT).
+  - Joint crevice geometries and critical crevice temperatures (CCT). (CC-001 as implemented does not yet receive joint type, operating temperature or most environment classes from the pipeline; see [`defects/CC-001-scoring-inputs-inert.md`](defects/CC-001-scoring-inputs-inert.md).)
   - Microbiological growth kinetics, flow velocity classes, and topological dead-leg length-to-diameter ratios.
   - NetworkX topological space-connectivity graph traversal (habitable space to exterior exit shortest paths via `IfcRelSpaceBoundary`).
   - Spatial boundary daylight calculations (window glazing area vs. room floor area).
@@ -61906,12 +63016,33 @@ Switch to the **Seismic** tab, project *FINAL AUDIT Seismic WR Federated*. It
 loads its stored result on mount once the cache is warm; on a cold backend it
 shows Run Audit — this is why pre-warm precedes the demo.
 
-Expect: **2,937 clashes** — 783 Critical, 314 High, 1,840 Medium. The federation
+Expect: **2,937 findings** — 783 Critical, 314 High, 1,840 Medium. The federation
 is two models, `west_riverside_hospital_plumb_ifc4.ifc` and
-`west_riverside_hospital_str_ifc4.ifc`: **2,051** clashes are within the
+`west_riverside_hospital_str_ifc4.ifc` — plumbing and structural only; there is
+no architectural model and no ductwork. **2,051** findings are within the
 plumbing model and **886** are cross-model, pipework against structure. Each
 cross-model finding names both files in `source_model` and
 `clashing_source_model`, so a coordinator knows which model to open.
+
+Do not present the 2,937 as clashes between services or with structure. Most of
+it is a pipe against its own fittings. Measured 13 September 2026:
+
+| What intrudes into the pipe's clearance halo | Findings | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+So of the 2,051 within the plumbing model, 1,869 are same-system adjacency and
+182 are unclassified objects. The same-system findings are all High (190) or
+Medium (1,679); **every one of the 783 Critical findings is structure or an
+unclassified object**. The figure to quote as clash detection is the scoped one:
+**1,068 seismic clearance intrusions into braced pipework (886 by structural
+members, 182 by unclassified model objects), 783 of them Critical** — 124 High,
+161 Medium — with same-system pipe-fitting adjacency excluded. That count comes
+from SB-001 scoped to piping (`service_scope=piping`), measured on
+`feat/blue-halo-federated` at `15a72dd`; the demo build does not offer the
+scope, so the page shows the unscoped 2,937.
 
 Each row carries the real measured overlap volume and the clearance that was
 applied (200.0 mm). A build from before 2026-09-13 labels that clearance with an
@@ -61922,7 +63053,9 @@ exists, and from schema 1.1.0 it reads as SB-001 authored screening calibration
 ### 4. Export and validate
 
 CSV from the Seismic page: **2,937 rows**, every one carrying
-`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**.
+`overlap_volume_mm3` and `clearance_mm`. BCF: **2,937 topics**. Both exports
+carry the whole unscoped set, so 1,869 of those rows and topics are pipes
+against their own fittings — see the breakdown in §3.
 
 Validate the archive in front of the audience if it helps:
 
@@ -61996,7 +63129,7 @@ every recorded audit number and every BCF topic id.
    appends; it does not replace. Running it against a project whose models are
    already attached leaves 1540 holding two copies of the plumbing model and
    1542 holding four — and because a seismic cache key is a SHA-256 over *all*
-   of a project's models, that silently moves 1542 off its 2,937 clashes. If
+   of a project's models, that silently moves 1542 off its 2,937 findings. If
    the models are already there, verify rather than re-post: download each one
    back through `GET /api/projects/{id}/files/{file_id}/ifc` and compare its
    SHA-256 with the local file. Confirmed byte-identical on 2026-09-10 —
@@ -79597,7 +80730,10 @@ elements, so the corrosion engines score them as if they were pipework.
 `IfcMember` and 2,211 `IfcPlate`, containing no pipes at all — produced **27,999
 findings** on the five-engine run, including 6,630 GC-001 verdicts scoring
 aluminium curtain-wall mullions against themselves (0 V self-couple) and 6,630
-CC-001 Mediums on an unclassified joint type. Separately, MM-001's only
+CC-001 Mediums on an unclassified joint type (that joint type is given to every
+CC-001 element, not only these, and CC-001's temperature and environment inputs
+are equally inert — see
+[`docs/defects/CC-001-scoring-inputs-inert.md`](../defects/CC-001-scoring-inputs-inert.md)). Separately, MM-001's only
 real-model verdicts in the whole corpus are **10 fire-extinguisher cabinets** on
 `Clinic_Architectural.ifc`, scored against a `GalvanisedSteel` that was not read
 from the model at all but inferred from the system name — `material_source:
@@ -102820,8 +103956,10 @@ rather than suppressed.
 Three cross-checks against the frozen demo, which the offline path reproduces
 exactly: the synthetic control's five-engine run gives **1,988 findings, bands
 10 / 168 / 1,206 / 322**; 1540's model gives **29,181, all data-quality**; the
-1542 federation gives **2,937 clashes at 783 / 314 / 1,840**. All three match
-`docs/demo/RUNBOOK.md`.
+1542 federation gives **2,937 findings at 783 / 314 / 1,840**. All three match
+`docs/demo/RUNBOOK.md`. The 2,937 is an unscoped count and most of it is not a
+clash between services or with structure — see the composition under SB-001
+below.
 
 ---
 
@@ -102973,6 +104111,26 @@ Its verdicts, again from the synthetic control and **labelled as synthetic**:
 The one engine that worked fully on real models, because it needs geometry rather
 than materials: **2,937 verdicts on the 1542 federation, 783 Critical / 314 High
 / 1,840 Medium, zero data-quality notes.**
+
+The federation is two models, plumbing (`west_riverside_hospital_plumb_ifc4`)
+and structural (`west_riverside_hospital_str_ifc4`); there is no architectural
+model and no ductwork. Every halo is a pipe's, and the 2,937 counts everything
+that intrudes into one. Measured 13 September 2026, that is:
+
+| What intrudes into the pipe's clearance halo | Verdicts | Share | Critical |
+| --- | ---: | ---: | ---: |
+| Its own pipe fittings (same-system adjacency) | 1,869 | 63.6% | 0 |
+| Structural members | 886 | 30.2% | 717 |
+| Unclassified model objects (`IfcBuildingElementProxy`) | 182 | 6.2% | 66 |
+
+Most of the count is same-system adjacency, and it is all High (190) or Medium
+(1,679): **none of the 783 Critical verdicts is a pipe against its own
+fittings.** Scoped to piping, SB-001 returns **1,068 seismic clearance
+intrusions into braced pipework (886 by structural members, 182 by unclassified
+model objects), 783 of them Critical** (124 High, 161 Medium), with same-system
+pipe-fitting adjacency excluded — measured on `feat/blue-halo-federated` at
+`15a72dd`, since the scope is not on the build this showcase ran. The ten rows
+below are all Critical, and all fall outside the adjacency set.
 
 | GUID | Element name (joined) | IFC type | Material (joined) | material_source | System | Band | Score | ruleset_version | Explanation (verbatim from findings.json) |
 | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |
