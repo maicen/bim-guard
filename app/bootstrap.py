@@ -678,7 +678,11 @@ def build_default_container() -> ApplicationContainer:
         # dedicated triplestore service each worker connects to over the
         # network) rather than an embedded per-process store.
         logger.warning(f"Could not initialize GraphTriplestoreService with disk store: {e}")
-        graph_triplestore_service = GraphTriplestoreService()
+        try:
+            graph_triplestore_service = GraphTriplestoreService()
+        except Exception as e_mem:
+            logger.warning("Could not initialize in-memory GraphTriplestoreService: %s", e_mem)
+            graph_triplestore_service = None
 
     bimguard_app = BIMGuard_App(
         projects_service=projects_service,

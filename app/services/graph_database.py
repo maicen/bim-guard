@@ -19,6 +19,10 @@ class GraphDatabaseProvider(Protocol):
     def add_node(self, label: str, properties: Dict[str, Any]) -> None:
         """Add a node to the graph."""
         ...
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single batch transaction."""
+        ...
         
     def add_edge(
         self,
@@ -35,6 +39,21 @@ class GraphDatabaseProvider(Protocol):
         from_label/to_label identify each endpoint's node type -- required by
         providers (e.g. Kùzu) whose graph is strictly typed; a provider that
         doesn't need them may ignore both.
+        """
+        ...
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single batch transaction.
+
+        Each edge dict in `edges` must contain 'source_id' and 'target_id', and
+        an optional 'properties' dict.
         """
         ...
         
@@ -60,7 +79,71 @@ class GraphService:
         if not self.provider:
             raise NotImplementedError("No Graph Database provider configured.")
         return self.provider.execute_query(query, parameters)
-        
+
+    def add_node(self, label: str, properties: Dict[str, Any]) -> None:
+        """Add a node via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_node(label, properties)
+
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch via the configured provider."""
+        if not self.provider or not nodes:
+            return
+        if hasattr(self.provider, "add_nodes_batch"):
+            self.provider.add_nodes_batch(label, nodes)
+        else:
+            for node in nodes:
+                self.provider.add_node(label, node)
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add an edge via the configured provider."""
+        if not self.provider:
+            return
+        self.provider.add_edge(
+            source_id,
+            target_id,
+            rel_type,
+            properties,
+            from_label=from_label,
+            to_label=to_label,
+        )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch via the configured provider."""
+        if not self.provider or not edges:
+            return
+        if hasattr(self.provider, "add_edges_batch"):
+            self.provider.add_edges_batch(
+                rel_type, edges, from_label=from_label, to_label=to_label
+            )
+        else:
+            for edge in edges:
+                self.provider.add_edge(
+                    edge["source_id"],
+                    edge["target_id"],
+                    rel_type,
+                    edge.get("properties"),
+                    from_label=from_label,
+                    to_label=to_label,
+                )
+
     def insert_document_node(self, node_id: str, text: str, metadata: Dict[str, Any]) -> None:
         """Insert an extracted NLP document node for GraphRAG."""
         if not self.provider:
@@ -81,4 +164,5 @@ class GraphService:
         self.provider.add_node("Rule", {"rule_id": rule_id})
         self.provider.add_node("IfcClass", {"id": ifc_class, "class_name": ifc_class})
         self.provider.add_edge(rule_id, ifc_class, "APPLIES_TO", from_label="Rule", to_label="IfcClass")
+
 

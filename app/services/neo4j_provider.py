@@ -144,6 +144,34 @@ class Neo4jDatabaseProvider:
         )
         self.execute_query(query, {"pk_val": props[pk], "props": props})
 
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add or update multiple nodes in a single UNWIND batch query."""
+        if not nodes:
+            return
+        self._validate_identifier(label)
+
+        # Determine PK property key (from cache or first node)
+        sample = dict(nodes[0])
+        pk = self._node_pk_by_label.get(label) or self._pick_primary_key(sample)
+        self._node_pk_by_label[label] = pk
+
+        prepared_batch = []
+        for node in nodes:
+            props = dict(node)
+            for key in props:
+                self._validate_identifier(key)
+            if pk not in props:
+                props[pk] = str(uuid.uuid4())
+            self._node_label_by_id[props[pk]] = label
+            prepared_batch.append(props)
+
+        query = (
+            f"UNWIND $batch AS item "
+            f"MERGE (n:{label} {{{pk}: item.{pk}}}) "
+            f"SET n += item"
+        )
+        self.execute_query(query, {"batch": prepared_batch})
+
     def add_edge(
         self,
         source_id: Any,
@@ -153,6 +181,8 @@ class Neo4jDatabaseProvider:
         *,
         from_label: Optional[str] = None,
         to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
     ) -> None:
         """Add or update a directed relationship between two nodes."""
         self._validate_identifier(rel_type)
@@ -160,6 +190,10 @@ class Neo4jDatabaseProvider:
             self._validate_identifier(from_label)
         if to_label:
             self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
 
         edge_props = properties or {}
         for key in edge_props:
@@ -171,8 +205,8 @@ class Neo4jDatabaseProvider:
         from_clause = f":{resolved_from}" if resolved_from else ""
         to_clause = f":{resolved_to}" if resolved_to else ""
 
-        pk_a = self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id"
-        pk_b = self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id"
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
 
         query = (
             f"MATCH (a{from_clause} {{{pk_a}: $source_id}}), "
@@ -188,6 +222,70 @@ class Neo4jDatabaseProvider:
                 "props": edge_props,
             },
         )
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+        from_pk: Optional[str] = None,
+        to_pk: Optional[str] = None,
+    ) -> None:
+        """Add or update multiple edges in a single UNWIND batch query."""
+        if not edges:
+            return
+        self._validate_identifier(rel_type)
+        if from_label:
+            self._validate_identifier(from_label)
+        if to_label:
+            self._validate_identifier(to_label)
+        if from_pk:
+            self._validate_identifier(from_pk)
+        if to_pk:
+            self._validate_identifier(to_pk)
+
+        first_source = edges[0].get("source_id")
+        first_target = edges[0].get("target_id")
+        resolved_from = from_label or self._node_label_by_id.get(first_source)
+        resolved_to = to_label or self._node_label_by_id.get(first_target)
+
+        from_clause = f":{resolved_from}" if resolved_from else ""
+        to_clause = f":{resolved_to}" if resolved_to else ""
+
+        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
+        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
+
+        prepared_edges = []
+        for edge in edges:
+            props = dict(edge.get("properties") or {})
+            for key in props:
+                self._validate_identifier(key)
+            prepared_edges.append(
+                {
+                    "source_id": edge["source_id"],
+                    "target_id": edge["target_id"],
+                    "props": props,
+                }
+            )
+
+        query = (
+            f"UNWIND $batch AS edge "
+            f"MATCH (a{from_clause} {{{pk_a}: edge.source_id}}), "
+            f"(b{to_clause} {{{pk_b}: edge.target_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += edge.props"
+        )
+        self.execute_query(query, {"batch": prepared_edges})
+
+    def ensure_index(self, label: str, property_name: str) -> None:
+        """Create an index on a node property if it does not already exist."""
+        self._validate_identifier(label)
+        self._validate_identifier(property_name)
+        index_name = f"idx_{label}_{property_name}".lower()
+        query = f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{property_name})"
+        self.execute_query(query)
 
     def clear(self) -> None:
         """Clear all nodes and relationships from the database."""

@@ -329,6 +329,30 @@ class KuzuDatabaseProvider:
         safe_params["__target_id"] = target_id
         self.execute_query(query, safe_params)
 
+    def add_nodes_batch(self, label: str, nodes: List[Dict[str, Any]]) -> None:
+        """Add multiple nodes in batch to the graph."""
+        for node in nodes:
+            self.add_node(label, node)
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: List[Dict[str, Any]],
+        *,
+        from_label: Optional[str] = None,
+        to_label: Optional[str] = None,
+    ) -> None:
+        """Add multiple edges in batch to the graph."""
+        for edge in edges:
+            self.add_edge(
+                edge["source_id"],
+                edge["target_id"],
+                rel_type,
+                edge.get("properties"),
+                from_label=from_label,
+                to_label=to_label,
+            )
+
     def clear(self) -> None:
         """Clear all data from the graph by dropping every table (rels first, then nodes)."""
         for t in self._rel_tables:

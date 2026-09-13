@@ -219,3 +219,80 @@ class TestGraphServiceWithNeo4j:
         assert any("MERGE (n:Rule" in q for q in queries)
         assert any("MERGE (n:IfcClass" in q for q in queries)
         assert any("MERGE (a)-[r:APPLIES_TO]->(b)" in q for q in queries)
+
+    def test_service_delegates_batches(self, provider, mock_driver):
+        service = GraphService(provider=provider)
+        service.add_nodes_batch(
+            "IfcWall",
+            [{"guid": "w1", "name": "Wall 1"}, {"guid": "w2", "name": "Wall 2"}],
+        )
+        service.add_edges_batch(
+            "CONTAINS",
+            [{"source_id": "storey1", "target_id": "w1", "properties": {}}],
+            from_label="IfcBuildingStorey",
+            to_label="IfcWall",
+        )
+
+        queries = mock_driver.session_instance.queries_executed
+        assert any("UNWIND $batch AS item" in q for q in queries)
+        assert any("UNWIND $batch AS edge" in q for q in queries)
+
+
+def test_add_nodes_batch_with_unwind(provider, mock_driver):
+    nodes = [
+        {"guid": "WALL-001", "name": "Exterior Wall", "fire_rating": "2HR"},
+        {"guid": "WALL-002", "name": "Interior Partition", "fire_rating": "1HR"},
+    ]
+    provider.add_nodes_batch("IfcWall", nodes)
+
+    query = mock_driver.session_instance.queries_executed[-1]
+    params = mock_driver.session_instance.params_executed[-1]
+
+    assert "UNWIND $batch AS item" in query
+    assert "MERGE (n:IfcWall {guid: item.guid})" in query
+    assert "SET n += item" in query
+    assert len(params["batch"]) == 2
+    assert params["batch"][0]["guid"] == "WALL-001"
+    assert params["batch"][1]["guid"] == "WALL-002"
+
+
+def test_add_edges_batch_with_unwind(provider, mock_driver):
+    edges = [
+        {
+            "source_id": "S1",
+            "target_id": "WALL-001",
+            "properties": {"level": "L1"},
+        },
+        {
+            "source_id": "S1",
+            "target_id": "WALL-002",
+            "properties": {"level": "L1"},
+        },
+    ]
+    provider.add_edges_batch(
+        "CONTAINS",
+        edges,
+        from_label="IfcBuildingStorey",
+        to_label="IfcWall",
+        to_pk="guid",
+    )
+
+    query = mock_driver.session_instance.queries_executed[-1]
+    params = mock_driver.session_instance.params_executed[-1]
+
+    assert "UNWIND $batch AS edge" in query
+    assert "MATCH (a:IfcBuildingStorey {id: edge.source_id})" in query
+    assert "(b:IfcWall {guid: edge.target_id})" in query
+    assert "MERGE (a)-[r:CONTAINS]->(b)" in query
+    assert "SET r += edge.props" in query
+    assert len(params["batch"]) == 2
+    assert params["batch"][0]["source_id"] == "S1"
+    assert params["batch"][0]["target_id"] == "WALL-001"
+
+
+def test_ensure_index(provider, mock_driver):
+    provider.ensure_index("IfcElement", "guid")
+
+    query = mock_driver.session_instance.queries_executed[-1]
+    assert "CREATE INDEX idx_ifcelement_guid IF NOT EXISTS" in query
+    assert "FOR (n:IfcElement) ON (n.guid)" in query

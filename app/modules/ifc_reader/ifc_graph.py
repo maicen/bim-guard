@@ -1,10 +1,23 @@
-"""Build IFC relationship graphs and render them as PyVis HTML."""
+"""Build IFC relationship graphs and ingest them into GraphService (Neo4j / KùzuDB).
 
-from html import escape
+Provides:
+- `build_ifc_graph(model) -> nx.DiGraph`: Builds a NetworkX directed relationship graph.
+- `ingest_ifc_to_graph(...) -> dict[str, int]`: Streamlines IFC entities and relationships
+  directly into a GraphService backend using batch Cypher / provider operations.
+- `build_ifc_graph_summary(...) -> dict`: Returns structured metadata and statistics.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
-from pyvis.network import Network
+
+if TYPE_CHECKING:
+    from app.services.graph_database import GraphService
 
 try:
     import ifcopenshell
@@ -12,42 +25,25 @@ try:
 
     _IFCOPENSHELL_AVAILABLE = True
 except ImportError:
+    ifcopenshell = None
     _IFCOPENSHELL_AVAILABLE = False
 
+logger = logging.getLogger(__name__)
 
 _SPATIAL_TYPES = {"IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcSpace"}
-_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2}
+_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2, "HasMaterial": 3}
 
 
-def _safe_label(entity) -> str:
+def _safe_label(entity: Any) -> str:
     name = getattr(entity, "Name", None)
     return name or entity.is_a()
 
 
-def _node_title(guid: str, label: str, ifc_type: str, psets: dict) -> str:
-    pset_names = list(psets.keys())[:6]
-    pset_suffix = ""
-    if pset_names:
-        joined = ", ".join(escape(name) for name in pset_names)
-        extra = len(psets) - len(pset_names)
-        more = f" (+{extra} more)" if extra > 0 else ""
-        pset_suffix = f"<br/><b>Psets:</b> {joined}{more}"
-    return (
-        f"<b>{escape(label)}</b>"
-        f"<br/><b>Type:</b> {escape(ifc_type)}"
-        f"<br/><b>GUID:</b> {escape(guid)}"
-        f"{pset_suffix}"
-    )
-
-
-def build_ifc_graph(model) -> nx.DiGraph:
-    """Build a directed IFC relationship graph from products and key relations."""
+def build_ifc_graph(model: Any) -> nx.DiGraph:
+    """Build a directed IFC relationship graph from products, spaces, and relations."""
     graph = nx.DiGraph()
 
-    # IfcProject is IfcContext, not IfcProduct, so it is added explicitly --
-    # the IfcProduct loop below would otherwise never see it, leaving the
-    # BOT graph (app.modules.ifc_reader.bot_graph) without a root bot:Zone
-    # node even though IfcRelAggregates links it to every IfcSite.
+    # IfcProject is an IfcContext, so add it explicitly as the root zone
     for project in model.by_type("IfcProject"):
         guid = getattr(project, "GlobalId", None)
         if not guid:
@@ -59,12 +55,13 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets={},
         )
 
+    # Physical products and spatial structures
     for product in model.by_type("IfcProduct"):
         guid = getattr(product, "GlobalId", None)
         if not guid:
             continue
         try:
-            psets = ifcopenshell.util.element.get_psets(product)
+            psets = ifcopenshell.util.element.get_psets(product) if ifcopenshell else {}
         except Exception:
             psets = {}
         graph.add_node(
@@ -74,6 +71,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
             psets=psets,
         )
 
+    # Spatial containment: (:Structure)-[:ContainedIn]->(:Element)
     for rel in model.by_type("IfcRelContainedInSpatialStructure"):
         container = getattr(rel, "RelatingStructure", None)
         container_guid = getattr(container, "GlobalId", None)
@@ -89,6 +87,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#4CAF50",
                 )
 
+    # Spatial aggregation: (:Whole)-[:Aggregates]->(:Part)
     for rel in model.by_type("IfcRelAggregates"):
         whole = getattr(rel, "RelatingObject", None)
         whole_guid = getattr(whole, "GlobalId", None)
@@ -104,6 +103,7 @@ def build_ifc_graph(model) -> nx.DiGraph:
                     color="#2196F3",
                 )
 
+    # Physical connection: (:Element)-[:Connects]->(:Element)
     for rel in model.by_type("IfcRelConnectsElements"):
         source = getattr(rel, "RelatingElement", None)
         target = getattr(rel, "RelatedElement", None)
@@ -117,147 +117,168 @@ def build_ifc_graph(model) -> nx.DiGraph:
                 color="#FF9800",
             )
 
+    # Material association: (:Element)-[:HasMaterial]->(:Material)
+    for rel in model.by_type("IfcRelAssociatesMaterial"):
+        material_select = getattr(rel, "RelatingMaterial", None)
+        if not material_select:
+            continue
+        material_name = (
+            getattr(material_select, "Name", None)
+            or getattr(material_select, "Material", None)
+            or material_select.is_a()
+        )
+        if not isinstance(material_name, str):
+            material_name = str(material_name)
+        material_id = f"Material_{material_name}"
+        if material_id not in graph:
+            graph.add_node(
+                material_id,
+                label=material_name,
+                ifc_type="IfcMaterial",
+                psets={},
+            )
+        for element in getattr(rel, "RelatedObjects", []):
+            element_guid = getattr(element, "GlobalId", None)
+            if element_guid and element_guid in graph:
+                graph.add_edge(
+                    element_guid,
+                    material_id,
+                    rel_type="HasMaterial",
+                    color="#9C27B0",
+                )
+
     return graph
 
 
-def _select_nodes(graph: nx.DiGraph, max_nodes: int) -> set[str]:
-    if graph.number_of_nodes() <= max_nodes:
-        return set(graph.nodes())
-
-    ranked = sorted(
-        graph.nodes(),
-        key=lambda node_id: (
-            graph.nodes[node_id].get("ifc_type") in _SPATIAL_TYPES,
-            graph.degree(node_id),
-            graph.in_degree(node_id),
-        ),
-        reverse=True,
-    )
-    return set(ranked[:max_nodes])
-
-
-def build_pyvis_graph(
-    graph: nx.DiGraph, violations: list[dict], max_nodes: int = 220, max_edges: int = 600
-):
-    """Render a PyVis HTML graph from the IFC relationship graph."""
+def build_ifc_graph_summary(
+    graph: nx.DiGraph, violations: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Generate structured summary metadata for an IFC relationship graph."""
     violation_ids = {
         entry.get("element")
-        for entry in violations
+        for entry in (violations or [])
         if isinstance(entry, dict) and entry.get("element")
     }
 
-    selected_nodes = _select_nodes(graph, max_nodes)
-    selected_graph = graph.subgraph(selected_nodes).copy()
-
-    edge_rows = sorted(
-        selected_graph.edges(data=True),
-        key=lambda edge: (
-            _EDGE_PRIORITY.get(edge[2].get("rel_type", "Connects"), 99),
-            edge[0],
-            edge[1],
-        ),
-    )
-    limited_edges = edge_rows[:max_edges]
-
-    net = Network(
-        height="700px",
-        width="100%",
-        directed=True,
-        bgcolor="#0f172a",
-        font_color="#e5e7eb",
-        select_menu=True,
-        filter_menu=True,
-        # Served directly as an HTTP response (no sibling lib/ folder on disk
-        # like pyvis's own write_html() creates), so assets must load from a
-        # CDN rather than pyvis's default local-relative-path scripts.
-        cdn_resources="remote",
-    )
-    net.barnes_hut(
-        gravity=-18000,
-        central_gravity=0.16,
-        spring_length=150,
-        spring_strength=0.04,
-        damping=0.1,
-    )
-
-    for node_id, attrs in selected_graph.nodes(data=True):
-        ifc_type = attrs.get("ifc_type", "IfcProduct")
-        label = attrs.get("label", ifc_type)
-        highlighted = node_id in violation_ids
-        is_spatial = ifc_type in _SPATIAL_TYPES
-        color = "#ef4444" if highlighted else "#22c55e" if is_spatial else "#60a5fa"
-        size = 24 if highlighted else 20 if is_spatial else 14
-        net.add_node(
-            node_id,
-            label=label[:36],
-            title=_node_title(node_id, label, ifc_type, attrs.get("psets", {})),
-            color=color,
-            shape="dot",
-            size=size,
-            group=ifc_type,
-        )
-        # pyvis's own add_node() silently drops the color= kwarg whenever
-        # group= is also passed (it falls back to group-based auto-coloring
-        # instead) — set it directly on the stored node options to override.
-        net.nodes[-1]["color"] = color
-
-    for source, target, attrs in limited_edges:
-        net.add_edge(
-            source,
-            target,
-            color=attrs.get("color", "#94a3b8"),
-            title=attrs.get("rel_type", "Relation"),
-            arrows="to",
-        )
-
-    net.set_options(
-        """
-        const options = {
-          "interaction": {"hover": true, "navigationButtons": true, "keyboard": true},
-          "nodes": {"borderWidth": 1, "borderWidthSelected": 2, "font": {"size": 14}},
-          "edges": {"smooth": {"type": "dynamic"}, "width": 2},
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -18000,
-              "centralGravity": 0.16,
-              "springLength": 150,
-              "springConstant": 0.04,
-              "damping": 0.1
-            },
-            "minVelocity": 0.75
-          }
-        }
-        """
-    )
-
-    relationship_counts = {
-        "ContainedIn": 0,
-        "Aggregates": 0,
-        "Connects": 0,
-    }
+    relationship_counts: dict[str, int] = defaultdict(int)
     for _, _, attrs in graph.edges(data=True):
-        rel_type = attrs.get("rel_type")
-        if rel_type in relationship_counts:
-            relationship_counts[rel_type] += 1
+        rel_type = attrs.get("rel_type", "Other")
+        relationship_counts[rel_type] += 1
+
+    type_counts: dict[str, int] = defaultdict(int)
+    for _, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        type_counts[ifc_type] += 1
 
     return {
-        "html": net.generate_html(notebook=False),
         "node_count": graph.number_of_nodes(),
         "edge_count": graph.number_of_edges(),
-        "displayed_node_count": selected_graph.number_of_nodes(),
-        "displayed_edge_count": len(limited_edges),
-        "truncated": selected_graph.number_of_nodes() < graph.number_of_nodes()
-        or len(limited_edges) < graph.number_of_edges(),
         "violation_count": len(violation_ids & set(graph.nodes())),
-        "relationship_counts": relationship_counts,
+        "relationship_counts": dict(relationship_counts),
+        "type_counts": dict(type_counts),
     }
 
 
-def render_ifc_graph(ifc_path: Path | str, violations: list[dict] | None = None):
-    """Open an IFC file, build its relationship graph, and return rendered HTML metadata."""
+def ingest_ifc_to_graph(
+    model_or_path: Any,
+    graph_service: GraphService,
+    *,
+    project_id: str | None = None,
+    include_psets: bool = False,
+) -> dict[str, int]:
+    """Extract IFC entities and relationships and ingest them in batch into GraphService.
+
+    Args:
+        model_or_path: An open ifcopenshell.file or a Path/str to an IFC file.
+        graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
+        project_id: Optional project identifier to associate with all ingested nodes.
+        include_psets: Whether to flatten and attach property set values to element nodes.
+
+    Returns:
+        Dict with total counts of ingested nodes and relationships.
+    """
+    if not _IFCOPENSHELL_AVAILABLE:
+        raise ImportError("ifcopenshell is not installed.")
+
+    if isinstance(model_or_path, (str, Path)):
+        model = ifcopenshell.open(str(model_or_path))
+    else:
+        model = model_or_path
+
+    graph = build_ifc_graph(model)
+
+    # Group nodes by label (ifc_type)
+    nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for node_id, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "IfcProduct")
+        node_props: dict[str, Any] = {
+            "id": node_id,
+            "guid": node_id,
+            "name": attrs.get("label", node_id),
+            "ifc_type": ifc_type,
+        }
+        if project_id:
+            node_props["project_id"] = project_id
+
+        if include_psets and attrs.get("psets"):
+            # Flatten top property set keys if requested
+            for pset_name, pset_vals in attrs["psets"].items():
+                if isinstance(pset_vals, dict):
+                    for k, v in list(pset_vals.items())[:10]:
+                        safe_key = f"pset_{pset_name}_{k}".replace(" ", "_")
+                        if isinstance(v, (str, int, float, bool)):
+                            node_props[safe_key[:40]] = v
+
+        nodes_by_label[ifc_type].append(node_props)
+
+    total_nodes = 0
+    for label, nodes in nodes_by_label.items():
+        graph_service.add_nodes_batch(label, nodes)
+        total_nodes += len(nodes)
+
+    # Group edges by rel_type
+    edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for source_id, target_id, attrs in graph.edges(data=True):
+        rel_type = attrs.get("rel_type", "CONNECTS").upper()
+        # Normalise relationship names to standard Cypher convention
+        if rel_type == "CONTAINEDIN":
+            rel_type = "CONTAINS"
+        edges_by_type[rel_type].append(
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "properties": {"project_id": project_id} if project_id else {},
+            }
+        )
+
+    total_edges = 0
+    for rel_type, edges in edges_by_type.items():
+        graph_service.add_edges_batch(rel_type, edges)
+        total_edges += len(edges)
+
+    logger.info(
+        "Ingested IFC model to graph: %d nodes across %d labels, %d edges across %d types",
+        total_nodes,
+        len(nodes_by_label),
+        total_edges,
+        len(edges_by_type),
+    )
+
+    return {
+        "nodes": total_nodes,
+        "edges": total_edges,
+        "labels": len(nodes_by_label),
+        "rel_types": len(edges_by_type),
+    }
+
+
+def render_ifc_graph(
+    ifc_path: Path | str, violations: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Open an IFC file and return structured graph summary metrics without PyVis."""
     if not _IFCOPENSHELL_AVAILABLE:
         raise ImportError("ifcopenshell is not installed.")
 
     model = ifcopenshell.open(str(ifc_path))
     graph = build_ifc_graph(model)
-    return build_pyvis_graph(graph, violations or [])
+    return build_ifc_graph_summary(graph, violations or [])
