@@ -43,7 +43,7 @@ TEST_THRESHOLDS = {
 
 #: What both stamps must read. Not a literal chosen here: XM-001's comes from
 #: data/rulesets/xm_001_cross_material.json and SB-001's from
-#: data/rulesets/config_en_1998_1_din_4149.json, and the two tests at the end of
+#: data/rulesets/sb001_seismic_clearance.json, and the two tests at the end of
 #: this file assert that those files are where the strings came from.
 XM_STAMP = "BIMGUARD-XM-001 v1.0.0"
 SB_STAMP = "BIMGUARD-SB-001 v1.0.0"

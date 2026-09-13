@@ -66,8 +66,11 @@ logger = get_logger(__name__)
 #: cannot tell which model to open.
 PRIMARY_MODEL_LABEL = "primary model"
 
-#: Jurisdiction config shipped with the Blue Halo work. Phase 2 output.
-DEFAULT_CONFIG_PATH = Path("data/rulesets/config_en_1998_1_din_4149.json")
+#: SB-001 clearance config shipped with the Blue Halo work. Renamed from
+#: config_en_1998_1_din_4149.json on 2026-09-13: its thresholds are authored
+#: screening calibration, not EN 1998-1 or DIN values (see the file's
+#: provenance blocks and docs/planning/sb001_provenance_2026-09-13.md).
+DEFAULT_CONFIG_PATH = Path("data/rulesets/sb001_seismic_clearance.json")
 
 #: Ruleset reference recorded on every seismic Issue.
 RULE_ID = "SB-001.01"
@@ -156,9 +159,10 @@ def _ruleset_version(config: ClearanceConfig) -> str:
     (audit F4).
 
     The config carried neither field until 2026-09-08, when both were added to
-    ``data/rulesets/config_en_1998_1_din_4149.json`` -- ``schema_version``
-    "1.0.0" matching the MM-001 and XM-001 packs, which are the same generation
-    of shipped ruleset. Read from the file, not written inline here: a version
+    the config (now ``data/rulesets/sb001_seismic_clearance.json``) --
+    ``schema_version`` "1.0.0" matching the MM-001 and XM-001 packs, which are
+    the same generation of shipped ruleset; "1.1.0" since the 2026-09-13
+    provenance re-label. Read from the file, not written inline here: a version
     the code invents is not provenance.
 
     Args:

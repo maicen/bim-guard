@@ -43,8 +43,14 @@ from app.modules.blue_halo.hermes_config_expanded import (  # noqa: E402
 
 # (standard names, output filename) in fallback order — EU pair first
 # (Blue Halo's Priority 1 per HERMES_CONTEXT.md), US pair as fallback.
+#
+# The EU pair's output is NOT the shipped SB-001 config. The shipped file,
+# data/rulesets/sb001_seismic_clearance.json, was hand-curated on 2026-09-13 to
+# remove fabricated standard editions from the Hermes research summary and to
+# record per-threshold provenance; regenerating over it would reintroduce both.
+# The generator therefore writes to a separate, clearly-named file.
 CANDIDATE_PAIRS: tuple[tuple[tuple[str, str], str], ...] = (
-    (("EN 1998-1", "DIN 4149"), "config_en_1998_1_din_4149.json"),
+    (("EN 1998-1", "DIN 4149"), "hermes_regenerated_eu_pair_unverified.json"),
     (("ASCE 7-22", "NFPA 13"), "config_asce_7_22_nfpa_13.json"),
 )
 
