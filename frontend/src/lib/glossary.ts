@@ -212,7 +212,7 @@ export const MECHANISMS: Record<string, GlossaryEntry> = {
   "CC-001": {
     label: "Crevice corrosion",
     description:
-      "Scores gaps, laps and shielded joints where stagnant electrolyte collects, weighing joint geometry against the alloy's critical crevice temperature and the environment.",
+      "Scores crevice risk where stagnant electrolyte collects, from the alloy's critical crevice temperature, the operating temperature, the environment and joint geometry. Today only the alloy is read from the model: every joint is scored as an unknown, tight gap, every pipe is assumed to run at 20 °C, and most spaces fall into one default environment class.",
     reference: "EN ISO 15329 · ASTM G48-B · ruleset BIMGUARD-CC-001",
   },
   "MC-001": {

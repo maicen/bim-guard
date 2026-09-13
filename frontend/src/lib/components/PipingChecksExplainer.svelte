@@ -181,19 +181,22 @@
           <strong class="text-fg-primary">What the check asks.</strong> Two things. How tight is the gap? (An open,
           smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the
           water it's sitting in? Each grade of stainless steel has a published temperature above which crevice
-          corrosion starts in salty water. The check compares that temperature against what the environment demands.
-          A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
+          corrosion starts in salty water. The check is designed to compare that temperature with the pipe's operating
+          temperature and the environment. A basic stainless grade in a swimming-pool plant room — warm, humid,
+          chlorinated air — is a known disaster.
         </p>
         <p>
-          <strong class="text-fg-primary">What it needs from the model.</strong> The joint type (which the check works
-          out from what kind of component it is — flange, threaded fitting, welded joint), the material grade, and the
-          environment.
+          <strong class="text-fg-primary">What it needs from the model.</strong> The joint type, the operating
+          temperature, the material grade, and the environment. Today only the material grade is actually used: every
+          joint is scored as unknown and tight (the finding says "Unknown / unclassified"), every pipe is assumed to run
+          at 20 °C whatever the model says, and most rooms are scored as ordinary indoor building services. In practice
+          the score depends almost entirely on which stainless grade is specified.
         </p>
         <p>
           <strong class="text-fg-primary">Example.</strong> Standard stainless flanges in a pool plant room:
           <strong class="text-fg-primary">Critical</strong> — the failure mode the galvanic check can't see at all,
-          because there's no second metal involved. The same flanges in a dry ceiling void:
-          <strong class="text-fg-primary">Low</strong>.
+          because there's no second metal involved. The same flanges in a dry ceiling void should be
+          <strong class="text-fg-primary">Low</strong>; today they score High.
         </p>
       {/snippet}
 

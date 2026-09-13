@@ -155,8 +155,11 @@ class PipingSystem(str, Enum):
 # ---------------------------------------------------------------------------
 # Joint type classification
 # ---------------------------------------------------------------------------
-# Keys match JT-001 through JT-014 in crevice_corrosion_ruleset.json.
-# See that file for geometry class assignment (open, moderate, tight, critical).
+# A separate vocabulary from the JT-001 to JT-014 joint_type_library in
+# crevice_corrosion_ruleset.json, with different numbering: here JT-003 is
+# threaded and JT-014 a dielectric union; there JT-003 is a slip-on flange and
+# JT-014 is Unknown. The codes do not correspond and must not be mapped by
+# number. See docs/defects/CC-001-scoring-inputs-inert.md.
 
 
 class JointType(str, Enum):
