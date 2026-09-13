@@ -10,56 +10,50 @@
 ## The Answer
 
 The number the shipped configuration applies is **200 mm** from a restrained MEP
-service to a structural element. It is worth understanding how that number was
-arrived at, because handing your coordinator a bare 200 mm without the reasoning
-will produce an argument the first time someone points at EN 1998-1 and reads
-150 mm.
+service to a structural element. Be clear with your coordinator about what that
+number is: **BIMGUARD's authored screening value, not a dimension from any code.**
 
-The configuration is a **combined** EN 1998-1:2020 and DIN 4149:2022 profile.
-Where the two standards give different values, the configuration takes whichever
-is more onerous and records why:
+Earlier versions of this answer attributed 200 mm to DIN 4149 and 150 mm to
+EN 1998-1. That was wrong. The editions cited ("EN 1998-1:2020", "DIN 4149:2022")
+do not exist, DIN 4149 is withdrawn, and neither EN 1998-1:2004+A1:2013 nor its
+German National Annex gives a clearance dimension for MEP services. The
+configuration was corrected on 2026-09-13 and now records the provenance of every
+threshold:
 
-| Parameter | EN 1998-1:2020 | DIN 4149:2022 | Combined | Governing logic |
-| --- | --- | --- | --- | --- |
-| Clearance from structure | 150 mm | 200 mm | **200 mm** | Larger governs — a halo big enough satisfies both |
-| Restraint spacing, transverse | 1.0 m | 1.2 m | **1.0 m** | Tighter governs — more restraints is conservative |
-| Restraint spacing, longitudinal | 1.5 m | 1.8 m | **1.5 m** | Same reasoning |
-| Pipe diameter threshold | 63 mm | 75 mm | **63 mm** | Lower governs — brings more pipes into scope |
-| Brace angle range | 35°–70° | 40°–65° | **40°–65°** | Intersection — the band satisfying both |
-| Importance factor, hospital | — | — | **1.6** | Per-key maximum across both |
-| Importance factor, standard | — | — | **1.0** | Per-key maximum across both |
+| Parameter | Value | Status | Basis |
+| --- | --- | --- | --- |
+| Clearance from structure | **200 mm** | authored | No source held gives a braced-service clearance |
+| Restraint spacing, transverse | **1.0 m** | authored | Screening value; FEMA E-74's sample spec allows up to 40 ft for ductile pipe |
+| Restraint spacing, longitudinal | **1.5 m** | authored | Screening value; FEMA E-74's sample spec allows up to 80 ft for ductile pipe |
+| Pipe diameter threshold | **63 mm** | authored | Inside the ~1–3 in exemption band FEMA E-74 reports for ASCE/SEI 7-10 |
+| Brace angle range | **40°–65° from horizontal** | authored | No source gives a pipe or duct brace angle |
+| Importance factor, hospital | **1.5** | sourced | FEMA E-74 §5.3.1; ASCE/SEI 7-10 §13.1.3 |
+| Importance factor, standard | **1.0** | sourced | Same |
 
-So 200 mm is the DIN 4149 value, adopted because a 200 mm envelope also contains
-the 150 mm one. If your project sits under EN 1998-1 with a national annex that
-does not invoke DIN 4149, 150 mm is defensible and the configuration can be
-narrowed to the EN-only profile. That is a decision for your structural engineer
-of record, not a default anyone should quietly change.
+The nearest sourced rule to a clearance is narrower than it looks: FEMA E-74's
+sample specification (App. A §3.9.D.9) asks for horizontal clearance of at least
+two-thirds of the hanger length — but only for **unbraced, exempt** piping, so it
+cannot justify a figure for braced services.
 
 The clearance values are the same across all four brace hardware types the
-configuration carries — cable, rod, angle for mechanical, angle for fire. The
-configuration is explicit that this is a limitation rather than a finding: the
-source research gives one combined restraint spacing and one minimum clearance
-per standard, not values broken out per brace variant, so all four share the same
-figures pending brace-specific research. If your bracing contractor is working to
-a manufacturer's system with different published clearances, use theirs and treat
-the BIMGUARD numbers as the code floor.
+configuration carries — cable, rod, angle for mechanical, angle for fire — because
+no source held distinguishes them. If your bracing contractor is working to a
+manufacturer's certified system, use its published clearances and treat the
+BIMGUARD number as a screening prompt, not a code floor.
 
 ## Does It Change for the Hospital Block?
 
 This is the part that surprises people, so the answer is worth stating plainly:
-**not in the clearance geometry — but check the clause text before you rely on
-that.**
+**not in the clearance geometry.**
 
-Both standards scale the required *restraint capacity* by importance factor, not
-the clearance geometry directly. A hospital carries an importance factor of 1.6
-against 1.0 for a standard occupancy, which means the braces and their anchors
-must be designed for a larger force. It does not, in the clause text the
-configuration was built from, mean the pipe must sit further from the beam. The
-configuration therefore sets both the seismic-zone clearance addition and the
-hospital clearance addition to **0 mm**, and it records that decision as a data
-gap: neither value is present in the source for either standard, so 0 mm was
-chosen as the defensible reading rather than a guessed uplift — with an explicit
-note to verify against the full clause text before relying on it.
+Hospitals attract stricter *design* requirements, not larger clearances. Under
+ASCE/SEI 7-10 §13.1.3, as reported by FEMA E-74 §5.3.1, critical components in
+Risk Category IV buildings are designated seismic systems with an importance
+factor of **1.5** against 1.0 otherwise — larger design forces, certification, and
+an expectation that the service still works after the event. No source held adds
+clearance for a hospital or for a higher seismic zone. The configuration sets both
+additions to **0 mm** and marks them `authored`, because a zero chosen without a
+source is still a choice.
 
 Practically, for your campus: the same 200 mm envelope applies to both blocks.
 The difference between them lands on the structural engineer sizing the braces
@@ -80,13 +74,12 @@ the frame:
   service and the structure it passes is correspondingly larger. This is where a
   clearance that looks generous on paper gets consumed.
 
-The shipped configuration does not vary the clearance by frame stiffness — it
-applies the code minimum, which is what the clause text supports. If your
-structural engineer's drift analysis indicates larger relative displacements at
-particular levels, that is a project-specific uplift on top of the code floor,
-and the configuration is the right place to record it: it is a JSON parameter
-file, and the value can be raised for a project with the reasoning noted in the
-same way the combined values are.
+The shipped configuration does not vary the clearance by frame stiffness; its
+200 mm is a fixed screening value. FEMA E-74's sample specification instead asks
+for designs to accommodate relative displacement (0.02 × storey height unless
+analysis gives the drift). If your structural engineer's drift analysis indicates
+larger relative displacements at particular levels, record a project-specific
+value in the configuration with its reasoning in the provenance block.
 
 ## When This Analysis Applies
 
@@ -99,27 +92,27 @@ allowance in its own right.
 
 For each intrusion: the required envelope dimension, the actual measured
 clearance, how much of the envelope was lost, the resulting severity and mapped
-risk band, both element `GlobalId`s, and the EN 1998-1 / DIN 4149 clause
-citation. Elements whose geometry could not be read produce a `data_quality`
-finding rather than being silently skipped.
+risk band, both element `GlobalId`s, and a citation to FEMA E-74 and
+ASCE/SEI 7-10 §13.6 naming the SB-001 screening calibration. Elements whose
+geometry could not be read produce a `data_quality` finding rather than being
+silently skipped.
 
 ## NotebookLM Prompt (for rule authoring — NOT compliance decisions)
 
 **Query:**
 
-> "From EN 1998-1:2020 clause 5.3.2.3, DIN 4149:2022-03 clause 8.2.4 and their
-> national annexes, extract every stated minimum clearance between a seismically
-> restrained mechanical or electrical service and a structural element. For each
-> value give: the exact clause, the service type it applies to, whether it varies
-> by importance factor, occupancy class or seismic zone, and whether the standard
-> expresses it as an absolute dimension or as a function of expected relative
-> displacement. State explicitly if the standard gives no clearance uplift for
-> importance factor — do not infer one."
+> "From ASCE/SEI 7-10 §13.6, EN 1998-1:2004+A1:2013 §4.3.5 and
+> DIN EN 1998-1/NA:2018-10, extract every stated minimum clearance between a
+> seismically restrained mechanical or electrical service and a structural
+> element. For each value give: the document, edition and clause, the service type
+> it applies to, whether it varies by importance factor, occupancy or seismic
+> zone, and whether it is an absolute dimension or a function of expected relative
+> displacement. State explicitly where no clearance is given — do not infer one."
 
-**Purpose.** Close the two documented 0 mm gaps in the configuration with sourced
-clause text, and establish whether the standards express clearance absolutely or
-as a displacement function — which would change the parameter's shape, not just
-its value.
+**Purpose.** Find a stated value that could replace the authored 200 mm and the
+authored 0 mm additions, and establish whether any source expresses clearance
+absolutely or as a displacement function — which would change the parameter's
+shape, not just its value.
 
 **Not for.** Setting the clearance rule in your clash detection software. Use the
 structural engineer of record's determination for that; this prompt sources the
@@ -136,9 +129,9 @@ clause text they will make it against.
 
 ## Next Steps for Your Project
 
-1. Confirm the governing jurisdiction with the structural engineer before setting
-   the number. 200 mm is the conservative combined value; 150 mm may be correct
-   for an EN-only project.
+1. Confirm the governing code and the bracing designer before setting the number.
+   200 mm is BIMGUARD's authored screening value, not a code figure; the bracing
+   design or certified restraint system governs.
 2. Set the coordination clearance rule to match whatever is confirmed, so
    Navisworks and BIMGUARD are not disagreeing with each other.
 3. Ask the structural engineer whether their drift analysis justifies an uplift
@@ -146,5 +139,5 @@ clause text they will make it against.
 4. Publish the halo reservations into the federated model early — clearance that
    is not visible gets re-consumed by the next trade through the zone.
 5. Take the 0 mm hospital and seismic-zone additions to the structural engineer
-   as an explicit question. They are documented gaps, and a hospital project is
-   the right place to close them.
+   as an explicit question. They are authored values with no source, and a
+   hospital project is the right place to test them.

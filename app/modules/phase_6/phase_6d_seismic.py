@@ -100,10 +100,10 @@ BRACED_CLASSES: tuple[str, ...] = (
 )
 
 #: The subset of BRACED_CLASSES that ``thresholds.pipe_diameter_mm`` governs.
-#: Ducts and cable carriers are sized by area, not diameter, and the config's
-#: ``thresholds.duct_area_sqm`` is null (a documented data gap), so they stay in
+#: Ducts and cable carriers are sized by area, not diameter, so they stay in
 #: scope unconditionally rather than being filtered by a threshold that does not
-#: describe them.
+#: describe them. The config's ``thresholds.duct_area_sqm`` (0.557 m², FEMA E-74
+#: §6.4.6.1, since schema 1.1.0) is recorded but not applied here.
 PIPE_CLASSES: tuple[str, ...] = ("IfcPipeSegment", "IfcFlowSegment")
 
 

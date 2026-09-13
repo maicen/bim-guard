@@ -34,14 +34,22 @@ analysis domains, so take them separately.
 | **ASTM B117** | Salt spray exposure | GC-001, MM-001 |
 | **Euro Inox / WorldStainless; AUCSC** | Galvanic series and corrosion rate data | GC-001 |
 
-### Seismic clearance — one combined jurisdiction profile
+### Seismic clearance — screening calibration with per-threshold provenance
 
-**EN 1998-1:2020 §5.3.2.3** and **DIN 4149:2022-03 §8.2.4**, merged into a single
-conservative profile. Every merged parameter records which standard's value
-governs and why (see Q08 for the full table). The configuration also records its
-own **data gaps** explicitly — duct area thresholds, adjacent-system clearance,
-default hazard factor and brace hardware sizes are left null or flagged as
-placeholders rather than filled with plausible numbers.
+SB-001's configuration (`data/rulesets/sb001_seismic_clearance.json`, schema
+1.1.0) cites **FEMA E-74** (4th ed., December 2012) and, upstream of it,
+**ASCE/SEI 7-10 §13.6**. It names the governing codes as
+**EN 1998-1:2004+A1:2013** (non-structural elements, §4.3.5) and
+**DIN EN 1998-1/NA:2018-10**, and records that neither gives MEP brace spacing or
+clearance dimensions; DIN 4149 is withdrawn.
+
+Earlier versions cited an EN 1998-1 edition dated 2020 and a DIN 4149 edition
+dated 2022, neither of which exists; that was corrected on 2026-09-13. Each threshold now carries a `provenance`
+block with a status. Three values are **sourced** (importance factors 1.5 / 1.0,
+and the 0.557 m² duct area threshold); two are **derived** arithmetic (ideal brace
+angle and tolerance); the other nine — including the 200 mm clearance, the
+1.0 / 1.5 m spacing, the 63 mm pipe threshold and the 40°–65° angle band — are
+**authored** screening calibration. See Q08 for the table.
 
 ### Architecture compliance — a baseline pack plus what you add
 
