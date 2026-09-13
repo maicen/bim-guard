@@ -25,8 +25,8 @@ def build():
     formula(s, "halo_bbox  =  element_bbox  ⊕  effective_clearance",
             note="⊕ is a uniform expansion on every face. effective_clearance is read from the jurisdiction config, never from code.")
     formula(s, "effective_clearance  =  base_clearance  +  seismic_zone_addition  +  hospital_addition",
-            y=2.50, note="The shipped SB-001 config sets a 200 mm base: authored screening calibration, not a code value. No code or guide held gives a braced-service clearance.")
-    note(s, "The implementation applies a uniform buffer because that is what the corpus can support. Angle-aware wedge envelopes for diagonal cable and rod bracing are deferred: the corpus carries no brace geometry to validate them against, and an unvalidated wedge would be a guess wearing a formula.", y=3.75)
+            y=2.80, note="The shipped SB-001 config sets a 200 mm base: authored screening calibration, not a code value. No code or guide held gives a braced-service clearance.")
+    note(s, "The implementation applies a uniform buffer because that is what the corpus can support. Angle-aware wedge envelopes for diagonal cable and rod bracing are deferred: the corpus carries no brace geometry to validate them against, and an unvalidated wedge would be a guess wearing a formula.", y=4.15)
 
     s = slide(p, "Four-phase architecture", "Each phase fails independently and reports why", BLUE)
     table(s, ["Phase", "Function", "Input", "Output"],
