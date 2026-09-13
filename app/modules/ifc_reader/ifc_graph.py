@@ -191,6 +191,33 @@ def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
     return results
 
 
+def find_orphan_elements(graph: nx.DiGraph) -> list[dict[str, Any]]:
+    """Return graph nodes with no containment, connection, or material relationship.
+
+    Excludes spatial root types (``IfcProject``/``IfcSite``/``IfcBuilding``/
+    ``IfcBuildingStorey``/``IfcSpace``), which legitimately sit at the top of
+    the containment tree and can have zero inbound edges, and synthetic
+    ``IfcMaterial`` nodes, which are graph bookkeeping rather than model
+    elements. Used by ``GraphTopologyEngine`` (GRAPH-TOPOLOGY-001) to flag
+    elements disconnected from the rest of the model.
+    """
+    orphans: list[dict[str, Any]] = []
+    for node, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        if ifc_type in _SPATIAL_TYPES or ifc_type == "IfcMaterial":
+            continue
+        if graph.in_degree(node) + graph.out_degree(node) == 0:
+            orphans.append(
+                {
+                    "guid": node,
+                    "label": attrs.get("label", node),
+                    "ifc_type": ifc_type,
+                    "degree": 0,
+                }
+            )
+    return orphans
+
+
 def get_centrality_consequence_multiplier(
     guid: str,
     centralities: dict[str, dict[str, float]],

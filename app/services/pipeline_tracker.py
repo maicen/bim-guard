@@ -170,12 +170,18 @@ class EngineSpec:
 #:     ``Status.PENDING`` and instrument it exactly as GC-001 is. Tracking always
 #:     wins over the declared status, so a tracked MC-001 run would report
 #:     ``running`` / ``complete`` regardless of this value.
+#: ``GRAPH-001``
+#:     The theme-agnostic graph engine (``app.engines.bimguard_graph_engine``),
+#:     run from ``orchestrator._run_graph_intelligence`` under the same
+#:     ``enable_graph`` flag as ``graph_summary``. ``pending`` means "no run
+#:     yet", exactly as it does for GC-001/CC-001.
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
     EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
     EngineSpec("MM-001", "Material / media comparator", Status.PENDING),
     EngineSpec("XM-001", "Cross-material comparator", Status.PENDING),
     EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
+    EngineSpec("GRAPH-001", "Graph topology intelligence", Status.PENDING),
 )
 
 #: Lookup by code, built once.
@@ -189,6 +195,7 @@ ENGINE_CODES: tuple[str, ...] = tuple(spec.code for spec in ENGINE_SPECS)
 #: site emitting under a name the endpoint does not know.
 GC_ENGINE = "GC-001"
 CC_ENGINE = "CC-001"
+GRAPH_ENGINE = "GRAPH-001"
 
 
 # ---------------------------------------------------------------------------
@@ -414,8 +421,9 @@ class PipelineTracker:
     ever existed.
     """
 
-    def __init__(self, project_id: int):
+    def __init__(self, project_id: int, run_key: str = "default"):
         self.project_id = project_id
+        self.run_key = run_key
         self._lock = threading.RLock()
         self._runs: dict[str, EngineRun] = {
             spec.code: EngineRun(code=spec.code, label=spec.label, lock=self._lock)
@@ -450,6 +458,7 @@ class PipelineTracker:
         with self._lock:
             return {
                 "project_id": self.project_id,
+                "run_key": self.run_key,
                 "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "engines": {code: run.snapshot() for code, run in self._runs.items()},
             }
@@ -469,46 +478,61 @@ MAX_TRACKERS: int = 32
 TTL_SECONDS: float = 900.0
 
 
+#: Store key: a project id plus which concurrent run owns the tracker.
+#: ``"default"`` is the corrosion pipeline's run (the only caller before
+#: per-run keys existed, so it keeps every existing call site's behaviour
+#: unchanged); a second theme run for the same project -- e.g. the graph
+#: engine, or a future Architecture/Seismic pass -- uses its own key so it
+#: gets its own tracker instead of resetting the corrosion run's progress via
+#: ``tracking(project_id, reset=True)``. See the module docstring's warning in
+#: CLAUDE.md about wrapping a second concurrent analysis path without this.
+_TrackerKey = tuple[int, str]
+
+
 class _TrackerStore:
-    """A bounded, expiring, thread-safe map of project id to tracker."""
+    """A bounded, expiring, thread-safe map of (project id, run key) to tracker."""
 
     def __init__(self, max_trackers: int = MAX_TRACKERS, ttl_seconds: float = TTL_SECONDS):
-        self._trackers: OrderedDict[int, PipelineTracker] = OrderedDict()
+        self._trackers: OrderedDict[_TrackerKey, PipelineTracker] = OrderedDict()
         self._max = max_trackers
         self._ttl = ttl_seconds
         self._lock = threading.Lock()
 
-    def get(self, project_id: int) -> Optional[PipelineTracker]:
-        """Return the tracker for ``project_id``, or ``None`` if absent or expired."""
+    def get(self, project_id: int, run_key: str = "default") -> Optional[PipelineTracker]:
+        """Return the tracker for ``(project_id, run_key)``, or ``None`` if absent or expired."""
+        key = (project_id, run_key)
         with self._lock:
-            tracker = self._trackers.get(project_id)
+            tracker = self._trackers.get(key)
             if tracker is None:
                 return None
             if (time.monotonic() - tracker.updated_at) > self._ttl:
-                del self._trackers[project_id]
-                logger.debug("Pipeline tracker expired project_id=%d", project_id)
+                del self._trackers[key]
+                logger.debug(
+                    "Pipeline tracker expired project_id=%d run_key=%s", project_id, run_key
+                )
                 return None
-            self._trackers.move_to_end(project_id)
+            self._trackers.move_to_end(key)
             return tracker
 
-    def get_or_create(self, project_id: int) -> PipelineTracker:
-        """Return the tracker for ``project_id``, creating one if needed."""
-        existing = self.get(project_id)
+    def get_or_create(self, project_id: int, run_key: str = "default") -> PipelineTracker:
+        """Return the tracker for ``(project_id, run_key)``, creating one if needed."""
+        existing = self.get(project_id, run_key)
         if existing is not None:
             return existing
+        key = (project_id, run_key)
         with self._lock:
-            tracker = PipelineTracker(project_id)
-            self._trackers[project_id] = tracker
-            self._trackers.move_to_end(project_id)
+            tracker = PipelineTracker(project_id, run_key)
+            self._trackers[key] = tracker
+            self._trackers.move_to_end(key)
             while len(self._trackers) > self._max:
                 evicted, _ = self._trackers.popitem(last=False)
-                logger.debug("Pipeline tracker evicted project_id=%d", evicted)
+                logger.debug("Pipeline tracker evicted project_id=%d run_key=%s", *evicted)
             return tracker
 
-    def discard(self, project_id: int) -> bool:
-        """Drop one project's tracker. Returns whether one was there."""
+    def discard(self, project_id: int, run_key: str = "default") -> bool:
+        """Drop one project run's tracker. Returns whether one was there."""
         with self._lock:
-            return self._trackers.pop(project_id, None) is not None
+            return self._trackers.pop((project_id, run_key), None) is not None
 
     def clear(self) -> None:
         """Empty the store. For tests and for a deliberate operational reset."""
@@ -520,13 +544,19 @@ class _TrackerStore:
 TRACKERS = _TrackerStore()
 
 
-def tracker_for(project_id: int) -> PipelineTracker:
-    """Return (creating if needed) the tracker for ``project_id``."""
-    return TRACKERS.get_or_create(project_id)
+def tracker_for(project_id: int, run_key: str = "default") -> PipelineTracker:
+    """Return (creating if needed) the tracker for ``(project_id, run_key)``.
+
+    ``run_key`` defaults to ``"default"``, the corrosion pipeline's run, so
+    every pre-existing call site is unaffected. Pass a distinct ``run_key``
+    (e.g. ``"graph"``) to track a second, genuinely concurrent analysis path
+    for the same project without resetting the default run's progress.
+    """
+    return TRACKERS.get_or_create(project_id, run_key)
 
 
-def snapshot(project_id: int) -> dict[str, Any]:
-    """Return the workflow payload for ``project_id``.
+def snapshot(project_id: int, run_key: str = "default") -> dict[str, Any]:
+    """Return the workflow payload for ``(project_id, run_key)``.
 
     A project nothing has ever analysed is not an error: it reports every engine
     at its declared status, which is the truthful answer to "how far has this
@@ -534,9 +564,9 @@ def snapshot(project_id: int) -> dict[str, Any]:
     case keeps an unbounded stream of polls for unknown ids from filling the
     store with empty entries.
     """
-    tracker = TRACKERS.get(project_id)
+    tracker = TRACKERS.get(project_id, run_key)
     if tracker is None:
-        return PipelineTracker(project_id).snapshot()
+        return PipelineTracker(project_id, run_key).snapshot()
     return tracker.snapshot()
 
 
@@ -559,21 +589,29 @@ def active() -> Optional[PipelineTracker]:
 
 
 @contextmanager
-def tracking(project_id: int, *, reset: bool = True) -> Iterator[PipelineTracker]:
-    """Bind a tracker for ``project_id`` for the duration of the block.
+def tracking(
+    project_id: int, *, reset: bool = True, run_key: str = "default"
+) -> Iterator[PipelineTracker]:
+    """Bind a tracker for ``(project_id, run_key)`` for the duration of the block.
 
     Args:
         project_id: Project being analysed.
         reset: Start from a clean tracker. On by default: a second analysis of
-            the same project is a new run, and inheriting the previous run's
-            counters would report an element count that never happened.
+            the same project *run* is a new run, and inheriting the previous
+            run's counters would report an element count that never happened.
+        run_key: Which concurrent run owns this tracker. Defaults to
+            ``"default"``, the corrosion pipeline's run. A second, genuinely
+            concurrent analysis path for the same project (e.g. the graph
+            engine) must pass a distinct ``run_key`` -- otherwise its
+            ``reset=True`` would discard the default run's in-flight progress
+            for the same project id.
 
     Yields:
         The bound :class:`PipelineTracker`.
     """
     if reset:
-        TRACKERS.discard(project_id)
-    tracker = tracker_for(project_id)
+        TRACKERS.discard(project_id, run_key)
+    tracker = tracker_for(project_id, run_key)
     token = _ACTIVE.set(tracker)
     try:
         yield tracker

@@ -85,6 +85,14 @@ class BIMGuard_App:
         the egress/spatial records this method already computes, surfacing
         findings under ``arch_engine_issues``/``arch_engine_error`` -- again
         without altering any existing key.
+
+        ``enable_graph`` (default False) opts into the theme-agnostic graph
+        intelligence side-channel (see ``_run_graph_intelligence``): the
+        existing ``graph_summary``/centrality output plus the registered
+        ``GRAPH-TOPOLOGY-001`` ``RuleEvaluator`` run over orphan elements found
+        in that same graph, surfacing findings under
+        ``graph_engine_issues``/``graph_engine_error`` -- again purely
+        additive.
         """
         from app.services.documents_service import DocumentService
         from app.services.models_service import ModelsService
@@ -155,6 +163,12 @@ class BIMGuard_App:
             ifc=ifc,
             project_id=project_id,
             log_progress=log_progress,
+        )
+
+        graph_summary, graph_engine_issues, graph_engine_error = (
+            self._run_graph_intelligence(ifc.get("m2_reader"), project_id)
+            if enable_graph
+            else (None, [], None)
         )
 
         rule_result = self._run_rule_compliance(
@@ -236,12 +250,12 @@ class BIMGuard_App:
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
-            # Opt-in graph intelligence side-channel (see enable_graph)
-            "graph_summary": (
-                BIMGuard_App._run_optional_graph_summary(ifc["m2_reader"])
-                if enable_graph and ifc.get("m2_reader")
-                else None
-            ),
+            # Opt-in graph intelligence side-channel (see enable_graph /
+            # _run_graph_intelligence) -- empty/None unless a caller explicitly
+            # passed enable_graph=True.
+            "graph_summary": graph_summary,
+            "graph_engine_issues": graph_engine_issues,
+            "graph_engine_error": graph_engine_error,
         }
 
     @staticmethod
@@ -704,21 +718,69 @@ class BIMGuard_App:
         }
 
     @staticmethod
-    def _run_optional_graph_summary(m2_reader: Any) -> dict[str, Any] | None:
-        """Opt-in graph intelligence summary extraction."""
-        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
-            return None
-        try:
-            from app.modules.ifc_reader.ifc_graph import (
-                build_ifc_graph,
-                build_ifc_graph_summary,
-            )
+    def _run_graph_intelligence(
+        m2_reader: Any, project_id: int
+    ) -> tuple[dict[str, Any] | None, list[dict], str | None]:
+        """Opt-in graph intelligence: summary/centrality plus an orphan-element check.
 
-            graph = build_ifc_graph(m2_reader.ifc_file)
-            return build_ifc_graph_summary(graph)
-        except Exception as exc:
-            logger.debug("Optional graph summary generation skipped: %s", exc)
-            return None
+        Runs the GRAPH-TOPOLOGY-001 RuleEvaluator
+        (``app.engines.bimguard_graph_engine.GraphTopologyEngine``) over orphan
+        elements found in the same graph build.
+
+        Builds the relationship graph once and reuses it for both, rather than
+        the two independent graph builds ``_run_shacl_compliance`` and this used
+        to each do. Wraps its own ``tracking(project_id, run_key="graph")``
+        context -- separate from the corrosion pipeline's ``"default"`` run key
+        -- so GRAPH-001 can report real progress via the existing pipeline
+        tracker without resetting an in-flight corrosion run for the same
+        project (see CLAUDE.md's `PipelineTracker` per-run-key note).
+
+        Returns ``(graph_summary, graph_engine_issues, graph_engine_error)``.
+        Never raises: any failure is caught, logged, and reported as
+        ``(None, [], None)`` -- exactly as ``graph_summary`` alone used to
+        silently return ``None`` before this existed, so callers that only look
+        at ``graph_summary`` see no behaviour change.
+        """
+        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
+            return None, [], None
+
+        from app.services.pipeline_tracker import GRAPH_ENGINE, Stage, tracking
+        from app.services.pipeline_tracker import complete as track_complete
+        from app.services.pipeline_tracker import emit as track_emit
+        from app.services.pipeline_tracker import fail as track_fail
+
+        with tracking(project_id, run_key="graph"):
+            try:
+                from app.engines.bimguard_graph_engine import GraphTopologyEngine
+                from app.modules.comparator.issue_adapter import lift_engine_result
+                from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+                from app.modules.ifc_reader.ifc_graph import (
+                    build_ifc_graph,
+                    build_ifc_graph_summary,
+                    find_orphan_elements,
+                )
+
+                track_emit(GRAPH_ENGINE, Stage.IFC_PARSING)
+                graph = build_ifc_graph(m2_reader.ifc_file)
+                summary = build_ifc_graph_summary(graph)
+
+                orphans = find_orphan_elements(graph)
+                track_emit(GRAPH_ENGINE, Stage.ENGINE_EXECUTION, records=len(orphans))
+
+                engine = GraphTopologyEngine()
+                issues = []
+                for record in orphans:
+                    result = engine.evaluate(record)
+                    issue = lift_engine_result(result, mechanism="GRAPH-TOPOLOGY-001")
+                    if issue is not None:
+                        issues.append(issue)
+
+                track_complete(GRAPH_ENGINE, findings=len(issues))
+                return summary, [issue_to_dict(issue) for issue in issues], None
+            except Exception as exc:
+                track_fail(GRAPH_ENGINE, str(exc))
+                logger.debug("Optional graph intelligence generation skipped: %s", exc)
+                return None, [], str(exc)
 
     @staticmethod
     def _run_arch_engine_compliance(

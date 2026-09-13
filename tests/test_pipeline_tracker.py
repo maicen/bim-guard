@@ -184,6 +184,63 @@ def test_binding_unwinds_so_later_calls_are_untracked_again():
 
 
 # ---------------------------------------------------------------------------
+# Per-run keys
+# ---------------------------------------------------------------------------
+#
+# A second, genuinely concurrent analysis path for the same project (e.g. the
+# graph engine's GRAPH-001, run alongside a corrosion analysis) must not reset
+# the default run's in-flight progress -- see the CLAUDE.md note on
+# `PipelineTracker`. These tests exercise the store keying that makes that
+# true, independent of any specific engine.
+
+
+def test_a_second_run_key_gets_its_own_tracker():
+    with pt.tracking(1):
+        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION, elements_total=5)
+    with pt.tracking(1, run_key="graph"):
+        pt.emit(GC_ENGINE, Stage.IFC_PARSING, elements_total=1)
+
+    default_engine = pt.snapshot(1)["engines"][GC_ENGINE]
+    graph_engine = pt.snapshot(1, run_key="graph")["engines"][GC_ENGINE]
+
+    assert default_engine["current_stage"] == 3
+    assert default_engine["metrics"]["elements_total"] == 5
+    assert graph_engine["current_stage"] == 2
+    assert graph_engine["metrics"]["elements_total"] == 1
+
+
+def test_resetting_a_second_run_key_does_not_touch_the_default_run():
+    with pt.tracking(1):
+        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION, elements_total=5)
+
+    # A second concurrent path for the same project, its own run_key, reset
+    # on entry (the default) -- must not discard the default run above.
+    with pt.tracking(1, run_key="graph"):
+        pass
+
+    assert pt.snapshot(1)["engines"][GC_ENGINE]["metrics"]["elements_total"] == 5
+
+
+def test_snapshot_reports_which_run_key_it_belongs_to():
+    with pt.tracking(1, run_key="graph"):
+        pass
+
+    assert pt.snapshot(1, run_key="graph")["run_key"] == "graph"
+    assert pt.snapshot(1)["run_key"] == "default"
+
+
+def test_discarding_one_run_key_leaves_other_run_keys_for_the_same_project():
+    with pt.tracking(1):
+        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
+    with pt.tracking(1, run_key="graph"):
+        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
+
+    assert pt.TRACKERS.discard(1, run_key="graph") is True
+    assert pt.TRACKERS.get(1, run_key="graph") is None
+    assert pt.TRACKERS.get(1) is not None
+
+
+# ---------------------------------------------------------------------------
 # The engines themselves
 # ---------------------------------------------------------------------------
 
@@ -307,7 +364,8 @@ def test_endpoint_returns_the_documented_shape(client):
 
     payload = response.json()
     assert payload["project_id"] == 1234
-    assert set(payload) == {"project_id", "timestamp", "engines"}
+    assert set(payload) == {"project_id", "run_key", "timestamp", "engines"}
+    assert payload["run_key"] == "default"
     assert tuple(payload["engines"]) == ENGINE_CODES
 
 
