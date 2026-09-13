@@ -12,6 +12,21 @@ Standards referenced:
   - buildingSMART BCF 2.1 (issue tracking specification)
   - ISO 19650 (BIM information management, IFC property set framework)
 
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-CC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts:
+  docs/planning/corrosion_provenance_2026-09-13.md.
+
+  Separately, the pipeline does not supply CC-001's three scoring inputs as the
+  specification describes: see docs/defects/CC-001-scoring-inputs-inert.md.
+
 Weighted composite score:
   Score_CC = (0.35 × geometry_risk)
             + (0.40 × CCT_adequacy)
@@ -155,7 +170,9 @@ def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
 
 
 # ── ENVIRONMENT SEVERITY ──────────────────────────────────────────────────────
-# Based on EN ISO 15329:2007 wetting class framework
+# Classes named after the EN ISO 15329:2007 wetting-class framework; the severity
+# and chloride figures are authored calibration, not quoted from the standard
+# (docs/planning/corrosion_provenance_2026-09-13.md).
 # T0 = essentially dry, T5 = permanent immersion / pool / coastal
 ENVIRONMENT_SEVERITY = {
     "T0_DRY": {

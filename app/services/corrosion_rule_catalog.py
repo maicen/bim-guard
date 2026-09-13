@@ -14,10 +14,30 @@ PRECEDENCE, HIGHEST FIRST
        database that is missing, unseeded or unreachable.
 
     Every step down is a degradation, not an equivalent path, and step 3 is
-    logged at warning level. The fallback tables are strict subsets of the
-    stored payloads -- fewer materials, fewer environment classes -- so a
-    catalog built from them scores real couples against reference data that
-    does not contain them.
+    logged at warning level. The fallback tables are NOT subsets of the stored
+    payloads. They hold fewer materials and environment classes, and where they
+    share an entry with the payload they do not always agree with it: GC-001
+    agrees on every shared value, but CC-001 differs in 5 threshold values
+    (including all three shared geometry-class risks and JT-001's class) and
+    MC-001 in 16 (flow, temperature, dead-leg and material scores and bounds).
+    The fallback also carries keys the payloads lack (MC-001 ``t_min``/``t_max``,
+    ``unknown``/``default`` material scores; GC-001 ``zone_to_env``). A catalog
+    built from them therefore scores against different numbers, not merely fewer.
+    Detail: docs/planning/corrosion_provenance_2026-09-13.md.
+
+PROVENANCE
+
+    The GC-001, CC-001 and MC-001 numbers served by this module -- from the
+    seeded payloads and from the fallback tables alike -- are a calibration
+    authored for those rulesets. They are NOT quoted from the standards the
+    payloads cite. Each citation names the standard or body of practice that
+    GOVERNS THE MECHANISM, not a document from which the digit was read. None of
+    the cited source documents is held by this project, and no value has been
+    verified against one. The rulesets were generated with AI assistance from
+    NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104). A corrosion
+    engineer must verify every value against the cited source before any value
+    is relied on. MM-001 and XM-001 carry their own equivalent declarations in
+    data/rulesets/.
 """
 
 from __future__ import annotations

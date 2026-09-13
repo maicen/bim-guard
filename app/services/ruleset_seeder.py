@@ -354,6 +354,17 @@ def _seed_risk_bands(
         )
 
 
+# ── GC-001, CC-001, MC-001 — provenance of what is seeded below ───────────────
+# Every GC-001, CC-001 and MC-001 row below is written with
+# source_text="Source: <citation>". That citation names the standard or body of
+# practice governing the mechanism; it is NOT the document the number was read
+# from. The numbers are a calibration authored for these rulesets with AI
+# assistance (NotebookLM prompts, April 2026; docs/RESOURCES.md:97-104), none of
+# the cited documents is held, and no value has been verified against one. The
+# "Source:" prefix is left as it is because it is stored rule data; the corrected
+# reading, and proposed wording, are in
+# docs/planning/corrosion_provenance_2026-09-13.md.
+
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
 
