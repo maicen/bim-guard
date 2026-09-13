@@ -666,8 +666,8 @@
       </h1>
       <p class="mt-1 max-w-3xl text-xs text-fg-muted sm:text-sm">
         {#if activeCategory === "seismic"}
-          Execute verified Blue Halo Seismic Clearance (SB-001 / EN 1998-1 / DIN 4149) buffer volume
-          and bracing audits.
+          Run Blue Halo Seismic Clearance (SB-001) buffer volume and bracing screening, against
+          BIMGUARD's authored screening calibration.
         {:else}
           Five corrosion checks — galvanic (GC-001), crevice (CC-001), microbial (MC-001),
           material–media (MM-001) and cross-material (XM-001) — run against every piping element in

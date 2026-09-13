@@ -237,7 +237,8 @@ export const MECHANISMS: Record<string, GlossaryEntry> = {
     label: "Seismic bracing clearance",
     description:
       "Blue Halo kernel. Checks that services keep the required clearance envelope for seismic movement and bracing.",
-    reference: "EN 1998-1 · DIN 4149 · ruleset BIMGUARD-SB-001",
+    reference:
+      "ruleset BIMGUARD-SB-001 · authored screening calibration, not code values · FEMA E-74 (4th ed., December 2012) where sourced",
   },
   CODE: {
     label: "Code compliance rule",
