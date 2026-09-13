@@ -707,8 +707,135 @@ def _seed_mc001(svc: RuleService) -> int:
     return count
 
 
+#: Why each SB-001 threshold has the value it has, as ``source_text``. Worded
+#: from the ``provenance`` notes in ``data/rulesets/sb001_seismic_clearance.json``
+#: (schema 1.1.0); tests/test_sb001_seeded_provenance.py holds the two together.
+_SB001_SOURCE_TEXT = {
+    "SB-001.01": (
+        "BIMGUARD SB-001 authored calibration. Within the ASCE 7-10 exemption band as "
+        "reported by FEMA E-74 §6.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) depending on "
+        "seismic design category and occupancy. 63 mm ≈ 2.48 in falls inside that band. "
+        "Not a stated standard value."
+    ),
+    "SB-001.02": (
+        "BIMGUARD SB-001 authored calibration. Authored. No source. Also the value of "
+        "brace_types[*].clearance_mm, which the loader applies in preference. FEMA E-74 "
+        "App. A §3.9.D.9 gives a related rule, horizontal clearance of at least 2/3 the "
+        "hanger length, but only for unbraced (exempt) piping. No braced-service clearance "
+        "dimension exists in any source held."
+    ),
+    "SB-001.03": (
+        "BIMGUARD SB-001 authored calibration. Authored conservative calibration. Upstream "
+        "reference: FEMA E-74 App. A §3.9.D.6-7 gives maxima of 40 ft (12.19 m) for "
+        "ductile and 20 ft (6.10 m) for nonductile pipe, from a sample specification "
+        "intended to be customised. BIMGUARD's value is approximately 6-12× tighter and "
+        "is a screening threshold, not a code requirement. Not applicable to ducts: E-74 "
+        "gives no duct brace spacing."
+    ),
+    "SB-001.04": (
+        "BIMGUARD SB-001 authored calibration. Authored conservative calibration. Upstream: "
+        "FEMA E-74 App. A §3.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft (12.19 m) "
+        "nonductile. Same screening rationale as the transverse value. Not applicable to ducts."
+    ),
+    "SB-001.05": (
+        "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
+        "brace angle for pipe or duct. Datum: degrees from horizontal."
+    ),
+}
+
+#: What SB-001 rows seeded before 2026-09-13 carry, and what replaces it. The
+#: descriptions attributed authored thresholds to EN 1998-1 / DIN 4149, which
+#: give no MEP brace spacing, and the angle range was the Hermes research
+#: summary's EN-only 35-70 degrees, not the 40-65 the configuration has always
+#: applied. A stored field is corrected only while it still holds exactly the
+#: old value, so a rule someone has since edited by hand is left as they left it.
+_SB001_SUPERSEDED = {
+    "SB-001.03": {
+        "description": (
+            "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
+            "Maximum transverse seismic brace spacing — 1.0 m, BIMGUARD SB-001 screening "
+            "calibration (authored, not a code value)",
+        ),
+    },
+    "SB-001.04": {
+        "description": (
+            "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
+            "Maximum longitudinal seismic brace spacing — 1.5 m, BIMGUARD SB-001 screening "
+            "calibration (authored, not a code value)",
+        ),
+    },
+    "SB-001.05": {
+        "description": (
+            "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
+            "Seismic brace installation angle — permissible range 40° to 65° from "
+            "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)",
+        ),
+        "value_min": (35.0, 40.0),
+        "value_max": (70.0, 65.0),
+    },
+}
+
+
+def _correct_superseded_seismic_rows(svc: RuleService) -> int:
+    """Correct SB-001 rows already stored with the pre-2026-09-13 content.
+
+    The insert pass skips any reference that exists, so without this a database
+    seeded before the correction would keep the old descriptions and angle range
+    indefinitely. Scoped to the SB-001 references in :data:`_SB001_SUPERSEDED`
+    and :data:`_SB001_SOURCE_TEXT`, and to fields still holding the exact old
+    value (or, for ``source_text``, still empty).
+
+    Returns:
+        The number of rows changed.
+    """
+    corrected = 0
+    for row in svc.rows_for_ruleset("BIMGUARD-SB-001"):
+        reference = str(row.get("reference") or "").strip()
+        if reference not in _SB001_SOURCE_TEXT:
+            continue
+        columns: dict[str, str] = {}
+        for field, (old, new) in _SB001_SUPERSEDED.get(reference, {}).items():
+            stored = row.get(field)
+            if field == "description":
+                if str(stored or "").strip() == old:
+                    columns[field] = new
+            elif RuleService._parse_numeric(_json_scalar(stored)) == old:
+                columns[field] = json.dumps(new)
+        if not str(row.get("source_text") or "").strip():
+            columns["source_text"] = _SB001_SOURCE_TEXT[reference]
+        if columns:
+            svc.patch_rule_columns(row["id"], columns)
+            corrected += 1
+            logger.info(
+                "Corrected superseded SB-001 rule reference=%s fields=%s",
+                reference,
+                sorted(columns),
+            )
+    return corrected
+
+
+def _json_scalar(stored) -> str:
+    """Unwrap a JSON-encoded scalar column (``'35.0'``, ``'"35.0"'``) to its text."""
+    if stored is None:
+        return ""
+    try:
+        decoded = json.loads(stored) if isinstance(stored, str) else stored
+    except ValueError:
+        return str(stored)
+    return "" if decoded is None else str(decoded)
+
+
 def seed_seismic_rules(svc: RuleService) -> int:
-    """Seed Blue Halo seismic bracing clearance rules (BIMGUARD-SB-001) per EN 1998-1 / DIN 4149."""
+    """Seed Blue Halo seismic bracing clearance rules (BIMGUARD-SB-001).
+
+    SB-001's thresholds are BIMGUARD screening calibration, not code values; each
+    row's ``source_text`` says so, citing FEMA E-74 where it bears on the value.
+    Rows seeded before that correction are brought up to date in place by
+    :func:`_correct_superseded_seismic_rows`.
+
+    Returns:
+        The number of rows inserted.
+    """
     rules_to_seed = [
         {
             "reference": "SB-001.01",
@@ -745,7 +872,7 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
+            "description": _SB001_SUPERSEDED["SB-001.03"]["description"][1],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "TransverseBraceSpacing",
             "operator": "<=",
@@ -760,7 +887,7 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
+            "description": _SB001_SUPERSEDED["SB-001.04"]["description"][1],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "LongitudinalBraceSpacing",
             "operator": "<=",
@@ -775,12 +902,12 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_range",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
+            "description": _SB001_SUPERSEDED["SB-001.05"]["description"][1],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "BraceAngle",
             "operator": "between",
-            "value_min": 35.0,
-            "value_max": 70.0,
+            "value_min": 40.0,
+            "value_max": 65.0,
             "unit": "deg",
             "ruleset_id": "BIMGUARD-SB-001",
             "mechanism": "SEISMIC",
@@ -792,8 +919,9 @@ def seed_seismic_rules(svc: RuleService) -> int:
     existing_refs = svc.all_references()
     for item in rules_to_seed:
         if item["reference"] not in existing_refs:
-            _create(svc, **item)
+            _create(svc, source_text=_SB001_SOURCE_TEXT[item["reference"]], **item)
             count += 1
+    _correct_superseded_seismic_rows(svc)
     return count
 
 

@@ -631,6 +631,20 @@ class RuleService:
             self._drop_folder_if_orphan(old_normalized)
         invalidate_cache("bimguard:rules")
 
+    def patch_rule_columns(self, rule_id: int, columns: dict[str, Any]) -> None:
+        """Overwrite the given columns of one rule and leave every other column as stored.
+
+        :meth:`update_rule` rebuilds the whole editable row from its form
+        defaults, so a caller changing one field resets others it never meant
+        to touch (offsets, ``needs_review``). A seed correction needs to change
+        a description or a bound and nothing else. Values are written as given:
+        JSON-encoded columns such as ``value_min`` must arrive already encoded.
+        """
+        if not columns:
+            return
+        self._rules.update(updates={**columns, "updated_at": now_iso_utc()}, pk_values=rule_id)
+        invalidate_cache("bimguard:rules")
+
     @staticmethod
     def _parse_numeric(value):
         """Convert a form string value to float, or None if blank/invalid."""
