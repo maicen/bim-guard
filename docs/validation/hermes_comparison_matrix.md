@@ -1,3 +1,18 @@
+> **⚠ AI-GENERATED — UNVERIFIED — DO NOT CITE.**
+>
+> This matrix was produced by "Hermes", an AI-assisted standards research pass, from
+> `docs/validation/data/hermes_standards_research_summary.json`. No value below
+> carries a quotation, a page reference or a verified clause, and none was checked
+> against the standards named. Known defects: the research cited EN 1998-1 and
+> DIN 4149 editions that do not exist; neither EN 1998-1 nor the German National
+> Annex gives MEP brace spacing, clearance, pipe thresholds or brace angles, so the
+> per-standard EU values are unsourced; no component importance factor of 1.6
+> exists; and the NFPA 13 and ASCE 7-22 columns have the same unverified shape.
+>
+> Retained as historical evidence of how SB-001's earlier configuration was
+> produced. The corrected ruleset is `data/rulesets/sb001_seismic_clearance.json`;
+> see `docs/planning/sb001_provenance_2026-09-13.md`.
+
 | Parameter               | EN 1998-1       | DIN 4149        | NFPA 13         | ASCE 7-22       |
 |-------------------------|----------------|-----------------|-----------------|-----------------|
 | **Restraint Spacing**   | 1.0 m (trans)  | 1.2 m (trans)   | 40 in (trans)   | 48 in (trans)   |

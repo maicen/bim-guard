@@ -42,7 +42,7 @@ utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
 ### Pipeline Components
 
 *   `app/engines/` — Core Python kernels for galvanic, crevice, and seismic clearance analysis.
-*   `data/rulesets/` — Static JSON configurations defining fallback rules for material mismatch (MM-001), cross-material (XM-001) interactions, and the EN 1998-1 / DIN 4149 seismic jurisdiction config.
+*   `data/rulesets/` — Static JSON configurations defining fallback rules for material mismatch (MM-001), cross-material (XM-001) interactions, and the SB-001 seismic clearance config (`sb001_seismic_clearance.json`: authored screening calibration with per-threshold provenance, not code values).
 *   `scripts/` — The AI data ingestion and Markdown compilation pipeline.
 *   `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
 
