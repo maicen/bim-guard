@@ -1,41 +1,219 @@
 {
   "metadata": {
     "ruleset_id": "BIMGUARD-SB-001",
-    "schema_version": "1.0.0",
-    "jurisdiction": "EN 1998-1:2020 + DIN 4149:2022",
+    "schema_version": "1.1.0",
+    "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds, not code values)",
     "region": "EU / Germany",
-    "created_by": "hermes_config_expanded.py",
+    "created_by": "hermes_config_expanded.py (v1.0.0); provenance re-labelled by hand 2026-09-13 (v1.1.0)",
     "standards_cited": [
-      "EN 1998-1",
-      "DIN 4149"
+      "FEMA E-74 (4th ed., December 2012)",
+      "ASCE/SEI 7-10 \u00a713.6"
+    ],
+    "governing_codes": [
+      {
+        "code": "EN 1998-1:2004+A1:2013",
+        "title": "Eurocode 8: Design of structures for earthquake resistance \u2013 Part 1",
+        "relevant_clause": "\u00a74.3.5 (non-structural elements)",
+        "note": "Provides the anchorage design framework for non-structural elements. Gives no brace spacing or clearance dimensions for MEP distribution systems. None of this config's thresholds come from it."
+      },
+      {
+        "code": "DIN EN 1998-1/NA:2018-10",
+        "title": "German National Annex to EN 1998-1 \u2013 nationally determined parameters",
+        "note": "Governs in Germany. Gives no MEP brace spacing or clearance dimensions. DIN 4149:2005-04 was withdrawn and replaced by DIN EN 1998-1:2010-12 with its National Annex; it is historical only."
+      },
+      {
+        "code": "FEMA E-74 (4th ed., December 2012)",
+        "title": "Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide",
+        "note": "Source of the dimensional logic where a threshold is marked sourced. A guide, not a code."
+      },
+      {
+        "code": "ASCE/SEI 7-10 \u00a713.6",
+        "title": "Minimum Design Loads for Buildings and Other Structures",
+        "note": "What FEMA E-74 defers to for the actual requirements. Cited as the upstream reference; not held."
+      }
     ],
     "data_gaps": [
-      "Combined config: spacing = min(EN 1998-1:2020=1.0/1.5m, DIN 4149:2022=1.2/1.8m) per axis \u2014 tighter (smaller) spacing governs \u2014 it requires more restraints, the conservative reading.",
-      "Combined config: base_from_structure_mm = max(EN 1998-1:2020=150.0mm, DIN 4149:2022=200.0mm) \u2014 larger clearance governs \u2014 it produces a halo big enough to satisfy both standards.",
-      "Combined config: pipe_diameter_mm = min(EN 1998-1:2020=63.0mm, DIN 4149:2022=75.0mm) \u2014 lower diameter threshold governs \u2014 it brings more pipes into scope for bracing.",
-      "thresholds.duct_area_sqm is not present in the source for either standard (no duct_threshold field found); left null pending standard-specific research.",
-      "Combined config: importance_factors = per-key max across EN 1998-1:2020 and DIN 4149:2022 \u2014 higher factor governs \u2014 it demands the greater restraint capacity.",
-      "Combined config: angle range = intersection of EN 1998-1:2020 (35.0-70.0 deg) and DIN 4149:2022 (40.0-65.0 deg) \u2014 intersection of both ranges governs \u2014 the band any brace satisfying both standards must fall in.",
-      "angle_constraints.ideal_degrees and tolerance_degrees are computed as the midpoint and half-range of the combined min/max above, not independently sourced values.",
-      "Source research summary gives one combined restraint_spacing and min_clearance per standard, not broken out per brace-hardware variant; all four brace_types variants below share the same combined spacing/clearance figures pending brace-specific research.",
-      "clearance_rules.seismic_zone_addition_mm and hospital_addition_mm are not present in the source for either standard; left at 0mm rather than guessed. Both standards scale required restraint capacity by Importance Factor, not clearance geometry directly, so 0mm additional clearance is the defensible reading absent clause text stating otherwise \u2014 verify against the full clause text before relying on this.",
-      "clearance_rules.adjacent_system_mm is not present in the source for either standard; left at 0mm pending standard-specific research.",
-      "seismic_parameters.hazard_factor_default is not present in the source for either standard; left null pending standard-specific research.",
-      "brace_types[*].base_footprint_mm values are generic bracing-hardware footprint placeholders (not sourced from either standard's clauses) and brace_types[*].standard_sizes are left empty pending a hardware catalog cross-reference.",
-      "standards_full_citations below are the section-reference citations from hermes_standards_research_summary.json (['EN 1998-1:2020 5.3.2.3', 'DIN 4149:2022-03 8.2.4']), not full bibliographic citations (author/title/publisher/location) \u2014 HERMES_CONTEXT.md's Priority 1/2 research pass should supply those."
+      "Thresholds marked status=authored in the provenance block are BIMGUARD screening calibration, not values stated by any standard held.",
+      "Brace spacing values describe piping; no source held gives a duct brace spacing.",
+      "seismic_parameters.hazard_factor_default is not set; left null.",
+      "brace_types[*].base_footprint_mm values are generic bracing-hardware footprint placeholders, not sourced; brace_types[*].standard_sizes are left empty pending a hardware catalogue cross-reference.",
+      "All four brace_types variants share the same spacing and clearance values; no source held distinguishes them.",
+      "At schema 1.1.0 no SB-001 code path reads seismic_parameters.importance_factors or thresholds.duct_area_sqm; both are recorded for provenance and future use."
     ],
-    "paywalled_sections": []
+    "paywalled_sections": [
+      "EN 1998-1:2004+A1:2013",
+      "DIN EN 1998-1/NA:2018-10",
+      "ASCE/SEI 7-10"
+    ],
+    "changelog": [
+      {
+        "version": "1.1.0",
+        "date": "2026-09-13",
+        "changes": [
+          "Removed fabricated standard editions. The EN 1998-1 and DIN 4149 editions previously cited do not exist; governing codes are now named as EN 1998-1:2004+A1:2013 (\u00a74.3.5) and DIN EN 1998-1/NA:2018-10, both recorded as giving no MEP dimensional rules, with DIN 4149:2005-04 recorded as withdrawn.",
+          "Removed the wrong EN 1998-1 clause reference; EN 1998-1 Chapter 5 covers concrete buildings, and non-structural elements are \u00a74.3.5.",
+          "Corrected seismic_parameters.importance_factors.hospital from 1.6 to 1.5 (FEMA E-74 \u00a75.3.1; ASCE/SEI 7-10 \u00a713.1.3). This alters verdicts wherever the hospital importance factor is consumed; at schema 1.1.0 no SB-001 code path reads it, so no current finding changes.",
+          "Set thresholds.duct_area_sqm from null to 0.557 (6 sq ft; FEMA E-74 \u00a76.4.6.1 and App. A \u00a73.9.E.1). At schema 1.1.0 no SB-001 code path reads it, so no current finding changes.",
+          "Re-labelled every other threshold as authored calibration or derived arithmetic, with per-threshold provenance. No other value changed.",
+          "Renamed the file to sb001_seismic_clearance.json."
+        ]
+      },
+      {
+        "version": "1.0.0",
+        "date": "2026-09-08",
+        "changes": [
+          "ruleset_id and schema_version added to the Hermes-generated config."
+        ]
+      }
+    ]
+  },
+  "provenance_summary": {
+    "sourced": 3,
+    "derived": 2,
+    "authored": 9,
+    "statement": "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 \u00a713.6 or EN 1998-1."
+  },
+  "provenance": {
+    "importance_factors.hospital": {
+      "value": 1.5,
+      "status": "sourced",
+      "source": {
+        "document": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012",
+        "section": "\u00a75.3.1",
+        "page": "5-8 to 5-9 (PDF pp. 84-85)",
+        "upstream": "ASCE/SEI 7-10 \u00a713.1.3 (not held)"
+      },
+      "note": "Ip = 1.5 for designated seismic systems, including critical nonstructural components in Risk Category IV buildings; 1.0 otherwise. Corrected from 1.6 on 2026-09-13: no Ip of 1.6 exists. The 1.6 in the earlier source is the coefficient in the force cap 1.6\u00b7S_DS\u00b7Ip\u00b7Wp (FEMA E-74 p.5-10), a different quantity."
+    },
+    "importance_factors.standard": {
+      "value": 1.0,
+      "status": "sourced",
+      "source": {
+        "document": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012",
+        "section": "\u00a75.3.1",
+        "page": "5-8 (PDF p.84)",
+        "upstream": "ASCE/SEI 7-10 \u00a713.1.3 (not held)"
+      },
+      "note": "Ip = 1.0 for components that are not designated seismic systems."
+    },
+    "thresholds.duct_area_sqm": {
+      "value": 0.557,
+      "status": "sourced",
+      "source": {
+        "document": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012",
+        "section": "\u00a76.4.6.1; Appendix A model specification \u00a73.9.E.1",
+        "page": "6-346 (PDF p.439); A-13 (PDF p.751)",
+        "upstream": "ASCE/SEI 7-10 \u00a713.6 (not held)"
+      },
+      "note": "E-74 exempts HVAC ducts with cross-sectional area under 6 sq ft (or weighing under 17 lb/ft) where impact is avoided or protected against; bracing is required above that or for ducts carrying hazardous materials. 6 sq ft = 0.557 m\u00b2: the metric conversion is BIMGUARD's, as E-74 is US customary throughout and gives no metric equivalent for this value. At schema 1.1.0 no SB-001 code path reads this value."
+    },
+    "brace_types.*.spacing_transverse_m": {
+      "value": 1.0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "upstream_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a73.9.D.6-7, pp. A-12 to A-13 (PDF pp. 750-751)"
+      },
+      "note": "Authored conservative calibration. Upstream reference: FEMA E-74 App. A \u00a73.9.D.6-7 gives maxima of 40 ft (12.19 m) for ductile and 20 ft (6.10 m) for nonductile pipe, from a sample specification intended to be customised. BIMGUARD's value is approximately 6-12\u00d7 tighter and is a screening threshold, not a code requirement. Not applicable to ducts: E-74 gives no duct brace spacing."
+    },
+    "brace_types.*.spacing_longitudinal_m": {
+      "value": 1.5,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "upstream_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a73.9.D.6, p. A-13 (PDF p.751)"
+      },
+      "note": "Authored conservative calibration. Upstream: FEMA E-74 App. A \u00a73.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft (12.19 m) nonductile. Same screening rationale as the transverse value. Not applicable to ducts."
+    },
+    "clearance_rules.base_from_structure_mm": {
+      "value": 200.0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a73.9.D.9, p. A-13 (PDF p.751)"
+      },
+      "note": "Authored. No source. Also the value of brace_types[*].clearance_mm, which the loader applies in preference. FEMA E-74 App. A \u00a73.9.D.9 gives a related rule, horizontal clearance of at least 2/3 the hanger length, but only for unbraced (exempt) piping. No braced-service clearance dimension exists in any source held."
+    },
+    "thresholds.pipe_diameter_mm": {
+      "value": 63.0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, \u00a76.4.3.1, p.6-238 (PDF p.331)",
+        "upstream": "ASCE/SEI 7-10 \u00a713.6 (not held)"
+      },
+      "note": "Within the ASCE 7-10 exemption band as reported by FEMA E-74 \u00a76.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) depending on seismic design category and occupancy. 63 mm \u2248 2.48 in falls inside that band. Not a stated standard value."
+    },
+    "angle_constraints.min_degrees": {
+      "value": 40.0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration"
+      },
+      "note": "Authored. No source. FEMA E-74 contains no brace angle for pipe or duct. Datum: degrees from horizontal."
+    },
+    "angle_constraints.max_degrees": {
+      "value": 65.0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration"
+      },
+      "note": "Authored. No source. FEMA E-74 contains no brace angle for pipe or duct. Datum: degrees from horizontal."
+    },
+    "angle_constraints.ideal_degrees": {
+      "value": 52.5,
+      "status": "derived",
+      "source": {
+        "document": "Arithmetic on angle_constraints.min_degrees and max_degrees"
+      },
+      "note": "Midpoint of 40-65 degrees. Not sourced."
+    },
+    "angle_constraints.tolerance_degrees": {
+      "value": 12.5,
+      "status": "derived",
+      "source": {
+        "document": "Arithmetic on angle_constraints.min_degrees and max_degrees"
+      },
+      "note": "Half-range of 40-65 degrees. Not sourced."
+    },
+    "clearance_rules.seismic_zone_addition_mm": {
+      "value": 0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a71.7.C-D, p. A-6 (PDF p.744)"
+      },
+      "note": "Authored, no source. E-74 gives relative-displacement design (0.02 \u00d7 storey height, App. A \u00a71.7.C) and seismic-joint crossings sized by structural analysis (\u00a71.7.D), neither of which adds clearance."
+    },
+    "clearance_rules.hospital_addition_mm": {
+      "value": 0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, \u00a75.3.1, p.5-9 (PDF p.85)"
+      },
+      "note": "Authored, no source. Hospitals attract stricter requirements (Ip 1.5, certification, post-event function), not larger clearances."
+    },
+    "clearance_rules.adjacent_system_mm": {
+      "value": 0,
+      "status": "authored",
+      "source": {
+        "document": "BIMGUARD SB-001 authored calibration",
+        "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, \u00a72.2.4, p.2-10 (PDF p.22); Appendix A \u00a71.8.D.2-3, p. A-8 (PDF p.746)"
+      },
+      "note": "Authored, no source. E-74 \u00a72.2.4 and App. A \u00a71.8.D.2-3 describe service-to-service interaction and require tolerance verification, but give no distance."
+    }
   },
   "seismic_parameters": {
     "hazard_factor_default": null,
     "importance_factors": {
-      "hospital": 1.6,
+      "hospital": 1.5,
       "standard": 1.0
     }
   },
   "thresholds": {
     "pipe_diameter_mm": 63.0,
-    "duct_area_sqm": null
+    "duct_area_sqm": 0.557
   },
   "brace_types": {
     "angle_fire": {
@@ -89,10 +267,13 @@
     "min_degrees": 40.0,
     "ideal_degrees": 52.5,
     "max_degrees": 65.0,
-    "tolerance_degrees": 12.5
+    "tolerance_degrees": 12.5,
+    "datum": "degrees_from_horizontal"
   },
   "standards_full_citations": [
-    "EN 1998-1:2020 5.3.2.3",
-    "DIN 4149:2022-03 8.2.4"
+    "FEMA (2012). Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, FEMA E-74, 4th ed. Federal Emergency Management Agency. December 2012.",
+    "ASCE (2010). Minimum Design Loads for Buildings and Other Structures, ASCE/SEI 7-10. American Society of Civil Engineers, Reston, Virginia. \u00a713.6 (not held; cited via FEMA E-74).",
+    "CEN. EN 1998-1:2004+A1:2013, Eurocode 8: Design of structures for earthquake resistance \u2013 Part 1: General rules, seismic actions and rules for buildings. \u00a74.3.5. Gives no MEP dimensional rules.",
+    "DIN. DIN EN 1998-1/NA:2018-10, National Annex \u2013 Nationally determined parameters for EN 1998-1. Gives no MEP dimensional rules."
   ]
 }
