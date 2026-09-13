@@ -191,6 +191,33 @@ def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
     return results
 
 
+def find_orphan_elements(graph: nx.DiGraph) -> list[dict[str, Any]]:
+    """Return graph nodes with no containment, connection, or material relationship.
+
+    Excludes spatial root types (``IfcProject``/``IfcSite``/``IfcBuilding``/
+    ``IfcBuildingStorey``/``IfcSpace``), which legitimately sit at the top of
+    the containment tree and can have zero inbound edges, and synthetic
+    ``IfcMaterial`` nodes, which are graph bookkeeping rather than model
+    elements. Used by ``GraphTopologyEngine`` (GRAPH-TOPOLOGY-001) to flag
+    elements disconnected from the rest of the model.
+    """
+    orphans: list[dict[str, Any]] = []
+    for node, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        if ifc_type in _SPATIAL_TYPES or ifc_type == "IfcMaterial":
+            continue
+        if graph.in_degree(node) + graph.out_degree(node) == 0:
+            orphans.append(
+                {
+                    "guid": node,
+                    "label": attrs.get("label", node),
+                    "ifc_type": ifc_type,
+                    "degree": 0,
+                }
+            )
+    return orphans
+
+
 def get_centrality_consequence_multiplier(
     guid: str,
     centralities: dict[str, dict[str, float]],
@@ -273,6 +300,7 @@ def ingest_ifc_to_graph(
     *,
     project_id: str | None = None,
     include_psets: bool = False,
+    graph: nx.DiGraph | None = None,
 ) -> dict[str, int]:
     """Extract IFC entities and relationships and ingest them in batch into GraphService.
 
@@ -281,19 +309,25 @@ def ingest_ifc_to_graph(
         graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
         project_id: Optional project identifier to associate with all ingested nodes.
         include_psets: Whether to flatten and attach property set values to element nodes.
+        graph: An already-built graph for ``model_or_path`` (from
+            ``build_ifc_graph``), reused instead of building a second one --
+            for a caller (e.g. the orchestrator's graph intelligence
+            side-channel) that already built the graph for its own summary or
+            engine pass over the same model.
 
     Returns:
         Dict with total counts of ingested nodes and relationships.
     """
-    if not _IFCOPENSHELL_AVAILABLE:
-        raise ImportError("ifcopenshell is not installed.")
+    if graph is None:
+        if not _IFCOPENSHELL_AVAILABLE:
+            raise ImportError("ifcopenshell is not installed.")
 
-    if isinstance(model_or_path, (str, Path)):
-        model = ifcopenshell.open(str(model_or_path))
-    else:
-        model = model_or_path
+        if isinstance(model_or_path, (str, Path)):
+            model = ifcopenshell.open(str(model_or_path))
+        else:
+            model = model_or_path
 
-    graph = build_ifc_graph(model)
+        graph = build_ifc_graph(model)
 
     # Group nodes by label (ifc_type)
     nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
