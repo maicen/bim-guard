@@ -34,8 +34,8 @@ distribution systems.** There is no EN-versus-DIN table of such values to compar
 
 BIMGUARD's seismic clearance check (SB-001) runs from one configuration file,
 `data/rulesets/sb001_seismic_clearance.json`. Earlier versions of that file and of
-this answer described it as a combined "EN 1998-1:2020 + DIN 4149:2022" profile
-with per-standard values. That was wrong: neither edition exists, and the
+this answer described it as a combined profile of an EN 1998-1 edition dated 2020
+and a DIN 4149 edition dated 2022, with per-standard values. That was wrong: neither edition exists, and the
 per-standard values attributed to them were not taken from either standard. The
 file was corrected on 2026-09-13 (schema 1.1.0); the full account is in
 `docs/planning/sb001_provenance_2026-09-13.md`.

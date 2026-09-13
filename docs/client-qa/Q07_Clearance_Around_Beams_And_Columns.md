@@ -14,8 +14,8 @@ service to a structural element. Be clear with your coordinator about what that
 number is: **BIMGUARD's authored screening value, not a dimension from any code.**
 
 Earlier versions of this answer attributed 200 mm to DIN 4149 and 150 mm to
-EN 1998-1. That was wrong. The editions cited ("EN 1998-1:2020", "DIN 4149:2022")
-do not exist, DIN 4149 is withdrawn, and neither EN 1998-1:2004+A1:2013 nor its
+EN 1998-1. That was wrong. The editions cited (EN 1998-1 dated 2020, DIN 4149
+dated 2022) do not exist, DIN 4149 is withdrawn, and neither EN 1998-1:2004+A1:2013 nor its
 German National Annex gives a clearance dimension for MEP services. The
 configuration was corrected on 2026-09-13 and now records the provenance of every
 threshold:

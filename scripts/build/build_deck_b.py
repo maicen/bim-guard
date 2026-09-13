@@ -9,7 +9,7 @@ def build():
 
     title_slide(p, "Blue Halo Clearance Algorithm",
         "Seismic Bracing Proactive Space Reservation",
-        "EN 1998-1  ·  DIN 4149  ·  ASCE 7-22  ·  NFPA 13  ·  SMACNA  ·  MSS SP-58",
+        "FEMA E-74  ·  ASCE/SEI 7-10 §13.6  ·  EN 1998-1 + DIN EN 1998-1/NA  ·  NFPA 13  ·  SMACNA",
         "BH-001  ·  LOD 300 → 350 space reservation  ·  Pluggable jurisdiction configs  ·  BCF 2.1 output")
 
     s = slide(p, "The problem in the design cycle", "Space for supports is designed after the space is gone", RED)
@@ -23,7 +23,7 @@ def build():
     formula(s, "halo_bbox  =  element_bbox  ⊕  effective_clearance",
             note="⊕ is a uniform expansion on every face. effective_clearance is read from the jurisdiction config, never from code.")
     formula(s, "effective_clearance  =  base_clearance  +  seismic_zone_addition  +  hospital_addition",
-            y=2.50, note="EN 1998-1:2020 + DIN 4149:2022 resolve to 200 mm base; ASCE 7-22 + NFPA 13 resolve to 457.2 mm (18 in).")
+            y=2.50, note="The shipped SB-001 config sets a 200 mm base: authored screening calibration, not a code value. No code or guide held gives a braced-service clearance.")
     note(s, "The implementation applies a uniform buffer because that is what the corpus can support. Angle-aware wedge envelopes for diagonal cable and rod bracing are deferred: the corpus carries no brace geometry to validate them against, and an unvalidated wedge would be a guess wearing a formula.", y=3.75)
 
     s = slide(p, "Four-phase architecture", "Each phase fails independently and reports why", BLUE)

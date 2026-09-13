@@ -49,8 +49,9 @@ explicit flag if a run was not genuine.
 ## Which Standards It Works From
 
 SB-001 runs from `data/rulesets/sb001_seismic_clearance.json`. Earlier versions
-described it as a combined "EN 1998-1:2020 + DIN 4149:2022" profile; neither
-edition exists, and the values were not taken from either standard. It was
+described it as a combined profile of an EN 1998-1 edition dated 2020 and a
+DIN 4149 edition dated 2022; neither edition exists, and the values were not
+taken from either standard. It was
 corrected on 2026-09-13 (schema 1.1.0), and every threshold now records its
 provenance:
 
