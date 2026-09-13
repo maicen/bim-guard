@@ -79,6 +79,14 @@ EXCLUDED_PATH_PATTERNS: list[str] = [
     "data/validation_*",
     "*.patch",
     "*.log",
+    # The Hermes AI research artifacts and the two retired generators that
+    # turned them into SB-001's fabricated configuration: the research brief
+    # (docs/HERMES_CONTEXT.md), the research summary and its merged config
+    # (docs/validation/data/hermes_*.json), the comparison matrix, and
+    # hermes_config_expanded.py. All are unverified and marked do-not-cite;
+    # feeding them to a notebook would present them as project knowledge.
+    "*hermes*",
+    "app/modules/blue_halo/generate_expanded_config.py",
 ]
 
 #: Maps a file suffix onto the language hint used for the Markdown fence.
@@ -141,11 +149,9 @@ ROUTING_RULES: list[tuple[str, str]] = [
     ("app/modules/phase_6/phase_6c_corrosion_ui.py", CORROSION),
 
     # -- 2. Explicit seismic paths -----------------------------------------
-    ("data/rulesets/config_*.json", SEISMIC),      # EN 1998-1 / DIN 4149 configs
-    ("app/modules/blue_halo/generate_expanded_config.py", SEISMIC),
+    ("data/rulesets/sb001_*.json", SEISMIC),       # SB-001 clearance config
     ("app/modules/phase_6/phase_6d_seismic.py", SEISMIC),
     ("app/modules/reporter/blue_halo_bcf_exporter.py", SEISMIC),
-    ("docs/HERMES_CONTEXT.md", SEISMIC),
 
     # -- 3. Corrosion keyword fallbacks ------------------------------------
     ("*galvanic*", CORROSION),
@@ -183,7 +189,6 @@ ROUTING_RULES: list[tuple[str, str]] = [
     ("*clearance*", SEISMIC),
     ("*clash*", SEISMIC),
     ("*halo*", SEISMIC),
-    ("*hermes*", SEISMIC),
     ("*sb_001*", SEISMIC),
     ("*sb-001*", SEISMIC),
     ("*sb001*", SEISMIC),
@@ -208,11 +213,12 @@ OUTPUTS: dict[str, dict[str, str]] = {
         "title": "BIMGUARD AI — Seismic Bracing & Clearance Corpus",
         "preamble": (
             "Seismic slice of the BIMGUARD AI OpenBIM compliance application: "
-            "the SB-001 (Blue Halo) bracing-clearance engine, generated "
-            "jurisdiction configs, halo volume generation and clash logic, "
-            "plus the shared platform architecture. Compiled for analysis "
-            "against seismic restraint codes (EN 1998-1, DIN 4149, ASCE 7-22, "
-            "NFPA 13, SMACNA, FEMA E-74)."
+            "the SB-001 (Blue Halo) bracing-clearance engine, its clearance "
+            "config (authored screening calibration with per-threshold "
+            "provenance), halo volume generation and clash logic, plus the "
+            "shared platform architecture. Compiled for analysis against "
+            "seismic restraint guidance (FEMA E-74, ASCE/SEI 7-10 §13.6, "
+            "EN 1998-1:2004+A1:2013 §4.3.5, NFPA 13, SMACNA)."
         ),
     },
     CORROSION: {
