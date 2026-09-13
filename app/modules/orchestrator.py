@@ -19,7 +19,10 @@ defaulting to a real instance when omitted so ``BIMGuard_App()`` still works
 standalone (tests, ad-hoc scripts) without reaching for the container.
 """
 
+from __future__ import annotations
+
 import time
+from typing import Any
 
 from app.logging_config import get_logger
 
@@ -61,6 +64,7 @@ class BIMGuard_App:
         include_type_definitions: bool = False,
         enable_shacl: bool = False,
         enable_arch_engines: bool = False,
+        enable_graph: bool = False,
     ) -> dict:
         """
         Run the full analysis pipeline for a project:
@@ -232,6 +236,12 @@ class BIMGuard_App:
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
+            # Opt-in graph intelligence side-channel (see enable_graph)
+            "graph_summary": (
+                BIMGuard_App._run_optional_graph_summary(ifc["m2_reader"])
+                if enable_graph and ifc.get("m2_reader")
+                else None
+            ),
         }
 
     @staticmethod
@@ -257,7 +267,7 @@ class BIMGuard_App:
             documents.append(
                 {
                     "filename": doc.get("filename", ""),
-                    "section_count": len([l for l in text.splitlines() if l.strip()]),
+                    "section_count": len([line for line in text.splitlines() if line.strip()]),
                 }
             )
         log_progress(10, "documents-loaded", loaded=len(documents), requested=len(doc_ids))
@@ -692,6 +702,23 @@ class BIMGuard_App:
             "shacl_issues": shacl_issues,
             "shacl_error": shacl_error,
         }
+
+    @staticmethod
+    def _run_optional_graph_summary(m2_reader: Any) -> dict[str, Any] | None:
+        """Opt-in graph intelligence summary extraction."""
+        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
+            return None
+        try:
+            from app.modules.ifc_reader.ifc_graph import (
+                build_ifc_graph,
+                build_ifc_graph_summary,
+            )
+
+            graph = build_ifc_graph(m2_reader.ifc_file)
+            return build_ifc_graph_summary(graph)
+        except Exception as exc:
+            logger.debug("Optional graph summary generation skipped: %s", exc)
+            return None
 
     @staticmethod
     def _run_arch_engine_compliance(

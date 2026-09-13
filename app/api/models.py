@@ -207,14 +207,21 @@ async def upload_models(
     file_roles = _roles_for(roles, len(names), primary_index)
     
     naming_config = naming_service.get_for_project(project_id)
-    convention = naming_service.resolve_convention(naming_config)
-    separator = str(naming_config.get("separator") or convention.get("separator") or "-")
+    is_configured = bool(naming_config and naming_config.get("is_configured"))
+    convention = naming_service.resolve_convention(naming_config) if is_configured else {}
+    separator = str(naming_config.get("separator") or convention.get("separator") or "-") if is_configured else "-"
     expected_project_code = project.get("project_code")
 
     parsed_files = []
     for name in names:
+        file_sep = separator
+        if not is_configured:
+            if name.count("-") >= 6 and name.count("_") < 6:
+                file_sep = "-"
+            elif name.count("_") >= 6 and name.count("-") < 6:
+                file_sep = "_"
         try:
-            parsed = validate_and_parse_filename(name, separator=separator, expected_project_code=expected_project_code)
+            parsed = validate_and_parse_filename(name, separator=file_sep, expected_project_code=expected_project_code)
             parsed_files.append(parsed)
         except ISO19650ValidationError as e:
             raise HTTPException(

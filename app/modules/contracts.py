@@ -71,6 +71,68 @@ class ReportPayloadContract(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Explainability Proof Graph & Graph Intelligence Contracts
+# ---------------------------------------------------------------------------
+
+ProofNodeType = Literal["asserted_fact", "rule_axiom", "inference_step", "verdict"]
+ProofEdgeType = Literal["satisfies", "violates", "infers", "applies"]
+
+
+class ProofNodeContract(BaseModel):
+    """A node in an explainable compliance proof DAG."""
+
+    id: str = Field(..., description="Unique node identifier in proof graph")
+    label: str = Field(..., description="Human-readable node description")
+    node_type: ProofNodeType = Field(..., description="Classification of proof node")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Supporting node properties/values"
+    )
+
+
+class ProofEdgeContract(BaseModel):
+    """A directed edge in an explainable compliance proof DAG."""
+
+    source: str = Field(..., description="Source node ID")
+    target: str = Field(..., description="Target node ID")
+    label: ProofEdgeType = Field("infers", description="Semantic relationship type")
+
+
+class IssueProofGraphContract(BaseModel):
+    """An explainable Directed Acyclic Graph proving why an issue was flagged."""
+
+    issue_id: str = Field(..., description="Unique issue identifier")
+    rule_id: str = Field(..., description="Target rule or check identifier")
+    element_id: str = Field(..., description="Target element GUID")
+    nodes: list[ProofNodeContract] = Field(default_factory=list, description="Proof DAG nodes")
+    edges: list[ProofEdgeContract] = Field(default_factory=list, description="Proof DAG edges")
+    explanation: str = Field(..., description="Concise textual derivation summary")
+
+
+class GraphStatusContract(BaseModel):
+    """Operational status and intelligence metrics for a project's graph."""
+
+    project_id: int = Field(..., description="Project database ID")
+    node_count: int = Field(0, description="Total nodes in relationship graph")
+    edge_count: int = Field(0, description="Total edges in relationship graph")
+    has_spatial_boundaries: bool = Field(False, description="Whether spatial boundaries are mapped")
+    is_geometric_fallback: bool = Field(False, description="Whether boundaries used geometric fallback")
+    centrality_summary: dict[str, Any] = Field(
+        default_factory=dict, description="Top centrality metrics and distribution"
+    )
+
+
+class GraphHealResponse(BaseModel):
+    """Response from reconciling and synthesizing missing spatial boundaries."""
+
+    project_id: int = Field(..., description="Project database ID")
+    healed_spaces: int = Field(0, description="Spaces with healed boundaries")
+    created_boundaries: int = Field(0, description="Synthesized boundary relationships")
+    total_boundaries: int = Field(0, description="Total boundaries in model post-heal")
+    status: str = Field("success", description="Status code (success, already_healed, no_op)")
+    message: str = Field(..., description="Human-readable operation summary")
+
+
+# ---------------------------------------------------------------------------
 # Project Contracts
 # ---------------------------------------------------------------------------
 

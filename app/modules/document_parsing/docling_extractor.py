@@ -277,12 +277,56 @@ class DoclingExtractor:
         if not xml_content or not xml_content.strip():
             return False
         import tempfile
+        import sys
         from pathlib import Path
         try:
             import doclang
-            with tempfile.NamedTemporaryFile(suffix=".xml", delete=False, mode="w", encoding="utf-8") as f:
+            import os
+            if sys.platform == "win32":
+                try:
+                    import doclang.backends.saxonche as sc
+                    if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
+                        def _patched_saxon_validate(self, xml_path, *, schema_path, allow_empty_namespace=False, verbose=False):
+                            from lxml import etree
+                            from saxonche import PySaxonProcessor
+                            from doclang.backends.saxonche import (
+                                _require_saxonche_backend,
+                                _parse_doclang_document,
+                                _ensure_namespace,
+                                _write_xml_without_dtd,
+                                _transpile_schematron_to_xslt,
+                                _svrl_failed_asserts_to_violations,
+                            )
+                            _require_saxonche_backend()
+                            with open(xml_path, "rb") as f:
+                                xml_doc = _parse_doclang_document(f)
+                            if allow_empty_namespace:
+                                xml_doc = _ensure_namespace(xml_doc)
+                            fd_saxon, tmp_saxon_path = tempfile.mkstemp(suffix=".xml")
+                            os.close(fd_saxon)
+                            with open(tmp_saxon_path, "wb") as tmp:
+                                _write_xml_without_dtd(xml_doc, tmp)
+                            try:
+                                with PySaxonProcessor(license=False) as proc:
+                                    xslt_proc = proc.new_xslt30_processor()
+                                    xslt_text = _transpile_schematron_to_xslt(schema_path, verbose=verbose)
+                                    xslt_executable = xslt_proc.compile_stylesheet(stylesheet_text=xslt_text)
+                                    result = xslt_executable.transform_to_string(source_file=tmp_saxon_path)
+                                    if not result:
+                                        return []
+                                    result_doc = etree.fromstring(result.encode("utf-8"))
+                                    return _svrl_failed_asserts_to_violations(result_doc)
+                            finally:
+                                Path(tmp_saxon_path).unlink(missing_ok=True)
+                        sc.SaxoncheValidator.validate = _patched_saxon_validate
+                        sc.SaxoncheValidator._win32_patched = True
+                except Exception:
+                    pass
+
+            fd, tmp_path = tempfile.mkstemp(suffix=".xml")
+            os.close(fd)
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(xml_content)
-                tmp_path = f.name
             try:
                 doclang.validate(tmp_path, allow_empty_namespace=True)
                 return True

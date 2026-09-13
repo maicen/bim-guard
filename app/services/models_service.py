@@ -310,7 +310,7 @@ class ModelsService:
             "file_path": file_path,
             "file_name": (file_name or "").strip() or Path(file_path.replace("\\", "/")).name,
             "is_primary": bool(is_primary),
-            "role": role_iso or (role or "").strip() or "context",
+            "role": (role or "").strip() or role_iso or "context",
             "uploaded_at": now_iso_utc(),
             "project_code": project_code or "",
             "originator": originator or "",

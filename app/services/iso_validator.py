@@ -7,6 +7,7 @@ from typing import Dict, Optional
 
 class ISO19650ValidationError(ValueError):
     """Exception raised for ISO 19650 naming convention violations."""
+
     pass
 
 
@@ -73,9 +74,9 @@ def validate_and_parse_filename(
     if not re.match(r"^[A-Za-z0-9]{2}$", level):
         raise ISO19650ValidationError(f"Level code '{level}' must be exactly 2 alphanumeric characters.")
 
-    # Field 5: Type (2 Alphabetic)
-    if not re.match(r"^[A-Za-z]{2}$", type_code):
-        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphabetic characters.")
+    # Field 5: Type (2 Alphanumeric, e.g. M3 for 3D model, DR, RP)
+    if not re.match(r"^[A-Za-z0-9]{2}$", type_code):
+        raise ISO19650ValidationError(f"Type code '{type_code}' must be exactly 2 alphanumeric characters.")
 
     # Field 6: Role/Discipline (1-2 Alphabetic)
     if not re.match(r"^[A-Za-z]{1,2}$", role):

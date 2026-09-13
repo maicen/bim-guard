@@ -71,6 +71,9 @@ from app.api import (
     settings as api_settings,
 )
 from app.api import (
+    graph_routes as api_graph,
+)
+from app.api import (
     sparql_routes as api_sparql,
 )
 from app.environment import load_env_file
@@ -328,6 +331,7 @@ app.include_router(
     tags=["LLM Providers"],
 )
 app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
+app.include_router(api_graph.router, prefix="/api", tags=["Graph & Spatial Intelligence"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 
 

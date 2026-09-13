@@ -150,10 +150,69 @@ def build_ifc_graph(model: Any) -> nx.DiGraph:
     return graph
 
 
+def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
+    """Compute closeness, degree, and betweenness centralities on an IFC relationship graph.
+
+    Inspired by TopologicPy network centrality analytics for BIM graphs:
+    identifies central structural conduits, key spatial hubs, and critical circulation nodes.
+    """
+    if len(graph) == 0:
+        return {}
+
+    # Convert to undirected graph for structural reachability
+    undirected = graph.to_undirected()
+
+    try:
+        closeness = nx.closeness_centrality(undirected)
+    except Exception:
+        closeness = {}
+
+    try:
+        degree = nx.degree_centrality(undirected)
+    except Exception:
+        degree = {}
+
+    # Betweenness is computationally heavier; cap at moderate sized graphs for interactive response
+    betweenness = {}
+    if len(graph) <= 1000:
+        try:
+            betweenness = nx.betweenness_centrality(undirected)
+        except Exception:
+            betweenness = {}
+
+    results: dict[str, dict[str, float]] = {}
+    for node in graph.nodes():
+        node_str = str(node)
+        results[node_str] = {
+            "closeness": round(float(closeness.get(node, 0.0)), 4),
+            "degree": round(float(degree.get(node, 0.0)), 4),
+            "betweenness": round(float(betweenness.get(node, 0.0)), 4) if betweenness else 0.0,
+        }
+    return results
+
+
+def get_centrality_consequence_multiplier(
+    guid: str,
+    centralities: dict[str, dict[str, float]],
+    base_multiplier: float = 1.0,
+    max_multiplier: float = 1.5,
+) -> float:
+    """Calculate a consequence multiplier (1.0 to 1.5x) based on element network centrality."""
+    metrics = centralities.get(guid)
+    if not metrics:
+        return base_multiplier
+
+    score = float(metrics.get("degree", 0.0))
+    boost = score * (max_multiplier - base_multiplier)
+    return round(base_multiplier + boost, 3)
+
+
 def build_ifc_graph_summary(
-    graph: nx.DiGraph, violations: list[dict[str, Any]] | None = None
+    graph: nx.DiGraph,
+    violations: list[dict[str, Any]] | None = None,
+    include_centrality: bool = True,
 ) -> dict[str, Any]:
-    """Generate structured summary metadata for an IFC relationship graph."""
+    """Generate structured summary metadata and centrality analytics for an IFC relationship graph."""
     violation_ids = {
         entry.get("element")
         for entry in (violations or [])
@@ -170,12 +229,41 @@ def build_ifc_graph_summary(
         ifc_type = attrs.get("ifc_type", "Unknown")
         type_counts[ifc_type] += 1
 
+    centrality_summary: dict[str, Any] = {}
+    top_central_elements: list[dict[str, Any]] = []
+
+    if include_centrality and len(graph) > 0:
+        centralities = compute_graph_centrality(graph)
+        sorted_nodes = sorted(
+            centralities.items(),
+            key=lambda item: max(item[1].get("degree", 0.0), item[1].get("closeness", 0.0)),
+            reverse=True,
+        )
+        for guid, metrics in sorted_nodes[:5]:
+            node_attrs = graph.nodes.get(guid, {})
+            top_central_elements.append(
+                {
+                    "guid": guid,
+                    "label": node_attrs.get("label", guid),
+                    "ifc_type": node_attrs.get("ifc_type", "Unknown"),
+                    "degree": metrics.get("degree", 0.0),
+                    "closeness": metrics.get("closeness", 0.0),
+                }
+            )
+        centrality_summary = {
+            "evaluated_nodes": len(centralities),
+            "max_degree": max((m.get("degree", 0.0) for m in centralities.values()), default=0.0),
+            "max_closeness": max((m.get("closeness", 0.0) for m in centralities.values()), default=0.0),
+        }
+
     return {
         "node_count": graph.number_of_nodes(),
         "edge_count": graph.number_of_edges(),
         "violation_count": len(violation_ids & set(graph.nodes())),
         "relationship_counts": dict(relationship_counts),
         "type_counts": dict(type_counts),
+        "centrality_summary": centrality_summary,
+        "top_central_elements": top_central_elements,
     }
 
 

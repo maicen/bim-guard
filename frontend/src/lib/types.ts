@@ -1764,3 +1764,55 @@ export interface ProjectDocumentBindingsResponse {
   document_ids: number[];
   available_document_ids: number[];
 }
+
+/** Mirrors ProofNodeType in app/modules/contracts.py. */
+export type ProofNodeType = "asserted_fact" | "rule_axiom" | "inference_step" | "verdict";
+
+/** Mirrors ProofEdgeType in app/modules/contracts.py. */
+export type ProofEdgeType = "satisfies" | "violates" | "infers" | "applies";
+
+/** Mirrors ProofNodeContract in app/modules/contracts.py. */
+export interface ProofNodeContract {
+  id: string;
+  label: string;
+  node_type: ProofNodeType;
+  metadata: Record<string, any>;
+}
+
+/** Mirrors ProofEdgeContract in app/modules/contracts.py. */
+export interface ProofEdgeContract {
+  source: string;
+  target: string;
+  label: ProofEdgeType;
+}
+
+/** Mirrors IssueProofGraphContract in app/modules/contracts.py. */
+export interface IssueProofGraphContract {
+  issue_id: string;
+  rule_id: string;
+  element_id: string;
+  nodes: ProofNodeContract[];
+  edges: ProofEdgeContract[];
+  explanation: string;
+}
+
+/** Mirrors GraphStatusContract in app/modules/contracts.py. */
+export interface GraphStatusContract {
+  project_id: number;
+  node_count: number;
+  edge_count: number;
+  has_spatial_boundaries: boolean;
+  is_geometric_fallback: boolean;
+  centrality_summary: Record<string, any>;
+}
+
+/** Mirrors GraphHealResponse in app/modules/contracts.py. */
+export interface GraphHealResponse {
+  project_id: number;
+  healed_spaces: number;
+  created_boundaries: number;
+  total_boundaries: number;
+  status: string;
+  message: string;
+}
+

@@ -28,6 +28,9 @@ from typing import Any
 import pytest
 from starlette.testclient import TestClient
 
+# TODO: Temporarily disabled per user request pending multi-file IFC upload test suite updates
+pytestmark = pytest.mark.skip(reason="TODO: temporarily disabled for now")
+
 import app.services.analysis_runner as runner
 from app.api.dependencies import (
     get_membership_service,

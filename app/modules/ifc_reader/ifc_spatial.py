@@ -14,6 +14,7 @@ Both return lists of result dicts compatible with the Module 4 report format.
 """
 
 import logging
+from typing import Any
 
 logger = logging.getLogger("bimguard.spatial")
 
@@ -116,13 +117,103 @@ def _is_exterior_door(element) -> bool | None:
     return None
 
 
-def _element_matches_location(element, location: str) -> bool:
-    """True if an element's IsExternal classification matches an
-    applies_when.location condition ("interior" or "exterior"). An element
-    with no verifiable IsExternal data (_is_exterior_door returns None) is
-    excluded — never guessed into either bucket.
+def classify_envelope_elements(ifc_file) -> dict[str, str]:
+    """Classify building elements into directional envelope face roles from 3D geometry.
+
+    Inspired by TopologicPy/IFC4-RV face decomposition:
+    - 'exterior_wall': External vertical faces bounding the building perimeter
+    - 'interior_wall': Internal vertical partitions
+    - 'roof': Topmost horizontal faces
+    - 'ground_slab': Bottommost horizontal ground/foundation slabs
+    - 'intermediate_slab': Intermediate floor slabs
     """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {}
+
+    try:
+        from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+        extractor = IFCGeometryExtractor(ifc_file)
+    except Exception:
+        return {}
+
+    # Collect elements
+    try:
+        walls = ifc_file.by_type("IfcWall") + ifc_file.by_type("IfcWallStandardCase")
+        slabs = ifc_file.by_type("IfcSlab")
+        roofs = ifc_file.by_type("IfcRoof") if hasattr(ifc_file, "by_type") else []
+        elements = walls + slabs + roofs
+    except Exception:
+        elements = []
+
+    if not elements:
+        return {}
+
+    bboxes: dict[str, tuple[Any, dict[str, float]]] = {}
+    for el in elements:
+        try:
+            bbox = extractor.get_bounding_box(el)
+            if bbox:
+                bboxes[getattr(el, "GlobalId", str(id(el)))] = (el, bbox)
+        except Exception:
+            continue
+
+    if not bboxes:
+        return {}
+
+    min_x = min(b["min_x"] for _, b in bboxes.values())
+    max_x = max(b["max_x"] for _, b in bboxes.values())
+    min_y = min(b["min_y"] for _, b in bboxes.values())
+    max_y = max(b["max_y"] for _, b in bboxes.values())
+    min_z = min(b["min_z"] for _, b in bboxes.values())
+    max_z = max(b["max_z"] for _, b in bboxes.values())
+
+    span_x = max(max_x - min_x, 1.0)
+    span_y = max(max_y - min_y, 1.0)
+    span_z = max(max_z - min_z, 1.0)
+
+    margin_xy = max(min(span_x, span_y) * 0.08, 300.0)
+    margin_z = max(span_z * 0.1, 400.0)
+
+    result: dict[str, str] = {}
+    for guid, (el, b) in bboxes.items():
+        is_wall = el.is_a() in ("IfcWall", "IfcWallStandardCase")
+        is_slab = el.is_a() in ("IfcSlab", "IfcRoof")
+
+        if is_wall:
+            touches_x = (b["min_x"] <= min_x + margin_xy) or (b["max_x"] >= max_x - margin_xy)
+            touches_y = (b["min_y"] <= min_y + margin_xy) or (b["max_y"] >= max_y - margin_xy)
+            result[guid] = "exterior_wall" if (touches_x or touches_y) else "interior_wall"
+        elif is_slab:
+            if b["max_z"] >= max_z - margin_z or el.is_a() == "IfcRoof":
+                result[guid] = "roof"
+            elif b["min_z"] <= min_z + margin_z:
+                result[guid] = "ground_slab"
+            else:
+                result[guid] = "intermediate_slab"
+
+    return result
+
+
+def is_exterior_element(element, ifc_file: Any = None) -> bool | None:
+    """Determine if an element is exterior, using Psets first, then geometric envelope fallback."""
     is_ext = _is_exterior_door(element)
+    if is_ext is not None:
+        return is_ext
+    if ifc_file is not None:
+        classification = classify_envelope_elements(ifc_file)
+        elem_role = classification.get(getattr(element, "GlobalId", None))
+        if elem_role in ("exterior_wall", "roof"):
+            return True
+        elif elem_role in ("interior_wall", "intermediate_slab"):
+            return False
+    return None
+
+
+def _element_matches_location(element, location: str, ifc_file: Any = None) -> bool:
+    """True if an element's IsExternal classification matches an
+    applies_when.location condition ("interior" or "exterior").
+    """
+    is_ext = is_exterior_element(element, ifc_file=ifc_file)
     if is_ext is None:
         return False
     return is_ext if location == "exterior" else not is_ext
@@ -131,21 +222,23 @@ def _element_matches_location(element, location: str) -> bool:
 # ── Core adjacency builder ────────────────────────────────────────────────────
 
 class IFCSpatialAdjacency:
-    """
-    Builds a spatial adjacency map from IfcRelSpaceBoundary relationships.
+    """Build a spatial adjacency map from IfcRelSpaceBoundary with geometric fallback.
 
     Attributes populated after build():
       _space_data  : {space_guid -> {space, boundaries: [{element, type, physical}]}}
       _wall_spaces : {wall_guid  -> [space_guid, ...]}   -- party wall detection
-      has_boundaries : bool  -- False if the file has no IfcRelSpaceBoundary data
+      has_boundaries : bool  -- True if space boundaries are mapped
+      is_geometric_fallback : bool -- True if populated via geometric proximity
     """
 
-    def __init__(self, ifc_file):
+    def __init__(self, ifc_file, fallback_to_geometric: bool = True):
         self.ifc_file = ifc_file
+        self.fallback_to_geometric = fallback_to_geometric
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
         self._door_to_spaces: dict[str, list[str]] | None = None
         self.has_boundaries = False
+        self.is_geometric_fallback = False
         self._built = False
 
     def build(self) -> "IFCSpatialAdjacency":
@@ -199,16 +292,123 @@ class IFCSpatialAdjacency:
                 continue
 
         self.has_boundaries = len(self._space_data) > 0
+
+        # Geometric fallback when IfcRelSpaceBoundary is absent or incomplete
+        if not self.has_boundaries and self.fallback_to_geometric:
+            self._build_geometric_fallback()
+
         self._built = True
 
         if not self.has_boundaries:
             logger.warning(
-                "No IfcRelSpaceBoundary data found. "
+                "No IfcRelSpaceBoundary data found and geometric fallback found no candidates. "
                 "Daylight and fire separation checks will be skipped. "
                 "Export your model with Space Boundaries enabled."
             )
 
         return self
+
+    def _build_geometric_fallback(self, tolerance_mm: float = 200.0) -> None:
+        """Derive spatial boundaries geometrically from bounding box contact."""
+        if not _IFC_AVAILABLE or self.ifc_file is None:
+            return
+
+        try:
+            spaces = self.ifc_file.by_type("IfcSpace")
+        except Exception:
+            spaces = []
+
+        if not spaces:
+            return
+
+        try:
+            from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+            extractor = IFCGeometryExtractor(self.ifc_file)
+        except Exception:
+            extractor = None
+
+        try:
+            walls = self.ifc_file.by_type("IfcWall") + self.ifc_file.by_type("IfcWallStandardCase")
+            doors = self.ifc_file.by_type("IfcDoor")
+            windows = self.ifc_file.by_type("IfcWindow")
+            slabs = self.ifc_file.by_type("IfcSlab")
+            candidates = walls + doors + windows + slabs
+        except Exception:
+            candidates = []
+
+        if not candidates:
+            return
+
+        # Cache bounding boxes
+        space_boxes: dict[str, tuple[Any, dict[str, float] | None]] = {}
+        for sp in spaces:
+            guid = getattr(sp, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(sp) if extractor else None
+            space_boxes[guid] = (sp, box)
+
+        cand_boxes: list[tuple[Any, str, str, dict[str, float] | None]] = []
+        for c in candidates:
+            guid = getattr(c, "GlobalId", None)
+            if not guid:
+                continue
+            box = extractor.get_bounding_box(c) if extractor else None
+            cand_boxes.append((c, guid, c.is_a(), box))
+
+        def _boxes_intersect(a: dict[str, float], b: dict[str, float], tol: float) -> bool:
+            return not (
+                a["max_x"] + tol < b["min_x"]
+                or a["min_x"] - tol > b["max_x"]
+                or a["max_y"] + tol < b["min_y"]
+                or a["min_y"] - tol > b["max_y"]
+                or a["max_z"] + tol < b["min_z"]
+                or a["min_z"] - tol > b["max_z"]
+            )
+
+        found_any = False
+        for s_guid, (sp, s_box) in space_boxes.items():
+            for c_elem, c_guid, c_type, c_box in cand_boxes:
+                is_contact = False
+                if s_box is not None and c_box is not None:
+                    is_contact = _boxes_intersect(s_box, c_box, tolerance_mm)
+                else:
+                    # Spatial container fallback: if element is contained in space's storey
+                    s_storey = getattr(sp, "Decomposes", None)
+                    c_storey = getattr(c_elem, "ContainedInStructure", None)
+                    if s_storey and c_storey and s_storey == c_storey:
+                        is_contact = True
+
+                if is_contact:
+                    if s_guid not in self._space_data:
+                        self._space_data[s_guid] = {
+                            "space": sp,
+                            "boundaries": [],
+                        }
+                    if any(b["element_guid"] == c_guid for b in self._space_data[s_guid]["boundaries"]):
+                        continue
+                    self._space_data[s_guid]["boundaries"].append(
+                        {
+                            "element": c_elem,
+                            "element_guid": c_guid,
+                            "element_type": c_type,
+                            "physical": True,
+                        }
+                    )
+                    if c_type in ("IfcWall", "IfcWallStandardCase"):
+                        if c_guid not in self._wall_spaces:
+                            self._wall_spaces[c_guid] = []
+                        if s_guid not in self._wall_spaces[c_guid]:
+                            self._wall_spaces[c_guid].append(s_guid)
+                    found_any = True
+
+        if found_any:
+            self.has_boundaries = True
+            self.is_geometric_fallback = True
+            logger.info(
+                "Populated %d space boundaries via 3D geometric contact fallback.",
+                len(self._space_data),
+            )
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
@@ -272,6 +472,89 @@ class IFCSpatialAdjacency:
             dguid: sorted(sguids) for dguid, sguids in mapping.items()
         }
         return self._door_to_spaces
+
+
+def heal_spatial_boundaries(ifc_file, tolerance_mm: float = 200.0) -> dict[str, Any]:
+    """Reconcile and synthesize missing IfcRelSpaceBoundary entities from geometric adjacency.
+
+    Inspired by TopologicPy's IFC healing workflow: detects spaces and bounding
+    elements (walls, slabs, doors, windows) that lack explicit boundary relationships
+    and generates IfcRelSpaceBoundary records directly in the IFC model memory.
+    """
+    if not _IFC_AVAILABLE or ifc_file is None:
+        return {
+            "healed_spaces": 0,
+            "created_boundaries": 0,
+            "total_boundaries": 0,
+            "status": "no_op",
+            "message": "IFC engine unavailable or empty model",
+        }
+
+    try:
+        existing_rels = ifc_file.by_type("IfcRelSpaceBoundary")
+    except Exception:
+        existing_rels = []
+
+    existing_pairs: set[tuple[str, str]] = set()
+    for r in existing_rels:
+        try:
+            sp = getattr(r, "RelatingSpace", None)
+            el = getattr(r, "RelatedBuildingElement", None)
+            if sp and el:
+                existing_pairs.add((sp.GlobalId, el.GlobalId))
+        except Exception:
+            continue
+
+    adj = IFCSpatialAdjacency(ifc_file, fallback_to_geometric=True).build()
+
+    created_count = 0
+    healed_spaces: set[str] = set()
+
+    for s_guid, s_info in adj._space_data.items():
+        space = s_info.get("space")
+        if not space:
+            continue
+        for b in s_info.get("boundaries", []):
+            elem = b.get("element")
+            if not elem:
+                continue
+            e_guid = b.get("element_guid")
+            if (s_guid, e_guid) not in existing_pairs:
+                try:
+                    import ifcopenshell.guid
+
+                    new_guid = ifcopenshell.guid.new()
+                    ifc_file.create_entity(
+                        "IfcRelSpaceBoundary",
+                        GlobalId=new_guid,
+                        RelatingSpace=space,
+                        RelatedBuildingElement=elem,
+                        PhysicalOrVirtualBoundary="PHYSICAL",
+                        InternalOrExternalBoundary="INTERNAL",
+                    )
+                    existing_pairs.add((s_guid, e_guid))
+                    created_count += 1
+                    healed_spaces.add(s_guid)
+                except Exception as exc:
+                    logger.debug(f"Failed to synthesize IfcRelSpaceBoundary: {exc}")
+                    continue
+
+    try:
+        total = len(ifc_file.by_type("IfcRelSpaceBoundary"))
+    except Exception:
+        total = created_count
+
+    return {
+        "healed_spaces": len(healed_spaces),
+        "created_boundaries": created_count,
+        "total_boundaries": total,
+        "status": "success" if created_count > 0 else "already_healed",
+        "message": (
+            f"Successfully synthesized {created_count} space boundaries across {len(healed_spaces)} spaces."
+            if created_count > 0
+            else "Model already contains full space boundary coverage."
+        ),
+    }
 
 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────

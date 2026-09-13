@@ -193,6 +193,145 @@ def summarise(issues: list[Issue]) -> dict[str, int]:
     return counts
 
 
+def build_issue_proof_graph(issue: Issue | dict[str, Any]) -> dict[str, Any]:
+    """Construct an explainable Directed Acyclic Graph proving why an issue was flagged.
+
+    Inspired by TopologicPy / Semantic Web explainability proof graphs:
+    Decomposes the finding into 4 explicit reasoning tiers:
+    1. Asserted Facts: Observable properties extracted from the BIM model.
+    2. Rule Axioms: Normative standards, building code requirements, and threshold limits.
+    3. Inference Steps: Logical evaluations connecting facts and axioms.
+    4. Verdict: Final compliance classification and risk band assignment.
+    """
+    data = to_dict(issue) if isinstance(issue, Issue) else dict(issue)
+
+    issue_id = str(data.get("id") or "ISSUE-UNKNOWN")
+    rule_id = str(data.get("rule_id") or "RULE-UNKNOWN")
+    element_id = str(data.get("element_id") or "ELEM-UNKNOWN")
+    title = str(data.get("title") or "Compliance Issue")
+    raw_band = data.get("band")
+    band = raw_band.value if hasattr(raw_band, "value") else str(raw_band or "medium")
+    score = float(data.get("score") or 0.0)
+    metadata = data.get("metadata") or {}
+    citations = data.get("citations") or []
+    mitigation = str(data.get("mitigation") or "")
+
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+    # 1. Asserted Fact Nodes
+    fact_elem_id = f"fact_elem_{element_id[:8]}"
+    nodes.append(
+        {
+            "id": fact_elem_id,
+            "label": f"Model Element: {element_id}",
+            "node_type": "asserted_fact",
+            "metadata": {"element_id": element_id},
+        }
+    )
+
+    fact_nodes: list[str] = [fact_elem_id]
+    for k, v in metadata.items():
+        if (
+            v is not None
+            and not isinstance(v, (dict, list))
+            and k not in ("guid", "element_id")
+        ):
+            f_id = f"fact_{k}"
+            nodes.append(
+                {
+                    "id": f_id,
+                    "label": f"Measured {k}: {v}",
+                    "node_type": "asserted_fact",
+                    "metadata": {k: v},
+                }
+            )
+            fact_nodes.append(f_id)
+
+    # 2. Rule Axiom Nodes
+    axiom_id = f"axiom_{rule_id}"
+    axiom_label = f"Rule Criterion: {rule_id}"
+    if citations:
+        c = citations[0]
+        std = c.get("standard")
+        cl = c.get("clause")
+        if std and cl:
+            axiom_label = f"Standard {std} §{cl}"
+        elif std:
+            axiom_label = f"Standard {std}"
+
+    nodes.append(
+        {
+            "id": axiom_id,
+            "label": axiom_label,
+            "node_type": "rule_axiom",
+            "metadata": {"rule_id": rule_id, "citations": citations},
+        }
+    )
+
+    # 3. Inference Step Node
+    inf_id = f"inf_{issue_id}"
+    inf_label = title if title else f"Violation of {rule_id}"
+    nodes.append(
+        {
+            "id": inf_id,
+            "label": f"Deduction: {inf_label}",
+            "node_type": "inference_step",
+            "metadata": {"score": score, "mitigation": mitigation},
+        }
+    )
+
+    for fn in fact_nodes:
+        edges.append(
+            {
+                "source": fn,
+                "target": inf_id,
+                "label": "applies",
+            }
+        )
+
+    edges.append(
+        {
+            "source": axiom_id,
+            "target": inf_id,
+            "label": "applies",
+        }
+    )
+
+    # 4. Verdict Node
+    verdict_id = f"verdict_{issue_id}"
+    nodes.append(
+        {
+            "id": verdict_id,
+            "label": f"Verdict: FAIL ({band.upper()}, Score: {score:.2f})",
+            "node_type": "verdict",
+            "metadata": {"band": band, "score": score},
+        }
+    )
+
+    edges.append(
+        {
+            "source": inf_id,
+            "target": verdict_id,
+            "label": "infers",
+        }
+    )
+
+    explanation = (
+        f"Element {element_id} was evaluated against {axiom_label}. "
+        f"Based on asserted model parameters, the check concluded: '{title}' with a risk score of {score:.2f} ({band})."
+    )
+
+    return {
+        "issue_id": issue_id,
+        "rule_id": rule_id,
+        "element_id": element_id,
+        "nodes": nodes,
+        "edges": edges,
+        "explanation": explanation,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Smoke test
 # ---------------------------------------------------------------------------
