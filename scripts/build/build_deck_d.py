@@ -97,15 +97,15 @@ def build():
     cards(s, [("The 16× gap",
         "35,609 elements carry material text the normaliser cannot map, so the engines still receive 'Unknown'. Reporting the 32.8% figure as coverage overstates usable data roughly sixteenfold. This distinction is the single easiest way to misread the corpus, and it is why every engine result is published beside its input coverage.", RED)], y=3.05, h=1.10)
 
-    s = slide(p, "Standards sensitivity", "Jurisdiction choice dominates the outcome", AMBER)
+    s = slide(p, "Standards sensitivity", "Clearance choice dominates the outcome", AMBER)
     table(s, ["Clearance", "Jurisdiction", "Clashes", "Critical", "Ratio"],
         [["25 mm", "—", "30,332", "148", "0.29×"],
          ["100 mm", "—", "69,307", "38", "0.67×"],
-         [("200 mm", NAVY, True), ("EN 1998-1 + DIN 4149", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
-         [("457.2 mm", RED, True), ("ASCE 7-22 + NFPA 13", RED, True), ("172,812", RED, True), ("16", RED, True), ("1.66×", RED, True)],
+         [("200 mm", NAVY, True), ("BIMGUARD SB-001 screening calibration (authored thresholds, not code values)", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
+         [("457.2 mm", RED, True), ("—", RED, True), ("172,812", RED, True), ("16", RED, True), ("1.66×", RED, True)],
          ["600 mm", "—", "212,870", "11", "2.04×"]],
         widths=[1.4, 3.2, 1.8, 1.4, 1.4], row_h=0.31)
-    note(s, "Moving from the European to the US standard produces 66% more clashes and 48% fewer Critical ones, because severity is an overlap ratio and a larger clearance inflates the denominator. Reproduced on two independent subsets.", y=3.45)
+    note(s, "Raising the clearance from the 200 mm row to the 457.2 mm row produces 66% more clashes and 48% fewer Critical ones, because severity is an overlap ratio and a larger clearance inflates the denominator. Reproduced on two independent subsets.", y=3.45)
 
     s = slide(p, "Test evidence", "What runs, and what the failures mean", GREEN)
     table(s, ["Suite", "Result", "Interpretation"],
