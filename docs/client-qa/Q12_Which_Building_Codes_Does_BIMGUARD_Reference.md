@@ -14,7 +14,16 @@ analysis domains, so take them separately.
 
 ### Piping corrosion — five engines, published materials standards
 
-| Standard | What it supplies | Engine |
+These standards govern the mechanisms each engine scores. They are not the source
+of the engines' numbers: every weighting, threshold and score in the five corrosion
+rulesets is a calibration authored for BIMGUARD, none of the documents below is
+held by the project, and no value has been verified against one. Two citations are
+suspect as recorded — ASTM G-187 is declared a soil-resistivity practice yet cited
+for MIC material susceptibility, and MC-001's "NACCE TPC 11" misspells the body,
+which is NACE (now AMPP). See
+`docs/planning/corrosion_provenance_2026-09-13.md`.
+
+| Standard | Mechanism it governs | Engine |
 | --- | --- | --- |
 | **NASA-STD-6012** | Galvanic voltage compatibility thresholds by environment class; the compatibility floor definition | GC-001, XM-001 |
 | **BS 8539** | Bi-metallic assemblies; dielectric separation practice | GC-001, XM-001 |
@@ -85,9 +94,13 @@ Rules are stored in a unified database table with typed fields and a JSON
 `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, `BIMGUARD-MC-001`, `BIMGUARD-MM-001`,
 `BIMGUARD-XM-001`, or a custom id for a project pack. Each engine's rule pack
 carries a `schema_version`, a `status`, and an `approval` block naming who signed
-it. Individual parameter entries in the corrosion packs carry their own `cite`
-(the source) and `conf` (confidence: `established` or `provisional`) fields, so
-the confidence grading is per-value rather than per-pack.
+it. In the MM-001 and XM-001 packs, individual parameter entries carry their own
+`cite` (the standard governing the mechanism) and `conf` (confidence:
+`established` or `provisional`) fields, so the confidence grading there is
+per-value rather than per-pack. GC-001, CC-001 and MC-001 carry no `conf` field.
+In all five corrosion rulesets the numbers are a calibration authored for the
+ruleset, not values quoted from the cited standards, and none of those documents
+is held (see `docs/planning/corrosion_provenance_2026-09-13.md`).
 
 Seeding is idempotent per rule rather than all-or-nothing, so a pack can be
 extended or resumed without duplicating what is already loaded, and engine
@@ -102,8 +115,10 @@ version should be archived together.
 1. **Read the citation on the finding.** Every finding carries `citations` — a
    standard, a clause, and the reason that clause applies. That is the claim.
 2. **Open the rule in the rules view** and read its `ref` field and its
-   `parameters`. For corrosion rules, read the `cite` and `conf` on the specific
-   parameter that drove the score, not just the pack-level reference.
+   `parameters`. For MM-001 and XM-001 rules, read the `cite` and `conf` on the
+   specific parameter that drove the score, not just the pack-level reference.
+   For any corrosion rule, treat the citation as the governing standard, not the
+   source of the number.
 3. **Check the `conf` grading.** A `provisional` value is one the authors have
    flagged as not fully established. Several MM-001 and XM-001 parameters are
    graded provisional deliberately, and the packs carry an

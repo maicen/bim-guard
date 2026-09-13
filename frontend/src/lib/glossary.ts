@@ -207,19 +207,22 @@ export const MECHANISMS: Record<string, GlossaryEntry> = {
     label: "Galvanic corrosion",
     description:
       "Scores dissimilar-metal couples from the driving voltage between them, the anode-to-cathode area ratio, and how aggressive the surrounding environment is.",
-    reference: "NASA-STD-6012 · IMOA Design Manual · ruleset BIMGUARD-GC-001",
+    reference:
+      "Governed by NASA-STD-6012 · IMOA Design Manual · ruleset BIMGUARD-GC-001 (thresholds authored, not quoted from these standards)",
   },
   "CC-001": {
     label: "Crevice corrosion",
     description:
       "Scores crevice risk where stagnant electrolyte collects, from the alloy's critical crevice temperature, the operating temperature, the environment and joint geometry. Today only the alloy is read from the model: every joint is scored as an unknown, tight gap, every pipe is assumed to run at 20 °C, and most spaces fall into one default environment class.",
-    reference: "EN ISO 15329 · ASTM G48-B · ruleset BIMGUARD-CC-001",
+    reference:
+      "Governed by EN ISO 15329 · ASTM G48-B · ruleset BIMGUARD-CC-001 (thresholds authored, not quoted from these standards)",
   },
   "MC-001": {
     label: "Microbially influenced corrosion",
     description:
       "Scores biofilm risk in water systems from flow velocity, operating temperature and dead-leg length — the same conditions that drive Legionella control.",
-    reference: "CIBSE TM13 · HSE HSG274 · ruleset BIMGUARD-MC-001",
+    reference:
+      "Governed by CIBSE TM13 · HSE HSG274 · ruleset BIMGUARD-MC-001 (thresholds authored, not quoted from these standards)",
   },
   "MM-001": {
     label: "Material–media compatibility",

@@ -118,8 +118,10 @@ deliberately because rules are live — edited rules take effect on the next run
 - **Diff before adopting.** Run V11 and V12 against the same model and compare
   the results. That difference is what changed in the standard, expressed as
   findings, and it is usually more informative than the operator's change log.
-- **Grade confidence.** The corrosion packs carry per-value `cite` and `conf`
-  fields distinguishing `established` from `provisional`. The same discipline
+- **Grade confidence.** The MM-001 and XM-001 corrosion packs carry per-value
+  `cite` and `conf` fields distinguishing `established` from `provisional`
+  (GC-001, CC-001 and MC-001 do not, and in all five the numbers are authored
+  calibration rather than quoted values). The same discipline
   applied to extracted rules — marking which have been reviewed against source
   and which have not — prevents an unreviewed extraction being read as settled.
 
