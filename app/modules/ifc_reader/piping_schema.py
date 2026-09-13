@@ -159,7 +159,7 @@ class PipingSystem(str, Enum):
 # crevice_corrosion_ruleset.json, with different numbering: here JT-003 is
 # threaded and JT-014 a dielectric union; there JT-003 is a slip-on flange and
 # JT-014 is Unknown. The codes do not correspond and must not be mapped by
-# number. See docs/defects/CC-001-joint-library-inert.md.
+# number. See docs/defects/CC-001-scoring-inputs-inert.md.
 
 
 class JointType(str, Enum):

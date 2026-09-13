@@ -46,11 +46,11 @@ Every result also shows its working: which rule was applied, which published eng
 
 **The everyday version.** Think of a tiny gap — under a washer, inside a threaded joint, between a flange and its gasket. Water gets into the gap and can't get out. The trapped water goes stale, turns slightly acidic, and starts attacking the metal from inside the gap where nobody can see it. Stainless steel, which people assume never rusts, is especially vulnerable to this — it's fine in open air and in flowing water, but it hates stagnant water in a tight gap.
 
-**What the check asks.** Two things. How tight is the gap? (An open, smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the water it's sitting in? Each grade of stainless steel has a published temperature above which crevice corrosion starts in salty water. The check compares that temperature against what the environment demands. A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
+**What the check asks.** Two things. How tight is the gap? (An open, smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the water it's sitting in? Each grade of stainless steel has a published temperature above which crevice corrosion starts in salty water. The check is designed to compare that temperature with the pipe's operating temperature and the environment. A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
 
-**What it needs from the model.** The joint type, the material grade, and the environment. Working out the joint type from the component does not work yet, so today every joint is treated as unknown and scored as a tight gap — the finding says "Unknown / unclassified". (Details: [CC-001 joint library defect](../defects/CC-001-joint-library-inert.md).)
+**What it needs from the model.** The joint type, the operating temperature, the material grade, and the environment. Today only the material grade is actually used: every joint is scored as unknown and tight (the finding says "Unknown / unclassified"), every pipe is assumed to run at 20 °C whatever the model says, and most rooms are scored as ordinary indoor building services. In practice the score depends almost entirely on which stainless grade is specified. (Details: [CC-001 scoring inputs defect](../defects/CC-001-scoring-inputs-inert.md).)
 
-**Example.** Standard stainless flanges in a pool plant room: **Critical** — the failure mode the galvanic check can't see at all, because there's no second metal involved. The same flanges in a dry ceiling void: **Low**.
+**Example.** Standard stainless flanges in a pool plant room: **Critical** — the failure mode the galvanic check can't see at all, because there's no second metal involved. The same flanges in a dry ceiling void should be **Low**; today they score High.
 
 ---
 

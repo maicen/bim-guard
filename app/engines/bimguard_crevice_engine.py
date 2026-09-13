@@ -135,7 +135,7 @@ def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
     loader stores each type's keywords under ``ifc_keywords`` but this function
     reads ``ifc_types``, and the pipeline passes a joint code such as
     ``"JT-012"`` rather than descriptive text. Every call therefore returns
-    JT-014 / Tight. See docs/defects/CC-001-joint-library-inert.md.
+    JT-014 / Tight. See docs/defects/CC-001-scoring-inputs-inert.md.
 
     Returns (joint_type_code, geometry_class, risk_score).
     """
@@ -240,7 +240,14 @@ ZONE_TO_SEVERITY = {
 
 
 def classify_environment_severity(zone_category: str, system_type: str = "") -> tuple[str, dict]:
-    """Map zone category and system type to environment severity class."""
+    """Map zone category and system type to environment severity class.
+
+    The pipeline passes the parser's environment code (``interior_conditioned``,
+    ``urban_exterior``, ``interior_dry`` ...) as ``zone_category``, which none of
+    the English phrases in ``ZONE_TO_SEVERITY`` match; only ``coastal``,
+    ``marine_splash``, ``swimming_pool`` or a matching system name leave
+    BUILDING_SERVICES. See docs/defects/CC-001-scoring-inputs-inert.md.
+    """
     text = (zone_category + " " + system_type).lower()
     for keyword, sev_key in ZONE_TO_SEVERITY.items():
         if keyword in text:
@@ -261,6 +268,12 @@ def calculate_cct_adequacy(
     Score = 1.00 if operating temp >= CCT (at immediate risk)
     Linear interpolation in between.
     Returns (score, explanation).
+
+    The analysis pipeline never supplies ``operating_temp_c``: ``_cc_element``
+    in ``phase_6c_corrosion_ui`` omits it, so ``CCElement``'s 20 °C default is
+    used for every element whatever temperature the model states, and this
+    score varies only with material grade. "Operating temp" in the notes below
+    means that default. See docs/defects/CC-001-scoring-inputs-inert.md.
     """
     if material_key is None:
         return 0.05, "Non-stainless material — CCT adequacy check not applicable (low base risk)"

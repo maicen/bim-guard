@@ -27,7 +27,10 @@ Five engines run. Three of them assess **individual elements**. **GC-001**
 by anode-to-cathode area ratio and electrolyte severity. **CC-001** (crevice)
 scores the geometry that traps stagnant electrolyte — flanges, gaskets, threaded
 joints, lap joints — against the critical crevice temperature of the alloy
-specified. **MC-001** (microbially influenced) scores flow velocity, operating
+specified. (In the current build CC-001 does not read the joint type, the
+operating temperature or most environment classes from the model, so its score
+varies mainly with the stainless grade; see the
+[defect record](../defects/CC-001-scoring-inputs-inert.md).) **MC-001** (microbially influenced) scores flow velocity, operating
 temperature, dead-leg length and material susceptibility against the Legionella
 and biofilm control regime in CIBSE TM13 and HSE HSG274. The other two assess
 the **network as a whole**. **MM-001** (material-media) scores how aggressively

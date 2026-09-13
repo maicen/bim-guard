@@ -168,7 +168,7 @@ BIM-Guard enforces strict Dependency Inversion across engines, repositories, and
 ### 6.2 Evaluator Scope Boundary: Custom Python vs. buildingSMART IDS
 - **Custom Python Evaluators**: Strictly limited to evaluations that declarative buildingSMART Information Delivery Specification (IDS) cannot express:
   - Multiphysics calculations (galvanic voltage gaps, anodic/cathodic area ratios, PREN adequacy).
-  - Joint crevice geometries and critical crevice temperatures (CCT).
+  - Joint crevice geometries and critical crevice temperatures (CCT). (CC-001 as implemented does not yet receive joint type, operating temperature or most environment classes from the pipeline; see [`defects/CC-001-scoring-inputs-inert.md`](defects/CC-001-scoring-inputs-inert.md).)
   - Microbiological growth kinetics, flow velocity classes, and topological dead-leg length-to-diameter ratios.
   - NetworkX topological space-connectivity graph traversal (habitable space to exterior exit shortest paths via `IfcRelSpaceBoundary`).
   - Spatial boundary daylight calculations (window glazing area vs. room floor area).

@@ -64,7 +64,7 @@ and the metadata distinguishes them.
 | Engine | Question it answers | Needs a second material? | Scope |
 | --- | --- | --- | --- |
 | GC-001 | Two metals in contact — which one sacrifices? | Yes | Element |
-| CC-001 | Does this geometry trap electrolyte above the alloy's CCT? | No | Element |
+| CC-001 | Does this geometry trap electrolyte above the alloy's CCT? (Today scored at a fixed joint class, a 20 °C default temperature and mostly one environment class — [defect record](../defects/CC-001-scoring-inputs-inert.md).) | No | Element |
 | MC-001 | Will biofilm establish here? | No | Element |
 | **MM-001** | **Is this material right for this fluid?** | **No** | **Network** |
 | XM-001 | Are dissimilar metals coupled across the network graph? | Yes | Network |

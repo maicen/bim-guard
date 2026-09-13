@@ -48,6 +48,12 @@ def build():
     note(s, "The single-element entry point pairs each element with itself, so no couple is ever formed. Recorded as a specification-against-implementation gap.", y=3.95, bold=True)
 
     s = slide(p, "Engine B — CC-001 crevice corrosion", "Geometry the galvanic check cannot see", BLUE)
+    # Annotation, deck not rebuilt: the formula below is the specification. In the
+    # current build the "CCT margin" term is always taken at the 20 °C default
+    # (_cc_element passes no operating temperature), geometry is always Tight and
+    # environment is almost always BUILDING_SERVICES, so only the material grade
+    # discriminates. On the next rebuild, say so on this slide. See
+    # docs/defects/CC-001-scoring-inputs-inert.md.
     formula(s, "Score  =  (0.35 × geometry)  +  (0.40 × CCT margin)  +  (0.25 × environment)", y=1.40, h=0.72)
     columns(s, [("Specified", "Crevice Corrosion Temperature table from SS304 to Titanium Gr 2; 14-type joint geometry library from butt weld to threaded connection — seeded but never executed: every joint scores JT-014 Unknown (Tight).", CYAN),
                 ("Implemented", "Executes on all 37 models and emits its own BCF topics, independent of GC-001.", GREEN),

@@ -541,7 +541,7 @@ def _seed_cc001(svc: RuleService) -> int:
 
     # ── Joint types (JT-001 … JT-014) ────────────────────────────────────────
     # Seeded, but not matched by the engine: every element scores JT-014.
-    # See docs/defects/CC-001-joint-library-inert.md.
+    # See docs/defects/CC-001-scoring-inputs-inert.md.
     for jt_code, jt in cc["joint_type_library"]["types"].items():
         _r(
             reference=f"CC-001.JT.{jt_code}",
