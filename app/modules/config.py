@@ -291,3 +291,12 @@ RULE_TYPE_REQUIRED_FIELDS = {
     "spatial_clearance": ["target", "property_name", "operator", "check_value"],
     "tiered": ["target", "desc"],
 }
+
+# ── Graph Database (Neo4j) ───────────────────────────────────────────────────
+# Optional graph database connection for GraphRAG and topological queries.
+# Connects to either hosted instances (AuraDB / remote) or Docker-launched instances.
+NEO4J_URI = os.environ.get("NEO4J_URI", "")
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "")
+NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
+

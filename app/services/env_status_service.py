@@ -57,6 +57,11 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     EnvVarSpec("DOCLING_SERVICE_URL", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_API_KEY", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_LOCAL_URL", "Document Parsing", "Seeds a self-hosted Docling parsing_engine_instances row on first boot."),
+    # ── Graph Database (Neo4j) ───────────────────────────────────────────────
+    EnvVarSpec("NEO4J_URI", "Graph Database", "Bolt or Neo4j URI for hosted or Docker-launched Neo4j instance."),
+    EnvVarSpec("NEO4J_USERNAME", "Graph Database", "Username for Neo4j basic auth (default: neo4j)."),
+    EnvVarSpec("NEO4J_PASSWORD", "Graph Database", "Password for Neo4j basic auth."),
+    EnvVarSpec("NEO4J_DATABASE", "Graph Database", "Neo4j target database name (default: neo4j)."),
     # ── Integrations ─────────────────────────────────────────────────────────
     EnvVarSpec("GOOGLE_DRIVE_API_KEY", "Integrations", "API-key-only access to public Google Drive file imports."),
     EnvVarSpec("GITHUB_TOKEN", "Integrations", "Token for GitHub repository sync/import."),

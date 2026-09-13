@@ -8,6 +8,7 @@ the codebase.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -45,6 +46,7 @@ from app.services.naming_config_service import (
 from app.services.naming_config_service import (
     NamingConfigService,
 )
+from app.services.neo4j_provider import Neo4jDatabaseProvider
 from app.services.object_storage import ObjectStorage
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.persistence import PersistenceService
@@ -639,12 +641,28 @@ def build_default_container() -> ApplicationContainer:
 
     digital_inspector_service = DigitalInspectorService()
     
-    try:
-        kuzu_provider = KuzuDatabaseProvider(db_path=".kuzu_db")
-        graph_service = GraphService(provider=kuzu_provider)
-    except Exception as e:
-        logger.warning(f"Could not initialize KuzuDatabaseProvider: {e}")
-        graph_service = GraphService()
+    neo4j_uri = os.environ.get("NEO4J_URI", "").strip()
+    graph_service = None
+    if neo4j_uri:
+        try:
+            neo4j_provider = Neo4jDatabaseProvider(
+                uri=neo4j_uri,
+                username=os.environ.get("NEO4J_USERNAME", "neo4j"),
+                password=os.environ.get("NEO4J_PASSWORD", None),
+                database=os.environ.get("NEO4J_DATABASE", "neo4j"),
+            )
+            graph_service = GraphService(provider=neo4j_provider)
+            logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)
+        except Exception as e:
+            logger.warning("Could not initialize Neo4jDatabaseProvider: %s", e)
+
+    if graph_service is None:
+        try:
+            kuzu_provider = KuzuDatabaseProvider(db_path=".kuzu_db")
+            graph_service = GraphService(provider=kuzu_provider)
+        except Exception as e:
+            logger.warning("Could not initialize KuzuDatabaseProvider: %s", e)
+            graph_service = GraphService()
 
     try:
         graph_triplestore_service = GraphTriplestoreService(store_path=".oxigraph_db")
@@ -673,6 +691,7 @@ def build_default_container() -> ApplicationContainer:
 
     # 6. Background Cache Pre-warming (MTR-03)
     import threading
+
     from app.services.bsdd_ontology_repository import get_bsdd_ontology_repository
 
     def _prewarm_bsdd_cache():

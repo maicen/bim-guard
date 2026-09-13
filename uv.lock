@@ -330,6 +330,7 @@ dependencies = [
     { name = "llama-index-core" },
     { name = "llama-index-llms-litellm" },
     { name = "matplotlib" },
+    { name = "neo4j" },
     { name = "networkx" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -347,7 +348,6 @@ dependencies = [
     { name = "reportlab" },
     { name = "scipy" },
     { name = "supabase" },
-    { name = "unstructured-client" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -365,6 +365,9 @@ ml-pipeline = [
 ]
 triplestore = [
     { name = "pyoxigraph" },
+]
+unstructured = [
+    { name = "unstructured-client" },
 ]
 
 [package.metadata]
@@ -387,6 +390,7 @@ requires-dist = [
     { name = "llama-index-core", specifier = ">=0.12.0" },
     { name = "llama-index-llms-litellm", specifier = ">=0.3.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
+    { name = "neo4j", specifier = ">=5.20.0" },
     { name = "networkx", specifier = ">=3.6.1" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -404,7 +408,6 @@ requires-dist = [
     { name = "reportlab", specifier = ">=5.0.0" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "supabase", specifier = ">=2.29.0" },
-    { name = "unstructured-client", specifier = ">=0.46.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
 ]
 
@@ -421,6 +424,7 @@ ml-pipeline = [
     { name = "spacy", specifier = ">=3.7.0" },
 ]
 triplestore = [{ name = "pyoxigraph", specifier = ">=0.4.0" }]
+unstructured = [{ name = "unstructured-client", specifier = ">=0.46.2" }]
 
 [[package]]
 name = "blinker"
@@ -2775,6 +2779,18 @@ wheels = [
 ]
 
 [[package]]
+name = "neo4j"
+version = "6.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/57/f939c3b9b28e5851095eafb823b5a996eea3f21a14be513bcf9b355f97da/neo4j-6.3.0.tar.gz", hash = "sha256:d0d3986c37ad174a549a39dfec6d22a00a061ebcb0267f1a5caf856589838e73", size = 242487, upload-time = "2026-08-28T10:25:04.743Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/47/d29d93455fe2959e5b8383e52f68b3633d729f39e87fef94743f9f2240ae/neo4j-6.3.0-py3-none-any.whl", hash = "sha256:d243f9c8adf882ae7205a76eb2419b0a632d5f3c89383d4a0044d737a2223991", size = 331471, upload-time = "2026-08-28T10:25:03.263Z" },
+]
+
+[[package]]
 name = "nest-asyncio"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3745,6 +3761,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
+]
+
+[[package]]
+name = "pytz"
+version = "2026.3.post1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/48/fb042503b6ca6cd271261dc559fd6432f7d8c713153e9ec5c591af4dfc1c/pytz-2026.3.post1.tar.gz", hash = "sha256:2211d3fcf9a797d3405cac96ac7f61d80e6a644f72a3309607282fe8a2010c5d", size = 319745, upload-time = "2026-07-25T15:12:07.385Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/7b/39c34ca613b0b198cb866466651b26b045e2009864c5183c979a3b83f383/pytz-2026.3.post1-py2.py3-none-any.whl", hash = "sha256:dd95840dd199baea12d9cc096a1d452caa6596a1c1e4b5f3dbd1541855d5e815", size = 508283, upload-time = "2026-07-25T15:12:05.782Z" },
 ]
 
 [[package]]

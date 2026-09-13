@@ -34,18 +34,6 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
 
-      # ── Document Parsing — Unstructured ──────────────────────────────────────
-      # Only consulted to seed the parsing_engine_instances registry on
-      # first boot (Settings > Parsing Engines is the source of truth afterwards).
-      - UNSTRUCTURED_API_KEY=${UNSTRUCTURED_API_KEY:-}
-      - UNSTRUCTURED_API_URL=${UNSTRUCTURED_API_URL:-}
-      - UNSTRUCTURED_STRATEGY=${UNSTRUCTURED_STRATEGY:-auto}
-      # Leave unset unless the `unstructured-api` service below is enabled
-      # (`docker compose --profile unstructured up -d`); then set this to
-      # http://unstructured-api:8000 — its internal compose network address,
-      # not the host-published UNSTRUCTURED_LOCAL_PORT — in your .env.
-      - UNSTRUCTURED_LOCAL_URL=${UNSTRUCTURED_LOCAL_URL:-}
-
       # ── Document Parsing — Docling ───────────────────────────────────────────
       # Hosted Docling Serve account (e.g. https://developer.dcls.saas.ibm.com).
       - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}
@@ -55,6 +43,16 @@ services:
       # http://docling-serve:5001 — its internal compose network address,
       # not the host-published DOCLING_LOCAL_PORT — in your .env.
       - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-}
+
+      # ── Graph Database — Neo4j (Optional) ──────────────────────────────────
+      # For a local Docker-launched instance (started via --profile neo4j):
+      #   NEO4J_URI=bolt://neo4j:7687
+      # For a hosted instance (e.g. Neo4j Aura):
+      #   NEO4J_URI=neo4j+s://<dbid>.databases.neo4j.io
+      - NEO4J_URI=${NEO4J_URI:-}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
 
       # ── Terminal Agent Configuration ────────────────────────────────────────
       - BIM_GUARD_AGENT_MODEL=${BIM_GUARD_AGENT_MODEL:-openrouter/auto}
@@ -87,31 +85,28 @@ services:
 
     restart: unless-stopped
 
-  # ── Optional: local self-hosted Unstructured parsing engine ─────────────────
-  # Open-source `unstructured-api` REST server (partition-only; distinct from
-  # the `unstructured-io/unstructured` offline library image documented at
-  # https://docs.unstructured.io/open-source/installation/docker-installation
-  # — this is the HTTP server product needed so bim-guard can call it as a
-  # parsing-engine instance: https://github.com/Unstructured-IO/unstructured-api).
+  # ── Optional: local self-hosted Neo4j graph database ────────────────────────
+  # Neo4j Community Edition (GraphRAG / topological queries).
   # Not started by default — bring it up explicitly with:
-  #   docker compose --profile unstructured up -d
-  # Then register it as a parsing engine instance in Settings > Parsing
-  # Engines (kind "local", API URL http://localhost:${UNSTRUCTURED_LOCAL_PORT:-8001}
-  # from the host, or http://unstructured-api:8000 from inside this compose
-  # network — e.g. set UNSTRUCTURED_LOCAL_URL above to that and restart
-  # bim-guard to have it seeded automatically on first boot).
-  unstructured-api:
-    image: quay.io/unstructured-io/unstructured-api:latest
-    container_name: bim-guard-unstructured
-    profiles: ["unstructured"]
+  #   docker compose --profile neo4j up -d
+  # Or connect to a hosted instance (e.g. Neo4j Aura) by setting NEO4J_URI
+  # to your remote cloud database.
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: bim-guard-neo4j
+    profiles: ["neo4j"]
     ports:
-      - "${UNSTRUCTURED_LOCAL_PORT:-8001}:8000"
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_AUTH:-neo4j/bimguardpassword}
+    volumes:
+      - bim-guard-neo4j-data:/data
     healthcheck:
-      # No curl in this image — use the Python that's already there.
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthcheck', timeout=5)\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
       start_period: 20s
     restart: unless-stopped
 
@@ -149,3 +144,6 @@ volumes:
     name: bim-guard-sessions
   bim-guard-logs:
     name: bim-guard-logs
+  bim-guard-neo4j-data:
+    name: bim-guard-neo4j-data
+

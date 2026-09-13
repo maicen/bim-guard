@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-import pyoxigraph
+try:
+    import pyoxigraph
+except ImportError:
+    pyoxigraph = None
+
 import rdflib
 
 from app.logging_config import get_logger
@@ -29,6 +32,10 @@ class GraphTriplestoreService:
                 the store is kept in-memory.
             max_in_memory_graphs: How many project graphs to keep if in-memory.
         """
+        if pyoxigraph is None:
+            raise ImportError(
+                "pyoxigraph is not installed. Please install it with `uv sync --group triplestore`."
+            )
         self.is_in_memory = not bool(store_path)
         self.max_in_memory_graphs = max_in_memory_graphs
         self._lru: list[int] = []
