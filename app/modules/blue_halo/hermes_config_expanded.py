@@ -1,6 +1,29 @@
 """
 app/modules/blue_halo/hermes_config_expanded.py
 
+========================================================================
+RETIRED 2026-09-13. HISTORICAL EVIDENCE ONLY. THIS MODULE REFUSES TO RUN.
+
+This generator produced fabricated standards content. It read an
+AI-generated research summary (docs/validation/data/
+hermes_standards_research_summary.json) that carries no quotations and no
+page references, and turned it into the shipped SB-001 configuration:
+  - standard editions that do not exist (EN 1998-1 dated 2020, DIN 4149
+    dated 2022-03) and an EN 1998-1 clause from the chapter on concrete
+    buildings;
+  - per-standard spacing, clearance, pipe-threshold and angle values that
+    neither EN 1998-1 nor the German National Annex states, merged by a
+    "governs" rule (GOVERNING_RULE_NOTES, merge_standards) as if they were;
+  - a hospital importance factor of 1.6, selected by the per-key maximum
+    rule. No component importance factor of 1.6 exists.
+
+Its ASCE 7-22 + NFPA 13 fallback pair reads entries of the same unverified
+shape. The file is kept, unmodified below this header, as a record of how
+the error was made. Do not revive it. The shipped SB-001 ruleset is
+data/rulesets/sb001_seismic_clearance.json, maintained by hand with
+per-threshold provenance; see docs/planning/sb001_provenance_2026-09-13.md.
+========================================================================
+
 Blue Halo — Phase 2 config generator: expands Hermes' raw standards
 research into a jurisdiction ClearanceConfig JSON file.
 
@@ -49,6 +72,15 @@ import math
 import re
 import sys
 from pathlib import Path
+
+RETIRED_MESSAGE = (
+    "hermes_config_expanded.py is retired (2026-09-13): it generated fabricated "
+    "standards content from an unverified AI research summary and is kept as "
+    "historical evidence only. The SB-001 ruleset is "
+    "data/rulesets/sb001_seismic_clearance.json; see "
+    "docs/planning/sb001_provenance_2026-09-13.md."
+)
+raise RuntimeError(RETIRED_MESSAGE)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOURCE_PATH = REPO_ROOT / "hermes_standards_research_summary.json"

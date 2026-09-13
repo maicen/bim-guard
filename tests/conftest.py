@@ -190,7 +190,16 @@ def reset_in_memory_cache():
 # the F-series (producer overload, issue adapter, band casing, MM/XM wiring).
 BASELINE_COMMIT = "4edba3a"
 
-KNOWN_IMPORT_FAILURES: dict[str, str] = {}
+KNOWN_IMPORT_FAILURES: dict[str, str] = {
+    "app.modules.blue_halo.hermes_config_expanded": (
+        "Retired 2026-09-13 and raises on import by design: it generated the fabricated "
+        "SB-001 standards content and is kept as historical evidence only."
+    ),
+    "app.modules.blue_halo.generate_expanded_config": (
+        "Retired 2026-09-13 and raises on import by design: it drove "
+        "hermes_config_expanded.py and is kept as historical evidence only."
+    ),
+}
 
 IMPORT_REGRESSIONS: dict[str, str] = {}
 
