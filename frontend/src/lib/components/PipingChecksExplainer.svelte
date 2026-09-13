@@ -185,9 +185,9 @@
           A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
         </p>
         <p>
-          <strong class="text-fg-primary">What it needs from the model.</strong> The joint type (which the check works
-          out from what kind of component it is — flange, threaded fitting, welded joint), the material grade, and the
-          environment.
+          <strong class="text-fg-primary">What it needs from the model.</strong> The joint type, the material grade, and
+          the environment. Working out the joint type from the component does not work yet, so today every joint is
+          treated as unknown and scored as a tight gap — the finding says "Unknown / unclassified".
         </p>
         <p>
           <strong class="text-fg-primary">Example.</strong> Standard stainless flanges in a pool plant room:

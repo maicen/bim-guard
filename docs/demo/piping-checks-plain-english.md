@@ -48,7 +48,7 @@ Every result also shows its working: which rule was applied, which published eng
 
 **What the check asks.** Two things. How tight is the gap? (An open, smooth joint is low risk; a tight threaded joint is high risk.) And is the metal tough enough for the water it's sitting in? Each grade of stainless steel has a published temperature above which crevice corrosion starts in salty water. The check compares that temperature against what the environment demands. A basic stainless grade in a swimming-pool plant room — warm, humid, chlorinated air — is a known disaster.
 
-**What it needs from the model.** The joint type (which the check works out from what kind of component it is — flange, threaded fitting, welded joint), the material grade, and the environment.
+**What it needs from the model.** The joint type, the material grade, and the environment. Working out the joint type from the component does not work yet, so today every joint is treated as unknown and scored as a tight gap — the finding says "Unknown / unclassified". (Details: [CC-001 joint library defect](../defects/CC-001-joint-library-inert.md).)
 
 **Example.** Standard stainless flanges in a pool plant room: **Critical** — the failure mode the galvanic check can't see at all, because there's no second metal involved. The same flanges in a dry ceiling void: **Low**.
 

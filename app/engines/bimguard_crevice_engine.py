@@ -129,7 +129,14 @@ JOINT_TYPES = _CC_CATALOG["joint_type_library"]["types"]
 
 def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
     """
-    Map a joint description string to a joint type and geometry class.
+    Intended to map a joint description string to a joint type and geometry class.
+
+    Known defect: the match never succeeds in the current build. The catalogue
+    loader stores each type's keywords under ``ifc_keywords`` but this function
+    reads ``ifc_types``, and the pipeline passes a joint code such as
+    ``"JT-012"`` rather than descriptive text. Every call therefore returns
+    JT-014 / Tight. See docs/defects/CC-001-joint-library-inert.md.
+
     Returns (joint_type_code, geometry_class, risk_score).
     """
     desc_lower = (joint_description or "").lower().strip()

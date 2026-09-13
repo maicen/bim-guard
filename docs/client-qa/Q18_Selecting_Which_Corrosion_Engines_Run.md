@@ -22,7 +22,7 @@ The five split into two kinds, and the selector labels them as such:
 | Engine | Kind | What it scores |
 | --- | --- | --- |
 | **GC-001 Galvanic** | Element | Dissimilar metals in contact, scored per element |
-| **CC-001 Crevice** | Element | Joint geometry and trapped electrolyte, per element |
+| **CC-001 Crevice** | Element | Crevice risk from alloy, environment and joint geometry, per element — joint type is not yet classified, so every joint scores as Unknown / Tight ([defect record](../defects/CC-001-joint-library-inert.md)) |
 | **MC-001 Microbiological** | Element | Flow, temperature and dead legs, per element |
 | **MM-001 Material-Media** | Network | The medium each pipe carries against its material, scored across the system |
 | **XM-001 Cross-Material** | Network | Dissimilar metals joined across the network — cannot be scored one element at a time |

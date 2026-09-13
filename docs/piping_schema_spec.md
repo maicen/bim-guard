@@ -115,7 +115,7 @@ Equipment subtypes (valve, pump, tank, etc) use `bbox` + `orientation_vector` + 
 
 ## Joints and connectivity
 
-`joint_type` identifies the joint at the element's connection (if the element is itself a joint, like a flange or union). Values match `JT-001` through `JT-014` in `crevice_corrosion_ruleset.json`. See that file for the geometry class (open / moderate / tight / critical) of each.
+`joint_type` identifies the joint at the element's connection (if the element is itself a joint, like a flange or union). Values come from the `JointType` enum, which is a **separate vocabulary** from the `JT-001` to `JT-014` joint library in `crevice_corrosion_ruleset.json`, with different numbering (here `JT-003` is threaded and `JT-014` a dielectric union; in the crevice library `JT-003` is a slip-on flange and `JT-014` is Unknown). The codes do not correspond and must not be mapped by number; neither carries the other's geometry class. See [the CC-001 joint library defect](defects/CC-001-joint-library-inert.md).
 
 `joined_to` is a list of GUIDs of directly-connected neighbouring elements. A pipe segment typically has two entries (upstream and downstream). A tee has three. A dead-end blind flange has one.
 

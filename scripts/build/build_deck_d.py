@@ -49,7 +49,7 @@ def build():
 
     s = slide(p, "Engine B — CC-001 crevice corrosion", "Geometry the galvanic check cannot see", BLUE)
     formula(s, "Score  =  (0.35 × geometry)  +  (0.40 × CCT margin)  +  (0.25 × environment)", y=1.40, h=0.72)
-    columns(s, [("Specified", "Crevice Corrosion Temperature table from SS304 to Titanium Gr 2; 14-type joint geometry library from butt weld to threaded connection.", CYAN),
+    columns(s, [("Specified", "Crevice Corrosion Temperature table from SS304 to Titanium Gr 2; 14-type joint geometry library from butt weld to threaded connection — seeded but never executed: every joint scores JT-014 Unknown (Tight).", CYAN),
                 ("Implemented", "Executes on all 37 models and emits its own BCF topics, independent of GC-001.", GREEN),
                 ("Measured", "116,006 of 116,006 flagged — 100%. Band floor is Medium; an absent material scores High.", RED)], y=2.35, h=1.45)
     note(s, "A 100% flag rate with 0% input coverage is the same fact twice: the coercer substitutes a default and the engine scores the default, uniformly.", y=3.95, bold=True)
