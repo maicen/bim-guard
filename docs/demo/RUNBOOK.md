@@ -2,7 +2,8 @@
 
 For the person driving the demo. Every command is PowerShell, run from the repo
 root unless a step says otherwise. Numbers quoted here were measured on
-2026-09-05/06 and are recorded in `docs/validation/final-audit-2026-09-06.md`.
+2026-09-05/06 and are recorded in `docs/validation/final-audit-2026-09-06.md`,
+except where a later measurement date is given next to them.
 
 ---
 
@@ -13,15 +14,24 @@ verified commit, so nothing merged this week can change what the audience sees.
 
 | | |
 | --- | --- |
-| Tag | `fmp-demo` |
-| Commit | `a55b70a` |
-| Worktree | `D:\Zigurat Masters\bim-guard-fmpdemo` |
-| Verified by | `docs/validation/final-verification-2026-09-09.md`, including the 2026-09-08 freeze spot-check |
+| Tag | `fmp-demo-hotfix-3d-deployed` |
+| Commit | `1450960` (`1450960ae4e2f32895352ef4f13fef1c4cd0c8aa`) |
+| Worktree | `D:\Zigurat Masters\bim-guard-fmpdemo`, detached at `1450960` |
+| Verified by | `docs/validation/final-verification-2026-09-09.md`, including the 2026-09-08 freeze spot-check, for the backend; the 2026-09-13 warm below re-verified the demo counts on `1450960` |
 
-The worktree was created with `git worktree add "D:\Zigurat Masters\bim-guard-fmpdemo" fmp-demo`,
-then `.env` and `frontend\.env` copied in, `uv sync`, `npm ci` and
-`npx vite build` run inside it. It already has its dependencies and its build.
-Nothing below needs repeating unless the worktree is deleted.
+**What `1450960` is.** The original freeze, tag `fmp-demo` at `a55b70a`, plus the
+four 3D-isolate hotfix commits — `d73f076`, `aafafa9`, `414d0b7`, `decb782` —
+and a Vite proxy change (`1450960` itself, which makes the proxy target and port
+configurable and defaults to 8000 and 5173). No `.py` file differs between
+`a55b70a` and `1450960`, so everything the backend computes, and every count in
+the walkthrough, is unchanged from the freeze; the difference is the 3D viewer
+and the dev proxy.
+
+The worktree was created with `git worktree add "D:\Zigurat Masters\bim-guard-fmpdemo" fmp-demo`
+(`a55b70a`), then `.env` and `frontend\.env` copied in, `uv sync`, `npm ci` and
+`npx vite build` run inside it, and has since been moved to `1450960` for the
+hotfix. It already has its dependencies and its build. Nothing below needs
+repeating unless the worktree is deleted.
 
 **Everything in this runbook runs from the worktree, not from the repo root** --
 with one exception, noted under Pre-warm.
@@ -34,9 +44,16 @@ commands verbatim; the working directory inside each is what makes
 than the reduced fallback table.
 
 ```powershell
-Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo'; `$env:BIMGUARD_CACHE_TTL_SECONDS='2592000'; `$env:BIMGUARD_CACHE_ENTRIES='128'; uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 *>&1 | Tee-Object -FilePath 'docs\validation\demo-backend.log'"
-Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo\frontend'; npx vite --port 5173"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo'; `$env:BIMGUARD_CACHE_TTL_SECONDS='2592000'; `$env:BIMGUARD_CACHE_ENTRIES='128'; uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 *>&1 | Tee-Object -FilePath 'docs\validation\demo-backend.log'"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo\frontend'; npm run dev"
 ```
+
+The directory, variables, host, port and frontend command match how the current
+servers were started by hand on 2026-09-13: backend from `D:\Zigurat Masters\bim-guard-fmpdemo` with
+`BIMGUARD_CACHE_TTL_SECONDS = "2592000"` and `BIMGUARD_CACHE_ENTRIES = "128"`,
+host `0.0.0.0`, port 8000; frontend `npm run dev` from `frontend\`, which on
+`1450960` serves on 5173 and proxies to 8000 unless `PORT` or
+`BIMGUARD_BACKEND_URL` say otherwise.
 
 **Why the two cache variables.** Left alone, `analysis_cache` keeps entries for
 24 hours (`BIMGUARD_CACHE_TTL_SECONDS`, default 86400) and holds only 64 of them
@@ -48,13 +65,27 @@ restart: the cache lives *inside* the uvicorn process, so a reboot, a crash or a
 deliberate restart empties it no matter how the variables are set. **Warm again
 after every restart.**
 
-PIDs from the 2026-09-10 restart: backend window **37452** (uvicorn worker
-**41008**), frontend window **36736** (vite **34392**). These are the processes
-holding the current warm cache — do not stop them. (Both earlier sets are gone
-along with their caches: 2026-09-09 backend window 54648 / worker 26168 and
-frontend window 74556 / vite 75828; 2026-09-08 backend window 33220 / worker
-29148 and frontend window 68816 / vite 45348.) Yours will differ after any
-restart; note them so you can stop the right windows afterwards.
+The servers holding the current warm cache, started 2026-09-13 from the
+`1450960` worktree — do not stop them:
+
+| Server | Port | PID | Process | Started |
+| --- | --- | --- | --- | --- |
+| Backend | 8000 | **56624** | python | 13/09/2026 15:52:43 |
+| Frontend | 5173 | **66180** | node | 13/09/2026 15:52:49 |
+
+Check they are alive, without sending a request to either port:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000,5173 -State Listen | Select-Object LocalPort,OwningProcess
+# expect 8000=56624, 5173=66180
+```
+
+**Killing PID 56624 destroys the cache.** (Earlier sets are gone along with
+their caches: 2026-09-10 backend window 37452 / uvicorn worker 41008 and
+frontend window 36736 / vite 34392; 2026-09-09 backend window 54648 / worker
+26168 and frontend window 74556 / vite 75828; 2026-09-08 backend window 33220 /
+worker 29148 and frontend window 68816 / vite 45348.) Yours will differ after
+any restart; note them so you can stop the right processes afterwards.
 
 Wait for `http://127.0.0.1:8000/api/health` to answer 200, then run the FALLBACK
 gate before anything else:
@@ -229,6 +260,40 @@ What to expect:
   back as hits in 3.3 min, every entry 2.8–4.3 s. Three cold runs now agree on
   the shape: 1917 under ten minutes, 1542 about a quarter of an hour, and 1540
   more than two hours on its own — budget two and a half hours for the lot.
+- Measured 2026-09-13 on the current servers (PIDs 56624 / 66180, build
+  `1450960`): **100.1 minutes** (6,004 s), 16:07:09 → 17:47:13, `Entries
+  verified 63/63; misses 0; warm errors 0`, 0 × 401, exit code 0. Three token
+  mints, all on the 40-minute timer, none 401-triggered. Cache TTL 30 days,
+  entry limit 128. **This was not a fully cold start**: 1917's five-engine entry
+  was already a cache HIT before the run began. The genuinely cold runs above
+  took 145.1 and 158.7 minutes — budget about **150 minutes** for a cold warm,
+  never 100.
+- Counts verified from that warm, each read back as a cache HIT:
+
+  | Project | Measured | Frozen | Cache HIT |
+  | --- | --- | --- | --- |
+  | 1917 five-engine | 1,988 (10 Critical / 168 High / 1,206 Medium / 322 Low / 282 data-quality) | 1,988 | 3.4–5.8 s |
+  | 1542 seismic | 2,937 (783 / 314 / 1,840) | 2,937 | 3.3–4.8 s |
+  | 1540 five-engine | 29,183, all data-quality | 29,181 ±2 | 3.3–3.4 s |
+
+  1540's 29,183 against the frozen 29,181 is the known ±2 run-to-run variation
+  (see Known limitations), not a regression.
+
+**The pre-warm script must be `main`'s.** The copy of `scripts/prewarm_demo.py`
+at `1450960` has no auth fix — on 2026-09-08 every warm request it made returned
+401 — so do not run it from the demo worktree. If you run `main`'s script from a
+copy outside the repo, note that it resolves `frontend\.env` from `parents[1]`,
+the directory *one level above the script's own folder*: the directory junction
+to the demo worktree's `frontend` folder must sit there, not beside the script.
+
+**Sleep prevention, applied for the 2026-09-13 warm and required for any warm.**
+On mains power throughout, and in addition to the per-thread hold below:
+
+```powershell
+powercfg /change standby-timeout-ac 0
+powercfg /change monitor-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
+```
 
 **Do not let the laptop sleep during the warm.** Windows Modern Standby drops
 the network, and a warm that loses it mid-run cannot re-mint its token and
@@ -292,16 +357,18 @@ Run this before every rehearsal and before the demo itself. It takes seconds
 and it is the difference between a cached page and a five-minute wait in front
 of the audience.
 
-1. **Confirm the uvicorn worker is still alive.** The warm cache lives inside
+1. **Confirm the backend process is still alive.** The warm cache lives inside
    that one process, so the PID is the cache.
 
    ```powershell
-   Get-Process -Id 41008 -ErrorAction SilentlyContinue
+   Get-NetTCPConnection -LocalPort 8000,5173 -State Listen | Select-Object LocalPort,OwningProcess
+   # expect 8000=56624, 5173=66180
    ```
 
-   41008 is the worker from the 2026-09-10 restart, recorded at the top of this
-   runbook — substitute the current one after any restart. **If it returns no
-   process the cache is cold and a re-warm is needed.** Budget **2.6 hours**,
+   56624 and 66180 are the servers started on 2026-09-13, recorded at the top of
+   this runbook — substitute the current ones after any restart. **If 8000 is not
+   listening, or is owned by a different PID, the cache is cold and a re-warm is
+   needed.** Budget **2.6 hours**,
    hold the machine awake with `SetThreadExecutionState` as documented under
    Pre-warm, and run from the repo root, not the worktree:
 
@@ -370,6 +437,38 @@ all.
 Open one finding's Details to show the citations and the provenance fields —
 `material_source`, `environment_source`, `ruleset_version` (e.g.
 `BIMGUARD-CC-001 v1.0.0`), and on GC-001 the `galvanic_couple` basis.
+
+### 1b. Open a finding in 3D (1917)
+
+Still on 1917's Piping results, click the blue **3D** button on a finding row.
+Use a **CRITICAL, HIGH or MEDIUM** row; do not promise the 3D selection on a
+DATA QUALITY row.
+
+**Then wait, and say so.** Expect roughly **20–25 seconds** on a warm page, and
+up to **45 seconds** on the first load after a restart. While it works, the
+viewer opens with the model; the element then turns red and **ISOLATE** becomes
+available. A pause with the model on screen is the viewer locating the finding,
+not a failure. Under the hood it asks for the project's latest BCF, which
+returns 404 after about 12 seconds, falls back to an export of about 7 seconds,
+then filters the archive to that element, selects it and fits the camera.
+**The second finding you click is faster than the first.** Click ISOLATE only
+once the element is red.
+
+Measured 13 September 2026 on project 1917, deep link `20KeDvTYrO59MhDS4MnkZ9`,
+fresh page load each time, mount to fit:
+
+| Build | Run | Mount → fit |
+| --- | --- | --- |
+| `decb782` | cold | 46.5 s |
+| `decb782` | warm | 22.9 s |
+| `15a72dd` | run 1 | 22.6 s |
+| `15a72dd` | run 2 | 19.4 s |
+
+The demo build is `1450960`, which carries the `decb782` hotfix. Earlier notes
+promising a much shorter wait were never reproduced under measurement; that
+figure most likely came from a stack where a persisted BCF already existed. A
+federated three-model project measured 58 s, 50.2 s of it model loading — a
+different path from this one, and not part of the demo.
 
 ### 2. Piping on a real model with no materials (1540)
 
@@ -525,8 +624,9 @@ State these plainly if asked; every one is measured, not estimated.
   `43780b5`.** It sent no `Authorization` header, and `47cf29b` made every
   `/api/analyze` route require one, so on 2026-09-08 all 63 warm requests
   returned `HTTP 401` and nothing was cached. It now mints and re-mints the dev
-  token itself. The fix is on `main`, not in the `fmp-demo` worktree, which is
-  why Pre-warm is the one step that runs from the repo root.
+  token itself. The fix is on `main`, not in the demo worktree at `1450960`,
+  whose script is still the unfixed one, which is why Pre-warm is the one step
+  that runs from the repo root.
 - **The Project Registry has a live per-row Delete with a weak confirmation.**
   On 2026-09-08 at 21:58 five projects were deleted by hand through the SPA
   (`DELETE /api/projects/{id}` → 204: 322, 1540, 1541, 1591, 1542), two of them
@@ -606,3 +706,11 @@ State these plainly if asked; every one is measured, not estimated.
   box and status-change comments are not generated.
 - **"Missing bearer token" appears when viewing an audit with no project
   selected** — select a project name from the dropdown to recover.
+- **Switching project inside the 3D viewer without a page reload returns
+  nothing the first time.** The first fetch still uses the previous project id;
+  a retry succeeds. This predates the 3D hotfix. **Reload the page when changing
+  project in the viewer.**
+- **Every CC-001 finding reads "Joint Unknown / unclassified … Tight geometry"
+  and states a 20 °C operating temperature.** That is a documented defect in
+  CC-001's scoring inputs, not a display fault — see
+  `docs/defects/CC-001-scoring-inputs-inert.md`.
