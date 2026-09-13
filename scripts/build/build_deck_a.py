@@ -137,7 +137,7 @@ def build():
 
     s = slide(p, "Academic contribution", "What this work adds", NAVY)
     columns(s, [("Method, not just result",
-        "A documented, reproducible method for interrogating electrochemical risk from IFC metadata alone, with every threshold traceable to a cited standard clause.", CYAN),
+        "A documented, reproducible method for interrogating electrochemical risk from IFC metadata alone, with every threshold tied to the standard governing its mechanism. The threshold values are authored calibration, not quoted from those standards.", CYAN),
         ("Quantified data gap",
          "The corpus measures how far real federated models fall short of what a corrosion assessment needs: 38,012 of 116,006 elements carry material text, and only 2,403 normalise to a scoreable key.", RED),
         ("White-box auditability",
@@ -161,8 +161,8 @@ def build():
         widths=[0.8, 4.2, 3.4, 1.1], row_h=0.32)
     note(s, "R3 is the highest-value item on the measured evidence: 35,609 elements carry material text the normaliser cannot map, so widening the rule table converts unusable text into scoreable input.", y=3.20, bold=True)
 
-    s = slide(p, "Standards compliance", "Every threshold traces to a cited source", NAVY)
-    table(s, ["Standard", "What it supplies", "Where it is applied"],
+    s = slide(p, "Standards compliance", "Standards governing each mechanism; the thresholds are authored calibration", NAVY)
+    table(s, ["Standard", "Mechanism it governs", "Where it is applied"],
         [["NASA-STD-6012", "Galvanic couple voltage thresholds", "Voltage risk term, band boundaries"],
          ["WorldStainless / Euro Inox", "Electrochemical series, corrosion data", "22-material potential table"],
          ["IMOA Design Manual", "PREN formula and grade selection", "PREN adequacy check"],
