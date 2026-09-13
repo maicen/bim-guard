@@ -87,6 +87,16 @@ EXCLUDED_PATH_PATTERNS: list[str] = [
     # feeding them to a notebook would present them as project knowledge.
     "*hermes*",
     "app/modules/blue_halo/generate_expanded_config.py",
+    # Dated evidence records that quote the SB-001 standard editions later
+    # found not to exist (EN 1998-1 dated 2020, DIN 4149 dated 2022-03). They
+    # stay in the repository as records of what the system said on the day; a
+    # notebook cannot tell a dated quotation from a current statement, so they
+    # are not fed to it. Other dated records (final-audit-2026-09-06.md,
+    # test-results.md, the engine-showcase runs) carry no edition string and
+    # stay routed for the measurements only they hold.
+    "docs/validation/final-godmode-audit-*",
+    "docs/validation/final-verification-*",
+    "docs/validation/seismic-and-coverage-*",
 ]
 
 #: Maps a file suffix onto the language hint used for the Markdown fence.
