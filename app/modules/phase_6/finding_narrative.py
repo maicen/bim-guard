@@ -232,10 +232,12 @@ def _describe_cc(issue, catalog, m: Mapping[str, Any]) -> str:
     cct = _num(m.get("cct_value_c"), "°C", places=1)
     temp = _num(m.get("operating_temp_c"), "°C", places=1)
     if cct and temp:
+        # _cc_element passes no temperature, so this is always CCElement's
+        # 20 °C default. See docs/defects/CC-001-scoring-inputs-inert.md.
         cct_txt = (
             f"{material or 'the specified grade'} has a critical crevice "
-            f"temperature of {cct} against an operating temperature of {temp} "
-            f"(ASTM G48 Method B)"
+            f"temperature of {cct}, assessed at the engine's default {temp}, not "
+            f"the element's stated temperature (ASTM G48 Method B)"
         )
     else:
         cct_txt = (
