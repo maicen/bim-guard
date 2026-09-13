@@ -25,7 +25,9 @@ elements, so the corrosion engines score them as if they were pipework.
 `IfcMember` and 2,211 `IfcPlate`, containing no pipes at all — produced **27,999
 findings** on the five-engine run, including 6,630 GC-001 verdicts scoring
 aluminium curtain-wall mullions against themselves (0 V self-couple) and 6,630
-CC-001 Mediums on an unclassified joint type. Separately, MM-001's only
+CC-001 Mediums on an unclassified joint type (that joint type is given to every
+CC-001 element, not only these — see
+[`docs/defects/CC-001-joint-library-inert.md`](../defects/CC-001-joint-library-inert.md)). Separately, MM-001's only
 real-model verdicts in the whole corpus are **10 fire-extinguisher cabinets** on
 `Clinic_Architectural.ifc`, scored against a `GalvanisedSteel` that was not read
 from the model at all but inferred from the system name — `material_source:
