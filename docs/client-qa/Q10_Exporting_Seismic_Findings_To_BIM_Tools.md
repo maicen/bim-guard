@@ -93,7 +93,10 @@ gate.
 Each BCF topic carries: the finding title and description including the mechanism
 and the clearance shortfall, the mapped priority, the topic status, a severity-
 derived due date, the viewpoint with camera position and element GUIDs, a
-snapshot image, and the EN 1998-1 / DIN 4149 citation in the description. The CSV
+snapshot image, and in the description a citation to FEMA E-74 and ASCE/SEI 7-10
+§13.6 naming the SB-001 screening calibration. The clearance applied is an authored
+screening value, not a code dimension — see the provenance blocks in
+`data/rulesets/sb001_seismic_clearance.json`. The CSV
 and JSON exports carry the same finding set — CSV with a fixed column order for
 tracking, JSON with full envelope geometry and aggregate `issue_stats`.
 

@@ -1,6 +1,24 @@
 """
 app/modules/blue_halo/generate_expanded_config.py
 
+========================================================================
+RETIRED 2026-09-13. HISTORICAL EVIDENCE ONLY. THIS MODULE REFUSES TO RUN.
+
+This driver generated fabricated standards content. It ran
+hermes_config_expanded.py (also retired) over an AI-generated research
+summary with no quotations and no page references, and wrote SB-001
+configurations citing EN 1998-1 and DIN 4149 editions that do not exist,
+per-standard values neither standard states, and a hospital importance
+factor of 1.6 that exists in no standard. Its ASCE 7-22 + NFPA 13 fallback
+would have written a second configuration from entries of the same
+unverified shape.
+
+The file is kept, unmodified below this header, as a record of how the
+error was made. Do not revive it. The shipped SB-001 ruleset is
+data/rulesets/sb001_seismic_clearance.json; see
+docs/planning/sb001_provenance_2026-09-13.md.
+========================================================================
+
 Blue Halo — Phase 2 prep: generate a clean, jurisdiction-pair-agnostic
 ClearanceConfig JSON from Hermes' raw standards research, with an
 EU -> US fallback.
@@ -29,6 +47,14 @@ import json
 import sys
 from pathlib import Path
 
+raise RuntimeError(
+    "generate_expanded_config.py is retired (2026-09-13): it generated fabricated "
+    "standards content from an unverified AI research summary and is kept as "
+    "historical evidence only. The SB-001 ruleset is "
+    "data/rulesets/sb001_seismic_clearance.json; see "
+    "docs/planning/sb001_provenance_2026-09-13.md."
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -43,8 +69,14 @@ from app.modules.blue_halo.hermes_config_expanded import (  # noqa: E402
 
 # (standard names, output filename) in fallback order — EU pair first
 # (Blue Halo's Priority 1 per HERMES_CONTEXT.md), US pair as fallback.
+#
+# The EU pair's output is NOT the shipped SB-001 config. The shipped file,
+# data/rulesets/sb001_seismic_clearance.json, was hand-curated on 2026-09-13 to
+# remove fabricated standard editions from the Hermes research summary and to
+# record per-threshold provenance; regenerating over it would reintroduce both.
+# The generator therefore writes to a separate, clearly-named file.
 CANDIDATE_PAIRS: tuple[tuple[tuple[str, str], str], ...] = (
-    (("EN 1998-1", "DIN 4149"), "config_en_1998_1_din_4149.json"),
+    (("EN 1998-1", "DIN 4149"), "hermes_regenerated_eu_pair_unverified.json"),
     (("ASCE 7-22", "NFPA 13"), "config_asce_7_22_nfpa_13.json"),
 )
 

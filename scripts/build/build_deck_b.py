@@ -1,15 +1,17 @@
 """Deck B — Blue Halo Clearance Algorithm (24 slides)."""
 try:
     from build_fmp_decks import *  # noqa: F403
+    from build_fmp_decks import _text
 except ImportError:
     from scripts.build.build_fmp_decks import *  # noqa: F403
+    from scripts.build.build_fmp_decks import _text
 
 def build():
     p = new_deck()
 
     title_slide(p, "Blue Halo Clearance Algorithm",
         "Seismic Bracing Proactive Space Reservation",
-        "EN 1998-1  ·  DIN 4149  ·  ASCE 7-22  ·  NFPA 13  ·  SMACNA  ·  MSS SP-58",
+        "FEMA E-74  ·  ASCE/SEI 7-10 §13.6  ·  EN 1998-1 + DIN EN 1998-1/NA  ·  NFPA 13  ·  SMACNA",
         "BH-001  ·  LOD 300 → 350 space reservation  ·  Pluggable jurisdiction configs  ·  BCF 2.1 output")
 
     s = slide(p, "The problem in the design cycle", "Space for supports is designed after the space is gone", RED)
@@ -23,8 +25,8 @@ def build():
     formula(s, "halo_bbox  =  element_bbox  ⊕  effective_clearance",
             note="⊕ is a uniform expansion on every face. effective_clearance is read from the jurisdiction config, never from code.")
     formula(s, "effective_clearance  =  base_clearance  +  seismic_zone_addition  +  hospital_addition",
-            y=2.50, note="EN 1998-1:2020 + DIN 4149:2022 resolve to 200 mm base; ASCE 7-22 + NFPA 13 resolve to 457.2 mm (18 in).")
-    note(s, "The implementation applies a uniform buffer because that is what the corpus can support. Angle-aware wedge envelopes for diagonal cable and rod bracing are deferred: the corpus carries no brace geometry to validate them against, and an unvalidated wedge would be a guess wearing a formula.", y=3.75)
+            y=2.80, note="The shipped SB-001 config sets a 200 mm base: authored screening calibration, not a code value. No code or guide held gives a braced-service clearance.")
+    note(s, "The implementation applies a uniform buffer because that is what the corpus can support. Angle-aware wedge envelopes for diagonal cable and rod bracing are deferred: the corpus carries no brace geometry to validate them against, and an unvalidated wedge would be a guess wearing a formula.", y=4.15)
 
     s = slide(p, "Four-phase architecture", "Each phase fails independently and reports why", BLUE)
     table(s, ["Phase", "Function", "Input", "Output"],
@@ -45,11 +47,11 @@ def build():
          "use-world-coords must be set, or every element returns in local coordinates near the origin and everything appears to clash. The iterator emits SI metres regardless of declared file units, so results scale by 1000.", NAVY)])
     note(s, "Verified against a fixture whose true extents are known exactly, so the unit handling is checked rather than assumed.", bold=True)
 
-    s = slide(p, "Phase 2 — halo generation", "Deterministic, and traceable to a clause", BLUE)
+    s = slide(p, "Phase 2 — halo generation", "Deterministic, and traceable to its config rule", BLUE)
     cards(s, [
         ("Read the rule, not a constant", "The brace variant selects a ClearanceRule from the loaded jurisdiction config. Base clearance, spacing and angle limits all come from the pack.", CYAN),
         ("Expand uniformly", "The element bounding box grows by the effective clearance on every face, producing an axis-aligned envelope in millimetres.", BLUE),
-        ("Record what produced it", "Each HaloVolume carries the rule variant, the clearance applied and the flags that modified it, so a volume can be traced back to the standard clause.", NAVY),
+        ("Record what produced it", "Each HaloVolume carries the rule variant, the clearance applied and the flags that modified it, so a volume can be traced back to the config rule and its provenance status.", NAVY),
         ("Immutable with respect to source", "The original element geometry is never mutated; the halo is a separate object keyed by GlobalId.", GREEN)], h=0.88, gap=0.12)
 
     s = slide(p, "Phase 3 — spatial indexing", "Why brute-force pairing does not finish", NAVY)
@@ -76,18 +78,19 @@ def build():
          ["Rod", "200 mm", "688,500,000", "1", "Marginal"],
          [("Cable", GREEN, True), ("200 mm", GREEN, True), ("688,500,000", GREEN, True), ("1", GREEN, True), ("Preferred on footprint", GREEN, True)]],
         widths=[2.6, 1.4, 2.4, 1.2, 2.2], row_h=0.32)
-    note(s, "All four variants share one clearance because the EN 1998-1 + DIN 4149 research does not differentiate clearance by brace hardware — a documented data gap in that config, not a property of the building. Where a jurisdiction does differentiate, the comparison separates and the smallest-footprint family wins.", y=3.20)
-    note(s, "This is the honest form of the comparison: the method distinguishes families; this jurisdiction's data does not yet let it.", y=4.35, bold=True)
+    note(s, "All four brace-type variants in the SB-001 config share one authored clearance; no source held distinguishes them. That is a gap in the config, not a property of the building. Where a config does differentiate, the comparison separates and the smallest-footprint family wins.", y=3.20)
+    note(s, "This is the honest form of the comparison: the method distinguishes families; the SB-001 config does not yet let it.", y=4.35, bold=True)
 
     s = slide(p, "Standards sensitivity — the counter-intuitive result", "Raising the clearance requirement raises findings and lowers severity", RED)
     table(s, ["Clearance", "Jurisdiction", "Clashes", "Critical", "vs 200 mm"],
         [["25 mm", "—", "30,332", "148", "0.29×"],
          ["100 mm", "—", "69,307", "38", "0.67×"],
-         [("200 mm", NAVY, True), ("EN 1998-1 + DIN 4149", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
-         [("457.2 mm", RED, True), ("ASCE 7-22 + NFPA 13", RED, True), ("172,812", RED, True), ("16", RED, True), ("1.66×", RED, True)],
+         [("200 mm", NAVY, True), ("SB-001 authored calibration¹", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
+         [("457.2 mm", RED, True), ("—", RED, True), ("172,812", RED, True), ("16", RED, True), ("1.66×", RED, True)],
          ["600 mm", "—", "212,870", "11", "2.04×"]],
         widths=[1.4, 3.2, 1.8, 1.4, 1.4], row_h=0.31)
-    note(s, "Adopting the US standard over the European yields 66% more clashes but 48% fewer Critical ones. Severity is an overlap ratio against halo volume, so a larger clearance inflates the denominator faster than the numerator.", y=3.45)
+    _text(s, 0.25, 3.23, 9.5, 0.20, "¹ BIMGUARD SB-001 screening calibration (authored thresholds, not code values)", size=9, colour=GREY)
+    note(s, "Raising the clearance from the 200 mm row to the 457.2 mm row yields 66% more clashes but 48% fewer Critical ones. Severity is an overlap ratio against halo volume, so a larger clearance inflates the denominator faster than the numerator.", y=3.45)
     note(s, "The finding is an argument that the severity heuristic needs rethinking, not retuning. It held on two independent model subsets, at 1.62× and 1.66×.", y=4.40, bold=True)
 
     s = slide(p, "Validation dataset", "What the algorithm was run against", BLUE)
@@ -128,7 +131,7 @@ def build():
         ("Axis-aligned boxes overstate intersection", "A clash is an AABB overlap. Diagonal and non-convex members are over-approximated, so counts are an upper bound, not a defect list.", AMBER),
         ("Uniform buffer, not a brace-shaped envelope", "Real sway braces are diagonal members with a base plate. The wedge envelope is deferred until brace geometry exists to validate against.", AMBER),
         ("Severity is a spatial heuristic", "Overlap fraction of halo volume, not a standards-derived threshold. Table B.6 shows its sensitivity to the clearance input.", RED),
-        ("One clearance regime per run", "The EN + DIN config assigns every brace variant the same clearance, so variant comparison is degenerate under that jurisdiction.", AMBER)], h=0.88, gap=0.12)
+        ("One clearance regime per run", "The SB-001 config assigns every brace variant the same authored clearance, so variant comparison is degenerate under it.", AMBER)], h=0.88, gap=0.12)
 
     s = slide(p, "Post-FMP roadmap", "R1 – R5, with the dependency each carries", BLUE)
     table(s, ["Ref", "Enhancement", "Dependency", "Target"],
@@ -142,24 +145,18 @@ def build():
 
     s = slide(p, "Standards compliance", "What each source supplies", NAVY)
     table(s, ["Standard", "Supplies", "Applied in"],
-        [["EN 1998-1:2004+A2:2011", "Seismic restraint of non-structural elements", "Clearance and spacing, EU config"],
-         ["DIN 4149:2005-04", "German regional seismic provisions", "Merged into the EU jurisdiction config"],
-         ["ASCE 7-22", "US seismic design provisions", "US fallback config, 457.2 mm"],
-         ["NFPA 13", "Sprinkler bracing and spacing", "US fallback config, fire systems"],
+        [["EN 1998-1:2004+A1:2013", "§4.3.5 (non-structural elements)", "Gives no MEP brace spacing or clearance"],
+         ["DIN EN 1998-1/NA:2018-10", "German NA; DIN 4149 withdrawn", "Gives no MEP brace spacing or clearance"],
+         ["FEMA E-74 (4th ed., December 2012)", "A guide, not a code", "Duct area threshold, importance factors"],
+         ["ASCE/SEI 7-10 §13.6", "What FEMA E-74 defers to", "Upstream reference; not held"],
          ["SMACNA / MSS SP-58", "Sway bracing and hanger support practice", "Brace family footprints"],
          ["ISO 16739-1 / BCF 2.1", "IFC schema and issue exchange", "Input parsing and topic output"]],
         widths=[2.9, 3.5, 3.1], row_h=0.30)
-    note(s, "Configs are generated from the research summary by script and carry their own data-gap list, so every value is either sourced or flagged as absent.", y=3.65)
+    note(s, "There is one SB-001 config, not a jurisdictional pair. Neither EN 1998-1 nor the German National Annex dimensions MEP bracing; DIN 4149:2005-04 was withdrawn and replaced by DIN EN 1998-1:2010-12 with its National Annex; it is historical only.", y=3.65)
 
     s = slide(p, "Jurisdiction as data, not as code", "How a new standard enters the system", GREEN)
-    table(s, ["Config field", "EN 1998-1 + DIN 4149", "ASCE 7-22 + NFPA 13", "Resolution rule"],
-        [["base_from_structure_mm", "200.0", "457.2", "Larger clearance governs"],
-         ["spacing_transverse_m", "1.0", "1.016", "Tighter spacing governs"],
-         ["pipe_diameter_mm", "63.0", "63.5", "Lower threshold governs"],
-         ["angle range (deg)", "40 – 65", "30 – 60", "Intersection of both ranges"],
-         ["hospital_addition_mm", ("0 — data gap", RED, False), ("0 — data gap", RED, False), "Absent from source research"]],
-        widths=[2.6, 2.4, 2.3, 2.2], row_h=0.31)
-    note(s, "Configs are generated from the standards research by script, never hand-edited. Each carries its own data-gap list, so a value that the source did not supply is flagged rather than invented — the hospital clearance addition above is recorded as absent rather than guessed.", y=3.30)
+    note(s, "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 §13.6 or EN 1998-1.", y=1.40)
+    note(s, "Every threshold carries a provenance block with a status: 3 sourced, 2 derived, 9 authored. FEMA E-74 (4th ed., December 2012) evidences the duct area threshold and the importance factors, and gives upstream brace spacing maxima that the authored calibration is deliberately tighter than. The remaining thresholds are authored, with no source held.", y=2.30)
     note(s, "Adding a jurisdiction is a data change with a provenance record, not a code change.", y=4.35, bold=True)
 
     s = slide(p, "Integration into the compliance pipeline", "Where Blue Halo sits", BLUE)
@@ -195,13 +192,13 @@ def build():
                 ("0.00% / 0.11%", "schema twin\ndeltas", BLUE),
                 ("223,516", "clashes detected\nand exported", NAVY)])
     cards(s, [("What the evidence supports",
-        "Halo generation and clash detection are deterministic, schema-independent and scale to the largest models in the corpus. What the corpus cannot yet support is brace-family differentiation, because the jurisdiction data does not distinguish clearance by hardware. The method is validated; that particular comparison is not.", CYAN)], y=3.05, h=1.10)
+        "Halo generation and clash detection are deterministic, schema-independent and scale to the largest models in the corpus. What the corpus cannot yet support is brace-family differentiation, because the SB-001 config does not distinguish clearance by hardware. The method is validated; that particular comparison is not.", CYAN)], y=3.05, h=1.10)
 
     s = slide(p, "Key findings", "What the corpus established", BLUE)
     cards(s, [
         ("Geometry is not the obstacle", "100% resolution across both IFC schemas and three authoring toolchains, using the full geometry iterator rather than a vertex shortcut.", GREEN),
         ("The result is schema-independent", "Same-building twins in IFC2x3 and IFC4 produced identical and near-identical clash counts — 0.00% and 0.11% apart.", CYAN),
-        ("Clearance choice dominates the outcome", "A 2× clearance change moves total clashes by 2× and Critical count in the opposite direction. Jurisdiction selection is the most consequential input.", RED),
+        ("Clearance choice dominates the outcome", "A 2× clearance change moves total clashes by 2× and Critical count in the opposite direction. The clearance value is the most consequential input.", RED),
         ("Severity needs a standards basis", "Overlap ratio is defensible as triage and indefensible as a verdict. R4 addresses it.", AMBER)], h=0.88, gap=0.12)
 
     closing(p, "Blue Halo Clearance Algorithm", "Questions?")

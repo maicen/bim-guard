@@ -9,140 +9,107 @@
 
 ## The Answer
 
-They are related but not interchangeable, and the distinction is the ordinary
-Eurocode/national relationship rather than a conflict. **EN 1998-1** is Eurocode
-8 Part 1 — the pan-European standard for the design of structures for earthquake
-resistance, applicable across the EU and EFTA and adopted with a National Annex
-in each member state. **DIN 4149** is the German standard for buildings in
-German earthquake zones. Historically it was the German national code that
-predated Eurocode adoption; in current practice it functions alongside the German
-National Annex to EN 1998-1, and German projects routinely reference both. For
-your Cologne project — which sits in one of Germany's more significant seismic
-zones, in the Lower Rhine Basin — both are live references, and your German
-partner is not wrong to name DIN 4149.
+They are not two live codes to choose between. **DIN 4149:2005-04** was the German
+standard for buildings in German earthquake zones. It has been **withdrawn** and
+replaced by **DIN EN 1998-1:2010-12** (the German adoption of Eurocode 8 Part 1)
+together with its National Annex, **DIN EN 1998-1/NA:2011-01**, updated as
+**DIN EN 1998-1/NA:2018-10**. DIN 4149 is therefore historical only; a partner
+naming it is usually referring to the German seismic zoning and detailing
+tradition it carried, which now lives in the National Annex.
 
-Where they differ for the purposes of non-structural MEP restraint, the
-differences are real but modest, and they run in a consistent direction: **DIN
-4149 is more demanding on clearance, EN 1998-1 is more demanding on restraint
-spacing and scope.**
+**EN 1998-1** is Eurocode 8 Part 1, current edition **EN 1998-1:2004 +A1:2013**.
+Its second generation is being published as BS EN 1998-1-1:2024 and
+BS EN 1998-1-2:2026. For a Cologne project the governing framework is
+EN 1998-1 with the German National Annex, as determined by the structural
+engineer of record.
 
-| Parameter | EN 1998-1:2020 | DIN 4149:2022 | Which is stricter |
+For non-structural MEP restraint specifically, the important point is what these
+documents do **not** contain. EN 1998-1 addresses non-structural elements in
+**§4.3.5**, which gives the framework for designing their anchorage against
+seismic action. **Neither EN 1998-1 nor the German National Annex gives brace
+spacing, brace angles or clearance dimensions for pipe, duct or cable-tray
+distribution systems.** There is no EN-versus-DIN table of such values to compare.
+
+## What BIMGUARD Applies
+
+BIMGUARD's seismic clearance check (SB-001) runs from one configuration file,
+`data/rulesets/sb001_seismic_clearance.json`. Earlier versions of that file and of
+this answer described it as a combined profile of an EN 1998-1 edition dated 2020
+and a DIN 4149 edition dated 2022, with per-standard values. That was wrong: neither edition exists, and the
+per-standard values attributed to them were not taken from either standard. The
+file was corrected on 2026-09-13 (schema 1.1.0); the full account is in
+`docs/planning/sb001_provenance_2026-09-13.md`.
+
+Every threshold in the file now carries a provenance block with a `status`:
+
+| Threshold | Value | Status | Basis |
 | --- | --- | --- | --- |
-| Minimum clearance from structure | 150 mm | 200 mm | DIN — larger envelope |
-| Restraint spacing, transverse | 1.0 m | 1.2 m | EN — more restraints |
-| Restraint spacing, longitudinal | 1.5 m | 1.8 m | EN — more restraints |
-| Pipe diameter threshold for restraint | 63 mm | 75 mm | EN — more pipes in scope |
-| Permitted brace angle | 35°–70° | 40°–65° | DIN — narrower band |
+| Importance factor, hospital / standard | 1.5 / 1.0 | sourced | FEMA E-74 §5.3.1; ASCE/SEI 7-10 §13.1.3 |
+| Duct area bracing threshold | 0.557 m² (6 sq ft) | sourced | FEMA E-74 §6.4.6.1 |
+| Clearance from structure | 200 mm | authored | No source gives a braced-service clearance |
+| Restraint spacing, transverse / longitudinal | 1.0 m / 1.5 m | authored | Screening values far tighter than FEMA E-74's sample-spec maxima (40/80 ft ductile pipe) |
+| Pipe diameter threshold | 63 mm | authored | Inside the ~1–3 in exemption band FEMA E-74 reports for ASCE 7-10 |
+| Brace angle | 40°–65° from horizontal | authored | No source gives a pipe or duct brace angle |
+| Ideal angle / tolerance | 52.5° / 12.5° | derived | Midpoint and half-range of 40°–65° |
+| Seismic-zone, hospital and adjacent-system additions | 0 mm | authored | No source gives a clearance addition |
 
-Referenced clauses are EN 1998-1:2020 §5.3.2.3 and DIN 4149:2022-03 §8.2.4.
-
-## How BIMGUARD Handles Both
-
-It does not make you choose. The shipped jurisdiction configuration is a
-**combined profile** that takes, for each parameter independently, whichever
-standard's value is more onerous — so a model that passes the combined profile
-satisfies both. The configuration records the governing logic for every merged
-value, in its own words:
-
-- **Clearance takes the maximum** (200 mm) — "larger clearance governs — it
-  produces a halo big enough to satisfy both standards."
-- **Restraint spacing takes the minimum** (1.0 m / 1.5 m) — "tighter (smaller)
-  spacing governs — it requires more restraints, the conservative reading."
-- **Diameter threshold takes the minimum** (63 mm) — "lower diameter threshold
-  governs — it brings more pipes into scope for bracing."
-- **Brace angle takes the intersection** (40°–65°) — "the band any brace
-  satisfying both standards must fall in."
-- **Importance factors take the per-key maximum** (hospital 1.6, standard 1.0) —
-  "higher factor governs — it demands the greater restraint capacity."
-
-The configuration also records two derived values honestly rather than
-presenting them as sourced: the ideal brace angle (52.5°) and tolerance (±12.5°)
-are computed as the midpoint and half-range of the combined 40°–65° band, not
-independently sourced from either standard. That is written into the file's data
-gaps list.
-
-This combined-profile approach has a consequence worth being explicit about: on
-an EN-only project, the combined profile is **stricter than required**. A 200 mm
-clearance finding against a model designed to EN 1998-1's 150 mm is a correct
-report of a DIN 4149 exceedance and a false alarm against the governing code.
-The configuration is a JSON parameter file, so an EN-only or DIN-only profile is
-a straightforward variant — but which profile governs is a determination for the
-structural engineer of record against the applicable National Annex, not a
-default anyone should change silently.
+**Authored** means BIMGUARD screening calibration, not a code value. SB-001 is a
+screening tool; it is not a substitute for design to ASCE/SEI 7-10 §13.6 or
+EN 1998-1.
 
 ## When Each Applies
 
-- **Germany** — both. DIN 4149 for the German zoning and detailing tradition,
-  EN 1998-1 with the German National Annex as the Eurocode framework. The
-  combined profile is the natural default here, and Cologne is exactly the case
-  it was built for.
-- **Elsewhere in the EU/EFTA** — EN 1998-1 with the relevant National Annex.
-  The National Annex sets nationally determined parameters, so the Portuguese,
-  Italian, Greek and Romanian readings of the same clause can differ materially
-  in hazard terms even where the non-structural clearance clause does not.
-- **Projects with a German client, insurer or parent standard** outside Germany —
-  DIN 4149 often arrives contractually rather than statutorily. The combined
-  profile satisfies that without a separate run.
-- **Outside the EU** — neither applies statutorily. IBC/ASCE 7 and their
-  non-structural component provisions govern in the US, and other regimes
-  elsewhere. The combined EU profile is not a substitute; it would need its own
-  jurisdiction configuration.
+- **Germany** — EN 1998-1 with DIN EN 1998-1/NA. DIN 4149 is withdrawn.
+- **Elsewhere in the EU/EFTA** — EN 1998-1 with the relevant National Annex, which
+  sets nationally determined parameters such as hazard values.
+- **Projects where DIN 4149 arrives contractually** — raise it with the structural
+  engineer; a contract citing a withdrawn standard is worth correcting.
+- **Outside the EU** — neither applies statutorily. In the US, ASCE/SEI 7 Chapter 13
+  (§13.6 for distribution systems) governs non-structural components, with
+  prescriptive guidance in documents such as FEMA E-74 and NFPA 13 for sprinklers.
+
+In every case the MEP bracing dimensions come from a bracing design or a certified
+restraint system, not from EN 1998-1 or its National Annexes.
 
 ## What the Report Contains
 
-Every seismic finding carries `standards_cited` naming both standards and the
-`standards_full_citations` entries — currently the section references
-`EN 1998-1:2020 5.3.2.3` and `DIN 4149:2022-03 8.2.4`. The configuration notes
-that these are section references rather than full bibliographic citations, and
-that a fuller citation pass is outstanding. For a report that will be read by an
-approving authority or an insurer, quote the clause and cite the standard
-formally alongside it.
-
-The findings themselves do not currently tell you *which* of the two standards a
-given exceedance breached — the profile is merged before the run. If you need
-that split (for example, to show an EN-only compliance position and a DIN
-exceedance separately), run the analysis twice against two profiles and diff the
-results.
+Every seismic finding cites **FEMA E-74 (4th ed., December 2012)** and
+**ASCE/SEI 7-10 §13.6**, with the clause text naming the SB-001 screening
+calibration and the clearance applied. The configuration's `governing_codes`
+block lists EN 1998-1:2004+A1:2013 and DIN EN 1998-1/NA:2018-10 and states that
+neither supplies the dimensions. The citation on a finding does not yet say
+whether that particular threshold is sourced or authored; read the provenance
+block in the configuration for that.
 
 ## NotebookLM Prompt (for rule authoring — NOT compliance decisions)
 
 **Query:**
 
-> "Compare EN 1998-1:2020 and DIN 4149:2022-03 on the seismic restraint of
-> non-structural mechanical and electrical components. Produce a clause-by-clause
-> table with columns: parameter, EN 1998-1 value and clause, DIN 4149 value and
-> clause, and whether the German National Annex to EN 1998-1 modifies the EN
-> value. Cover minimum clearance to structure, restraint spacing, diameter and
-> duct-area thresholds, brace angle limits and importance factors by occupancy.
-> Do not merge or reconcile the two — report both values side by side, and state
-> where either standard is silent."
+> "From EN 1998-1:2004+A1:2013 §4.3.5 and DIN EN 1998-1/NA:2018-10, list every
+> provision that applies to the seismic restraint of non-structural mechanical and
+> electrical distribution systems. For each, give the clause, the quantity
+> governed, and whether a numeric dimension (spacing, clearance, angle, size
+> threshold) is stated. State explicitly where no such dimension is given — do not
+> infer one and do not supply values from other documents."
 
-**Purpose.** The National Annex column is the one currently missing. The
-configuration merges EN and DIN directly; it does not yet account for the German
-NA modifying the EN values before the merge, which could change which value
-governs on one or more parameters.
+**Purpose.** Confirm from the clause text that no MEP dimensional rule exists in
+the Eurocode framework, so that any future SB-001 threshold marked `sourced` is
+sourced to a document that actually states it.
 
 **Not for.** Deciding which code governs your project. That determination belongs
 to the structural engineer of record and the building control authority.
 
 ## Export Options
 
-- **BCF 2.1**, **CSV** and **JSON** — identical to the other analyses. The JSON
-  export carries the full jurisdiction configuration reference, which is the
-  right artefact to attach to a compliance submission.
+- **BCF 2.1**, **CSV** and **JSON** — identical to the other analyses. Attach the
+  configuration file to any submission; its provenance blocks are the audit trail.
 
 ## Next Steps for Your Project
 
-1. Get the structural engineer of record to confirm, in writing, which profile
-   governs — combined, EN-only, or DIN-only. Everything downstream depends on it.
-2. If EN-only governs, expect the combined profile's 200 mm clearance findings to
-   over-report. Run against an EN-only profile before issuing anything to the
-   design team.
-3. If you need to demonstrate compliance against each standard separately, run
-   twice and diff. One merged run cannot tell you which standard a finding came
-   from.
-4. Ask the structural engineer whether the German National Annex modifies any of
-   the EN values you are relying on. That is the known gap in the current profile.
-5. Attach the jurisdiction configuration file to any submission. Its documented
-   governing logic and data gaps are the audit trail an approving authority will
-   want to see.
+1. Get the structural engineer of record to confirm the governing framework in
+   writing — for Cologne, EN 1998-1 with DIN EN 1998-1/NA.
+2. Treat SB-001 findings as screening. The 200 mm clearance and 1.0/1.5 m spacing
+   are authored calibration; your bracing designer's calculations govern.
+3. If a contract cites DIN 4149, raise it: the standard is withdrawn.
+4. Attach the configuration file to any submission, and quote its
+   `provenance_summary` statement alongside the findings.

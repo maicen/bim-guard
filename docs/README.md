@@ -16,7 +16,7 @@ These files should be treated as current sources of truth.
 - `piping_schema_spec.md`
 - `BIMGUARD_DATA_ARCHITECTURE.md`
 - `CONVENTIONS.md`
-- `HERMES_CONTEXT.md`
+- `HERMES_CONTEXT.md` — AI research brief, retained as historical evidence; unverified, do not cite
 - `PHASE_6_DATA_CONTRACTS.md`
 - `ifc-property-mapping.md`
 

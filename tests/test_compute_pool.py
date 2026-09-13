@@ -149,7 +149,7 @@ def test_corrosion_parallel_vs_sequential_parity(monkeypatch: pytest.MonkeyPatch
 
 def test_seismic_clashes_chunk_execution() -> None:
     """Test computing halo clash chunks in a worker process."""
-    config_path = Path("data/rulesets/config_en_1998_1_din_4149.json")
+    config_path = Path("data/rulesets/sb001_seismic_clearance.json")
     if not config_path.exists():
         pytest.skip("Seismic config json not present")
 

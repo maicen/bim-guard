@@ -18,8 +18,9 @@ event. In an earthquake, the structural frame and the suspended services move
 differently — different masses, different periods, different support conditions.
 A pipe that sits 40 mm from a concrete beam has nowhere to go; it impacts the
 beam, and the failure is at the joint or the hanger, not in the middle of the
-run. Codes therefore require a minimum clearance between restrained services and
-structure. SB-001 checks whether your model actually provides it.
+run. SB-001 screens whether your model leaves room around braced services. Note
+that the clearance it applies is BIMGUARD's authored screening value, not a
+dimension stated by any code (see below).
 
 Mechanically, the engine generates a **clearance envelope** — the "halo" — around
 each braced element, sized from the jurisdiction configuration, and then detects
@@ -47,35 +48,34 @@ explicit flag if a run was not genuine.
 
 ## Which Standards It Works From
 
-The shipped jurisdiction configuration is a **combined** EN 1998-1:2020 and
-DIN 4149:2022 profile, referenced to EN 1998-1:2020 clause 5.3.2.3 and
-DIN 4149:2022-03 clause 8.2.4. Combined means every parameter takes whichever of
-the two values is more onerous, and the configuration records the reasoning for
-each one:
+SB-001 runs from `data/rulesets/sb001_seismic_clearance.json`. Earlier versions
+described it as a combined profile of an EN 1998-1 edition dated 2020 and a
+DIN 4149 edition dated 2022; neither edition exists, and the values were not
+taken from either standard. It was
+corrected on 2026-09-13 (schema 1.1.0), and every threshold now records its
+provenance:
 
-- **Clearance from structure: 200 mm** — the *larger* of EN 1998-1's 150 mm and
-  DIN 4149's 200 mm governs, because the larger clearance produces a halo that
-  satisfies both.
-- **Restraint spacing: 1.0 m transverse / 1.5 m longitudinal** — the *tighter* of
-  EN 1998-1's 1.0/1.5 m and DIN 4149's 1.2/1.8 m governs, because tighter spacing
-  demands more restraints, which is the conservative reading.
-- **Pipe diameter threshold: 63 mm** — the *lower* of EN 1998-1's 63 mm and
-  DIN 4149's 75 mm governs, because it brings more pipes into scope for bracing.
-- **Brace angle: 40°–65°** — the *intersection* of EN 1998-1's 35°–70° and
-  DIN 4149's 40°–65°, which is the band any brace satisfying both must fall in.
-- **Importance factor: 1.6 for hospital, 1.0 for standard** — the per-key maximum
-  across the two standards, because the higher factor demands greater restraint
-  capacity.
+- **Clearance from structure: 200 mm** — *authored*. No source held gives a
+  clearance dimension for a braced service.
+- **Restraint spacing: 1.0 m transverse / 1.5 m longitudinal** — *authored*
+  screening values. FEMA E-74's sample specification gives maxima of 40 ft / 80 ft
+  for ductile pipe, so BIMGUARD's values are far tighter than that reference.
+- **Pipe diameter threshold: 63 mm** — *authored*, inside the roughly 1–3 in
+  exemption band FEMA E-74 reports for ASCE/SEI 7-10.
+- **Brace angle: 40°–65° from horizontal** — *authored*; no source gives a pipe or
+  duct brace angle. The 52.5° ideal and ±12.5° tolerance are *derived* arithmetic.
+- **Importance factor: 1.5 for hospital, 1.0 for standard** — *sourced* to FEMA
+  E-74 §5.3.1 and ASCE/SEI 7-10 §13.1.3 (corrected from 1.6).
+- **Duct area threshold: 0.557 m² (6 sq ft)** — *sourced* to FEMA E-74 §6.4.6.1.
+- **Seismic-zone, hospital and adjacent-system clearance additions: 0 mm** —
+  *authored*; no source gives a clearance addition.
 
-The configuration also records its **data gaps** explicitly rather than filling
-them with plausible numbers. Seismic-zone and hospital clearance additions are
-set to 0 mm because neither standard states a clearance addition — both scale
-restraint *capacity* by importance factor, not clearance geometry — and that is
-flagged as needing verification against the full clause text. Duct area
-thresholds, adjacent-system clearance and the default hazard factor are left null
-pending standard-specific research. Brace hardware footprints are marked as
-generic placeholders. This matters for your insurer conversation: the
-configuration tells you what it knows and what it does not.
+The governing codes are named accurately in the file: **EN 1998-1:2004+A1:2013**
+(non-structural elements, §4.3.5) and **DIN EN 1998-1/NA:2018-10**. Neither gives
+MEP brace spacing or clearance dimensions, and DIN 4149 is withdrawn. Brace
+hardware footprints remain generic placeholders and the default hazard factor is
+unset. This matters for your insurer conversation: the configuration now states
+which numbers are sourced and which are BIMGUARD's own.
 
 ## Why This Matters
 
@@ -87,14 +87,14 @@ expensive to fix on site: moving a hanger 150 mm at coordination stage costs
 nothing, and doing it after the slab is poured and the containment is installed
 costs a week.
 
-For your Rhine Graben project specifically: low seismicity does not remove the
-clearance requirement, it changes the restraint capacity. The 200 mm envelope is
-a geometric requirement that does not scale down with hazard.
+For your Rhine Graben project specifically: low seismicity changes the restraint
+capacity a bracing design needs. SB-001's 200 mm envelope does not scale with
+hazard, but it is a screening value, not a code requirement.
 
 ## When This Analysis Applies
 
-- Projects in any declared seismic zone under EN 1998-1 or a national annex.
-- German projects where DIN 4149 applies.
+- Projects in any declared seismic zone under EN 1998-1 and its national annex,
+  or under ASCE/SEI 7 — as a screening check ahead of the bracing design.
 - Healthcare, data centres, emergency services and other facilities carrying an
   elevated importance factor — where the requirement is post-event *function*,
   not merely life safety.
@@ -118,21 +118,20 @@ serve both.
 
 **Query:**
 
-> "From EN 1998-1:2020 clause 5.3.2.3 and DIN 4149:2022-03 clause 8.2.4, extract
-> the full clause text governing the seismic restraint of non-structural
-> mechanical and electrical components. Report specifically: minimum clearance
-> between restrained services and structural elements; maximum restraint spacing,
-> transverse and longitudinal; the pipe diameter and duct area thresholds at
-> which restraint becomes required; permitted brace angle ranges; and importance
-> factors by occupancy class. Give the clause number for each value, quote the
-> conditions on it, and state explicitly where a value the question asks for is
-> not present in the clause text."
+> "From ASCE/SEI 7-10 §13.6, EN 1998-1:2004+A1:2013 §4.3.5 and
+> DIN EN 1998-1/NA:2018-10, extract the provisions governing the seismic restraint
+> of non-structural mechanical and electrical distribution systems. Report
+> specifically: minimum clearance between restrained services and structural
+> elements; maximum restraint spacing, transverse and longitudinal; the pipe
+> diameter and duct area thresholds at which restraint becomes required; permitted
+> brace angle ranges; and importance factors by occupancy. Give the document,
+> edition and clause for each value, quote the conditions on it, and state
+> explicitly where a value the question asks for is not present."
 
-**Purpose.** The last sentence is the important one. The current configuration
-carries several documented nulls and zeros precisely because the source research
-did not establish those values, and the honest thing is to keep them null rather
-than infer them. This prompt is designed to close those gaps with sourced clause
-text, or to confirm that the gap is real.
+**Purpose.** The last sentence is the important one. Most SB-001 thresholds are
+marked `authored` because no document held states them. This prompt is designed
+to find a stated value that could replace an authored one, or to confirm that the
+gap is real.
 
 **Not for.** Determining whether your building needs seismic restraint at all, or
 what its importance factor is. That is a determination made by the structural
@@ -152,13 +151,13 @@ engineer of record against the applicable national annex and the site hazard.
 
 ## Next Steps for Your Project
 
-1. Confirm with your structural engineer which jurisdiction profile applies —
-   the shipped configuration is a deliberately conservative EN 1998-1 + DIN 4149
-   combination, which may be stricter than your national annex requires.
+1. Confirm with your structural engineer which code governs and who designs the
+   bracing — SB-001's thresholds are authored screening calibration, not values
+   from EN 1998-1 or its national annex, which give no MEP dimensions.
 2. Issue Critical intrusions to the MEP coordinator as a routing change, not to
    the structural engineer. The pipe usually moves; the beam does not.
 3. Use the `Pset_HaloReservation` output to publish the reserved volumes into the
    federated model, so the next trade to route through the zone can see them.
-4. Give your insurer the configuration file alongside the findings. Its recorded
-   data gaps and governing-value reasoning are the audit trail, and a claim
-   reviewer will value that more than a finding count.
+4. Give your insurer the configuration file alongside the findings. Its
+   per-threshold provenance and `provenance_summary` are the audit trail, and a
+   claim reviewer will value that more than a finding count.

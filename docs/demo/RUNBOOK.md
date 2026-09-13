@@ -400,7 +400,10 @@ cross-model finding names both files in `source_model` and
 `clashing_source_model`, so a coordinator knows which model to open.
 
 Each row carries the real measured overlap volume and the clearance that was
-applied (200.0 mm, EN 1998-1:2020 + DIN 4149:2022).
+applied (200.0 mm). A build from before 2026-09-13 labels that clearance with an
+EN 1998-1 edition dated 2020 and a DIN 4149 edition dated 2022; neither edition
+exists, and from schema 1.1.0 it reads as SB-001 authored screening calibration
+(see `docs/planning/sb001_provenance_2026-09-13.md`).
 
 ### 4. Export and validate
 

@@ -1,3 +1,26 @@
+> **⚠ AI-GENERATED RESEARCH BRIEF — UNVERIFIED — DO NOT CITE.**
+>
+> This is the brief given to "Hermes", an AI-assisted standards research pass. Its
+> output (`docs/validation/data/hermes_standards_research_summary.json`) is the
+> origin of SB-001's earlier fabricated configuration: EN 1998-1 and DIN 4149
+> editions that do not exist, per-standard values neither standard states, and a
+> hospital importance factor of 1.6 that exists in no standard.
+>
+> The brief carries unsourced values of its own. None has a quotation, page or
+> verified clause, and none should be used as a source:
+>
+> - Hospital importance factor Ip = 1.5 attributed to EN 1998-1 (EN 1998-1 uses γa,
+>   not Ip; the 1.5 that is evidenced comes from FEMA E-74 §5.3.1 citing ASCE/SEI 7-10)
+> - Base / standard-building importance factor 0.75
+> - Seismic hazard factor Cs = 0.35
+> - 50 mm clearance from structure
+> - 30 m maximum transverse spacing
+> - The "consensus" 30–60° angle range, 45° ideal angle and >50 mm pipe threshold
+>
+> Retained as historical evidence of how the error was made. The corrected SB-001
+> ruleset is `data/rulesets/sb001_seismic_clearance.json`; the audit is
+> `docs/planning/sb001_provenance_2026-09-13.md`.
+
 # HERMES_CONTEXT.md — Hermes Research Context for BIMGUARD AI Blue Halo Standards Research
 
 **Last Updated:** 22 August 2026  

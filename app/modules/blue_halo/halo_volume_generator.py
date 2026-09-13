@@ -36,7 +36,9 @@ DEPENDENCIES
 
 OWNERSHIP
     Blue Halo Phase 1 (this file): generic algorithm.
-    Blue Halo Phase 2 (Hermes-authored JSON configs): jurisdiction data.
+    Blue Halo Phase 2 (JSON configs): clearance data, e.g.
+        data/rulesets/sb001_seismic_clearance.json (authored screening
+        calibration with per-threshold provenance).
     Blue Halo Phase 3+: config-driven wiring into Module 4 comparators.
 """
 
@@ -77,9 +79,9 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 # BraceType — generic bracing hardware taxonomy
 # ---------------------------------------------------------------------------
-# Deliberately standard-agnostic: every seismic bracing standard researched
-# for Blue Halo (EN 1998-1, DIN 4149, NFPA 13, ...) reduces to some subset of
-# these physical hardware categories. Jurisdiction-specific sub-variants
+# Deliberately standard-agnostic: the bracing hardware any clearance config
+# describes (angle iron, cable, rod, ...) reduces to some subset of these
+# physical hardware categories. Jurisdiction-specific sub-variants
 # (e.g. NFPA's "fire" vs "mechanical" angle iron) are carried on
 # ClearanceRule.variant, not as separate enum members, so this taxonomy
 # never needs to grow when a new standard is onboarded in Phase 2.
@@ -280,12 +282,11 @@ class ClearanceConfig:
 def load_clearance_config(config_path: str | Path) -> ClearanceConfig:
     """Load a jurisdiction-specific clearance config from JSON.
 
-    Expects the shape produced by Blue Halo Phase 2 (Hermes standards
-    research): a top-level "metadata" object, a "brace_types" object keyed
-    by hardware variant, a "clearance_rules" object of shared clearance
-    additions, and an "angle_constraints" object. See
-    HERMES_CONTEXT.md's CONFIG TEMPLATE OUTPUT FORMAT for the authoritative
-    shape.
+    Expects the Blue Halo Phase 2 config shape (see
+    data/rulesets/sb001_seismic_clearance.json): a top-level "metadata"
+    object, a "brace_types" object keyed by hardware variant, a "clearance_rules" object of shared clearance
+    additions, and an "angle_constraints" object. The shipped SB-001
+    config is the reference instance of that shape.
 
     Args:
         config_path: Path to the jurisdiction's JSON config file.

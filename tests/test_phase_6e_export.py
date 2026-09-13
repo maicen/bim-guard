@@ -667,7 +667,7 @@ class TestBCFStructuredDescription:
                 "clearance_mm": 200.0,
                 "source_model": "plumb.ifc",
                 "clashing_source_model": "str.ifc",
-                "jurisdiction": "EN 1998-1:2020 + DIN 4149:2022",
+                "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds, not code values)",
             },
             citations=[],
         )
@@ -678,7 +678,10 @@ class TestBCFStructuredDescription:
         assert "Required clearance: 200 mm" in text
         assert "Source model: plumb.ifc" in text
         assert "Clashing source model: str.ifc" in text
-        assert "Jurisdiction: EN 1998-1:2020 + DIN 4149:2022" in text
+        assert (
+            "Jurisdiction: BIMGUARD SB-001 screening calibration "
+            "(authored thresholds, not code values)" in text
+        )
 
     def test_absent_values_produce_no_line_rather_than_an_empty_one(self):
         """An empty 'Material: ' asserts an empty material; silence asserts nothing."""

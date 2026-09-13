@@ -1,5 +1,14 @@
 # Seismic federated runs, coverage tracers and a measured model manifest — September 2026
 
+> **Provenance note (added 2026-09-13).** The body of this report is left as
+> recorded on 2026-09-05. Where it names the configuration's standards
+> (EN 1998-1 and DIN 4149, with edition dates), that attribution was wrong: the
+> editions do not exist, and neither standard states SB-001's clearance, spacing,
+> pipe-threshold or angle values, which are BIMGUARD's authored screening
+> calibration. The measured numbers are unaffected. The configuration was renamed
+> `data/rulesets/sb001_seismic_clearance.json` (schema 1.1.0) with per-threshold
+> provenance; see `docs/planning/sb001_provenance_2026-09-13.md`.
+
 Scope: SB-001 (Blue Halo) seismic clearance run federated and single-model per
 building; the four material/environment/temperature coverage tracers; and a
 measured replacement for the fabricated figures in `data/models-manifest.json`.

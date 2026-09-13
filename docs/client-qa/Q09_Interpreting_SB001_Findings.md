@@ -111,8 +111,11 @@ that were going to change anyway; running it later means the fixes are on site.
 Per finding: rule id `SB-001.01`, mechanism `SB-001` ("Seismic bracing
 clearance"), the braced element and the intruding element `GlobalId`s, the
 envelope geometry and how much of it was lost, the severity and mapped band, and
-the EN 1998-1 / DIN 4149 citation. Findings use the same `Issue` shape as the
-corrosion results, so they sort, filter and export identically.
+a citation to FEMA E-74 and ASCE/SEI 7-10 §13.6 naming the SB-001 screening
+calibration. The clearance applied is an authored screening value, not a code
+dimension — see the provenance blocks in `data/rulesets/sb001_seismic_clearance.json`.
+Findings use the same `Issue` shape as the corrosion results, so they sort, filter
+and export identically.
 
 There is deliberately no synthetic-issue mode in the seismic path. Findings are
 computed from real geometry or they are absent; the result carries an explicit
@@ -122,19 +125,20 @@ flag if a run was not genuine, and the interface is required to honour it.
 
 **Query:**
 
-> "From EN 1998-1:2020 §5.3.2.3, DIN 4149:2022-03 §8.2.4 and available seismic
-> restraint design guidance, extract what the standards state about the
-> consequences of insufficient clearance between a restrained service and
-> structure. Specifically: is there any stated tolerance or acceptance criterion
-> for partial clearance; does either standard grade a deficiency by degree; and
-> is any alternative detailed solution — resilient buffer, engineered soft
-> contact, flexible connection — recognised in place of the clearance? Give clause
-> references and quote any acceptance conditions verbatim."
+> "From ASCE/SEI 7-10 §13.6, EN 1998-1:2004+A1:2013 §4.3.5, FEMA E-74 (4th ed.,
+> December 2012) and available seismic restraint design guidance, extract what
+> each states about the consequences of insufficient clearance between a
+> restrained service and structure. Specifically: is there any stated tolerance or
+> acceptance criterion for partial clearance; does any document grade a deficiency
+> by degree; and is any alternative detailed solution — resilient buffer,
+> engineered soft contact, flexible connection — recognised in place of the
+> clearance? Give document, edition and clause, and quote any acceptance
+> conditions verbatim."
 
 **Purpose.** The current severity model grades by envelope loss, which is an
-engineering-reasonable but internally-derived grading. If either standard defines
-a graded acceptance criterion, the severity mapping should be sourced from it
-rather than derived. This prompt is written to find out whether it does.
+engineering-reasonable but internally-derived grading. If any of these documents
+defines a graded acceptance criterion, the severity mapping should be sourced from
+it rather than derived. This prompt is written to find out whether one does.
 
 **Not for.** Deciding whether a particular Critical finding is acceptable in your
 building. That is a structural engineer's judgement on a specific detail.

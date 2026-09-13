@@ -73,8 +73,8 @@ app/modules/
 │   └── cost_model.py               — configurable cost/duration model
 ├── blue_halo/                    # Seismic bracing clearance ("Blue Halo") algorithm
 │   ├── halo_volume_generator.py    — standard-agnostic clearance envelope generation
-│   ├── hermes_config_expanded.py   — jurisdiction clearance/spacing config loader
-│   ├── generate_expanded_config.py — config generation helper
+│   ├── hermes_config_expanded.py   — RETIRED: generated the fabricated SB-001 config; historical evidence, refuses to run
+│   ├── generate_expanded_config.py — RETIRED: drove hermes_config_expanded.py; historical evidence, refuses to run
 │   └── build_test_ifc.py           — synthetic IFC fixture builder for tests
 ├── phase_6/                      # Legacy phase-numbered pipeline stages (upload, parsing,
 │                                    corrosion UI, seismic, export) — see
