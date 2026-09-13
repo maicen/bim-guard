@@ -1,8 +1,10 @@
 """Deck B — Blue Halo Clearance Algorithm (24 slides)."""
 try:
     from build_fmp_decks import *  # noqa: F403
+    from build_fmp_decks import _text
 except ImportError:
     from scripts.build.build_fmp_decks import *  # noqa: F403
+    from scripts.build.build_fmp_decks import _text
 
 def build():
     p = new_deck()
@@ -83,10 +85,11 @@ def build():
     table(s, ["Clearance", "Jurisdiction", "Clashes", "Critical", "vs 200 mm"],
         [["25 mm", "—", "30,332", "148", "0.29×"],
          ["100 mm", "—", "69,307", "38", "0.67×"],
-         [("200 mm", NAVY, True), ("BIMGUARD SB-001 screening calibration (authored thresholds, not code values)", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
+         [("200 mm", NAVY, True), ("SB-001 authored calibration¹", NAVY, True), ("104,144", NAVY, True), ("31", NAVY, True), ("1.00×", NAVY, True)],
          [("457.2 mm", RED, True), ("—", RED, True), ("172,812", RED, True), ("16", RED, True), ("1.66×", RED, True)],
          ["600 mm", "—", "212,870", "11", "2.04×"]],
         widths=[1.4, 3.2, 1.8, 1.4, 1.4], row_h=0.31)
+    _text(s, 0.25, 3.23, 9.5, 0.20, "¹ BIMGUARD SB-001 screening calibration (authored thresholds, not code values)", size=9, colour=GREY)
     note(s, "Raising the clearance from the 200 mm row to the 457.2 mm row yields 66% more clashes but 48% fewer Critical ones. Severity is an overlap ratio against halo volume, so a larger clearance inflates the denominator faster than the numerator.", y=3.45)
     note(s, "The finding is an argument that the severity heuristic needs rethinking, not retuning. It held on two independent model subsets, at 1.62× and 1.66×.", y=4.40, bold=True)
 
@@ -143,7 +146,7 @@ def build():
     s = slide(p, "Standards compliance", "What each source supplies", NAVY)
     table(s, ["Standard", "Supplies", "Applied in"],
         [["EN 1998-1:2004+A1:2013", "§4.3.5 (non-structural elements)", "Gives no MEP brace spacing or clearance"],
-         ["DIN EN 1998-1/NA:2018-10", "German National Annex; DIN 4149:2005-04 withdrawn", "Gives no MEP brace spacing or clearance"],
+         ["DIN EN 1998-1/NA:2018-10", "German NA; DIN 4149 withdrawn", "Gives no MEP brace spacing or clearance"],
          ["FEMA E-74 (4th ed., December 2012)", "A guide, not a code", "Duct area threshold, importance factors"],
          ["ASCE/SEI 7-10 §13.6", "What FEMA E-74 defers to", "Upstream reference; not held"],
          ["SMACNA / MSS SP-58", "Sway bracing and hanger support practice", "Brace family footprints"],
