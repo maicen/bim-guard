@@ -59,37 +59,35 @@ In this method, `cloudflared` runs as a Docker container directly inside your `d
 
 ### Step 1: Create a Tunnel in Cloudflare Zero Trust
 
-1. Log into the [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/).
-2. Navigate to **Networks** → **Tunnels**.
-3. Click **Add a tunnel** (or **Create a tunnel**).
-4. Select **Cloudflared** as the connector and click **Next**.
-5. Give your tunnel a descriptive name, e.g. `bim-guard`.
-6. On the **Install connector** screen:
+1. Open your account's [Zero Trust Tunnels Dashboard](https://one.dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/networks/tunnels).
+2. Click **Add a tunnel** (or **Create a tunnel**).
+3. Select **Cloudflared** as the connector and click **Next**.
+4. Give your tunnel a descriptive name, e.g. `bim-guard`.
+5. On the **Install connector** screen:
    - Under "Choose your environment", select **Docker**.
-   - Cloudflare will show a command starting with `docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token ey...`.
+   - Cloudflare will display a command containing `--token ey...`.
    - **Copy the token string** (the text after `--token`). This is your `TUNNEL_TOKEN`.
-7. Click **Next** to proceed to the **Public Hostnames** tab.
-8. Add a public hostname:
-   - **Subdomain**: e.g. `bim` (or whatever subdomain you want; leave blank for apex domain)
-   - **Domain**: Select your domain from the dropdown (e.g. `yourdomain.com`)
+6. Click **Next** to proceed to the **Public Hostnames** tab.
+7. Add a public hostname:
+   - **Subdomain**: leave blank (for root domain `bim-guard.xyz`) or enter `app` / `bim`
+   - **Domain**: `bim-guard.xyz`
    - **Path**: Leave blank
    - **Type**: `HTTP`
-   - **URL**: `bim-guard:8000`
-9. Click **Save tunnel**. Cloudflare automatically configures the CNAME DNS record.
+   - **URL**: `bim-guard:8000` (resolves internally inside Docker)
+8. Click **Save tunnel**. Cloudflare automatically adds the CNAME DNS record in your [DNS Settings](https://dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/bim-guard.xyz/dns/records).
 
 ### Step 2: Configure Environment Variables in `.env`
 
-Open your `.env` file in the project root and add the following settings:
+In your `/Users/sam/coding/bim-guard/.env`:
 
 ```env
-# ── Cloudflare Tunnel & Domain Routing ────────────────────────────────────────
-# Your public domain URL for CORS validation
-BIM_GUARD_ALLOWED_ORIGINS=https://bim.yourdomain.com
+# ── Cloudflare Tunnel & Domain Routing (bim-guard.xyz) ────────────────────────
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
 
-# Cloudflare Zero Trust Remote Tunnel Token
-TUNNEL_TOKEN=eyJh...<your_copied_token_here>
+# Paste your copied tunnel token here:
+TUNNEL_TOKEN=eyJh...
 
-# Automatically include the cloudflared container when running `docker compose up`
+# Automatically enable the cloudflared container:
 COMPOSE_PROFILES=tunnel
 ```
 
@@ -219,4 +217,41 @@ docker compose logs -f cloudflared
 3. **Cloudflared connection error 502 Bad Gateway**:
    - In Method A: Ensure the Cloudflare Zero Trust public hostname URL points to `http://bim-guard:8000` (internal Docker hostname), NOT `localhost:8000`.
    - In Method B: Ensure it points to `http://localhost:8000`.
+
+---
+
+## 8. Cloudflare MCP Server Integration (`mcp-server-cloudflare`)
+
+To allow your AI coding assistant (Antigravity / Cursor / Claude) to interact directly with your Cloudflare account resources (DNS, Workers, Tunnels, Analytics) via natural language:
+
+### 1. Configuration in `~/.gemini/config/mcp_config.json`
+
+The MCP server is registered in your global Antigravity configuration:
+
+```json
+{
+  "mcpServers": {
+    "cloudflare": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cloudflare/mcp-server-cloudflare",
+        "run",
+        "a7ed8378cd620788b8f508e8b5d15975"
+      ]
+    }
+  }
+}
+```
+
+### 2. Authenticating Wrangler
+
+The `@cloudflare/mcp-server-cloudflare` server uses your local Wrangler session. Authenticate it by running once in your terminal:
+
+```bash
+npx wrangler login
+```
+
+This launches a browser authorization flow and saves your credentials locally to `~/Library/Preferences/.wrangler/config/default.toml`. Once logged in, your assistant can discover and call Cloudflare tools automatically.
+
 
