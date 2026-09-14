@@ -165,6 +165,10 @@ class RuleDraftService:
             needs_review=payload.needs_review,
             applies_when=payload.applies_when,
             exceptions=payload.exceptions,
+            rase_requirement=payload.rase_requirement,
+            rase_applicability=payload.rase_applicability,
+            rase_selection=payload.rase_selection,
+            rase_exception=payload.rase_exception,
         )
 
         self._drafts.update(updates={"promoted_rule_id": created.get("id")}, pk_values=draft_id)

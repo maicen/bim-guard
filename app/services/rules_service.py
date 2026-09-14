@@ -440,6 +440,11 @@ class RuleService:
         rule_category: str = "property_check",
         category: str = "",
         rule_id: str = "",
+        # RASE (Requirement/Applicability/Selection/Exception) provenance
+        rase_requirement: str | None = None,
+        rase_applicability: dict | None = None,
+        rase_selection: dict | None = None,
+        rase_exception: dict | None = None,
     ) -> dict:
         """Build a rule row dict (no I/O) shared by single and bulk create paths."""
         ref = (rule_id or reference or "").strip()
@@ -491,6 +496,10 @@ class RuleService:
             "ruleset_id": self.normalize_ruleset_id(ruleset_id),
             "rule_category": rule_category or "property_check",
             "category": norm_cat,
+            "rase_requirement": rase_requirement or None,
+            "rase_applicability": rase_applicability or None,
+            "rase_selection": rase_selection or None,
+            "rase_exception": rase_exception or None,
             "created_at": now,
             "updated_at": now,
         }
@@ -577,6 +586,11 @@ class RuleService:
         # meta
         confidence: float | None = None,
         needs_review: bool = False,
+        # RASE (Requirement/Applicability/Selection/Exception) provenance
+        rase_requirement: str | None = None,
+        rase_applicability: dict | None = None,
+        rase_selection: dict | None = None,
+        rase_exception: dict | None = None,
     ):
         """Update editable fields for an existing rule."""
         existing = self.get_rule(rule_id)
@@ -612,6 +626,10 @@ class RuleService:
             "source_text": source_text or (existing or {}).get("source_text", ""),
             "confidence": str(confidence) if confidence is not None else (existing or {}).get("confidence", ""),
             "needs_review": int(bool(needs_review)),
+            "rase_requirement": rase_requirement if rase_requirement is not None else (existing or {}).get("rase_requirement"),
+            "rase_applicability": rase_applicability if rase_applicability is not None else (existing or {}).get("rase_applicability"),
+            "rase_selection": rase_selection if rase_selection is not None else (existing or {}).get("rase_selection"),
+            "rase_exception": rase_exception if rase_exception is not None else (existing or {}).get("rase_exception"),
             "updated_at": now_iso_utc(),
         }
         if category:

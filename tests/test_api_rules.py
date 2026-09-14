@@ -62,6 +62,47 @@ def test_create_and_update_rule_persists_target_ifc_class():
         client.delete(f"/api/rules/{created['id']}")
 
 
+def test_create_and_update_rule_persists_rase_fields():
+    """Verify RASE fields round-trip through create and update.
+
+    Previously silently dropped on create and would raise a TypeError on
+    update.
+    """
+    create_res = client.post(
+        "/api/rules",
+        json={
+            "rule_id": "RASE-FIELDS-TEST-01",
+            "mechanism": "CODE",
+            "category": "Arch",
+            "severity": "Medium",
+            "ruleset_id": "BUILDING-CODE-PART9",
+            "rase_requirement": "Doors shall have a clear width of at least 850mm.",
+            "rase_applicability": {"occupancy": "residential"},
+            "rase_selection": {"element_type": "IfcDoor"},
+            "rase_exception": {"has_sprinkler": True},
+        },
+    )
+    assert create_res.status_code == 201
+    created = create_res.json()
+    try:
+        assert created["rase_requirement"] == "Doors shall have a clear width of at least 850mm."
+        assert created["rase_applicability"] == {"occupancy": "residential"}
+        assert created["rase_selection"] == {"element_type": "IfcDoor"}
+        assert created["rase_exception"] == {"has_sprinkler": True}
+
+        update_res = client.put(
+            f"/api/rules/{created['id']}",
+            json={"rase_requirement": "Doors shall have a clear width of at least 900mm."},
+        )
+        assert update_res.status_code == 200
+        updated = update_res.json()
+        assert updated["rase_requirement"] == "Doors shall have a clear width of at least 900mm."
+        # Fields not sent in the update are preserved, not wiped.
+        assert updated["rase_applicability"] == {"occupancy": "residential"}
+    finally:
+        client.delete(f"/api/rules/{created['id']}")
+
+
 @pytest.mark.slow
 def test_rule_folder_crud():
     """Verify complete CRUD lifecycle for ruleset folders via REST API."""

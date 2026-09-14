@@ -954,6 +954,10 @@ def create_rule(
             needs_review=payload.needs_review,
             applies_when=payload.applies_when,
             exceptions=payload.exceptions,
+            rase_requirement=payload.rase_requirement,
+            rase_applicability=payload.rase_applicability,
+            rase_selection=payload.rase_selection,
+            rase_exception=payload.rase_exception,
         )
         return _rule_response(created)
     except Exception as exc:
@@ -1131,6 +1135,10 @@ def bulk_create_rules(
             needs_review=payload.needs_review,
             applies_when=payload.applies_when,
             exceptions=payload.exceptions,
+            rase_requirement=payload.rase_requirement,
+            rase_applicability=payload.rase_applicability,
+            rase_selection=payload.rase_selection,
+            rase_exception=payload.rase_exception,
         )
         for payload in rules
     ]
