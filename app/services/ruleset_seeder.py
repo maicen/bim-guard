@@ -678,7 +678,7 @@ def _seed_mc001(svc: RuleService) -> int:
             description=f"{mat['label']}: MIC susceptibility score {mat['score']}",
             check_value=mat["score"],
             keyword=mat_key,
-            source_text=f"Source: {mat.get('reference', 'NACCE TPC 11')}",
+            source_text=f"Source: {mat.get('reference', 'AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration')}",
             parameters=json.dumps({**mat, "material_key": mat_key}),
         )
 

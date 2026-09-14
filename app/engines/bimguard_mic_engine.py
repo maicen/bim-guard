@@ -15,6 +15,10 @@ Standards referenced:
   - NACCE TPC 11 (MIC in Industrial Water Systems) -- suspect citation, recorded
     as written: the body is NACE (now AMPP), and the document is unverified
 
+  Neither suspect citation is emitted. BCF issues and findings name AMPP
+  (formerly NACE) industry practice for the MIC mechanism only, and state that
+  the thresholds are authored calibration. The seeded payload still carries both.
+
 PROVENANCE:
   The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
   class boundaries -- are a calibration authored for BIMGUARD-MC-001. They are
@@ -535,7 +539,8 @@ Relevant standards:
   CIBSE TM13:2013 — Minimising Risk from Legionella
   HSE HSG274 Parts 1–3 — Legionella Control
   BS 8552:2012 — Sampling and Monitoring of Water Systems
-  ASTM G-187 — MIC Assessment Standard Practice"""
+  AMPP (formerly NACE) industry practice — MIC mechanism only
+  MC-001 thresholds are authored calibration, not values quoted from any standard above"""
     return BCFIssue(
         guid=str(uuid.uuid4()).upper(),
         title=f"MC-001 MIC Risk — {result.risk_band} — {result.element_type} [{result.global_id[:8]}]",
