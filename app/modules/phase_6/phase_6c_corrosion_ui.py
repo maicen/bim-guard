@@ -860,7 +860,37 @@ def _assess_network(elements: list, spec: MechanismSpec, allocator: IssueIdAlloc
     return [], f"{spec.code} is not a network mechanism"
 
 
-def _provenance(element: ServiceElement) -> dict[str, str]:
+#: The engine module holding each per-element mechanism's threshold catalog.
+_CATALOG_ENGINES = {
+    "GC-001": bimguard_corrosion_engine,
+    "CC-001": bimguard_crevice_engine,
+    "MC-001": bimguard_mic_engine,
+}
+
+
+def _catalog_provenance(spec: MechanismSpec) -> dict[str, str]:
+    """Report which catalog source the engine for ``spec`` holds in this process.
+
+    Called in the process that scores the element -- a pool worker or the
+    parent -- because each process loads its own catalog and the two need not
+    agree. Returns ``{}`` for mechanisms without a threshold catalog (MM-001 and
+    XM-001 read versioned packs instead) or when the engine cannot say.
+    """
+    module = _CATALOG_ENGINES.get(spec.code)
+    if module is None:
+        return {}
+    try:
+        return dict(module.catalog_source())
+    except Exception:  # pragma: no cover - never let provenance break a finding
+        logger.warning("Catalog source unavailable mechanism=%s", spec.code, exc_info=True)
+        return {}
+
+
+def _provenance(
+    element: ServiceElement,
+    spec: MechanismSpec | None = None,
+    catalog: dict[str, str] | None = None,
+) -> dict[str, str]:
     """Report where this element's material and environment actually came from.
 
     GC-001, CC-001 and MC-001 are decided by ``material_a`` and
@@ -869,17 +899,27 @@ def _provenance(element: ServiceElement) -> dict[str, str]:
     ``SPACE_TO_ENV`` keyword yields the module's indoor default. Both then look
     identical to values read off the model by the time an engine scores them.
 
+    Given the mechanism, it also reports where that engine's *thresholds* came
+    from: ``catalog_source`` (``database_rows``, ``stored_payload`` or
+    ``in_memory_fallback``) and ``catalog_payload_source``. The fallback tables
+    band some elements differently from the seeded ruleset, so a finding has to
+    say which one scored it. ``catalog`` is passed in when the element was scored
+    in another process; otherwise it is read here.
+
     Every finding carries this block so a reviewer can see whether a Critical
     band rests on the building or on an assumption — the same question
     ``assumed_nominal_diameter_m`` already answers for MC-001's diameter, asked
     of the two inputs that matter most.
     """
-    return {
+    inputs = {
         "material_source": element.material_source,
         "material_confidence": element.material_confidence,
         "environment_source": element.environment_source,
         "environment_confidence": element.environment_confidence,
     }
+    if spec is None:
+        return inputs
+    return {**inputs, **(catalog if catalog is not None else _catalog_provenance(spec))}
 
 
 def _data_quality_issue(
@@ -890,6 +930,7 @@ def _data_quality_issue(
     *,
     check: str = "band_unassessed",
     inputs: dict[str, Any] | None = None,
+    catalog: dict[str, str] | None = None,
 ) -> Issue:
     """Report that a mechanism could not be evaluated for this element.
 
@@ -935,7 +976,7 @@ def _data_quality_issue(
             **(inputs or {}),
             # Often the explanation for the absence: an engine that could not
             # resolve a material usually could not because none was read.
-            **_provenance(element),
+            **_provenance(element, spec, catalog),
         },
         citations=[],
     )
@@ -998,7 +1039,8 @@ def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
     try:
         from app.services.corrosion_rule_catalog import load_mc_catalog
 
-        missing = list(load_mc_catalog().get("temperature_bounds_missing") or [])
+        mc_catalog = load_mc_catalog()
+        missing = list(mc_catalog.get("temperature_bounds_missing") or [])
     except Exception:  # pragma: no cover - a catalog that will not load is
         return []      # already reported by the per-element path
 
@@ -1033,6 +1075,8 @@ def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
                 "check": RULESET_TEMPERATURE_BOUNDS_MISSING,
                 "mechanism_code": MIC.code,
                 "classes": sorted(missing),
+                "catalog_source": mc_catalog.get("catalog_source", ""),
+                "catalog_payload_source": mc_catalog.get("catalog_payload_source", ""),
             },
             citations=[],
         )
@@ -1090,6 +1134,8 @@ def _finding_issue(
     band: RiskBand,
     citations: list[dict],
     allocator: IssueIdAllocator,
+    *,
+    catalog: dict[str, str] | None = None,
 ) -> Issue:
     """Build the Issue for a mechanism that did produce a band."""
     mitigations = list(getattr(result, "mitigations", []) or [])
@@ -1110,8 +1156,8 @@ def _finding_issue(
             "system": element.system,
             "ifc_type": element.ifc_type,
             # Recorded so a reviewer can see which inputs were assumed rather
-            # than read from the model.
-            **_provenance(element),
+            # than read from the model, and which catalog set the thresholds.
+            **_provenance(element, spec, catalog),
             **(
                 {"assumed_nominal_diameter_m": ASSUMED_NOMINAL_DIAMETER_M}
                 if spec is MIC
@@ -1149,23 +1195,31 @@ def _assess_elements_chunk(
     raw_items: list[tuple] = []
     mic_scored = False
     specs = tuple(spec for spec in MECHANISMS if spec.code in specs_codes)
+    # Read in this worker, from the catalog this worker holds: it is the one
+    # that scores these elements, and it need not match the parent's.
+    catalogs = {spec.code: _catalog_provenance(spec) for spec in specs}
 
     for element in elements_chunk:
         for spec in specs:
+            catalog = catalogs[spec.code]
             gated = _preflight(element, spec)
             if gated is not None:
                 check, reason, gate_inputs = gated
-                raw_items.append(("dq", element, spec.code, reason, check, gate_inputs))
+                raw_items.append(("dq", element, spec.code, reason, check, gate_inputs, catalog))
                 continue
 
             result, citations, error = _assess(element, spec)
             if result is None:
-                raw_items.append(("dq", element, spec.code, error or "no result", None, None))
+                raw_items.append(
+                    ("dq", element, spec.code, error or "no result", None, None, catalog)
+                )
                 continue
 
             raw_band = getattr(result, "risk_band", None)
             if raw_band in (None, ""):
-                raw_items.append(("dq", element, spec.code, "engine returned no band", None, None))
+                raw_items.append(
+                    ("dq", element, spec.code, "engine returned no band", None, None, catalog)
+                )
                 continue
 
             band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
@@ -1175,7 +1229,7 @@ def _assess_elements_chunk(
             if band is RiskBand.LOW and not include_low:
                 continue
 
-            raw_items.append(("finding", element, spec.code, result, band, citations))
+            raw_items.append(("finding", element, spec.code, result, band, citations, catalog))
 
     return raw_items, mic_scored
 
@@ -1270,17 +1324,27 @@ def run_corrosion_analysis(
                     mic_scored = True
                 for item in chunk_items:
                     if item[0] == "dq":
-                        _, elem, code, reason, check, gate_inputs = item
+                        _, elem, code, reason, check, gate_inputs, catalog = item
                         spec = spec_map[code]
                         issues.append(
                             _data_quality_issue(
-                                elem, spec, reason, allocator, check=check, inputs=gate_inputs
+                                elem,
+                                spec,
+                                reason,
+                                allocator,
+                                check=check,
+                                inputs=gate_inputs,
+                                catalog=catalog,
                             )
                         )
                     else:
-                        _, elem, code, result, band, citations = item
+                        _, elem, code, result, band, citations, catalog = item
                         spec = spec_map[code]
-                        issues.append(_finding_issue(elem, spec, result, band, citations, allocator))
+                        issues.append(
+                            _finding_issue(
+                                elem, spec, result, band, citations, allocator, catalog=catalog
+                            )
+                        )
         except Exception as exc:
             logger.warning("Parallel corrosion analysis failed; falling back to sequential: %s", exc)
             use_pool = False

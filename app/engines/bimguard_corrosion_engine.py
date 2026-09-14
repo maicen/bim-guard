@@ -384,6 +384,20 @@ def select_gc_mitigation(
     return list(dict.fromkeys(mits))
 
 
+def catalog_source() -> dict[str, str]:
+    """Return where the GC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_GC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_GC_CATALOG.get("catalog_payload_source", "")),
+    }
+
+
 def reload_rules() -> None:
     """Reload all GC-001 tables and thresholds from the database catalog."""
     global _GC_CATALOG, GALVANIC_SERIES, ENVIRONMENT_CLASSES, ZONE_TO_ENV

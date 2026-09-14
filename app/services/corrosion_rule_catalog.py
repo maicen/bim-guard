@@ -13,17 +13,24 @@ PRECEDENCE, HIGHEST FIRST
     3. :data:`_FALLBACK_RULESETS`, a hardcoded reduced table kept only for a
        database that is missing, unseeded or unreachable.
 
-    Every step down is a degradation, not an equivalent path, and step 3 is
-    logged at warning level. The fallback tables are NOT subsets of the stored
-    payloads. They hold fewer materials and environment classes, and where they
-    share an entry with the payload they do not always agree with it: GC-001
-    agrees on every shared value, but CC-001 differs in 5 threshold values
-    (including all three shared geometry-class risks and JT-001's class) and
-    MC-001 in 16 (flow, temperature, dead-leg and material scores and bounds).
-    The fallback also carries keys the payloads lack (MC-001 ``t_min``/``t_max``,
-    ``unknown``/``default`` material scores; GC-001 ``zone_to_env``). A catalog
-    built from them therefore scores against different numbers, not merely fewer.
-    Detail: docs/planning/corrosion_provenance_2026-09-13.md.
+    Every step down is a degradation, not an equivalent path, and both steps
+    down are logged at warning level. The fallback tables are NOT subsets of
+    the stored payloads. They hold fewer materials and environment classes, and
+    where they share an entry with the payload they do not always agree with
+    it: GC-001 agrees on every shared value, but CC-001 differs in 5 threshold
+    values (including all three shared geometry-class risks and JT-001's class)
+    and MC-001 in 16 (flow, temperature, dead-leg and material scores and
+    bounds). The fallback also carries keys the payloads lack (MC-001
+    ``t_min``/``t_max``, ``unknown``/``default`` material scores; GC-001
+    ``zone_to_env``). A catalog built from them therefore scores against
+    different numbers, not merely fewer, and can band the same element
+    differently. Detail: docs/planning/corrosion_provenance_2026-09-13.md and
+    docs/defects/corrosion-catalog-fallback-divergence.md.
+
+    Which step a catalog was built from is recorded on it as
+    ``catalog_source`` (one of :data:`CATALOG_SOURCES`) and carried onto every
+    corrosion finding, so a degraded run is distinguishable from a good one
+    after the fact.
 
 PROVENANCE
 
@@ -52,6 +59,14 @@ from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
 
 logger = get_logger(__name__)
+
+#: The catalog was built from seeded rule rows (precedence step 1).
+CATALOG_SOURCE_ROWS = "database_rows"
+#: No rows; built from the stored ``static_data_assets`` payload (step 2).
+CATALOG_SOURCE_PAYLOAD = "stored_payload"
+#: No rows and no stored payload; built from :data:`_FALLBACK_RULESETS` (step 3).
+CATALOG_SOURCE_FALLBACK = "in_memory_fallback"
+CATALOG_SOURCES = (CATALOG_SOURCE_ROWS, CATALOG_SOURCE_PAYLOAD, CATALOG_SOURCE_FALLBACK)
 
 
 class RulesetIncompleteError(RuntimeError):
@@ -316,8 +331,9 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
         under the fallback, so couples involving them were scored from an
         incomplete table rather than from their real potentials.
 
-    Falling back is logged at warning level. Silently scoring an audit from the
-    reduced table is exactly the condition that needs to be visible in a log.
+    Falling back is logged at warning level by :func:`_catalog_source`, once
+    the rows are known, because the same fallback payload is harmless when rows
+    exist and decisive when they do not.
     """
     asset_map = {
         "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
@@ -343,23 +359,100 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
 
     fallback = _FALLBACK_RULESETS.get(filename)
     if fallback is not None:
-        logger.warning(
-            "Using hardcoded fallback ruleset for %s -- stored asset %s unavailable. "
-            "Scores come from a reduced lookup table.",
-            filename,
-            asset_key or "(unmapped)",
-        )
+        # Not logged here: whether this fallback decides any score depends on
+        # whether the rules table holds rows for the ruleset, which only the
+        # caller knows. :func:`_catalog_source` logs the actual outcome.
         return fallback
 
     raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
 def _rules_for(ruleset_id: str) -> list[dict[str, Any]]:
-    """Return stored rows for a ruleset, or an empty list when unseeded."""
+    """Return stored rows for a ruleset, or an empty list when unseeded.
+
+    A failed read still returns ``[]`` -- the loaders' precedence depends on it
+    -- but it is logged, because an unreachable rules table and an unseeded one
+    lead to the same empty list and only the first is a fault.
+    """
     try:
         return RuleService().list_by_ruleset(ruleset_id)
     except Exception:
+        logger.warning(
+            "Rule rows could not be read ruleset_id=%s; the catalog treats the "
+            "ruleset as having no rows",
+            ruleset_id,
+            exc_info=True,
+        )
         return []
+
+
+def _catalog_source(
+    engine: str, filename: str, json_data: dict[str, Any], rows_found: bool
+) -> dict[str, str]:
+    """Name which precedence step a catalog is built from, and log a degradation.
+
+    Args:
+        engine: ``GC-001``, ``CC-001`` or ``MC-001``, for the log line.
+        filename: The ruleset filename passed to :func:`_load_json_ruleset`.
+        json_data: What :func:`_load_json_ruleset` returned. It is the fallback
+            exactly when it *is* the :data:`_FALLBACK_RULESETS` entry.
+        rows_found: Whether :func:`_rules_for` returned any rows.
+
+    Returns:
+        ``catalog_source`` -- the step the lookup tables came from -- and
+        ``catalog_payload_source`` -- where the JSON payload came from. With rows
+        present the payload fills only entries the rows lack (risk bands, and
+        GC-001 area-ratio bands), which is why the two are recorded separately.
+    """
+    payload_source = (
+        CATALOG_SOURCE_FALLBACK
+        if json_data is _FALLBACK_RULESETS.get(filename)
+        else CATALOG_SOURCE_PAYLOAD
+    )
+    ruleset_id = json_data.get("ruleset_id", "")
+    if rows_found:
+        source = CATALOG_SOURCE_ROWS
+        if payload_source == CATALOG_SOURCE_FALLBACK:
+            logger.warning(
+                "Catalog built from database rows engine=%s ruleset_id=%s "
+                "catalog_source=%s catalog_payload_source=%s; stored ruleset "
+                "payload unavailable, so the hardcoded fallback supplies only "
+                "entries the rows do not carry",
+                engine,
+                ruleset_id,
+                source,
+                payload_source,
+            )
+        else:
+            logger.debug(
+                "Catalog built from database rows engine=%s ruleset_id=%s "
+                "catalog_source=%s catalog_payload_source=%s",
+                engine,
+                ruleset_id,
+                source,
+                payload_source,
+            )
+    elif payload_source == CATALOG_SOURCE_PAYLOAD:
+        source = CATALOG_SOURCE_PAYLOAD
+        logger.warning(
+            "No database rows for ruleset engine=%s ruleset_id=%s catalog_source=%s; "
+            "thresholds come from the stored ruleset payload",
+            engine,
+            ruleset_id,
+            source,
+        )
+    else:
+        source = CATALOG_SOURCE_FALLBACK
+        logger.warning(
+            "Using hardcoded fallback ruleset for %s -- no database rows and stored "
+            "payload unavailable engine=%s ruleset_id=%s catalog_source=%s. Scores come "
+            "from a reduced lookup table whose values diverge from the seeded ruleset.",
+            filename,
+            engine,
+            ruleset_id,
+            source,
+        )
+    return {"catalog_source": source, "catalog_payload_source": payload_source}
 
 
 def _risk_band_thresholds(
@@ -529,6 +622,7 @@ def load_gc_catalog() -> dict[str, Any]:
     """Load the GC-001 lookup tables from the database or fallback JSON."""
     json_data = _load_json_ruleset("galvanic_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("GC-001", "galvanic_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -717,6 +811,7 @@ def load_gc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }
 
 
@@ -753,6 +848,7 @@ def load_cc_catalog() -> dict[str, Any]:
     """Load the CC-001 lookup tables from the database or fallback JSON."""
     json_data = _load_json_ruleset("crevice_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("CC-001", "crevice_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -897,6 +993,7 @@ def load_cc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }
 
 
@@ -916,6 +1013,7 @@ def load_mc_catalog() -> dict[str, Any]:
     """
     json_data = _load_json_ruleset("mic_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("MC-001", "mic_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -1130,4 +1228,5 @@ def load_mc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }

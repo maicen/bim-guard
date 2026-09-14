@@ -393,6 +393,20 @@ def select_cc_mitigation(
     return list(dict.fromkeys(mits))
 
 
+def catalog_source() -> dict[str, str]:
+    """Return where the CC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_CC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_CC_CATALOG.get("catalog_payload_source", "")),
+    }
+
+
 def reload_rules() -> None:
     """Reload all CC-001 tables and thresholds from the database catalog."""
     global _CC_CATALOG, CCT_TABLE, GEOMETRY_CLASSES, JOINT_TYPES, ENVIRONMENT_SEVERITY, MITIGATIONS_CC
