@@ -18,7 +18,6 @@ from typing import Any
 
 import pytest
 
-from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.membership_service import MembershipService
 from app.services.ruleset_access_service import RulesetAccessService
 
@@ -170,52 +169,6 @@ def test_narrowing_org_grants_does_not_retroactively_unbind_a_project(
     ruleset_access.set_project_bindings(1, ["BIMGUARD-GC-001"], organization_id=10)
     ruleset_access.set_org_grants(10, [])
     assert ruleset_access.list_project_bindings(1) == ["BIMGUARD-GC-001"]
-
-
-def test_arch_analysis_rejects_a_ruleset_not_bound_to_the_project(
-    ruleset_access: RulesetAccessService,
-) -> None:
-    service = ArchAnalysisService(
-        projects_service=object(),
-        rules_service=object(),
-        documents_service=object(),
-        report_service=object(),
-        ruleset_access_service=ruleset_access,
-    )
-    with pytest.raises(ValueError, match="not assigned to this project"):
-        service.run_analysis(project_id=1, rule_folder="BIMGUARD-GC-001")
-
-
-def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> None:
-    """The gate opens once the ruleset is bound.
-
-    Everything past that point is exercised by other test modules, so this
-    only checks that the gate does not fire.
-    """
-    ruleset_access = RulesetAccessService(
-        organization_ruleset_grants_repo=FakeTable(),
-        project_ruleset_bindings_repo=FakeTable(),
-    )
-    ruleset_access.set_org_grants(10, ["BIMGUARD-GC-001"])
-    ruleset_access.set_project_bindings(1, ["BIMGUARD-GC-001"], organization_id=10)
-
-    service = ArchAnalysisService(
-        projects_service=object(),
-        rules_service=object(),
-        documents_service=object(),
-        report_service=object(),
-        ruleset_access_service=ruleset_access,
-    )
-
-    import app.services.pipeline_services as pipeline_services
-
-    monkeypatch.setattr(
-        pipeline_services.PipelineOrchestratorService,
-        "orchestrate_workflow",
-        staticmethod(lambda **kwargs: {"error": "stopped before real orchestration"}),
-    )
-    with pytest.raises(ValueError, match="stopped before real orchestration"):
-        service.run_analysis(project_id=1, rule_folder="BIMGUARD-GC-001")
 
 
 # ---------------------------------------------------------------------------

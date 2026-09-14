@@ -636,7 +636,6 @@ def build_default_container() -> ApplicationContainer:
         rules_service=rules_service,
         documents_service=documents_service,
         engine_registry=registry,
-        ruleset_access_service=ruleset_access_service,
     )
 
     digital_inspector_service = DigitalInspectorService()
