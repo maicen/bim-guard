@@ -40,6 +40,10 @@ def _jwks() -> PyJWKClient:
     if _jwks_client is None:
         jwks_url = os.getenv("SUPABASE_JWKS_URL", "").strip()
         if not jwks_url:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+            if supabase_url:
+                jwks_url = f"{supabase_url}/auth/v1/.well-known/jwks.json"
+        if not jwks_url:
             raise RuntimeError("SUPABASE_JWKS_URL is not configured")
         _jwks_client = PyJWKClient(jwks_url)
     return _jwks_client
