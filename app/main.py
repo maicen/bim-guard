@@ -448,6 +448,33 @@ async def terms_page():
     raise HTTPException(status_code=404, detail="Terms of service not found.")
 
 
+@app.get("/sitemap.xml", response_class=FileResponse, include_in_schema=False)
+async def sitemap_xml():
+    """Serve sitemap.xml for search engine indexing."""
+    target = _resolve_public_html("sitemap.xml")
+    if target:
+        return FileResponse(target, media_type="application/xml")
+    raise HTTPException(status_code=404, detail="Sitemap not found.")
+
+
+@app.get("/robots.txt", response_class=FileResponse, include_in_schema=False)
+async def robots_txt():
+    """Serve robots.txt for search engine crawler governance."""
+    target = _resolve_public_html("robots.txt")
+    if target:
+        return FileResponse(target, media_type="text/plain")
+    raise HTTPException(status_code=404, detail="Robots.txt not found.")
+
+
+@app.get("/og-image.png", response_class=FileResponse, include_in_schema=False)
+async def og_image():
+    """Serve Open Graph social sharing preview image."""
+    target = _resolve_public_html("og-image.png")
+    if target:
+        return FileResponse(target, media_type="image/png")
+    raise HTTPException(status_code=404, detail="Open Graph image not found.")
+
+
 # Production SPA Client Serving & Fallback
 frontend_dist = Path("frontend/dist")
 if (frontend_dist / "index.html").exists():
