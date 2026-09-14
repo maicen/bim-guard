@@ -142,6 +142,36 @@ class SpatialTreeResponse(BaseModel):
     )
 
 
+class ElementRelationEdge(BaseModel):
+    """One outgoing or incoming BOT/SAREF4BLDG relationship for an element."""
+
+    predicate: str = Field(..., description="Local predicate name, e.g. adjacentZone, hasSpace")
+    guid: str = Field(..., description="GlobalId of the element on the other end of the edge")
+    label: str = Field(..., description="Human-readable name of that element")
+
+
+class ElementRelationshipsResponse(BaseModel):
+    """One element's BOT/SAREF4BLDG classification and graph relationships.
+
+    Backs the Knowledge Graph-Enriched 3D Viewport: clicking an element
+    queries the model's BOT graph for its spatial containment, boundary
+    interfaces (adjacentZone/adjacentElement), and -- for MEP elements --
+    SAREF4BLDG distribution-system typing.
+    """
+
+    project_id: int
+    guid: str
+    exists: bool = Field(..., description="Whether this GlobalId was found in the model's graph")
+    ifc_type: Optional[str] = None
+    label: Optional[str] = None
+    bot_classes: list[str] = Field(default_factory=list, description="BOT classes, e.g. Space, Element")
+    s4bldg_classes: list[str] = Field(
+        default_factory=list, description="SAREF4BLDG classes for MEP/distribution elements"
+    )
+    outgoing: list[ElementRelationEdge] = Field(default_factory=list)
+    incoming: list[ElementRelationEdge] = Field(default_factory=list)
+
+
 class GraphHealResponse(BaseModel):
     """Response from reconciling and synthesizing missing spatial boundaries."""
 

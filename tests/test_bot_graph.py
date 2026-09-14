@@ -11,6 +11,7 @@ from app.modules.ifc_reader.bot_graph import (
     build_bot_graph,
     element_uri,
     enrich_literal,
+    get_element_relationships,
 )
 
 
@@ -93,6 +94,111 @@ def test_build_bot_graph_emits_hasspace_containment():
     # generic containment predicate).
     assert (element_uri("SPACE-1"), BOT.containsElement, element_uri("DOOR-1")) in bot_graph
     assert (element_uri("SPACE-1"), BOT.hasElement, element_uri("DOOR-1")) in bot_graph
+
+
+class _FakeAdjacency:
+    """Minimal stand-in for IFCSpatialAdjacency, just the methods build_bot_graph reads."""
+
+    has_boundaries = True
+
+    def __init__(self, party_walls: list[dict], door_to_spaces: dict[str, list[str]]):
+        self._party_walls = party_walls
+        self._door_to_spaces = door_to_spaces
+
+    def get_party_walls(self) -> list[dict]:
+        return self._party_walls
+
+    def get_door_to_spaces(self) -> dict[str, list[str]]:
+        return self._door_to_spaces
+
+
+def _two_space_graph() -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_node("STOREY-1", label="Level 1", ifc_type="IfcBuildingStorey", psets={})
+    graph.add_node("SPACE-1", label="Room A", ifc_type="IfcSpace", psets={})
+    graph.add_node("SPACE-2", label="Room B", ifc_type="IfcSpace", psets={})
+    graph.add_node("WALL-1", label="Party Wall", ifc_type="IfcWall", psets={})
+    graph.add_edge("STOREY-1", "SPACE-1", rel_type="ContainedIn", color="#4CAF50")
+    graph.add_edge("STOREY-1", "SPACE-2", rel_type="ContainedIn", color="#4CAF50")
+    return graph
+
+
+def test_build_bot_graph_emits_adjacentzone_between_spaces_sharing_a_party_wall():
+    adjacency = _FakeAdjacency(
+        party_walls=[{"wall_guid": "WALL-1", "space_guids": ["SPACE-1", "SPACE-2"]}],
+        door_to_spaces={},
+    )
+
+    bot_graph = build_bot_graph(_two_space_graph(), adjacency)
+
+    assert (element_uri("SPACE-1"), BOT.adjacentZone, element_uri("SPACE-2")) in bot_graph
+    assert (element_uri("SPACE-2"), BOT.adjacentZone, element_uri("SPACE-1")) in bot_graph
+    # The wall/space relation is still one-directional.
+    assert (element_uri("WALL-1"), BOT.adjacentElement, element_uri("SPACE-1")) in bot_graph
+    assert (element_uri("SPACE-1"), BOT.adjacentElement, element_uri("WALL-1")) not in bot_graph
+
+
+def test_build_bot_graph_emits_no_adjacentzone_for_a_wall_with_one_space():
+    adjacency = _FakeAdjacency(
+        party_walls=[{"wall_guid": "WALL-1", "space_guids": ["SPACE-1"]}],
+        door_to_spaces={},
+    )
+
+    bot_graph = build_bot_graph(_two_space_graph(), adjacency)
+
+    assert len(list(bot_graph.subjects(BOT.adjacentZone, None))) == 0
+
+
+# ---------------------------------------------------------------------------
+# get_element_relationships
+# ---------------------------------------------------------------------------
+
+
+def test_get_element_relationships_for_unknown_guid():
+    bot_graph = build_bot_graph(_sample_ifc_graph())
+
+    result = get_element_relationships(bot_graph, "NOT-IN-THE-GRAPH")
+
+    assert result["exists"] is False
+    assert result["outgoing"] == []
+    assert result["incoming"] == []
+
+
+def test_get_element_relationships_reports_type_label_and_containment():
+    bot_graph = build_bot_graph(_sample_ifc_graph())
+
+    result = get_element_relationships(bot_graph, "SPACE-1")
+
+    assert result["exists"] is True
+    assert result["ifc_type"] == "IfcSpace"
+    assert result["label"] == "Corridor 101"
+    assert "Space" in result["bot_classes"]
+    # Incoming: STOREY-1 --hasSpace--> SPACE-1
+    incoming_predicates = {r["predicate"] for r in result["incoming"]}
+    assert "hasSpace" in incoming_predicates
+    # Outgoing: SPACE-1 --containsElement/hasElement--> DOOR-1
+    outgoing_predicates = {r["predicate"] for r in result["outgoing"]}
+    assert "containsElement" in outgoing_predicates
+    assert "hasElement" in outgoing_predicates
+
+
+def test_get_element_relationships_includes_adjacent_zone_and_s4bldg_type():
+    adjacency = _FakeAdjacency(
+        party_walls=[{"wall_guid": "WALL-1", "space_guids": ["SPACE-1", "SPACE-2"]}],
+        door_to_spaces={},
+    )
+    bot_graph = build_bot_graph(_two_space_graph(), adjacency)
+
+    result = get_element_relationships(bot_graph, "SPACE-1")
+    outgoing_targets = {(r["predicate"], r["guid"]) for r in result["outgoing"]}
+    assert ("adjacentZone", "SPACE-2") in outgoing_targets
+
+    graph = nx.DiGraph()
+    graph.add_node("STOREY-1", label="Level 1", ifc_type="IfcBuildingStorey", psets={})
+    graph.add_node("SENSOR-1", label="Smoke Sensor", ifc_type="IfcSensor", psets={})
+    graph.add_edge("STOREY-1", "SENSOR-1", rel_type="ContainedIn", color="#4CAF50")
+    sensor_result = get_element_relationships(build_bot_graph(graph), "SENSOR-1")
+    assert "Sensor" in sensor_result["s4bldg_classes"]
 
 
 def test_build_bot_graph_emits_saref4bldg_type_for_distribution_elements():

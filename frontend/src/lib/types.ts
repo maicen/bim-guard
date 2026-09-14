@@ -1839,3 +1839,23 @@ export interface SpatialTreeResponse {
   root: SpatialTreeNodeContract | null;
 }
 
+/** Mirrors ElementRelationEdge in app/modules/contracts.py. */
+export interface ElementRelationEdge {
+  predicate: string;
+  guid: string;
+  label: string;
+}
+
+/** Mirrors ElementRelationshipsResponse in app/modules/contracts.py. */
+export interface ElementRelationshipsResponse {
+  project_id: number;
+  guid: string;
+  exists: boolean;
+  ifc_type?: string | null;
+  label?: string | null;
+  bot_classes: string[];
+  s4bldg_classes: string[];
+  outgoing: ElementRelationEdge[];
+  incoming: ElementRelationEdge[];
+}
+

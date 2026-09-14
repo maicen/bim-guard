@@ -28,6 +28,7 @@ import type {
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
   DocumentUpdatePayload,
+  ElementRelationshipsResponse,
   EnvVarStatusResponse,
   GitHubRepo,
   GitHubRepoCreatePayload,
@@ -2226,6 +2227,17 @@ export const graphApi = {
   async getSpatialTree(projectId: number): Promise<SpatialTreeResponse> {
     const res = await apiFetch(`${API_BASE}/graph/${projectId}/spatial-tree`);
     return handleResponse<SpatialTreeResponse>(res);
+  },
+
+  /** One element's BOT/SAREF4BLDG classification and graph relationships. */
+  async getElementRelationships(
+    projectId: number,
+    guid: string,
+  ): Promise<ElementRelationshipsResponse> {
+    const res = await apiFetch(
+      `${API_BASE}/graph/${projectId}/element/${encodeURIComponent(guid)}/relationships`,
+    );
+    return handleResponse<ElementRelationshipsResponse>(res);
   },
 };
 

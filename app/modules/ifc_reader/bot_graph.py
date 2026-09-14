@@ -133,7 +133,11 @@ def build_bot_graph(ifc_graph: nx.DiGraph, adjacency: Any | None = None) -> Grap
 
 
 def _add_adjacency_triples(graph: Graph, adjacency: Any) -> None:
-    """Add `bot:hasSpace` (door/space) and `bot:adjacentElement` (party-wall) triples."""
+    """Add door/space, party-wall, and space/space adjacency triples.
+
+    `bot:hasSpace` (door/space), `bot:adjacentElement` (party-wall), and
+    `bot:adjacentZone` (space/space, symmetric).
+    """
     for door_guid, space_guids in adjacency.get_door_to_spaces().items():
         door = element_uri(door_guid)
         for space_guid in space_guids:
@@ -141,8 +145,107 @@ def _add_adjacency_triples(graph: Graph, adjacency: Any) -> None:
 
     for party_wall in adjacency.get_party_walls():
         wall = element_uri(party_wall["wall_guid"])
-        for space_guid in party_wall["space_guids"]:
+        space_guids = party_wall["space_guids"]
+        for space_guid in space_guids:
             graph.add((wall, BOT.adjacentElement, element_uri(space_guid)))
+
+        # Every pair of spaces sharing this wall is a pair of adjacent zones
+        # -- emitted in both directions, since "adjacent to" is inherently
+        # symmetric for two spaces (unlike bot:adjacentElement above, which
+        # is deliberately one-directional: the wall bounds the space, not
+        # the reverse).
+        for i, guid_a in enumerate(space_guids):
+            for guid_b in space_guids[i + 1 :]:
+                zone_a, zone_b = element_uri(guid_a), element_uri(guid_b)
+                graph.add((zone_a, BOT.adjacentZone, zone_b))
+                graph.add((zone_b, BOT.adjacentZone, zone_a))
+
+
+def get_element_relationships(bot_graph: Graph, guid: str) -> dict[str, Any]:
+    """Return one element's BOT/SAREF4BLDG classification and relationships.
+
+    Reads an already-built `build_bot_graph()` output rather than a separate
+    persisted triplestore, so the Knowledge Graph-Enriched 3D Viewport works
+    the same way `graph_routes.py`'s `/status`/`/spatial-tree` endpoints do --
+    on demand from the primary model file, regardless of whether this project
+    has ever had `enable_shacl=True` persist a graph.
+
+    Relationships are limited to BOT/SAREF4BLDG predicates (containment,
+    `bot:adjacentElement`, `bot:adjacentZone`, `bot:hasSpace`) -- not the
+    `bimguard:` engine-literal enrichments (`enrich_literal`), which are
+    per-rule computed values, not graph structure.
+    """
+    subject = element_uri(guid)
+    has_outgoing = any(bot_graph.triples((subject, None, None)))
+    has_incoming = any(bot_graph.triples((None, None, subject)))
+    if not has_outgoing and not has_incoming:
+        return {
+            "exists": False,
+            "ifc_type": None,
+            "label": None,
+            "bot_classes": [],
+            "s4bldg_classes": [],
+            "outgoing": [],
+            "incoming": [],
+        }
+
+    ifc_type: str | None = None
+    bot_classes: list[str] = []
+    s4bldg_classes: list[str] = []
+    for rdf_class in bot_graph.objects(subject, RDF.type):
+        class_str = str(rdf_class)
+        if class_str.startswith(str(BOT)):
+            bot_classes.append(class_str[len(str(BOT)) :])
+        elif class_str.startswith(str(S4BLDG)):
+            s4bldg_classes.append(class_str[len(str(S4BLDG)) :])
+        elif class_str.startswith(str(BIMGUARD)) and class_str[len(str(BIMGUARD)) :].startswith("Ifc"):
+            ifc_type = class_str[len(str(BIMGUARD)) :]
+
+    label = next(bot_graph.objects(subject, RDFS.label), None)
+
+    def _local_name(uri: URIRef) -> str:
+        text = str(uri)
+        return text.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+
+    def _node_label(node: URIRef) -> str:
+        found = next(bot_graph.objects(node, RDFS.label), None)
+        return str(found) if found else _local_name(node)
+
+    outgoing: list[dict[str, str]] = []
+    for predicate, obj in bot_graph.predicate_objects(subject):
+        pred_str = str(predicate)
+        if isinstance(obj, Literal) or not (pred_str.startswith(str(BOT)) or pred_str.startswith(str(S4BLDG))):
+            continue
+        outgoing.append(
+            {
+                "predicate": _local_name(predicate),
+                "guid": _local_name(obj),
+                "label": _node_label(obj),
+            }
+        )
+
+    incoming: list[dict[str, str]] = []
+    for subj, predicate in bot_graph.subject_predicates(subject):
+        pred_str = str(predicate)
+        if not (pred_str.startswith(str(BOT)) or pred_str.startswith(str(S4BLDG))):
+            continue
+        incoming.append(
+            {
+                "predicate": _local_name(predicate),
+                "guid": _local_name(subj),
+                "label": _node_label(subj),
+            }
+        )
+
+    return {
+        "exists": True,
+        "ifc_type": ifc_type,
+        "label": str(label) if label else None,
+        "bot_classes": bot_classes,
+        "s4bldg_classes": s4bldg_classes,
+        "outgoing": outgoing,
+        "incoming": incoming,
+    }
 
 
 def enrich_literal(

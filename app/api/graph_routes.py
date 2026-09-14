@@ -11,11 +11,13 @@ from app.api.dependencies import get_graph_service, get_models_service
 from app.api.projects import ProjectAccessChecker, get_project_access_checker
 from app.modules.comparator.issue_schema import build_issue_proof_graph
 from app.modules.contracts import (
+    ElementRelationshipsResponse,
     GraphHealResponse,
     GraphStatusContract,
     IssueProofGraphContract,
     SpatialTreeResponse,
 )
+from app.modules.ifc_reader.bot_graph import build_bot_graph, get_element_relationships
 from app.modules.ifc_reader.ifc_graph import (
     build_ifc_graph,
     build_ifc_graph_summary,
@@ -184,6 +186,52 @@ def get_spatial_tree(
     except Exception as exc:
         logger.warning("Failed to build spatial tree for project %d: %s", project_id, exc)
         return SpatialTreeResponse(project_id=project_id, root=None)
+
+
+@router.get(
+    "/{project_id}/element/{guid}/relationships",
+    response_model=ElementRelationshipsResponse,
+    summary="Get one element's BOT/SAREF4BLDG classification and relationships",
+)
+def get_element_relationships_route(
+    project_id: int,
+    guid: str,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
+) -> ElementRelationshipsResponse:
+    """Backs the Knowledge Graph-Enriched 3D Viewport.
+
+    Click an element, see its BOT spatial containment/boundary interfaces
+    and SAREF4BLDG typing.
+
+    Builds the BOT graph on demand from the primary model file, the same way
+    `/status` and `/spatial-tree` do, rather than depending on a persisted
+    triplestore -- this works regardless of whether the project has ever had
+    an `enable_shacl=True` analysis run.
+    """
+    project_access(project_id)
+
+    path = models_service.resolve_primary_path(project_id)
+    if path is None or not path.exists():
+        return ElementRelationshipsResponse(project_id=project_id, guid=guid, exists=False)
+
+    try:
+        import ifcopenshell
+
+        model = ifcopenshell.open(str(path))
+        ifc_graph = build_ifc_graph(model)
+        adjacency = IFCSpatialAdjacency(model, fallback_to_geometric=True).build()
+        bot_graph = build_bot_graph(ifc_graph, adjacency)
+        relationships = get_element_relationships(bot_graph, guid)
+        return ElementRelationshipsResponse(project_id=project_id, guid=guid, **relationships)
+    except Exception as exc:
+        logger.warning(
+            "Failed to resolve element relationships for project %d guid %s: %s",
+            project_id,
+            guid,
+            exc,
+        )
+        return ElementRelationshipsResponse(project_id=project_id, guid=guid, exists=False)
 
 
 @router.post(

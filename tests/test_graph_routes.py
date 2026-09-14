@@ -117,6 +117,15 @@ def test_graph_routes_endpoints():
             assert tree_data["project_id"] == 101
             assert tree_data["root"] is None
 
+        # Test element relationships endpoint with no file (graceful fallback)
+        with patch("app.services.models_service.ModelsService.resolve_primary_path", return_value=None):
+            res = client.get("/api/graph/101/element/SOME-GUID/relationships")
+            assert res.status_code == 200
+            rel_data = res.json()
+            assert rel_data["project_id"] == 101
+            assert rel_data["guid"] == "SOME-GUID"
+            assert rel_data["exists"] is False
+
     finally:
         app.dependency_overrides.pop(get_project_access_checker, None)
 
