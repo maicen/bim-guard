@@ -393,11 +393,17 @@ def _crevice_citations(result) -> list[dict]:
 
 
 def _mic_citations(result) -> list[dict]:
-    """Cite the standards and the classes MC-001 actually applied."""
+    """Cite the standards and the classes MC-001 actually applied.
+
+    The first entry names the body of practice for the MIC mechanism, not a
+    document: the ruleset's ASTM G-187 and "NACCE TPC 11" citations are suspect
+    (docs/planning/corrosion_provenance_2026-09-13.md §5), and no standard
+    supplies MC-001's flow-class thresholds.
+    """
     return [
         {
-            "standard": "ASTM G-187",
-            "clause": "MIC assessment standard practice",
+            "standard": "AMPP (formerly NACE) industry practice",
+            "clause": "MIC mechanism only; MC-001 flow-class threshold is authored calibration, not a standard value",
             "reason": f"flow class {result.flow_velocity_class}",
         },
         {

@@ -12,6 +12,21 @@ Standards referenced:
   - ISO 19650 (BIM information management, IFC property set framework)
   - buildingSMART BCF 2.1 (issue tracking specification)
 
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-GC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts:
+  docs/planning/corrosion_provenance_2026-09-13.md.
+
+  XM-001 reads this engine's galvanic series and voltage thresholds at runtime,
+  so the same statement applies to the potentials and voltages XM-001 scores.
+
 Weighted composite score:
   Score_GC = (0.50 × voltage_risk)
             + (0.30 × area_ratio_risk)

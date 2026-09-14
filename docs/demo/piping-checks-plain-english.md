@@ -26,7 +26,7 @@ Every pipe that gets checked comes out with one of these:
 
 That last one matters. A lot of software would fill in the blanks with an assumption and give you an answer anyway. BIMGUARD doesn't. If the model doesn't say what a pipe is made of, the check says "I can't tell you" and explains what's missing. A wrong answer that looks confident is worse than an honest "don't know".
 
-Every result also shows its working: which rule was applied, which published engineering standard the rule came from, and where each piece of data came from. Anyone can trace a result back to the page in the standard that justifies it.
+Every result also shows its working: which rule was applied, which published engineering standard governs that kind of corrosion, and where each piece of data came from. The numbers behind the rules are BIMGUARD's own calibration written against those standards, not figures copied from them, so a corrosion engineer should check them before a result is relied on.
 
 ---
 
@@ -105,6 +105,6 @@ Neither family is better; they see different things. Together they cover the fiv
 
 ## What comes out the other end
 
-Every pipe scored Medium or worse becomes an *issue* in a standard file format that any building-design program can open. Each issue points at the exact pipe in the 3D model, says which check raised it, gives the score and the reason, names the standard the rule came from, and suggests a fix. The designer opens the file, clicks an issue, and the model jumps to the pipe in question.
+Every pipe scored Medium or worse becomes an *issue* in a standard file format that any building-design program can open. Each issue points at the exact pipe in the 3D model, says which check raised it, gives the score and the reason, names the standard that governs that kind of corrosion, and suggests a fix. The designer opens the file, clicks an issue, and the model jumps to the pipe in question.
 
 Pipes scored Low go into a spreadsheet instead — an asset register — so there's a complete record of everything that was checked, including the ones that passed and the ones the model didn't contain enough data to judge.
