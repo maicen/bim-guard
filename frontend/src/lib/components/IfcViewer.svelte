@@ -2,7 +2,7 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree } from "lucide-svelte";
+  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree, Terminal } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
   import { resolvedTheme } from "../theme";
@@ -12,6 +12,7 @@
   import LayersPanel from "./viewer/LayersPanel.svelte";
   import DrawingsPanel from "./viewer/DrawingsPanel.svelte";
   import SpatialTreePanel from "./viewer/SpatialTreePanel.svelte";
+  import QueryConsolePanel from "./viewer/QueryConsolePanel.svelte";
   import PropertiesSection from "./viewer/PropertiesSection.svelte";
   import { AccordionRoot } from "./ui";
 
@@ -68,6 +69,7 @@
   const RIGHT_DOCK_SECTION_ICONS = [
     { id: "bcf-topics", label: "BCF Topics", icon: ClipboardList },
     { id: "spatial-tree", label: "Spatial Hierarchy", icon: ListTree },
+    { id: "query-console", label: "Query Console", icon: Terminal },
     { id: "layers", label: "Layers", icon: LayoutGrid },
     { id: "drawings", label: "Drawings", icon: PenTool },
   ];
@@ -320,6 +322,9 @@
         </PropertiesSection>
         <PropertiesSection value="spatial-tree" title="Spatial Hierarchy" icon={ListTree}>
           <SpatialTreePanel {projectId} />
+        </PropertiesSection>
+        <PropertiesSection value="query-console" title="Query Console" icon={Terminal}>
+          <QueryConsolePanel {projectId} />
         </PropertiesSection>
         <PropertiesSection value="layers" title="Layers" icon={LayoutGrid}>
           <LayersPanel {viewerAPI} />

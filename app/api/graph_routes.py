@@ -7,12 +7,17 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_graph_service, get_models_service
+from app.api.dependencies import get_graph_service, get_models_service, get_rules_service
 from app.api.projects import ProjectAccessChecker, get_project_access_checker
 from app.modules.comparator.issue_schema import build_issue_proof_graph
 from app.modules.contracts import (
+    CodeToIfcTraceEntry,
+    CodeToIfcTraceResponse,
     ElementRelationshipsResponse,
     GraphHealResponse,
+    GraphQueryPresetListResponse,
+    GraphQueryPresetSummary,
+    GraphQueryResultResponse,
     GraphStatusContract,
     IssueProofGraphContract,
     SpatialTreeResponse,
@@ -26,7 +31,9 @@ from app.modules.ifc_reader.ifc_graph import (
 )
 from app.modules.ifc_reader.ifc_spatial import IFCSpatialAdjacency, heal_spatial_boundaries
 from app.services.graph_database import GraphService
+from app.services.graph_query_presets import GRAPH_QUERY_PRESETS, get_preset, run_preset
 from app.services.models_service import ModelsService
+from app.services.rules_service import RuleService
 
 logger = logging.getLogger("bimguard.api.graph")
 
@@ -232,6 +239,129 @@ def get_element_relationships_route(
             exc,
         )
         return ElementRelationshipsResponse(project_id=project_id, guid=guid, exists=False)
+
+
+@router.get(
+    "/query-presets",
+    response_model=GraphQueryPresetListResponse,
+    summary="List available GraphRAG query console Cypher presets",
+)
+def list_graph_query_presets() -> GraphQueryPresetListResponse:
+    """List every preset the query console can run.
+
+    Not project-scoped: the presets themselves are the same for every
+    project, only their result rows differ (see `run_graph_query_preset`).
+    """
+    return GraphQueryPresetListResponse(
+        presets=[
+            GraphQueryPresetSummary(
+                key=preset.key,
+                label=preset.label,
+                description=preset.description,
+                params=list(preset.params),
+            )
+            for preset in GRAPH_QUERY_PRESETS
+        ]
+    )
+
+
+@router.post(
+    "/{project_id}/query-presets/{preset_key}/run",
+    response_model=GraphQueryResultResponse,
+    summary="Run one Cypher preset against the project's graph",
+)
+def run_graph_query_preset(
+    project_id: int,
+    preset_key: str,
+    params: dict[str, Any],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> GraphQueryResultResponse:
+    """Run one named Cypher preset, `project_id` always injected server-side.
+
+    Free-form Cypher is not exposed at all -- see
+    `app.services.graph_query_presets` for why the property graph specifically
+    (unlike the triplestore) cannot safely accept caller-supplied query text.
+    """
+    project_access(project_id)
+
+    preset = get_preset(preset_key)
+    if preset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown preset {preset_key!r}.")
+
+    try:
+        rows = run_preset(graph_service, preset, project_id=project_id, params=params)
+        return GraphQueryResultResponse(rows=rows, row_count=len(rows))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.warning(
+            "Graph query preset failed project_id=%d preset=%s: %s", project_id, preset_key, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Preset query failed: {exc}"
+        )
+
+
+@router.get(
+    "/{project_id}/code-to-ifc-trace",
+    response_model=CodeToIfcTraceResponse,
+    summary="Trace rule catalog clauses to the IFC classes they govern in this project's model",
+)
+def get_code_to_ifc_trace(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
+    rules_service: Annotated[RuleService, Depends(get_rules_service)],
+) -> CodeToIfcTraceResponse:
+    """Build a minimal Code-to-BIM Ontology trace: rule -> target_ifc_class -> model elements.
+
+    `target_ifc_class` is the only link between a regulatory clause and a
+    BIM component that exists today (no dedicated code-document-to-element
+    graph has been built -- see the SRS's GraphRAG section). Cross-references
+    against this project's actual element type counts so the trace shows
+    only clauses whose target class this model actually contains, rather
+    than the whole rule catalog regardless of relevance.
+    """
+    project_access(project_id)
+
+    path = models_service.resolve_primary_path(project_id)
+    if path is None or not path.exists():
+        return CodeToIfcTraceResponse(project_id=project_id, entries=[])
+
+    try:
+        import ifcopenshell
+
+        model = ifcopenshell.open(str(path))
+        graph = build_ifc_graph(model)
+        summary = build_ifc_graph_summary(graph, include_centrality=False)
+        type_counts: dict[str, int] = summary.get("type_counts", {})
+
+        entries: list[CodeToIfcTraceEntry] = []
+        for rule in rules_service.list_rules():
+            target_class = str(rule.get("target_ifc_class") or "").strip()
+            if not target_class:
+                continue
+            element_count = type_counts.get(target_class, 0)
+            if element_count == 0:
+                continue
+            entries.append(
+                CodeToIfcTraceEntry(
+                    rule_id=rule["id"],
+                    reference=str(rule.get("reference") or ""),
+                    description=str(rule.get("description") or ""),
+                    target_ifc_class=target_class,
+                    element_count=element_count,
+                    source_document_id=rule.get("source_document_id"),
+                    source_page_number=rule.get("source_page_number"),
+                )
+            )
+
+        entries.sort(key=lambda e: e.element_count, reverse=True)
+        return CodeToIfcTraceResponse(project_id=project_id, entries=entries)
+    except Exception as exc:
+        logger.warning("Failed to build code-to-IFC trace for project %d: %s", project_id, exc)
+        return CodeToIfcTraceResponse(project_id=project_id, entries=[])
 
 
 @router.post(

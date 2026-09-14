@@ -1859,3 +1859,46 @@ export interface ElementRelationshipsResponse {
   incoming: ElementRelationEdge[];
 }
 
+/** Mirrors GraphQueryPresetSummary in app/modules/contracts.py. */
+export interface GraphQueryPresetSummary {
+  key: string;
+  label: string;
+  description: string;
+  params: string[];
+}
+
+/** Mirrors GraphQueryPresetListResponse in app/modules/contracts.py. */
+export interface GraphQueryPresetListResponse {
+  presets: GraphQueryPresetSummary[];
+}
+
+/** Mirrors GraphQueryResultResponse in app/modules/contracts.py. */
+export interface GraphQueryResultResponse {
+  rows: Record<string, unknown>[];
+  row_count: number;
+}
+
+/** Mirrors CodeToIfcTraceEntry in app/modules/contracts.py. */
+export interface CodeToIfcTraceEntry {
+  rule_id: number;
+  reference: string;
+  description: string;
+  target_ifc_class: string;
+  element_count: number;
+  source_document_id?: number | null;
+  source_page_number?: number | null;
+}
+
+/** Mirrors CodeToIfcTraceResponse in app/modules/contracts.py. */
+export interface CodeToIfcTraceResponse {
+  project_id: number;
+  entries: CodeToIfcTraceEntry[];
+}
+
+/** Mirrors the SPARQL JSON results shape execute_sparql_query returns. */
+export interface SparqlQueryResult {
+  head?: { vars: string[] };
+  results?: { bindings: Record<string, { type: string; value: string }>[] };
+  boolean?: boolean;
+}
+

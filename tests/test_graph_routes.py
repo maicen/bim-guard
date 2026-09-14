@@ -164,3 +164,93 @@ def test_get_issue_proof_uses_the_real_stored_issue_not_a_dummy():
             assert data["element_id"] != "2O2Fr$t4X7Zf8NOew3FL9r"
     finally:
         app.dependency_overrides.pop(get_project_access_checker, None)
+
+
+# ---------------------------------------------------------------------------
+# GraphRAG query console: presets
+# ---------------------------------------------------------------------------
+
+
+def test_list_graph_query_presets_returns_the_registry():
+    client = TestClient(app)
+
+    res = client.get("/api/graph/query-presets")
+
+    assert res.status_code == 200
+    data = res.json()
+    keys = {p["key"] for p in data["presets"]}
+    assert "element-counts-by-type" in keys
+    assert "element-neighbors" in keys
+
+
+def test_run_graph_query_preset_end_to_end_against_real_kuzu(tmp_path):
+    from app.api.dependencies import get_graph_service
+    from app.services.graph_database import GraphService
+    from app.services.kuzu_provider import KuzuDatabaseProvider
+
+    provider = KuzuDatabaseProvider(db_path=str(tmp_path / "graph"))
+    test_service = GraphService(provider=provider)
+    test_service.add_nodes_batch(
+        "IfcWall",
+        [
+            {"id": "P1-W1", "guid": "W1", "name": "Wall 1", "ifc_type": "IfcWall", "project_id": "1"},
+            {"id": "P2-W1", "guid": "W1", "name": "Other Wall", "ifc_type": "IfcWall", "project_id": "2"},
+        ],
+    )
+
+    client = TestClient(app)
+    app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
+    app.dependency_overrides[get_graph_service] = lambda: test_service
+
+    try:
+        res = client.post("/api/graph/1/query-presets/element-counts-by-type/run", json={})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["rows"] == [{"type": "IfcWall", "count": 1}]
+        assert data["row_count"] == 1
+    finally:
+        app.dependency_overrides.pop(get_project_access_checker, None)
+        app.dependency_overrides.pop(get_graph_service, None)
+        provider.close()
+
+
+def test_run_graph_query_preset_unknown_key_404s():
+    client = TestClient(app)
+    app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
+
+    try:
+        res = client.post("/api/graph/1/query-presets/not-a-real-preset/run", json={})
+        assert res.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_project_access_checker, None)
+
+
+def test_run_graph_query_preset_missing_param_400s():
+    client = TestClient(app)
+    app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
+
+    try:
+        res = client.post("/api/graph/1/query-presets/element-neighbors/run", json={})
+        assert res.status_code == 400
+    finally:
+        app.dependency_overrides.pop(get_project_access_checker, None)
+
+
+# ---------------------------------------------------------------------------
+# Code-to-IFC trace
+# ---------------------------------------------------------------------------
+
+
+def test_code_to_ifc_trace_with_no_file_returns_empty():
+    client = TestClient(app)
+    app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
+
+    try:
+        with patch("app.services.models_service.ModelsService.resolve_primary_path", return_value=None):
+            res = client.get("/api/graph/101/code-to-ifc-trace")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["project_id"] == 101
+            assert data["entries"] == []
+    finally:
+        app.dependency_overrides.pop(get_project_access_checker, None)

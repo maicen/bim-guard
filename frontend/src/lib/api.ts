@@ -21,6 +21,7 @@ import type {
   CDESyncResponse,
   CDEUserResponse,
   CDEVersionsResponse,
+  CodeToIfcTraceResponse,
   CurrentUserResponse,
   DocumentDetail,
   DocumentItem,
@@ -36,6 +37,8 @@ import type {
   GitHubRepoUpdatePayload,
   GoogleDriveImportPayload,
   GoogleDriveImportResponse,
+  GraphQueryPresetListResponse,
+  GraphQueryResultResponse,
   IdsImportResult,
   NamingCatalog,
   NamingConfig,
@@ -100,6 +103,7 @@ import type {
   RuleSnapshotCreatePayload,
   RuleShaclShapeResponse,
   RuleSourceResponse,
+  SparqlQueryResult,
   SpatialTreeResponse,
   UserProfile,
   WorkflowStatus,
@@ -2238,6 +2242,53 @@ export const graphApi = {
       `${API_BASE}/graph/${projectId}/element/${encodeURIComponent(guid)}/relationships`,
     );
     return handleResponse<ElementRelationshipsResponse>(res);
+  },
+
+  /** Every Cypher preset the GraphRAG query console can run (not project-scoped). */
+  async listQueryPresets(): Promise<GraphQueryPresetListResponse> {
+    const res = await apiFetch(`${API_BASE}/graph/query-presets`);
+    return handleResponse<GraphQueryPresetListResponse>(res);
+  },
+
+  /** Run one named Cypher preset; project_id is always enforced server-side. */
+  async runQueryPreset(
+    projectId: number,
+    presetKey: string,
+    params: Record<string, string>,
+  ): Promise<GraphQueryResultResponse> {
+    const res = await apiFetch(
+      `${API_BASE}/graph/${projectId}/query-presets/${encodeURIComponent(presetKey)}/run`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      },
+    );
+    return handleResponse<GraphQueryResultResponse>(res);
+  },
+
+  /** Rule catalog clauses traced to the IFC classes they govern in this project's model. */
+  async getCodeToIfcTrace(projectId: number): Promise<CodeToIfcTraceResponse> {
+    const res = await apiFetch(`${API_BASE}/graph/${projectId}/code-to-ifc-trace`);
+    return handleResponse<CodeToIfcTraceResponse>(res);
+  },
+};
+
+export const sparqlApi = {
+  /**
+   * Run a free-form SPARQL SELECT/ASK/CONSTRUCT query against the project's
+   * named graph. Unlike the Cypher preset console, this is safe to expose
+   * as free text: GraphTriplestoreService.query() only accepts pyoxigraph's
+   * read-only query forms (never SPARQL Update) and is tenant-isolated via
+   * named_graphs scoping to this project alone.
+   */
+  async query(projectId: number, query: string): Promise<SparqlQueryResult> {
+    const res = await apiFetch(`${API_BASE}/sparql/${projectId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    return handleResponse<SparqlQueryResult>(res);
   },
 };
 

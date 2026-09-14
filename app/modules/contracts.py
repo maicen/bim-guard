@@ -172,6 +172,62 @@ class ElementRelationshipsResponse(BaseModel):
     incoming: list[ElementRelationEdge] = Field(default_factory=list)
 
 
+class GraphQueryPresetSummary(BaseModel):
+    """One available Cypher preset for the GraphRAG query console.
+
+    Free-form Cypher is deliberately not exposed -- see
+    `app.services.graph_query_presets` -- so the console can only ever run
+    one of these, each already scoped to the requesting project server-side.
+    """
+
+    key: str
+    label: str
+    description: str
+    params: list[str] = Field(
+        default_factory=list, description="Extra parameter names the caller must supply to run this preset"
+    )
+
+
+class GraphQueryPresetListResponse(BaseModel):
+    """Every Cypher preset the query console can run."""
+
+    presets: list[GraphQueryPresetSummary] = Field(default_factory=list)
+
+
+class GraphQueryResultResponse(BaseModel):
+    """Result rows from running one Cypher preset."""
+
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    row_count: int = 0
+
+
+class CodeToIfcTraceEntry(BaseModel):
+    """One rule (regulatory clause) traced to the IFC class it governs.
+
+    The only faithful link between "a clause" and "a component" that exists
+    today is a rule's `target_ifc_class` -- there is no dedicated
+    code-document-to-BIM-element data model yet (see the SRS's GraphRAG
+    section). `element_count` cross-references the project's actual model
+    rather than the rule catalog alone, so the trace shows only clauses this
+    project's model can actually be checked against.
+    """
+
+    rule_id: int
+    reference: str
+    description: str
+    target_ifc_class: str
+    element_count: int
+    source_document_id: Optional[int] = None
+    source_page_number: Optional[int] = None
+
+
+class CodeToIfcTraceResponse(BaseModel):
+    """Every rule in the catalog whose target IFC class this project's model contains."""
+
+    project_id: int
+    entries: list[CodeToIfcTraceEntry] = Field(default_factory=list)
+
+
 class GraphHealResponse(BaseModel):
     """Response from reconciling and synthesizing missing spatial boundaries."""
 
