@@ -537,6 +537,18 @@ offline from the `20260806180500` payload. Only `source_text` changes. The
 `parameters` JSON of those rows still carries the old `reference` key, and the
 static asset re-seed is still not written. No SQL was run.
 
+The seeder is now corrected on the same branch. `_seed_mc001` maps the five
+distinct old payload references (seven materials) to the wording above. That
+string is byte-identical to the migration's. An offline seed of the
+`20260806180500` payload gives 57 rows before and after: exactly those 7 differ,
+and only in `source_text`. The seeder inserts only. `_seed_mc001` returns early
+once `BIMGUARD-MC-001` has any row, and the insert has no conflict or update
+clause. So a restart never rewrites a stored row, and **the migration is still
+needed** for databases seeded before this change. The seeder fix only stops a
+fresh seed from reintroducing the old text. `source_text` feeds no finding or
+score. It reaches the rules API response, keyword search, ruleset export and the
+rules UI.
+
 ### 12.3 The seismic "remnant" in `ruleset_seeder.py` is neither a second site nor an incomplete fix
 
 §9 recorded that `ruleset_seeder.py` "still describes seismic brace spacing as
