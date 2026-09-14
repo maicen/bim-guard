@@ -77,6 +77,12 @@ class ObjectStorage:
 
         # 2. HTTP/HTTPS URL (e.g. GitHub raw model URLs)
         if reference.startswith("http://") or reference.startswith("https://"):
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(reference, allow_localhost=False):
+                logger.warning("Blocked unsafe remote model URL ref=%s (SSRF protection)", reference)
+                return None
+
             import hashlib
 
             import httpx

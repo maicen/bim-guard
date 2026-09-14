@@ -77,6 +77,12 @@ class LLMProviderInstancesService:
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         if self.get_by_name(organization_id, clean_name):
             raise ValueError(f"An instance named '{clean_name}' already exists in this organization.")
+        clean_base = (api_base or "").strip().rstrip("/")
+        if clean_base:
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
+                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
 
         clean_is_default = bool(is_default)
         if clean_is_default:
@@ -88,7 +94,7 @@ class LLMProviderInstancesService:
             "name": clean_name,
             "kind": clean_kind,
             "api_key": (api_key or "").strip(),
-            "api_base": (api_base or "").strip().rstrip("/"),
+            "api_base": clean_base,
             "is_default": clean_is_default,
             "is_enabled": bool(is_enabled),
             "notes": (notes or "").strip(),
@@ -130,7 +136,13 @@ class LLMProviderInstancesService:
         if api_key is not None:
             updates["api_key"] = api_key.strip()
         if api_base is not None:
-            updates["api_base"] = api_base.strip().rstrip("/")
+            clean_base = api_base.strip().rstrip("/")
+            if clean_base:
+                from app.services.ssrf_protection import is_safe_url
+
+                if not is_safe_url(clean_base, allow_localhost=(existing.get("kind") == "ollama")):
+                    raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
+            updates["api_base"] = clean_base
         if is_enabled is not None:
             updates["is_enabled"] = bool(is_enabled)
         if notes is not None:
@@ -179,6 +191,11 @@ class LLMProviderInstancesService:
         if driver.requires_api_key and not clean_key:
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         clean_base = (api_base or "").strip().rstrip("/")
+        if clean_base:
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
+                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
         return await driver.test_connection(api_key=clean_key, api_base=clean_base or None)
 
     @staticmethod

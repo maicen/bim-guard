@@ -24,8 +24,9 @@ from app.api.dependencies import (
     get_documents_service,
     get_membership_service,
     get_parsing_engine_instances_service,
+    get_profile_service,
 )
-from app.auth import get_current_user, get_current_user_flexible
+from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEState,
@@ -56,6 +57,7 @@ from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
 from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
+from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.utils import safe_upload_name, validate_document_upload
 
@@ -77,11 +79,96 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 flexible_router = APIRouter(dependencies=[Depends(get_current_user_flexible)])
 
 
+def _require_document_grant(
+    document_id: Optional[int],
+    current_user: CurrentUser,
+    memberships: MembershipService,
+    document_access: DocumentAccessService,
+    profiles: ProfileService,
+    *,
+    for_mutation: bool = False,
+) -> None:
+    """Raise 403 unless *current_user* may access or mutate *document_id*.
+
+    Documents are global records whose access is gated by organization grants
+    (via ``organization_document_grants``). A superadmin bypasses the check.
+    For regular users, at least one of their organizations must hold a grant
+    for this document.
+    """
+    if document_id is None:
+        return
+    if profiles.is_superadmin(current_user.id):
+        return
+
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    for org_id in org_ids:
+        if document_id in document_access.list_org_grants(org_id):
+            if for_mutation:
+                role = memberships.get_role(org_id, current_user.id)
+                if role not in ("owner", "admin", "member"):
+                    continue
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Your organization has not been granted access to document {document_id}.",
+    )
+
+
+class DocumentAccessChecker:
+    """Callable wrapper around :func:`_require_document_grant`."""
+
+    def __init__(
+        self,
+        current_user: CurrentUser,
+        memberships: MembershipService,
+        document_access: DocumentAccessService,
+        profiles: ProfileService,
+    ) -> None:
+        self._current_user = current_user
+        self._memberships = memberships
+        self._document_access = document_access
+        self._profiles = profiles
+
+    def __call__(self, document_id: Optional[int], *, for_mutation: bool = False) -> None:
+        _require_document_grant(
+            document_id,
+            self._current_user,
+            self._memberships,
+            self._document_access,
+            self._profiles,
+            for_mutation=for_mutation,
+        )
+
+
+def get_document_access_checker(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> DocumentAccessChecker:
+    """Dependency factory for :class:`DocumentAccessChecker`."""
+    return DocumentAccessChecker(current_user, memberships, document_access, profiles)
+
+
+def get_document_access_checker_flexible(
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> DocumentAccessChecker:
+    """Dependency factory for :class:`DocumentAccessChecker` on flexible routes."""
+    return DocumentAccessChecker(current_user, memberships, document_access, profiles)
+
+
 @router.get("", response_model=list[DocumentResponse], summary="List all uploaded specification documents")
 def list_documents(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     if_none_match: str | None = Header(default=None, alias="If-None-Match"),
@@ -97,6 +184,13 @@ def list_documents(
     if effective_org_id is not None:
         allowed_ids = set(document_access.list_org_grants(effective_org_id))
         rows = [r for r in rows if r["id"] in allowed_ids]
+    elif not profiles.is_superadmin(current_user.id):
+        user_org_ids = memberships.org_ids_for_user(current_user.id)
+        if user_org_ids:
+            allowed_ids = set()
+            for oid in user_org_ids:
+                allowed_ids.update(document_access.list_org_grants(oid))
+            rows = [r for r in rows if r["id"] in allowed_ids]
     # `documents` rows carry no `created_at`/`updated_at` column, so the ETag
     # is derived from the rows' own content (not just their count) — otherwise
     # an edit or DocLang generation that doesn't change the row count would
@@ -148,8 +242,10 @@ def get_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
     response: Response,
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentDetailResponse:
     """Retrieve a document by ID including its full plain text, derived from DocLang."""
+    access_checker(document_id)
     response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=60"
     doc = service.get_document(document_id)
     if not doc:
@@ -186,6 +282,7 @@ def get_document(
 def get_document_file(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker_flexible)],
 ) -> FileResponse:
     """Stream the original uploaded file bytes for the document viewer.
 
@@ -194,6 +291,7 @@ def get_document_file(
     works whether the file lives in Supabase Storage, on disk, or at a
     cached http(s) URL.
     """
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -283,6 +381,8 @@ async def upload_document(
     ] = None,
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
     memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
+    profiles: Annotated[ProfileService, Depends(get_profile_service)] = None,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)] = None,
 ) -> DocumentDetailResponse:
     """Upload a specification document and generate its DocLang XML.
 
@@ -308,6 +408,14 @@ async def upload_document(
         from app.bootstrap import get_container
 
         document_access = get_container().document_access_service
+    if memberships is None:
+        from app.bootstrap import get_container
+
+        memberships = get_container().membership_service
+    if profiles is None:
+        from app.bootstrap import get_container
+
+        profiles = get_container().profile_service
 
     resolved_instance = _resolve_parsing_instance(engine_instance, instances_service)
 
@@ -341,6 +449,17 @@ async def upload_document(
     target_org_id = organization_id
     if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
         target_org_id = int(x_org_id.strip())
+
+    if current_user is not None and not profiles.is_superadmin(current_user.id):
+        user_orgs = memberships.org_ids_for_user(current_user.id) if memberships else []
+        if target_org_id is not None:
+            if target_org_id not in user_orgs:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"You do not belong to organization {target_org_id}.",
+                )
+        elif user_orgs:
+            target_org_id = user_orgs[0]
 
     # ISO 19650 Originator: default to the target organization's own code
     # when the caller didn't specify one explicitly, same as project
@@ -454,6 +573,7 @@ async def generate_document_doclang(
     instances_service: Annotated[
         ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
     ],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentDetailResponse:
     """Run extraction against an already-stored file and persist its DocLang XML.
 
@@ -461,6 +581,7 @@ async def generate_document_doclang(
     documents uploaded with generation deferred (or where an earlier attempt
     failed) — see `DocumentService.generate_doclang_for_existing`.
     """
+    access_checker(document_id, for_mutation=True)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -485,8 +606,10 @@ def update_document(
     document_id: int,
     payload: DocumentUpdateRequest,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentDetailResponse:
     """Update specification document metadata."""
+    access_checker(document_id, for_mutation=True)
     existing = service.get_document(document_id)
     if not existing:
         raise HTTPException(
@@ -554,8 +677,10 @@ def update_document(
 def get_document_doclang(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> Response:
     """Retrieve canonical DocLang XML export (including OTSL tables) for a document."""
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -580,6 +705,7 @@ def get_document_asset(
     document_id: int,
     filename: str,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker_flexible)],
 ) -> Response:
     """Resolve a `assets/{filename}` reference from a document's DocLang XML to bytes.
 
@@ -589,6 +715,7 @@ def get_document_asset(
     On `flexible_router` (not `router`) so it works as a bare browser-loaded
     `<img src>` via `?token=`, the same pattern as `/file` and `/export-doclang`.
     """
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -613,6 +740,7 @@ def get_document_asset(
 def export_document_doclang_archive(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker_flexible)],
     redirect: bool = Query(
         default=False,
         description="Redirect to direct signed storage URL if archive is pre-persisted in Supabase Storage",
@@ -625,6 +753,8 @@ def export_document_doclang_archive(
     is pre-persisted in Supabase Storage, returns a 307 temporary redirect to the signed URL.
     """
     from fastapi.responses import RedirectResponse
+
+    access_checker(document_id)
 
     doc = service.get_document(document_id)
     if not doc:
@@ -700,12 +830,14 @@ def export_document_doclang_archive(
 def get_document_sections(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentSectionsResponse:
     """Split a document's DocLang XML into sections for scoped rule extraction.
 
     Returns no sections when the document has no DocLang XML yet (generation
     deferred or failed) — the caller should fall back to a manual excerpt.
     """
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -734,6 +866,7 @@ def get_document_sections(
 async def get_document_sections_tree(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentSectionTreeResponse:
     """Nest a document's detected sections into a tree for the scope picker.
 
@@ -745,6 +878,7 @@ async def get_document_sections_tree(
     when that table has rows for this document; older documents uploaded
     before that table existed just get ``page_number: null`` everywhere.
     """
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -801,6 +935,7 @@ async def get_document_sections_tree(
 def get_document_element_bboxes(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentElementBboxesResponse:
     """Return one bbox per rendered block (heading/paragraph/table/picture), keyed by element id.
 
@@ -810,6 +945,7 @@ def get_document_element_bboxes(
     empty list for documents predating this feature or imported as raw
     `.dclg`/`.dclx` (no Docling extraction pass, so no ids were injected).
     """
+    access_checker(document_id)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -828,6 +964,7 @@ def get_document_element_bboxes(
 async def ingest_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> DocumentIngestResponse:
     """Ingest an already-uploaded document's DocLang-derived text via LlamaIndexIngestor.
 
@@ -835,6 +972,7 @@ async def ingest_document(
     deontic ("shall"/"must"/"should"/"may") statements. Progress streams on
     the existing `GET /api/events/{document_id}` SSE channel.
     """
+    access_checker(document_id, for_mutation=True)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -869,6 +1007,7 @@ async def ingest_document(
 async def extract_rule_drafts(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
     model: Optional[str] = None,
     body: Optional[RuleDraftExtractionRequest] = None,
 ) -> RuleExtractionDraftListResponse:
@@ -884,6 +1023,7 @@ async def extract_rule_drafts(
     the document (e.g. sections picked in the UI) rather than its full
     DocLang-derived text.
     """
+    access_checker(document_id, for_mutation=True)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
@@ -909,12 +1049,16 @@ async def extract_rule_drafts(
     response_model=RuleExtractionProgressResponse,
     summary="Poll progress of an in-flight or recent rule-draft extraction",
 )
-def get_rule_extraction_progress(document_id: int) -> RuleExtractionProgressResponse:
+def get_rule_extraction_progress(
+    document_id: int,
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+) -> RuleExtractionProgressResponse:
     """Return how many of a document's clause-nodes have finished extraction.
 
     `status="unknown"` means nothing has run for this document since the
     process started (or the last run's entry expired) -- not an error.
     """
+    access_checker(document_id)
     from app.services.extraction_progress import snapshot as progress_snapshot
 
     progress = progress_snapshot(document_id)
@@ -934,8 +1078,12 @@ def get_rule_extraction_progress(document_id: int) -> RuleExtractionProgressResp
     response_model=RuleExtractionDraftListResponse,
     summary="List rule extraction drafts for a document",
 )
-def list_rule_drafts(document_id: int) -> RuleExtractionDraftListResponse:
+def list_rule_drafts(
+    document_id: int,
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+) -> RuleExtractionDraftListResponse:
     """Return all extraction drafts for one document, newest first."""
+    access_checker(document_id)
     from app.services.rule_draft_service import RuleDraftService
 
     rows = RuleDraftService().list_drafts(document_id)
@@ -948,8 +1096,12 @@ def list_rule_drafts(document_id: int) -> RuleExtractionDraftListResponse:
     "/{document_id}/rules/drafts/ids-preview",
     summary="Preview the IDS XML that would be produced by a document's rule drafts",
 )
-def preview_rule_drafts_ids(document_id: int) -> Response:
+def preview_rule_drafts_ids(
+    document_id: int,
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+) -> Response:
     """Render an IDS preview from a document's extraction drafts, before promotion."""
+    access_checker(document_id)
     from app.modules.contracts import RuleExtractionDraft as _RuleExtractionDraft
     from app.modules.rule_builder.ids_exporter import translate_rule_drafts_to_ids
     from app.services.rule_draft_service import RuleDraftService
@@ -968,8 +1120,10 @@ def preview_rule_drafts_ids(document_id: int) -> Response:
 def delete_document(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
 ) -> None:
     """Delete a document record and its stored file."""
+    access_checker(document_id, for_mutation=True)
     doc = service.get_document(document_id)
     if not doc:
         raise HTTPException(
