@@ -3,10 +3,10 @@
 Corrosion slice of the BIMGUARD AI OpenBIM compliance application: the GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media and XM-001 cross-material rule logic, their catalogs and rule packs, plus the shared platform architecture. Compiled for analysis against corrosion standards (ISO 9223, ISO 12944, ASTM G82).
 
 - **NotebookLM workspace:** FMP: BIMGUARD AI - Corrosion
-- **Generated:** 2026-09-14 19:40 UTC
+- **Generated:** 2026-09-14 21:05 UTC
 - **Source repository:** `bim-guard-merge`
 - **File types included:** `.csv`, `.json`, `.md`, `.py`, `.txt`, `.xml`
-- **Files included:** 350 (105 corrosion-specific, 245 shared architecture files also present in the companion notebook)
+- **Files included:** 351 (105 corrosion-specific, 246 shared architecture files also present in the companion notebook)
 
 ---
 
@@ -61088,6 +61088,46 @@ def _seed_cc001(svc: RuleService) -> int:
 # ── MC-001 — Microbially Influenced Corrosion ─────────────────────────────────
 
 
+#: The corrected citation for the MC-001 materials whose payload ``reference``
+#: names ASTM G-187 (a soil-resistivity practice) or NACCE TPC 11 (an
+#: unverified, misspelt NACE document). Wording from
+#: docs/planning/corrosion_provenance_2026-09-13.md §12.2, identical to what
+#: migration 20260914195107 writes.
+_MC001_MATERIAL_SOURCE_TEXT = (
+    "Source: AMPP (formerly NACE) industry practice, MIC mechanism only; "
+    "score is MC-001 authored calibration"
+)
+
+#: Payload ``reference`` -> seeded ``source_text`` for the seven
+#: ``material_susceptibility`` entries carrying a suspect citation (carbon_steel,
+#: cast_iron, galv_steel, ss304, ss316, duplex2205, titanium; five distinct
+#: strings). Keyed by the exact payload string; every other reference is seeded
+#: as ``Source: <reference>`` unchanged.
+_MC001_SUPERSEDED_MATERIAL_REFERENCES = {
+    "ASTM G-187 / NACCE TPC 11": _MC001_MATERIAL_SOURCE_TEXT,
+    "NACCE TPC 11": _MC001_MATERIAL_SOURCE_TEXT,
+    "ASTM G-187": _MC001_MATERIAL_SOURCE_TEXT,
+    "NACE / ASTM G-187": _MC001_MATERIAL_SOURCE_TEXT,
+    "ASTM G-187 — exceptional MIC resistance": _MC001_MATERIAL_SOURCE_TEXT,
+}
+
+
+def _mc001_material_source_text(mat: dict) -> str:
+    """Return the ``source_text`` seeded for one MC-001 material.
+
+    A payload reference in :data:`_MC001_SUPERSEDED_MATERIAL_REFERENCES` is
+    replaced by :data:`_MC001_MATERIAL_SOURCE_TEXT`; any other reference, and the
+    no-reference default, is emitted as before. The seeder inserts only, so
+    existing rows are corrected by migration 20260914195107; this change prevents
+    a fresh seed from reintroducing the old text.
+    """
+    reference = mat.get(
+        "reference",
+        "AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration",
+    )
+    return _MC001_SUPERSEDED_MATERIAL_REFERENCES.get(reference, f"Source: {reference}")
+
+
 def _seed_mc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-MC-001"
     if svc.has_ruleset(RULESET_ID):
@@ -61171,7 +61211,7 @@ def _seed_mc001(svc: RuleService) -> int:
             description=f"{mat['label']}: MIC susceptibility score {mat['score']}",
             check_value=mat["score"],
             keyword=mat_key,
-            source_text=f"Source: {mat.get('reference', 'AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration')}",
+            source_text=_mc001_material_source_text(mat),
             parameters=json.dumps({**mat, "material_key": mat_key}),
         )
 
@@ -64049,6 +64089,268 @@ endpoint:
 
 ---
 
+### docs/deployment_orbstack_cloudflare.md
+
+````markdown
+# Running BIM Guard via OrbStack and Cloudflare Tunnel (`cloudflared`)
+
+This guide explains how to deploy and run **BIM Guard** locally or on a private server using **OrbStack** (fast, lightweight Docker containerization on macOS) and expose it securely to your custom domain through **Cloudflare Tunnel (`cloudflared`)** with automatic SSL/TLS, DDoS protection, and Supabase OAuth support.
+
+---
+
+## 1. Architectural Overview
+
+```text
+  Internet Client (Browser)
+             │
+             │ HTTPS (e.g. https://bim.yourdomain.com)
+             ▼
+   Cloudflare Edge Network
+   (SSL Termination, DDoS Protection, DNS Routing)
+             │
+             │ Encrypted Outbound Tunnel (No open router ports)
+             ▼
+┌─────────────────────────────────────────────────────────────┐
+│ macOS / Server (OrbStack Docker Runtime)                    │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ cloudflared container                               │   │
+│   │ (Proxies traffic into internal Docker network)      │   │
+│   └──────────────────────────┬──────────────────────────┘   │
+│                              │ HTTP                         │
+│                              ▼                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ bim-guard-app container (Port 8000)                 │   │
+│   │  - Svelte 5 Single Page Application (SPA)           │   │
+│   │  - FastAPI REST Gateway & SSE Streaming (/api)      │   │
+│   └──────────────────────────┬──────────────────────────┘   │
+│                              │ Bolt (7687)                  │
+│                              ▼                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ neo4j container                                     │   │
+│   │ (Graph database for topological queries)            │   │
+│   └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Prerequisites
+
+1. **OrbStack**: Installed and active. Verify with:
+   ```bash
+   orb status
+   docker context show # Should output: orbstack
+   ```
+2. **Domain on Cloudflare**: Your domain's nameservers should be pointed to Cloudflare.
+3. **Supabase Project**: A valid Supabase project with credentials in your `.env`.
+
+---
+
+## 3. Deployment Method A: All-in-One Compose (Recommended)
+
+In this method, `cloudflared` runs as a Docker container directly inside your `docker-compose` stack in OrbStack. No local certificates or CLI login files on your Mac are needed.
+
+### Step 1: Create a Tunnel in Cloudflare Zero Trust
+
+1. Open your account's [Zero Trust Tunnels Dashboard](https://one.dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/networks/tunnels).
+2. Click **Add a tunnel** (or **Create a tunnel**).
+3. Select **Cloudflared** as the connector and click **Next**.
+4. Give your tunnel a descriptive name, e.g. `bim-guard`.
+5. On the **Install connector** screen:
+   - Under "Choose your environment", select **Docker**.
+   - Cloudflare will display a command containing `--token ey...`.
+   - **Copy the token string** (the text after `--token`). This is your `TUNNEL_TOKEN`.
+6. Click **Next** to proceed to the **Public Hostnames** tab.
+7. Add a public hostname:
+   - **Subdomain**: leave blank (for root domain `bim-guard.xyz`) or enter `app` / `bim`
+   - **Domain**: `bim-guard.xyz`
+   - **Path**: Leave blank
+   - **Type**: `HTTP`
+   - **URL**: `bim-guard:8000` (resolves internally inside Docker)
+8. Click **Save tunnel**. Cloudflare automatically adds the CNAME DNS record in your [DNS Settings](https://dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/bim-guard.xyz/dns/records).
+
+### Step 2: Configure Environment Variables in `.env`
+
+In your `/Users/sam/coding/bim-guard/.env`:
+
+```env
+# ── Cloudflare Tunnel & Domain Routing (bim-guard.xyz) ────────────────────────
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+
+# Paste your copied tunnel token here:
+TUNNEL_TOKEN=eyJh...
+
+# Automatically enable the cloudflared container:
+COMPOSE_PROFILES=tunnel
+```
+
+> [!NOTE]
+> `docker-compose.yml` automatically forwards `SUPABASE_URL` and `SUPABASE_KEY` / `SUPABASE_PUBLISHABLE_KEY` from your `.env` into the Docker build arguments (`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`), ensuring the Svelte 5 frontend bundle compiles with working Supabase client configuration.
+
+### Step 3: Build and Launch with OrbStack
+
+Run:
+```bash
+docker compose --profile tunnel up -d --build
+```
+*(If you set `COMPOSE_PROFILES=tunnel` in `.env`, `docker compose up -d --build` works as well).*
+
+To check that all services are healthy:
+```bash
+docker compose ps
+```
+You should see:
+- `bim-guard-app` (healthy, port 8000)
+- `bim-guard-neo4j` (healthy, ports 7474, 7687)
+- `bim-guard-cloudflared` (running)
+
+---
+
+## 4. Deployment Method B: Host CLI-Managed Tunnel
+
+If you prefer running `cloudflared` directly on macOS using the installed Homebrew binary (`/opt/homebrew/bin/cloudflared`):
+
+### Step 1: Login to Cloudflare via CLI
+```bash
+cloudflared tunnel login
+```
+This opens a browser window to authorize your Cloudflare domain and downloads an origin certificate to `~/.cloudflared/cert.pem`.
+
+### Step 2: Create Tunnel
+```bash
+cloudflared tunnel create bim-guard
+```
+Note the Tunnel UUID output (e.g. `12345678-abcd-1234-abcd-1234567890ab`).
+
+### Step 3: Route DNS
+```bash
+cloudflared tunnel route dns bim-guard bim.yourdomain.com
+```
+
+### Step 4: Create Tunnel Configuration File
+Create `~/.cloudflared/config.yml`:
+```yaml
+tunnel: 12345678-abcd-1234-abcd-1234567890ab
+credentials-file: /Users/sam/.cloudflared/12345678-abcd-1234-abcd-1234567890ab.json
+
+ingress:
+  - hostname: bim.yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404
+```
+
+### Step 5: Start Stack and Run Tunnel
+Start BIM Guard in OrbStack:
+```bash
+docker compose up -d --build
+```
+Start the tunnel on your Mac:
+```bash
+cloudflared tunnel run bim-guard
+```
+*(Optionally run as a persistent macOS service using `sudo cloudflared service install`).*
+
+---
+
+## 5. Supabase Auth Configuration (Required)
+
+Because authentication in BIM Guard is handled via Supabase (Google OAuth and email accounts), Supabase must recognize your custom domain as an authorized callback target.
+
+1. Open the [Supabase Dashboard](https://supabase.com/dashboard).
+2. Select your project and navigate to **Project Settings** → **Authentication** → **URL Configuration**.
+3. **Site URL**:
+   - Set to: `https://bim.yourdomain.com` (or keep your primary domain).
+4. **Redirect URLs**:
+   - Add: `https://bim.yourdomain.com/**`
+   - Add: `https://bim.yourdomain.com/`
+   - Keep existing `http://localhost:5173/**` and `http://localhost:8000/**` so local development still functions.
+5. Click **Save**.
+
+---
+
+## 6. Real-Time Streaming (SSE) over Cloudflare
+
+BIM Guard uses Server-Sent Events (`/api/events/{project_id}`) to stream real-time analysis progress from the compliance engines to the Svelte 5 frontend.
+
+The backend automatically sends:
+- `Cache-Control: no-cache, no-transform`
+- `X-Accel-Buffering: no`
+
+In the Cloudflare Dashboard for your domain:
+1. Navigate to **Network**.
+2. Ensure **WebSockets** is toggled **ON** (enabled by default).
+3. Ensure **gRPC** is toggled **ON** if you use gRPC microservices.
+
+---
+
+## 7. Verification & Troubleshooting
+
+### Check Container Logs
+```bash
+# Backend & SPA logs
+docker compose logs -f bim-guard
+
+# Cloudflared tunnel connection logs
+docker compose logs -f cloudflared
+```
+
+### Common Issues & Fixes
+
+1. **"CORS request did not succeed" / Network Error in Browser**:
+   - Check that `BIM_GUARD_ALLOWED_ORIGINS` in your `.env` contains `https://bim.yourdomain.com` (exact protocol and domain, no trailing slash).
+   - Restart the stack: `docker compose restart bim-guard`.
+
+2. **"Sign-in is disabled" or "placeholder.supabase.co" in browser console**:
+   - Rebuild the container so the frontend picks up the build arguments:
+     ```bash
+     docker compose build --no-cache bim-guard
+     docker compose up -d bim-guard
+     ```
+
+3. **Cloudflared connection error 502 Bad Gateway**:
+   - In Method A: Ensure the Cloudflare Zero Trust public hostname URL points to `http://bim-guard:8000` (internal Docker hostname), NOT `localhost:8000`.
+   - In Method B: Ensure it points to `http://localhost:8000`.
+
+---
+
+## 8. Cloudflare MCP Server Integration (`mcp-server-cloudflare`)
+
+To allow your AI coding assistant (Antigravity / Cursor / Claude) to interact directly with your Cloudflare account resources (DNS, Workers, Tunnels, Analytics) via natural language:
+
+### 1. Configuration in `~/.gemini/config/mcp_config.json`
+
+The MCP server is registered in your global Antigravity configuration:
+
+```json
+{
+  "mcpServers": {
+    "cloudflare": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cloudflare/mcp-server-cloudflare",
+        "run",
+        "a7ed8378cd620788b8f508e8b5d15975"
+      ]
+    }
+  }
+}
+```
+
+### 2. Authenticating Wrangler
+
+The `@cloudflare/mcp-server-cloudflare` server uses your local Wrangler session. Authenticate it by running once in your terminal:
+
+```bash
+npx wrangler login
+```
+
+This launches a browser authorization flow and saves your credentials locally to `~/Library/Preferences/.wrangler/config/default.toml`. Once logged in, your assistant can discover and call Cloudflare tools automatically.
+````
+
+---
+
 ### docs/expert_review_process.md
 
 ````markdown
@@ -65894,6 +66196,7 @@ domain (Piping, Seismic, Architecture, Workflow).
 ## Operational Guides
 
 - `../frontend/README.md`
+- `deployment_orbstack_cloudflare.md` — OrbStack Docker + Cloudflare Tunnel deployment guide
 - `NotebookLM/README.md`
 - `NotebookLM/setup_guide.md`
 - `NotebookLM/sources.md`
@@ -88229,6 +88532,28 @@ the seeded value, to `Source: AMPP (formerly NACE) industry practice, MIC
 mechanism only; score is MC-001 authored calibration`. It should also re-seed
 the `ruleset:BIMGUARD-MC-001` static asset with the payload wording above. That
 migration was not written.
+
+**Update, 2026-09-14, branch `fix/mic-material-citations`.** The rows half is now
+written, and it is **unapplied**:
+`supabase/migrations/20260914195107_correct_mc001_material_citations.sql`. It has
+one `UPDATE` per reference. Each matches `ruleset_id = 'BIMGUARD-MC-001'`, the
+reference, and the exact seeded `source_text`, and sets the wording above. The
+seven old strings were checked byte for byte against `_seed_mc001` output built
+offline from the `20260806180500` payload. Only `source_text` changes. The
+`parameters` JSON of those rows still carries the old `reference` key, and the
+static asset re-seed is still not written. No SQL was run.
+
+The seeder is now corrected on the same branch. `_seed_mc001` maps the five
+distinct old payload references (seven materials) to the wording above. That
+string is byte-identical to the migration's. An offline seed of the
+`20260806180500` payload gives 57 rows before and after: exactly those 7 differ,
+and only in `source_text`. The seeder inserts only. `_seed_mc001` returns early
+once `BIMGUARD-MC-001` has any row, and the insert has no conflict or update
+clause. So a restart never rewrites a stored row, and **the migration is still
+needed** for databases seeded before this change. The seeder fix only stops a
+fresh seed from reintroducing the old text. `source_text` feeds no finding or
+score. It reaches the rules API response, keyword search, ruleset export and the
+rules UI.
 
 ### 12.3 The seismic "remnant" in `ruleset_seeder.py` is neither a second site nor an incomplete fix
 
