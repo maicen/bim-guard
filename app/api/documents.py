@@ -110,8 +110,8 @@ def _require_document_grant(
             return
 
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail=f"Your organization has not been granted access to document {document_id}.",
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Document {document_id} not found.",
     )
 
 
@@ -186,11 +186,10 @@ def list_documents(
         rows = [r for r in rows if r["id"] in allowed_ids]
     elif not profiles.is_superadmin(current_user.id):
         user_org_ids = memberships.org_ids_for_user(current_user.id)
-        if user_org_ids:
-            allowed_ids = set()
-            for oid in user_org_ids:
-                allowed_ids.update(document_access.list_org_grants(oid))
-            rows = [r for r in rows if r["id"] in allowed_ids]
+        allowed_ids: set[int] = set()
+        for oid in user_org_ids:
+            allowed_ids.update(document_access.list_org_grants(oid))
+        rows = [r for r in rows if r["id"] in allowed_ids]
     # `documents` rows carry no `created_at`/`updated_at` column, so the ETag
     # is derived from the rows' own content (not just their count) — otherwise
     # an edit or DocLang generation that doesn't change the row count would
@@ -459,7 +458,7 @@ async def upload_document(
                     detail=f"You do not belong to organization {target_org_id}.",
                 )
         elif user_orgs:
-            target_org_id = user_orgs[0]
+            target_org_id = next(iter(user_orgs))
 
     # ISO 19650 Originator: default to the target organization's own code
     # when the caller didn't specify one explicitly, same as project

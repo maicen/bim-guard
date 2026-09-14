@@ -1643,6 +1643,7 @@ class GitHubRepoResponse(TimestampFields):
     branch: str = "main"
     description: str = ""
     is_active: bool = True
+    organization_id: int
 
 
 class GitHubRepoItem(BaseModel):

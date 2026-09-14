@@ -278,6 +278,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
         response.headers.setdefault(
             "Content-Security-Policy",
+            # script-src keeps 'unsafe-inline' deliberately, not by default:
+            # frontend/index.html ships a small inline dark-mode bootstrap
+            # <script> (runs before Svelte hydrates, to avoid a flash of the
+            # wrong theme) and a `type="importmap"` block pinning the web-ifc
+            # CDN import, both of which CSP treats as inline script elements.
+            # Neither is user-controlled, so this doesn't open an injection
+            # vector for reflected/stored XSS payloads elsewhere on the page,
+            # but it does mean script-src doesn't block inline <script>
+            # injected by an XSS bug. Tightening this further would require
+            # moving both scripts to hashed/nonced sources tracked in lockstep
+            # with the built frontend/dist/index.html.
             "default-src 'self'; "
             "img-src 'self' data: blob: https:; "
             "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; "

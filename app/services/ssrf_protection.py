@@ -48,6 +48,16 @@ def is_safe_url(url: str, *, allow_localhost: bool = False) -> bool:
 
     Returns:
         True if the URL is safe to query; False otherwise.
+
+    Note:
+        This is a check-then-use validation: the hostname is resolved here,
+        but the caller's own HTTP client resolves it again independently when
+        it actually connects. A hostname with a short-TTL DNS record could in
+        principle resolve safely here and to an internal address moments
+        later (DNS rebinding). Full protection would require pinning the
+        connection to the IP validated here (e.g. a custom transport), which
+        is not implemented. Callers that need stronger guarantees should
+        additionally restrict egress at the network layer.
     """
     if not url or not isinstance(url, str):
         return False

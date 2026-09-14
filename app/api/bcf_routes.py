@@ -226,9 +226,14 @@ def create_topic(
 def get_topic(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFTopicResponse:
     """Fetch details of a single BCF topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     topic = service.get_topic(project_id, topic_guid)
     if not topic:
         raise HTTPException(
@@ -248,9 +253,14 @@ def update_topic(
     project_id: str,
     topic_guid: str,
     payload: BCFTopicUpdatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFTopicResponse:
     """Update status, priority, description, or ISO 19650 metadata of a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     updated = service.update_topic(project_id, topic_guid, payload)
     if not updated:
         raise HTTPException(
@@ -269,9 +279,14 @@ def update_topic(
 def delete_topic(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> None:
     """Delete a BCF topic and all associated viewpoints/comments."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     deleted = service.delete_topic(project_id, topic_guid)
     if not deleted:
         raise HTTPException(
@@ -295,9 +310,14 @@ def delete_topic(
 def list_comments(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> list[BCFCommentResponse]:
     """List all comments attached to a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.get_comments(topic_guid)
 
 
@@ -312,9 +332,14 @@ def create_comment(
     project_id: str,
     topic_guid: str,
     payload: BCFCommentCreatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFCommentResponse:
     """Add a new comment to a BCF topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.create_comment(topic_guid=topic_guid, payload=payload)
 
 
@@ -332,9 +357,14 @@ def create_comment(
 def list_viewpoints(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> list[BCFViewpointResponse]:
     """Retrieve 3D camera viewpoints associated with a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.get_viewpoints(topic_guid)
 
 
@@ -349,9 +379,14 @@ def create_viewpoint(
     project_id: str,
     topic_guid: str,
     payload: BCFViewpointCreatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFViewpointResponse:
     """Create a new camera viewpoint with component highlighting."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.create_viewpoint(topic_guid=topic_guid, payload=payload)
 
 
@@ -365,9 +400,14 @@ def get_viewpoint(
     project_id: str,
     topic_guid: str,
     viewpoint_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFViewpointResponse:
     """Fetch camera viewpoint definition."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     vps = service.get_viewpoints(topic_guid)
     target = next((v for v in vps if v.guid.upper() == viewpoint_guid.upper()), None)
     if not target:
@@ -389,9 +429,14 @@ def get_viewpoint_snapshot(
     project_id: str,
     topic_guid: str,
     viewpoint_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> RawResponse:
     """Return raw snapshot PNG image binary for viewpoint."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     img_bytes = service.get_snapshot(viewpoint_guid)
     if not img_bytes:
         # Generate 1x1 transparent PNG fallback

@@ -197,12 +197,33 @@ def test_document_access_checker_enforces_organization_grants():
     document_access.list_org_grants.return_value = [999]
     _require_document_grant(999, user, memberships, document_access, profiles)
 
-    # Case 3: Regular user without grant -> 403 Forbidden
+    # Case 3: Regular user without grant -> 404 Not Found (not 403, to avoid
+    # confirming the document's existence to an unauthorized caller).
     document_access.list_org_grants.return_value = [100, 101]
     with pytest.raises(HTTPException) as exc_info:
         _require_document_grant(999, user, memberships, document_access, profiles)
-    assert exc_info.value.status_code == 403
-    assert "has not been granted access to document 999" in exc_info.value.detail
+    assert exc_info.value.status_code == 404
+    assert "Document 999 not found" in exc_info.value.detail
+
+
+def test_document_route_returns_404_for_ungranted_document():
+    """Integration-level check that GET /api/documents/{id} is wired to the real DocumentAccessChecker.
+
+    Not just that the checker function itself works. tests/conftest.py overrides get_document_access_checker to a permissive
+    no-op for every other test file's convenience; this test removes that
+    override for the duration of the call so the real dependency chain
+    (memberships/document_access/profiles, all hitting the actual services)
+    runs end to end, the same way a real unauthorized request would.
+    """
+    from app.api.documents import get_document_access_checker
+
+    original_override = app.dependency_overrides.pop(get_document_access_checker, None)
+    try:
+        response = client.get("/api/documents/999999999")
+        assert response.status_code == 404
+    finally:
+        if original_override is not None:
+            app.dependency_overrides[get_document_access_checker] = original_override
 
 
 # ---------------------------------------------------------------------------
@@ -231,3 +252,44 @@ def test_bcf_project_access_scoping():
     with pytest.raises(HTTPException) as exc_info:
         _require_bcf_project_access("42", user, projects_service, memberships, profiles)
     assert exc_info.value.status_code == 404
+
+
+def test_bcf_topic_and_viewpoint_routes_enforce_project_access():
+    """Integration check that every BCF v2.1 sub-resource route calls _require_bcf_project_access.
+
+    Not just list_topics/create_topic. Unlike test_bcf_project_access_scoping above (which calls the checker
+    function directly), this hits the real HTTP routes through TestClient so a
+    route that forgets to wire the dependency/call in would fail here even
+    though the checker itself works fine in isolation.
+    """
+    from app.api.dependencies import get_projects_service
+
+    class _OtherOrgProjectsService:
+        def get_project(self, project_id: int) -> dict:
+            return {"id": project_id, "name": "Other Org Project", "organization_id": 999999}
+
+        def list_projects(self) -> list[dict]:
+            return [self.get_project(1)]
+
+    app.dependency_overrides[get_projects_service] = lambda: _OtherOrgProjectsService()
+    try:
+        routes = [
+            ("GET", "/api/bcf/v2.1/projects/1/topics/TOPIC-1", None),
+            ("PUT", "/api/bcf/v2.1/projects/1/topics/TOPIC-1", {}),
+            ("DELETE", "/api/bcf/v2.1/projects/1/topics/TOPIC-1", None),
+            ("GET", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/comments", None),
+            ("POST", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/comments", {"comment": "test"}),
+            ("GET", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/viewpoints", None),
+            ("POST", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/viewpoints", {}),
+            ("GET", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/viewpoints/VP-1", None),
+            ("GET", "/api/bcf/v2.1/projects/1/topics/TOPIC-1/viewpoints/VP-1/snapshot", None),
+        ]
+        for method, path, body in routes:
+            response = client.request(method, path, json=body)
+            assert response.status_code == 404, (
+                f"{method} {path} returned {response.status_code}, expected 404 "
+                "(project belongs to another organization) -- route may be missing "
+                "_require_bcf_project_access."
+            )
+    finally:
+        del app.dependency_overrides[get_projects_service]

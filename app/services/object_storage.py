@@ -99,12 +99,33 @@ class ObjectStorage:
 
             try:
                 logger.info("Downloading remote model from URL ref=%s", reference)
-                with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-                    resp = client.get(reference)
-                    resp.raise_for_status()
-                    cache_file.write_bytes(resp.content)
-                    logger.info("Downloaded remote model ref=%s bytes=%d", reference, len(resp.content))
-                    return cache_file
+                # follow_redirects is deliberately off: a validated public URL
+                # could otherwise 302 to an internal/metadata address that
+                # is_safe_url never re-checks. Each hop is re-validated here.
+                with httpx.Client(timeout=60.0, follow_redirects=False) as client:
+                    current_url = reference
+                    for _ in range(5):
+                        resp = client.get(current_url)
+                        if resp.is_redirect:
+                            next_url = resp.headers.get("location")
+                            if not next_url:
+                                resp.raise_for_status()
+                            next_url = str(httpx.URL(current_url).join(next_url))
+                            if not is_safe_url(next_url, allow_localhost=False):
+                                logger.warning(
+                                    "Blocked unsafe redirect target ref=%s -> %s (SSRF protection)",
+                                    reference,
+                                    next_url,
+                                )
+                                return None
+                            current_url = next_url
+                            continue
+                        resp.raise_for_status()
+                        cache_file.write_bytes(resp.content)
+                        logger.info("Downloaded remote model ref=%s bytes=%d", reference, len(resp.content))
+                        return cache_file
+                logger.warning("Too many redirects downloading remote model ref=%s", reference)
+                return None
             except Exception as exc:
                 logger.exception("Failed to download remote model ref=%s: %s", reference, exc)
                 return None
