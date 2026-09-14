@@ -2,7 +2,7 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool } from "lucide-svelte";
+  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
   import { resolvedTheme } from "../theme";
@@ -11,6 +11,7 @@
   import ViewerRibbon from "./viewer/ViewerRibbon.svelte";
   import LayersPanel from "./viewer/LayersPanel.svelte";
   import DrawingsPanel from "./viewer/DrawingsPanel.svelte";
+  import SpatialTreePanel from "./viewer/SpatialTreePanel.svelte";
 
   interface Props {
     projectId?: number | null;
@@ -254,6 +255,17 @@
     </CollapsiblePanel>
 
     <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
+
+    <CollapsiblePanel
+      title="Spatial Hierarchy"
+      icon={ListTree}
+      side="right"
+      id="viewer-spatial-tree"
+      collapsed={true}
+      resizable
+    >
+      <SpatialTreePanel {projectId} />
+    </CollapsiblePanel>
 
     <CollapsiblePanel
       title="Layers"

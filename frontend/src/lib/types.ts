@@ -1816,3 +1816,18 @@ export interface GraphHealResponse {
   message: string;
 }
 
+/** Mirrors SpatialTreeNodeContract in app/modules/contracts.py. */
+export interface SpatialTreeNodeContract {
+  guid: string;
+  label: string;
+  ifc_type: string;
+  children: SpatialTreeNodeContract[];
+  truncated_count: number;
+}
+
+/** Mirrors SpatialTreeResponse in app/modules/contracts.py. */
+export interface SpatialTreeResponse {
+  project_id: number;
+  root: SpatialTreeNodeContract | null;
+}
+

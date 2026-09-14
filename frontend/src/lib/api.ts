@@ -98,6 +98,7 @@ import type {
   RuleSnapshot,
   RuleSnapshotCreatePayload,
   RuleSourceResponse,
+  SpatialTreeResponse,
   UserProfile,
   WorkflowStatus,
 } from "./types";
@@ -2211,6 +2212,14 @@ export const bsddApi = {
     const result = await handleResponse<BSDDOntologyPropertyDetail>(res);
     setPersistentCache(cacheKey, result);
     return result;
+  },
+};
+
+export const graphApi = {
+  /** The project's IFC spatial containment tree (Project->Site->Building->Storey->Space->Element). */
+  async getSpatialTree(projectId: number): Promise<SpatialTreeResponse> {
+    const res = await apiFetch(`${API_BASE}/graph/${projectId}/spatial-tree`);
+    return handleResponse<SpatialTreeResponse>(res);
   },
 };
 

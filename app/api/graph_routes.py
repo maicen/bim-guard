@@ -14,10 +14,12 @@ from app.modules.contracts import (
     GraphHealResponse,
     GraphStatusContract,
     IssueProofGraphContract,
+    SpatialTreeResponse,
 )
 from app.modules.ifc_reader.ifc_graph import (
     build_ifc_graph,
     build_ifc_graph_summary,
+    build_spatial_tree,
     ingest_ifc_to_graph,
 )
 from app.modules.ifc_reader.ifc_spatial import IFCSpatialAdjacency, heal_spatial_boundaries
@@ -147,6 +149,41 @@ def get_graph_status(
             is_geometric_fallback=False,
             centrality_summary={},
         )
+
+
+@router.get(
+    "/{project_id}/spatial-tree",
+    response_model=SpatialTreeResponse,
+    summary="Get the project's IFC spatial containment tree",
+)
+def get_spatial_tree(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
+) -> SpatialTreeResponse:
+    """Roll the model's spatial decomposition/containment relationships into a tree.
+
+    Rooted at IfcProject, for a viewer panel that navigates the physical
+    hierarchy (Project -> Site -> Building -> Storey -> Space -> Element)
+    rather than IFC layer/category, which is all the existing Layers panel
+    exposes.
+    """
+    project_access(project_id)
+
+    path = models_service.resolve_primary_path(project_id)
+    if path is None or not path.exists():
+        return SpatialTreeResponse(project_id=project_id, root=None)
+
+    try:
+        import ifcopenshell
+
+        model = ifcopenshell.open(str(path))
+        graph = build_ifc_graph(model)
+        tree = build_spatial_tree(graph)
+        return SpatialTreeResponse(project_id=project_id, root=tree)
+    except Exception as exc:
+        logger.warning("Failed to build spatial tree for project %d: %s", project_id, exc)
+        return SpatialTreeResponse(project_id=project_id, root=None)
 
 
 @router.post(

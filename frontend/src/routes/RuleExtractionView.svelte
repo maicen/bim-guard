@@ -877,10 +877,10 @@
                         >
                         {#if draft.review_notes?.startsWith("bSDD grounding")}
                           <span
-                            class="rounded-md border border-emerald-800 bg-emerald-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300"
+                            class="rounded-md border border-success-border bg-success-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-success"
                             title={draft.review_notes}
                           >
-                            bSDD
+                            bSDD Grounded
                           </span>
                         {/if}
                       </div>

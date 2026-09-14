@@ -218,6 +218,56 @@ def find_orphan_elements(graph: nx.DiGraph) -> list[dict[str, Any]]:
     return orphans
 
 
+def build_spatial_tree(graph: nx.DiGraph, *, max_children_per_node: int = 500) -> dict[str, Any] | None:
+    """Roll the graph's ``Aggregates``/``ContainedIn`` edges into a rooted spatial tree.
+
+    ``IfcProject`` -> ``IfcSite`` -> ``IfcBuilding`` -> ``IfcBuildingStorey`` ->
+    ``IfcSpace``/other elements, mirroring the physical containment hierarchy
+    (``build_ifc_graph``'s ``Aggregates`` edges are IFC's spatial decomposition
+    relationships; its ``ContainedIn`` edges are element placement into a
+    spatial structure -- together they form one tree rooted at the project).
+
+    Returns ``None`` if the graph has no ``IfcProject`` node (nothing to root
+    a tree at). ``max_children_per_node`` caps how many children are returned
+    per node (excess reported via ``truncated_count``) so a storey with
+    thousands of elements doesn't blow up the response -- the UI this backs is
+    a navigable tree, not a full model export.
+
+    Cycle-guarded via a visited set: the source graph is built from real IFC
+    relationships and shouldn't contain one, but a malformed model must not
+    hang this on infinite recursion.
+    """
+    roots = [node for node, attrs in graph.nodes(data=True) if attrs.get("ifc_type") == "IfcProject"]
+    if not roots:
+        return None
+
+    children_by_parent: dict[Any, list[Any]] = defaultdict(list)
+    for source, target, attrs in graph.edges(data=True):
+        if attrs.get("rel_type") in ("Aggregates", "ContainedIn"):
+            children_by_parent[source].append(target)
+
+    def build_node(guid: Any, visited: set[Any]) -> dict[str, Any]:
+        attrs = graph.nodes[guid]
+        node: dict[str, Any] = {
+            "guid": str(guid),
+            "label": attrs.get("label", str(guid)),
+            "ifc_type": attrs.get("ifc_type", "Unknown"),
+            "children": [],
+            "truncated_count": 0,
+        }
+        if guid in visited:
+            return node
+        visited = visited | {guid}
+
+        child_ids = children_by_parent.get(guid, [])
+        node["truncated_count"] = max(0, len(child_ids) - max_children_per_node)
+        for child_id in child_ids[:max_children_per_node]:
+            node["children"].append(build_node(child_id, visited))
+        return node
+
+    return build_node(roots[0], set())
+
+
 def get_centrality_consequence_multiplier(
     guid: str,
     centralities: dict[str, dict[str, float]],

@@ -121,6 +121,27 @@ class GraphStatusContract(BaseModel):
     )
 
 
+class SpatialTreeNodeContract(BaseModel):
+    """One node of the IFC spatial containment tree (Project->Site->Building->Storey->Space->Element)."""
+
+    guid: str = Field(..., description="IFC GlobalId, or a synthetic id for non-product nodes")
+    label: str = Field(..., description="Human-readable name")
+    ifc_type: str = Field(..., description="IFC entity type, e.g. IfcBuildingStorey")
+    children: list["SpatialTreeNodeContract"] = Field(default_factory=list)
+    truncated_count: int = Field(
+        0, description="Children omitted beyond the per-node cap, if any"
+    )
+
+
+class SpatialTreeResponse(BaseModel):
+    """The project's IFC spatial containment tree, rooted at IfcProject."""
+
+    project_id: int = Field(..., description="Project database ID")
+    root: Optional[SpatialTreeNodeContract] = Field(
+        None, description="Root node, or None if the model has no IfcProject"
+    )
+
+
 class GraphHealResponse(BaseModel):
     """Response from reconciling and synthesizing missing spatial boundaries."""
 
