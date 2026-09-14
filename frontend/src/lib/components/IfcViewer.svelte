@@ -91,7 +91,24 @@
   let loadedProjectId: number | null = $state(null);
   let loadedFileId: number | null = $state(null);
   let loadedBcfArtifactId: number | null = $state(null);
+  let elementNotFound = $state(false);
   let isInitialized = false;
+
+  // A BCF topic carries its own selection; a bare element_guid deep link
+  // needs a direct GlobalId lookup against the loaded model instead. Tries
+  // the topic match first (cheap, and preserves the topic detail panel when
+  // one exists) and falls back to selectByGuid so links without a BCF
+  // artifact still land on the element instead of silently doing nothing.
+  async function selectElementByGuid(guid: string) {
+    elementNotFound = false;
+    const topic = viewerAPI.findTopicByElementGuid(guid);
+    if (topic) {
+      await viewerAPI.selectTopic(topic);
+      return;
+    }
+    const found = await viewerAPI.selectByGuid?.(guid);
+    elementNotFound = !found;
+  }
 
   async function init() {
     if (!viewportHost || isInitialized) return;
@@ -101,7 +118,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-ribbon-2";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-guid-select-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer({
         viewport: viewportHost,
@@ -160,10 +177,7 @@
         await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
         loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
-        const topic = viewerAPI.findTopicByElementGuid(elementGuid);
-        if (topic) {
-          await viewerAPI.selectTopic(topic);
-        }
+        await selectElementByGuid(elementGuid);
       }
     } catch (err: any) {
       console.error("Failed to load project IFC:", err);
@@ -218,10 +232,7 @@
 
   run(() => {
     if (viewerAPI && elementGuid && loadedProjectId) {
-      const topic = viewerAPI.findTopicByElementGuid(elementGuid);
-      if (topic) {
-        viewerAPI.selectTopic(topic);
-      }
+      selectElementByGuid(elementGuid);
     }
   });
 
@@ -265,6 +276,26 @@
           <span>Retry</span>
         </button>
       {/if}
+    </div>
+  {/if}
+
+  <!-- Element-not-found notice: the deep-linked element_guid isn't in the
+       loaded model (wrong file, different storey/model, or a stale link) -->
+  {#if elementNotFound}
+    <div
+      class="z-20 flex shrink-0 items-center justify-between border-b border-warning-border bg-warning-bg p-3.5 text-xs text-warning"
+    >
+      <div class="flex items-center gap-2">
+        <AlertCircle class="h-4 w-4 shrink-0 text-warning" />
+        <span>Could not find the linked element in this model.</span>
+      </div>
+      <button
+        type="button"
+        onclick={() => (elementNotFound = false)}
+        class="rounded-lg px-2.5 py-1 text-caption font-medium transition-opacity hover:opacity-90"
+      >
+        Dismiss
+      </button>
     </div>
   {/if}
 

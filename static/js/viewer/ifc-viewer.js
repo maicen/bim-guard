@@ -157,8 +157,18 @@ function installErrorHighlighting(components, world) {
         }
     }
 
+    // Generic version of highlightTopics's clear/highlight/track sequence, for
+    // callers that already have a ModelIdMap of their own (e.g. a direct
+    // GlobalId lookup) rather than a set of BCF topics.
+    async function highlightMap(map) {
+        await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        setSelectionMap(map);
+        if (map) await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, map, false, false);
+    }
+
     return {
         highlightTopics,
+        highlightMap,
         hider,
         highlighter,
         isolate: {
@@ -903,7 +913,7 @@ export async function initViewer(mounts) {
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    const { highlightTopics, hider, isolate, highlighter } = installErrorHighlighting(components, world);
+    const { highlightTopics, highlightMap, hider, isolate, highlighter } = installErrorHighlighting(components, world);
 
     function applyTheme() {
         const theme = getThemeConfig();
@@ -1065,6 +1075,30 @@ export async function initViewer(mounts) {
         return null;
     }
 
+    // Direct IFC GlobalId -> geometry lookup, for deep links (e.g. from an
+    // analysis report row) that carry an element_guid but no BCF artifact, so
+    // findTopicByElementGuid has nothing to match against. Highlights and
+    // frames the element the same way a topic viewpoint would. Returns false
+    // (rather than throwing) when the GUID isn't in any loaded model, so the
+    // caller can surface a "not found" state instead of silently doing nothing.
+    async function selectByGuid(elementGuid) {
+        if (!elementGuid) return false;
+        for (const [modelId, model] of fragments.list) {
+            const [localId] = await model.getLocalIdsByGuids([elementGuid]);
+            if (localId == null) continue;
+            const map = { [modelId]: new Set([localId]) };
+            await highlightMap(map);
+            try {
+                const box = await model.getMergedBox([localId]);
+                await world.camera.controls.fitToBox(box, true);
+            } catch (e) {
+                console.warn("Could not fit camera to element:", e);
+            }
+            return true;
+        }
+        return false;
+    }
+
     async function loadBcf(urlOrFile, elementGuid, getHeaders) {
         try {
             const file = typeof urlOrFile === "string"
@@ -1137,6 +1171,7 @@ export async function initViewer(mounts) {
         setupFileLoader,
         selectTopic: workspace.selectTopic,
         findTopicByElementGuid,
+        selectByGuid,
         topics: {
             getSelected: workspace.getSelectedTopic,
             onSelectionChange: workspace.onSelectionChange,
