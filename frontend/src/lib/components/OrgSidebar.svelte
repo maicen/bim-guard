@@ -2,6 +2,8 @@
   import {
     LayoutDashboard,
     BookOpen,
+    BookOpenCheck,
+    Box,
     Sparkles,
     ListChecks,
     Settings,
@@ -37,10 +39,11 @@
   // Compliance Audit, Reports, Models, Live Pipeline) lives in
   // ProjectSidebar instead, shown once a project is selected. The project
   // registry itself lives on the Dashboard (org homepage), not a separate
-  // nav item. Reference material (User Manual, Modeling Manual, bSDD Wiki)
-  // and Integrations (Revit Sync, IFC Export Setting) are in the navbar's
-  // Resources and Integrations menus instead (ResourcesMenu.svelte,
-  // IntegrationsMenu.svelte). Organization Settings is reachable from the
+  // nav item. bSDD Wiki, Design System, and API Docs stay in the navbar's
+  // Resources menu (ResourcesMenu.svelte); User Manual and Modeling Manual
+  // are also pinned here for one-click access. Integrations (Revit Sync,
+  // IFC Export Setting) are in the navbar's Integrations menu
+  // (IntegrationsMenu.svelte). Organization Settings is reachable from the
   // user menu (UserMenu.svelte).
   const NAV_SECTIONS = [
     {
@@ -56,6 +59,13 @@
         { id: "documents", label: "Rule Documents", icon: BookOpen },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
         { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
+      ],
+    },
+    {
+      title: "Manuals",
+      items: [
+        { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
+        { id: "modeling-manual", label: "Modeling Manual", icon: Box },
       ],
     },
   ];
