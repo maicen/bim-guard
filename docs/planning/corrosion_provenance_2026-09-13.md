@@ -316,7 +316,7 @@ replace it.
 
 - **Output strings still cite ASTM G-187 as an MIC standard practice**
   (`bimguard_mic_engine.py:538`, `phase_6c_corrosion_ui.py:399`). Every MC-001
-  finding and BCF issue carries it.
+  finding and BCF issue carries it. *Fixed 2026-09-14, §12.*
 - **Findings cannot say a value is authored.** Citations are built per engine from
   standard names. A finding does not carry per-threshold status; the declaration
   lives in the code and this document.
@@ -333,7 +333,8 @@ replace it.
 - **Out of scope, found in passing:** `app/services/ruleset_seeder.py` still
   describes seismic brace spacing as "per EN 1998-1 / DIN 4149", which SB-001's
   correction established is not a source. The README seismic line cites ASCE 7-22,
-  while SB-001 cites ASCE/SEI 7-10.
+  while SB-001 cites ASCE/SEI 7-10. *Both examined 2026-09-14, §12: the seeder
+  observation was a misreading; the README is corrected.*
 
 ### Needs rebuilding afterwards
 
@@ -406,3 +407,181 @@ Corrosion findings therefore rank relative risk under a stated calibration. They
 not certify that a design meets any cited standard, and a corrosion engineer must
 verify the governing values against the source documents before a finding is
 relied on.
+
+## 12. Follow-up, 2026-09-14: emitted MIC citations, the seismic remnant, the README
+
+Branch `fix/corrosion-provenance`, from 4f8adc7. No threshold, weight, band
+cut-off or scoring formula changed. No migration was edited, and no SQL was
+written or run.
+
+### 12.1 MC-001 citations no longer attribute a threshold to a named standard
+
+**Option chosen: name the mechanism and the body of practice, and mark the
+threshold authored.** Keeping the citation behind an "unverified" qualifier was
+rejected. A reader of a finding sees a standard designation first and a qualifier
+second. Leaving "ASTM G-187" in the standard field would still read as a source
+for a number, and the ruleset's own description rules the document out. AMPP
+(formerly NACE) is named as a body of practice only, and no document number is
+given. The ruleset already names NACE for MIC (`"NACE / ASTM G-187"`,
+`NACE SP0198`), and "NACCE" is a misspelling of that body. So nothing is named
+that the ruleset does not already point to. No document title was substituted
+for "TPC 11", because none can be confirmed.
+
+| Location | Old | New |
+| --- | --- | --- |
+| `app/engines/bimguard_mic_engine.py:542-543` (BCF issue description) | `ASTM G-187 — MIC Assessment Standard Practice` | `AMPP (formerly NACE) industry practice — MIC mechanism only` / `MC-001 thresholds are authored calibration, not values quoted from any standard above` |
+| `app/modules/phase_6/phase_6c_corrosion_ui.py:405-406` (finding citation) | standard `ASTM G-187`, clause `MIC assessment standard practice` | standard `AMPP (formerly NACE) industry practice`, clause `MIC mechanism only; MC-001 flow-class threshold is authored calibration, not a standard value` |
+| `app/services/ruleset_seeder.py:681` (`source_text` default) | `NACCE TPC 11` | `AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration` |
+
+The citation `reason` (`flow class <key>`) is unchanged. The module docstring now
+says neither suspect citation is emitted.
+`tests/test_mc001_citation_provenance.py` holds this: all six cases fail against
+4f8adc7's code and pass after the change.
+
+The seeder default only applies to a material with no `reference`. All ten seeded
+materials carry one, so seeding the current payload does not use the default.
+
+**Effect on project 1917** (frozen export `bimguard-corrosion-project-1917.json`,
+exported 2026-09-09T09:25:45Z). All **294** MC-001 findings (critical 10, high 64,
+medium 220) carry the changed citation, one each. The export contains no "NACCE"
+string. No MC-001 narrative quotes G-187: the flow, temperature and dead-leg
+references the narrative prints are other citations.
+
+**Score invariance, offline.** Method:
+
+1. Parse the MC-001 `content_json` literal out of migration `20260806180500` at
+   :918.
+2. Serve it through a patched `StaticDataService.get_asset_json`.
+3. Build the rule rows with `_seed_mc001` against a fake service. The fake uses
+   the real `RuleService._build_rule_row` and captures 57 rows.
+4. Serve those rows through a patched `RuleService.list_by_ruleset`.
+5. Reload the engine catalog.
+6. For each finding, rebuild the `MICElement` from the export. Flow velocity,
+   operating temperature and dead-leg length come from the narrative. The
+   material comes from the narrative's resolved catalog label, mapped back to its
+   key. System and IFC type come from metadata, and diameter is metadata's
+   `assumed_nominal_diameter_m`.
+7. Score with `assess_mic_risk` and build the citations with `_mic_citations`.
+
+No database, network or running server was used. Run at 4f8adc7 and again after
+the change:
+
+| | 4f8adc7 | after |
+| --- | --- | --- |
+| findings reconstructed | 294 / 294 | 294 / 294 |
+| max abs score deviation | 0.0 | 0.0 |
+| band / mitigation / class-key mismatches | 0 / 0 / 0 | 0 / 0 / 0 |
+| citation `reason` equal to export | 294 | 294 |
+| first citation standard | `ASTM G-187` × 294 | `AMPP (formerly NACE) industry practice` × 294 |
+
+Finding ids are taken from the export and are unaffected. A first pass that
+ignored the material label deviated on 23 findings, by up to 0.037. Those were
+copper elements scored as unknown, a flaw in the reconstruction script rather
+than a code difference. It was corrected before any code was changed.
+
+**Dated evidence left as recorded.** These still show the old string, as produced
+at the time:
+
+- the 1917 frozen export;
+- the `docs/validation/engine-showcase-2026-09-08/` samples and README;
+- `docs/validation/final-godmode-audit-2026-09-07.md`.
+
+### 12.2 Seeded wording recorded, not edited
+
+Migration `20260806180500_seed_static_data_assets.sql` is applied and unchanged.
+A future migration that re-seeds the MC-001 payload should use:
+
+| Line | Current | Proposed |
+| --- | --- | --- |
+| :929 | `"ASTM G-187 — Standard Practice for Measurement of Soil Resistivity"` in `standards_referenced` | Remove from the MC-001 list. By its own description it has no bearing on MIC. |
+| :932 | `"NACCE TPC 11 — MIC in Industrial Water Systems"` | `"AMPP (formerly NACE) — MIC industry practice (no document verified)"` |
+| :961 | SRB `"reference": "ASTM G-187 / NACCE TPC 11"` | `"governing_reference": "AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :969 | IOB `"reference": "NACCE TPC 11"` | as :961 |
+| :977 | APB `"reference": "CIBSE Guide G / NACCE TPC 11"` | `"governing_reference": "CIBSE Guide G / AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :1013 | carbon_steel `"ASTM G-187 / NACCE TPC 11"` | `"governing_reference": "AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :1014 | cast_iron `"NACCE TPC 11"` | as :1013 |
+| :1015 | galv_steel `"NACCE TPC 11"` | as :1013 |
+| :1016 | ss304 `"ASTM G-187"` | as :1013 |
+| :1017 | ss316 `"ASTM G-187"` | as :1013 |
+| :1018 | duplex2205 `"NACE / ASTM G-187"` | as :1013 |
+| :1022 | titanium `"ASTM G-187 — exceptional MIC resistance"` | as :1013. Drop "exceptional MIC resistance" as a sourced claim. |
+
+**Stored `rules` rows carrying the same text.** `_seed_mc001` writes
+`source_text = "Source: <reference>"`. So a database seeded from this payload holds
+seven MC-001 rows whose `source_text` repeats a suspect citation:
+
+- `MC-001.MAT.CARBON_STEEL`
+- `.CAST_IRON`
+- `.GALV_STEEL`
+- `.SS304`
+- `.SS316`
+- `.DUPLEX2205`
+- `.TITANIUM`
+
+They appear in the rules catalog, not in findings. A code change cannot reach
+them, because the insert pass skips existing references. Correcting them needs a
+new migration. It should update `source_text` for exactly those seven references
+in `ruleset_id = 'BIMGUARD-MC-001'`, and only where `source_text` still equals
+the seeded value, to `Source: AMPP (formerly NACE) industry practice, MIC
+mechanism only; score is MC-001 authored calibration`. It should also re-seed
+the `ruleset:BIMGUARD-MC-001` static asset with the payload wording above. That
+migration was not written.
+
+### 12.3 The seismic "remnant" in `ruleset_seeder.py` is neither a second site nor an incomplete fix
+
+§9 recorded that `ruleset_seeder.py` "still describes seismic brace spacing as
+per EN 1998-1 / DIN 4149". That was a misreading of a search hit.
+
+- The only occurrences in the file at 4f8adc7 are :768 and :775, plus the comment
+  at :760. They sit inside `_SB001_SUPERSEDED`, as the **old** half of each
+  `(old, new)` pair. `_correct_superseded_seismic_rows` (:792) looks for exactly
+  that string and replaces it with the calibration wording. The string is the
+  correction's match key, not seeded text.
+- `seed_seismic_rules` (:841 onward) seeds no description containing EN 1998-1 or
+  DIN 4149.
+- The correction is in this branch: `fdafd86`, "stop seeding EN 1998-1 / DIN 4149
+  attributions and correct stored rows", is an ancestor of 4f8adc7.
+- `git log -S "DIN 4149" -- app/services/ruleset_seeder.py` shows one commit that
+  introduced the wording, `eaf2afd`. Its two description strings are identical to
+  the match keys, so no other variant was ever seeded from this file. Migration
+  `20260913131052` matches the same two strings, plus the folder-description
+  variant from `20260830001000`.
+
+Changing those strings would stop both the in-place correction and
+`tests/test_sb001_seeded_provenance.py` from matching pre-correction rows. They
+were left unchanged. **No additional SQL is needed.** Any production row seeded
+from this file carries exactly the string that `_correct_superseded_seismic_rows`
+and migration `20260913131052` already target. Whether that migration has been
+applied was not checked (no SQL run).
+
+Found in passing, not changed:
+
+- `.github/ISSUE_TEMPLATE/compliance_defect.yml:22` labels Blue Halo "EN 1998 /
+  DIN 4149".
+
+### 12.4 README seismic edition
+
+`README.md:30` cited "FEMA E-74, ASCE 7-22". It now cites FEMA E-74 and ASCE/SEI
+7-10 §13.6 as cited by it, and says the thresholds are screening calibration
+except where marked sourced. That matches `sb001_seismic_clearance.json`.
+
+Other files with the ASCE 7-22 mismatch, reported and not changed:
+
+| File | What it says | Why left |
+| --- | --- | --- |
+| `app/constants.py:522-528` | standards registry entry "ASCE 7-22", applicable to Halo | Executable; outside this change's permitted differences |
+| `scripts/NOTEBOOK_STANDARDS.py:108-114` | same registry entry | Same data, NotebookLM tooling |
+| `docs/ISO19650/BIMGuard-ISO19650-Requirements.md:83` | Tier 4 row cites ASCE 7-22 and labels GC-001 as seismic bracing | Separate doc correction |
+| `docs/HERMES_CONTEXT.md:67` | ASCE 7-22 in the Hermes brief | Headered Hermes artifact |
+| `app/modules/blue_halo/generate_expanded_config.py`, `hermes_config_expanded.py` | the retired Hermes ASCE 7-22 + NFPA 13 pair | Accurate historical description |
+
+### 12.5 Needs rebuilding
+
+- **NotebookLM corpora:** `docs/bimguard_corrosion_rules.md` quotes the old BCF
+  string, the old `_mic_citations` and the old seeder default. Rebuild via
+  `scripts/compile_for_notebooklm.py`.
+- **Decks:** no deck source changed in this follow-up. Deck A and Deck C are
+  still pending from §9.
+- **Frontend bundle:** no frontend file changed.
+- **Running demo:** the live backend serves the old citation until it restarts on
+  this code. The warm cache holds findings with the old string.
