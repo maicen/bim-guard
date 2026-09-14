@@ -3,10 +3,10 @@
 Corrosion slice of the BIMGUARD AI OpenBIM compliance application: the GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media and XM-001 cross-material rule logic, their catalogs and rule packs, plus the shared platform architecture. Compiled for analysis against corrosion standards (ISO 9223, ISO 12944, ASTM G82).
 
 - **NotebookLM workspace:** FMP: BIMGUARD AI - Corrosion
-- **Generated:** 2026-09-13 18:10 UTC
+- **Generated:** 2026-09-14 19:40 UTC
 - **Source repository:** `bim-guard-merge`
 - **File types included:** `.csv`, `.json`, `.md`, `.py`, `.txt`, `.xml`
-- **Files included:** 347 (102 corrosion-specific, 245 shared architecture files also present in the companion notebook)
+- **Files included:** 350 (105 corrosion-specific, 245 shared architecture files also present in the companion notebook)
 
 ---
 
@@ -44,8 +44,8 @@ OpenBIM standards (IFC, BCF, IDS) with large language models. Its compliance
 engines and data ingestion pipeline evaluate structural and material integrity
 against international building codes through two primary modules:
 
-*   **GC-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing standards (e.g., FEMA E-74, ASCE 7-22).
-*   **CC-001 (Piping & Corrosion):** Evaluates material degradation, galvanic mismatch, and environmental exposure against atmospheric standards (e.g., ISO 9223, MBIE B2).
+*   **SB-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing guidance (FEMA E-74, and ASCE/SEI 7-10 §13.6 as cited by it). Its dimensional thresholds are BIMGUARD screening calibration except where marked sourced, not code values (`data/rulesets/sb001_seismic_clearance.json`).
+*   **GC-001, CC-001, MC-001, MM-001, XM-001 (Piping & Corrosion):** Evaluate galvanic, crevice, microbiological, material-media and cross-material corrosion risk, citing the standards that govern each mechanism (e.g., NASA-STD-6012, EN ISO 15329, HSE HSG274). The thresholds are a calibration authored for each ruleset, not values quoted from those standards (`docs/planning/corrosion_provenance_2026-09-13.md`).
 
 ## The Agentic RAG Methodology
 
@@ -869,6 +869,21 @@ Standards referenced:
   - ISO 19650 (BIM information management, IFC property set framework)
   - buildingSMART BCF 2.1 (issue tracking specification)
 
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-GC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts:
+  docs/planning/corrosion_provenance_2026-09-13.md.
+
+  XM-001 reads this engine's galvanic series and voltage thresholds at runtime,
+  so the same statement applies to the potentials and voltages XM-001 scores.
+
 Weighted composite score:
   Score_GC = (0.50 × voltage_risk)
             + (0.30 × area_ratio_risk)
@@ -1224,6 +1239,20 @@ def select_gc_mitigation(
         mits.append("MIT-GC-004")
     mits.append("MIT-GC-010")
     return list(dict.fromkeys(mits))
+
+
+def catalog_source() -> dict[str, str]:
+    """Return where the GC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_GC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_GC_CATALOG.get("catalog_payload_source", "")),
+    }
 
 
 def reload_rules() -> None:
@@ -1834,6 +1863,21 @@ Standards referenced:
   - buildingSMART BCF 2.1 (issue tracking specification)
   - ISO 19650 (BIM information management, IFC property set framework)
 
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-CC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts:
+  docs/planning/corrosion_provenance_2026-09-13.md.
+
+  Separately, the pipeline does not supply CC-001's three scoring inputs as the
+  specification describes: see docs/defects/CC-001-scoring-inputs-inert.md.
+
 Weighted composite score:
   Score_CC = (0.35 × geometry_risk)
             + (0.40 × CCT_adequacy)
@@ -1977,7 +2021,9 @@ def classify_joint_type(joint_description: str) -> tuple[str, str, float]:
 
 
 # ── ENVIRONMENT SEVERITY ──────────────────────────────────────────────────────
-# Based on EN ISO 15329:2007 wetting class framework
+# Classes named after the EN ISO 15329:2007 wetting-class framework; the severity
+# and chloride figures are authored calibration, not quoted from the standard
+# (docs/planning/corrosion_provenance_2026-09-13.md).
 # T0 = essentially dry, T5 = permanent immersion / pool / coastal
 ENVIRONMENT_SEVERITY = {
     "T0_DRY": {
@@ -2196,6 +2242,20 @@ def select_cc_mitigation(
         mits.append("MIT-CC-004")
     mits.append("MIT-CC-008")
     return list(dict.fromkeys(mits))
+
+
+def catalog_source() -> dict[str, str]:
+    """Return where the CC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_CC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_CC_CATALOG.get("catalog_payload_source", "")),
+    }
 
 
 def reload_rules() -> None:
@@ -2904,6 +2964,94 @@ def run_galvanic_compliance_check(element: Any) -> dict[str, Any]:
 
 ---
 
+### app/engines/bimguard_graph_engine.py
+
+```python
+"""BIMGUARD AI — Topology & Graph Compute Engine.
+
+Implements the RuleEvaluator protocol for theme-agnostic structural graph
+checks that sit underneath every discipline (Architecture, Piping, Seismic)
+rather than inside one of them -- see ``app.modules.ifc_reader.ifc_graph`` for
+the NetworkX relationship graph this evaluates records from.
+
+Engines:
+1. GraphTopologyEngine (GRAPH-TOPOLOGY-001):
+   Flags IFC products with no spatial, connection, or material relationship
+   anywhere in the model (``ifc_graph.find_orphan_elements``).
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from app.logging_config import get_logger
+from app.modules.comparator.engine_registry import RuleEvaluationContext, RuleEvaluator
+from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
+
+logger = get_logger(__name__)
+
+_SPATIAL_ROOT_TYPES = {"IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcSpace"}
+
+
+class GraphTopologyEngine(RuleEvaluator):
+    """Orphan/disconnected element detection engine conforming to RuleEvaluator.
+
+    Unlike the discipline engines in ``bimguard_arch_engine.py``, this check
+    has no numeric threshold to resolve from the DB rules table: an element
+    with zero relationships in the model graph is a structural defect
+    regardless of ruleset, the same way a missing FireRating property is an
+    unconditional fail in ``SpatialDaylightEngine``.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the engine. No DI seam needed -- no DB thresholds to resolve."""
+        self.rule_type = "GRAPH-TOPOLOGY-001"
+
+    def evaluate(
+        self,
+        element: Any,
+        *,
+        context: RuleEvaluationContext | RuleEvaluationRequest | None = None,
+    ) -> RuleEvaluationResult:
+        """Evaluate one graph-node record (``guid``/``label``/``ifc_type``/``degree``)."""
+        data = element if isinstance(element, dict) else getattr(element, "__dict__", {})
+        guid = str(data.get("guid") or data.get("id") or "UNKNOWN")
+        label = str(data.get("label") or guid)
+        ifc_type = str(data.get("ifc_type") or "Unknown")
+        degree = int(data.get("degree") or 0)
+
+        is_orphan = degree == 0 and ifc_type not in _SPATIAL_ROOT_TYPES
+
+        if is_orphan:
+            band, score, status = "Medium", 0.5, "FAIL"
+            action = (
+                f"{ifc_type} '{label}' has no spatial containment, connection, or "
+                "material relationship anywhere in the model; verify placement and "
+                "connectivity"
+            )
+        else:
+            band, score, status, action = "Low", 0.0, "PASS", "Compliant"
+
+        return RuleEvaluationResult(
+            rule_type=self.rule_type,
+            band=band,
+            score=score,
+            details={
+                "check_type": "orphan_element",
+                "label": label,
+                "ifc_type": ifc_type,
+                "degree": degree,
+                "passes": not is_orphan,
+                "code_reference": "GRAPH-TOPOLOGY-001",
+            },
+            status=status,
+            element_id=guid,
+            action=action,
+        )
+```
+
+---
+
 ### app/engines/bimguard_mic_engine.py
 
 ```python
@@ -2915,11 +3063,30 @@ Standards referenced:
   - CIBSE TM13:2013 (Minimising the Risk of Legionella)
   - HSE HSG274 Parts 1–3 (Legionella Control)
   - BS 8552:2012 (Sampling and Monitoring of Water)
-  - ASTM G-187 (MIC Assessment)
+  - ASTM G-187 (MIC Assessment) -- suspect citation: the seeded ruleset itself
+    declares ASTM G-187 a soil-resistivity practice, yet cites it for material
+    susceptibility to MIC
   - EN ISO 9308-1 (Microbiological Water Quality)
   - CIBSE Guide G (Public Health Engineering)
   - WHO Guidelines for Drinking Water Quality (4th Ed.)
-  - NACCE TPC 11 (MIC in Industrial Water Systems)
+  - NACCE TPC 11 (MIC in Industrial Water Systems) -- suspect citation, recorded
+    as written: the body is NACE (now AMPP), and the document is unverified
+
+  Neither suspect citation is emitted. BCF issues and findings name AMPP
+  (formerly NACE) industry practice for the MIC mechanism only, and state that
+  the thresholds are authored calibration. The seeded payload still carries both.
+
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-MC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts, and the two suspect
+  citations: docs/planning/corrosion_provenance_2026-09-13.md.
 
 Weighted composite score:
   Score_MC = (0.35 × flow_velocity_risk)
@@ -2991,8 +3158,11 @@ DEAD_LEG_CLASSES = _MC_CATALOG["dead_leg_classes"]
 
 def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) -> tuple[str, dict]:
     """
-    Classify dead-leg by length-to-diameter ratio per HSE HSG274.
-    Returns risk class key and metadata dict from DB.
+    Classify dead-leg by length-to-diameter ratio.
+
+    The dead-leg concern is HSE HSG274's; the ratio bands and risk scores are
+    authored calibration, not quoted from it. Returns risk class key and
+    metadata dict from DB.
     """
     if length_m is None or diameter_m is None or diameter_m <= 0:
         return "DL5_UNKNOWN", DEAD_LEG_CLASSES.get("DL5_UNKNOWN", {"risk": 0.5})
@@ -3096,6 +3266,20 @@ MITIGATIONS = {
 }
 if _MC_CATALOG.get("mitigations"):
     MITIGATIONS.update(_MC_CATALOG["mitigations"])
+
+
+def catalog_source() -> dict[str, str]:
+    """Return where the MC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_MC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_MC_CATALOG.get("catalog_payload_source", "")),
+    }
 
 
 def reload_rules() -> None:
@@ -3426,7 +3610,8 @@ Relevant standards:
   CIBSE TM13:2013 — Minimising Risk from Legionella
   HSE HSG274 Parts 1–3 — Legionella Control
   BS 8552:2012 — Sampling and Monitoring of Water Systems
-  ASTM G-187 — MIC Assessment Standard Practice"""
+  AMPP (formerly NACE) industry practice — MIC mechanism only
+  MC-001 thresholds are authored calibration, not values quoted from any standard above"""
     return BCFIssue(
         guid=str(uuid.uuid4()).upper(),
         title=f"MC-001 MIC Risk — {result.risk_band} — {result.element_type} [{result.global_id[:8]}]",
@@ -5017,6 +5202,113 @@ class GraphStatusContract(BaseModel):
     )
 
 
+class SpatialTreeNodeContract(BaseModel):
+    """One node of the IFC spatial containment tree (Project->Site->Building->Storey->Space->Element)."""
+
+    guid: str = Field(..., description="IFC GlobalId, or a synthetic id for non-product nodes")
+    label: str = Field(..., description="Human-readable name")
+    ifc_type: str = Field(..., description="IFC entity type, e.g. IfcBuildingStorey")
+    children: list["SpatialTreeNodeContract"] = Field(default_factory=list)
+    truncated_count: int = Field(
+        0, description="Children omitted beyond the per-node cap, if any"
+    )
+
+
+class SpatialTreeResponse(BaseModel):
+    """The project's IFC spatial containment tree, rooted at IfcProject."""
+
+    project_id: int = Field(..., description="Project database ID")
+    root: Optional[SpatialTreeNodeContract] = Field(
+        None, description="Root node, or None if the model has no IfcProject"
+    )
+
+
+class ElementRelationEdge(BaseModel):
+    """One outgoing or incoming BOT/SAREF4BLDG relationship for an element."""
+
+    predicate: str = Field(..., description="Local predicate name, e.g. adjacentZone, hasSpace")
+    guid: str = Field(..., description="GlobalId of the element on the other end of the edge")
+    label: str = Field(..., description="Human-readable name of that element")
+
+
+class ElementRelationshipsResponse(BaseModel):
+    """One element's BOT/SAREF4BLDG classification and graph relationships.
+
+    Backs the Knowledge Graph-Enriched 3D Viewport: clicking an element
+    queries the model's BOT graph for its spatial containment, boundary
+    interfaces (adjacentZone/adjacentElement), and -- for MEP elements --
+    SAREF4BLDG distribution-system typing.
+    """
+
+    project_id: int
+    guid: str
+    exists: bool = Field(..., description="Whether this GlobalId was found in the model's graph")
+    ifc_type: Optional[str] = None
+    label: Optional[str] = None
+    bot_classes: list[str] = Field(default_factory=list, description="BOT classes, e.g. Space, Element")
+    s4bldg_classes: list[str] = Field(
+        default_factory=list, description="SAREF4BLDG classes for MEP/distribution elements"
+    )
+    outgoing: list[ElementRelationEdge] = Field(default_factory=list)
+    incoming: list[ElementRelationEdge] = Field(default_factory=list)
+
+
+class GraphQueryPresetSummary(BaseModel):
+    """One available Cypher preset for the GraphRAG query console.
+
+    Free-form Cypher is deliberately not exposed -- see
+    `app.services.graph_query_presets` -- so the console can only ever run
+    one of these, each already scoped to the requesting project server-side.
+    """
+
+    key: str
+    label: str
+    description: str
+    params: list[str] = Field(
+        default_factory=list, description="Extra parameter names the caller must supply to run this preset"
+    )
+
+
+class GraphQueryPresetListResponse(BaseModel):
+    """Every Cypher preset the query console can run."""
+
+    presets: list[GraphQueryPresetSummary] = Field(default_factory=list)
+
+
+class GraphQueryResultResponse(BaseModel):
+    """Result rows from running one Cypher preset."""
+
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    row_count: int = 0
+
+
+class CodeToIfcTraceEntry(BaseModel):
+    """One rule (regulatory clause) traced to the IFC class it governs.
+
+    The only faithful link between "a clause" and "a component" that exists
+    today is a rule's `target_ifc_class` -- there is no dedicated
+    code-document-to-BIM-element data model yet (see the SRS's GraphRAG
+    section). `element_count` cross-references the project's actual model
+    rather than the rule catalog alone, so the trace shows only clauses this
+    project's model can actually be checked against.
+    """
+
+    rule_id: int
+    reference: str
+    description: str
+    target_ifc_class: str
+    element_count: int
+    source_document_id: Optional[int] = None
+    source_page_number: Optional[int] = None
+
+
+class CodeToIfcTraceResponse(BaseModel):
+    """Every rule in the catalog whose target IFC class this project's model contains."""
+
+    project_id: int
+    entries: list[CodeToIfcTraceEntry] = Field(default_factory=list)
+
+
 class GraphHealResponse(BaseModel):
     """Response from reconciling and synthesizing missing spatial boundaries."""
 
@@ -5873,6 +6165,22 @@ class RuleSourceResponse(BaseModel):
     snippet: str = Field(default="", description="The rule's source_text, for text-layer highlighting")
     bbox: Optional[dict[str, Any]] = Field(
         default=None, description="Bounding box coordinates on the page for visual halo highlighting: {l, t, r, b, coord_origin}"
+    )
+
+
+class RuleShaclShapeResponse(BaseModel):
+    """A rule's compiled W3C SHACL shape, for the Rule Inspection Studio."""
+
+    rule_id: int
+    eligible: bool = Field(
+        ..., description="Whether this rule's requirement can be expressed as a SHACL shape at all"
+    )
+    turtle: str = Field(
+        default="", description="The compiled shape, Turtle-serialized. Empty when not eligible."
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Why the rule is not SHACL-eligible, when eligible is False",
     )
 
 
@@ -7644,6 +7952,15 @@ class HealthCheckResponse(BaseModel):
     status: str
     service: str
     version: str
+    graph_backend: str = Field(
+        "none",
+        description=(
+            "Which GraphDatabaseProvider is actually backing graph_service: "
+            "'neo4j', 'kuzu', or 'none' if neither initialized. Informational "
+            "only -- a broken graph backend does not fail this health check, "
+            "since compliance/rules/documents work independently of it."
+        ),
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -7737,6 +8054,7 @@ class BIMGuard_App:
         rules_service=None,
         analysis_service=None,
         triplestore_service=None,
+        graph_service=None,
     ) -> None:
         """Initialize with explicit dependency injection, defaulting to real instances."""
         self._projects_service = projects_service
@@ -7745,6 +8063,7 @@ class BIMGuard_App:
         self._rules_service = rules_service
         self._analysis_service = analysis_service
         self._triplestore_service = triplestore_service
+        self._graph_service = graph_service
 
     def orchestrate_workflow(
         self,
@@ -7778,6 +8097,14 @@ class BIMGuard_App:
         the egress/spatial records this method already computes, surfacing
         findings under ``arch_engine_issues``/``arch_engine_error`` -- again
         without altering any existing key.
+
+        ``enable_graph`` (default False) opts into the theme-agnostic graph
+        intelligence side-channel (see ``_run_graph_intelligence``): the
+        existing ``graph_summary``/centrality output plus the registered
+        ``GRAPH-TOPOLOGY-001`` ``RuleEvaluator`` run over orphan elements found
+        in that same graph, surfacing findings under
+        ``graph_engine_issues``/``graph_engine_error`` -- again purely
+        additive.
         """
         from app.services.documents_service import DocumentService
         from app.services.models_service import ModelsService
@@ -7848,6 +8175,14 @@ class BIMGuard_App:
             ifc=ifc,
             project_id=project_id,
             log_progress=log_progress,
+        )
+
+        graph_summary, graph_engine_issues, graph_engine_error = (
+            self._run_graph_intelligence(
+                ifc.get("m2_reader"), project_id, graph_service=self._graph_service
+            )
+            if enable_graph
+            else (None, [], None)
         )
 
         rule_result = self._run_rule_compliance(
@@ -7929,12 +8264,12 @@ class BIMGuard_App:
             "building_summary": ifc["building_summary"],
             "spatial_checks": ifc["spatial_checks"],
             "egress_checks": ifc["egress_checks"],
-            # Opt-in graph intelligence side-channel (see enable_graph)
-            "graph_summary": (
-                BIMGuard_App._run_optional_graph_summary(ifc["m2_reader"])
-                if enable_graph and ifc.get("m2_reader")
-                else None
-            ),
+            # Opt-in graph intelligence side-channel (see enable_graph /
+            # _run_graph_intelligence) -- empty/None unless a caller explicitly
+            # passed enable_graph=True.
+            "graph_summary": graph_summary,
+            "graph_engine_issues": graph_engine_issues,
+            "graph_engine_error": graph_engine_error,
         }
 
     @staticmethod
@@ -8397,21 +8732,99 @@ class BIMGuard_App:
         }
 
     @staticmethod
-    def _run_optional_graph_summary(m2_reader: Any) -> dict[str, Any] | None:
-        """Opt-in graph intelligence summary extraction."""
-        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
-            return None
-        try:
-            from app.modules.ifc_reader.ifc_graph import (
-                build_ifc_graph,
-                build_ifc_graph_summary,
-            )
+    def _run_graph_intelligence(
+        m2_reader: Any, project_id: int, *, graph_service: Any = None
+    ) -> tuple[dict[str, Any] | None, list[dict], str | None]:
+        """Opt-in graph intelligence: summary/centrality plus an orphan-element check.
 
-            graph = build_ifc_graph(m2_reader.ifc_file)
-            return build_ifc_graph_summary(graph)
-        except Exception as exc:
-            logger.debug("Optional graph summary generation skipped: %s", exc)
-            return None
+        Runs the GRAPH-TOPOLOGY-001 RuleEvaluator
+        (``app.engines.bimguard_graph_engine.GraphTopologyEngine``) over orphan
+        elements found in the same graph build, and -- when ``graph_service``
+        is injected (see ``BIMGuard_App.__init__``'s ``graph_service`` param,
+        wired from ``app.bootstrap``'s Neo4j/Kùzu-backed ``GraphService``) --
+        persists the same graph into it via ``ingest_ifc_to_graph``, so an
+        analysis run with ``enable_graph=True`` populates the real graph
+        database rather than only building an in-memory one. Persistence is
+        best-effort: a Neo4j/Kùzu hiccup is logged and skipped, never costing
+        the orphan-element findings below, which need only the in-memory graph.
+
+        Builds the relationship graph once and reuses it for the summary, the
+        persistence step, and the engine, rather than the independent graph
+        builds ``_run_shacl_compliance`` and this used to each do. Wraps its
+        own ``tracking(project_id, run_key="graph")`` context -- separate from
+        the corrosion pipeline's ``"default"`` run key -- so GRAPH-001 can
+        report real progress via the existing pipeline tracker without
+        resetting an in-flight corrosion run for the same project (see
+        CLAUDE.md's `PipelineTracker` per-run-key note).
+
+        Returns ``(graph_summary, graph_engine_issues, graph_engine_error)``.
+        Never raises: any failure is caught, logged, and reported as
+        ``(None, [], None)`` -- exactly as ``graph_summary`` alone used to
+        silently return ``None`` before this existed, so callers that only look
+        at ``graph_summary`` see no behaviour change.
+        """
+        if not m2_reader or not getattr(m2_reader, "ifc_file", None):
+            return None, [], None
+
+        from app.services.pipeline_tracker import GRAPH_ENGINE, Stage, tracking
+        from app.services.pipeline_tracker import complete as track_complete
+        from app.services.pipeline_tracker import emit as track_emit
+        from app.services.pipeline_tracker import fail as track_fail
+
+        with tracking(project_id, run_key="graph"):
+            try:
+                from app.engines.bimguard_graph_engine import GraphTopologyEngine
+                from app.modules.comparator.issue_adapter import lift_engine_result
+                from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+                from app.modules.ifc_reader.ifc_graph import (
+                    build_ifc_graph,
+                    build_ifc_graph_summary,
+                    find_orphan_elements,
+                    ingest_ifc_to_graph,
+                )
+
+                track_emit(GRAPH_ENGINE, Stage.IFC_PARSING)
+                graph = build_ifc_graph(m2_reader.ifc_file)
+                summary = build_ifc_graph_summary(graph)
+
+                if graph_service is not None:
+                    try:
+                        ingest_stats = ingest_ifc_to_graph(
+                            m2_reader.ifc_file,
+                            graph_service,
+                            project_id=str(project_id),
+                            graph=graph,
+                        )
+                        track_emit(
+                            GRAPH_ENGINE,
+                            None,
+                            persisted_nodes=ingest_stats.get("nodes", 0),
+                            persisted_edges=ingest_stats.get("edges", 0),
+                        )
+                    except Exception as ingest_exc:
+                        logger.warning(
+                            "Graph persistence skipped project_id=%d: %s",
+                            project_id,
+                            ingest_exc,
+                        )
+
+                orphans = find_orphan_elements(graph)
+                track_emit(GRAPH_ENGINE, Stage.ENGINE_EXECUTION, records=len(orphans))
+
+                engine = GraphTopologyEngine()
+                issues = []
+                for record in orphans:
+                    result = engine.evaluate(record)
+                    issue = lift_engine_result(result, mechanism="GRAPH-TOPOLOGY-001")
+                    if issue is not None:
+                        issues.append(issue)
+
+                track_complete(GRAPH_ENGINE, findings=len(issues))
+                return summary, [issue_to_dict(issue) for issue in issues], None
+            except Exception as exc:
+                track_fail(GRAPH_ENGINE, str(exc))
+                logger.debug("Optional graph intelligence generation skipped: %s", exc)
+                return None, [], str(exc)
 
     @staticmethod
     def _run_arch_engine_compliance(
@@ -20108,7 +20521,11 @@ def build_bot_graph(ifc_graph: nx.DiGraph, adjacency: Any | None = None) -> Grap
 
 
 def _add_adjacency_triples(graph: Graph, adjacency: Any) -> None:
-    """Add `bot:hasSpace` (door/space) and `bot:adjacentElement` (party-wall) triples."""
+    """Add door/space, party-wall, and space/space adjacency triples.
+
+    `bot:hasSpace` (door/space), `bot:adjacentElement` (party-wall), and
+    `bot:adjacentZone` (space/space, symmetric).
+    """
     for door_guid, space_guids in adjacency.get_door_to_spaces().items():
         door = element_uri(door_guid)
         for space_guid in space_guids:
@@ -20116,8 +20533,107 @@ def _add_adjacency_triples(graph: Graph, adjacency: Any) -> None:
 
     for party_wall in adjacency.get_party_walls():
         wall = element_uri(party_wall["wall_guid"])
-        for space_guid in party_wall["space_guids"]:
+        space_guids = party_wall["space_guids"]
+        for space_guid in space_guids:
             graph.add((wall, BOT.adjacentElement, element_uri(space_guid)))
+
+        # Every pair of spaces sharing this wall is a pair of adjacent zones
+        # -- emitted in both directions, since "adjacent to" is inherently
+        # symmetric for two spaces (unlike bot:adjacentElement above, which
+        # is deliberately one-directional: the wall bounds the space, not
+        # the reverse).
+        for i, guid_a in enumerate(space_guids):
+            for guid_b in space_guids[i + 1 :]:
+                zone_a, zone_b = element_uri(guid_a), element_uri(guid_b)
+                graph.add((zone_a, BOT.adjacentZone, zone_b))
+                graph.add((zone_b, BOT.adjacentZone, zone_a))
+
+
+def get_element_relationships(bot_graph: Graph, guid: str) -> dict[str, Any]:
+    """Return one element's BOT/SAREF4BLDG classification and relationships.
+
+    Reads an already-built `build_bot_graph()` output rather than a separate
+    persisted triplestore, so the Knowledge Graph-Enriched 3D Viewport works
+    the same way `graph_routes.py`'s `/status`/`/spatial-tree` endpoints do --
+    on demand from the primary model file, regardless of whether this project
+    has ever had `enable_shacl=True` persist a graph.
+
+    Relationships are limited to BOT/SAREF4BLDG predicates (containment,
+    `bot:adjacentElement`, `bot:adjacentZone`, `bot:hasSpace`) -- not the
+    `bimguard:` engine-literal enrichments (`enrich_literal`), which are
+    per-rule computed values, not graph structure.
+    """
+    subject = element_uri(guid)
+    has_outgoing = any(bot_graph.triples((subject, None, None)))
+    has_incoming = any(bot_graph.triples((None, None, subject)))
+    if not has_outgoing and not has_incoming:
+        return {
+            "exists": False,
+            "ifc_type": None,
+            "label": None,
+            "bot_classes": [],
+            "s4bldg_classes": [],
+            "outgoing": [],
+            "incoming": [],
+        }
+
+    ifc_type: str | None = None
+    bot_classes: list[str] = []
+    s4bldg_classes: list[str] = []
+    for rdf_class in bot_graph.objects(subject, RDF.type):
+        class_str = str(rdf_class)
+        if class_str.startswith(str(BOT)):
+            bot_classes.append(class_str[len(str(BOT)) :])
+        elif class_str.startswith(str(S4BLDG)):
+            s4bldg_classes.append(class_str[len(str(S4BLDG)) :])
+        elif class_str.startswith(str(BIMGUARD)) and class_str[len(str(BIMGUARD)) :].startswith("Ifc"):
+            ifc_type = class_str[len(str(BIMGUARD)) :]
+
+    label = next(bot_graph.objects(subject, RDFS.label), None)
+
+    def _local_name(uri: URIRef) -> str:
+        text = str(uri)
+        return text.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+
+    def _node_label(node: URIRef) -> str:
+        found = next(bot_graph.objects(node, RDFS.label), None)
+        return str(found) if found else _local_name(node)
+
+    outgoing: list[dict[str, str]] = []
+    for predicate, obj in bot_graph.predicate_objects(subject):
+        pred_str = str(predicate)
+        if isinstance(obj, Literal) or not (pred_str.startswith(str(BOT)) or pred_str.startswith(str(S4BLDG))):
+            continue
+        outgoing.append(
+            {
+                "predicate": _local_name(predicate),
+                "guid": _local_name(obj),
+                "label": _node_label(obj),
+            }
+        )
+
+    incoming: list[dict[str, str]] = []
+    for subj, predicate in bot_graph.subject_predicates(subject):
+        pred_str = str(predicate)
+        if not (pred_str.startswith(str(BOT)) or pred_str.startswith(str(S4BLDG))):
+            continue
+        incoming.append(
+            {
+                "predicate": _local_name(predicate),
+                "guid": _local_name(subj),
+                "label": _node_label(subj),
+            }
+        )
+
+    return {
+        "exists": True,
+        "ifc_type": ifc_type,
+        "label": str(label) if label else None,
+        "bot_classes": bot_classes,
+        "s4bldg_classes": s4bldg_classes,
+        "outgoing": outgoing,
+        "incoming": incoming,
+    }
 
 
 def enrich_literal(
@@ -22008,6 +22524,83 @@ def compute_graph_centrality(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
     return results
 
 
+def find_orphan_elements(graph: nx.DiGraph) -> list[dict[str, Any]]:
+    """Return graph nodes with no containment, connection, or material relationship.
+
+    Excludes spatial root types (``IfcProject``/``IfcSite``/``IfcBuilding``/
+    ``IfcBuildingStorey``/``IfcSpace``), which legitimately sit at the top of
+    the containment tree and can have zero inbound edges, and synthetic
+    ``IfcMaterial`` nodes, which are graph bookkeeping rather than model
+    elements. Used by ``GraphTopologyEngine`` (GRAPH-TOPOLOGY-001) to flag
+    elements disconnected from the rest of the model.
+    """
+    orphans: list[dict[str, Any]] = []
+    for node, attrs in graph.nodes(data=True):
+        ifc_type = attrs.get("ifc_type", "Unknown")
+        if ifc_type in _SPATIAL_TYPES or ifc_type == "IfcMaterial":
+            continue
+        if graph.in_degree(node) + graph.out_degree(node) == 0:
+            orphans.append(
+                {
+                    "guid": node,
+                    "label": attrs.get("label", node),
+                    "ifc_type": ifc_type,
+                    "degree": 0,
+                }
+            )
+    return orphans
+
+
+def build_spatial_tree(graph: nx.DiGraph, *, max_children_per_node: int = 500) -> dict[str, Any] | None:
+    """Roll the graph's ``Aggregates``/``ContainedIn`` edges into a rooted spatial tree.
+
+    ``IfcProject`` -> ``IfcSite`` -> ``IfcBuilding`` -> ``IfcBuildingStorey`` ->
+    ``IfcSpace``/other elements, mirroring the physical containment hierarchy
+    (``build_ifc_graph``'s ``Aggregates`` edges are IFC's spatial decomposition
+    relationships; its ``ContainedIn`` edges are element placement into a
+    spatial structure -- together they form one tree rooted at the project).
+
+    Returns ``None`` if the graph has no ``IfcProject`` node (nothing to root
+    a tree at). ``max_children_per_node`` caps how many children are returned
+    per node (excess reported via ``truncated_count``) so a storey with
+    thousands of elements doesn't blow up the response -- the UI this backs is
+    a navigable tree, not a full model export.
+
+    Cycle-guarded via a visited set: the source graph is built from real IFC
+    relationships and shouldn't contain one, but a malformed model must not
+    hang this on infinite recursion.
+    """
+    roots = [node for node, attrs in graph.nodes(data=True) if attrs.get("ifc_type") == "IfcProject"]
+    if not roots:
+        return None
+
+    children_by_parent: dict[Any, list[Any]] = defaultdict(list)
+    for source, target, attrs in graph.edges(data=True):
+        if attrs.get("rel_type") in ("Aggregates", "ContainedIn"):
+            children_by_parent[source].append(target)
+
+    def build_node(guid: Any, visited: set[Any]) -> dict[str, Any]:
+        attrs = graph.nodes[guid]
+        node: dict[str, Any] = {
+            "guid": str(guid),
+            "label": attrs.get("label", str(guid)),
+            "ifc_type": attrs.get("ifc_type", "Unknown"),
+            "children": [],
+            "truncated_count": 0,
+        }
+        if guid in visited:
+            return node
+        visited = visited | {guid}
+
+        child_ids = children_by_parent.get(guid, [])
+        node["truncated_count"] = max(0, len(child_ids) - max_children_per_node)
+        for child_id in child_ids[:max_children_per_node]:
+            node["children"].append(build_node(child_id, visited))
+        return node
+
+    return build_node(roots[0], set())
+
+
 def get_centrality_consequence_multiplier(
     guid: str,
     centralities: dict[str, dict[str, float]],
@@ -22090,6 +22683,7 @@ def ingest_ifc_to_graph(
     *,
     project_id: str | None = None,
     include_psets: bool = False,
+    graph: nx.DiGraph | None = None,
 ) -> dict[str, int]:
     """Extract IFC entities and relationships and ingest them in batch into GraphService.
 
@@ -22098,19 +22692,25 @@ def ingest_ifc_to_graph(
         graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
         project_id: Optional project identifier to associate with all ingested nodes.
         include_psets: Whether to flatten and attach property set values to element nodes.
+        graph: An already-built graph for ``model_or_path`` (from
+            ``build_ifc_graph``), reused instead of building a second one --
+            for a caller (e.g. the orchestrator's graph intelligence
+            side-channel) that already built the graph for its own summary or
+            engine pass over the same model.
 
     Returns:
         Dict with total counts of ingested nodes and relationships.
     """
-    if not _IFCOPENSHELL_AVAILABLE:
-        raise ImportError("ifcopenshell is not installed.")
+    if graph is None:
+        if not _IFCOPENSHELL_AVAILABLE:
+            raise ImportError("ifcopenshell is not installed.")
 
-    if isinstance(model_or_path, (str, Path)):
-        model = ifcopenshell.open(str(model_or_path))
-    else:
-        model = model_or_path
+        if isinstance(model_or_path, (str, Path)):
+            model = ifcopenshell.open(str(model_or_path))
+        else:
+            model = model_or_path
 
-    graph = build_ifc_graph(model)
+        graph = build_ifc_graph(model)
 
     # Group nodes by label (ifc_type)
     nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -34017,11 +34617,17 @@ def _crevice_citations(result) -> list[dict]:
 
 
 def _mic_citations(result) -> list[dict]:
-    """Cite the standards and the classes MC-001 actually applied."""
+    """Cite the standards and the classes MC-001 actually applied.
+
+    The first entry names the body of practice for the MIC mechanism, not a
+    document: the ruleset's ASTM G-187 and "NACCE TPC 11" citations are suspect
+    (docs/planning/corrosion_provenance_2026-09-13.md §5), and no standard
+    supplies MC-001's flow-class thresholds.
+    """
     return [
         {
-            "standard": "ASTM G-187",
-            "clause": "MIC assessment standard practice",
+            "standard": "AMPP (formerly NACE) industry practice",
+            "clause": "MIC mechanism only; MC-001 flow-class threshold is authored calibration, not a standard value",
             "reason": f"flow class {result.flow_velocity_class}",
         },
         {
@@ -34478,7 +35084,37 @@ def _assess_network(elements: list, spec: MechanismSpec, allocator: IssueIdAlloc
     return [], f"{spec.code} is not a network mechanism"
 
 
-def _provenance(element: ServiceElement) -> dict[str, str]:
+#: The engine module holding each per-element mechanism's threshold catalog.
+_CATALOG_ENGINES = {
+    "GC-001": bimguard_corrosion_engine,
+    "CC-001": bimguard_crevice_engine,
+    "MC-001": bimguard_mic_engine,
+}
+
+
+def _catalog_provenance(spec: MechanismSpec) -> dict[str, str]:
+    """Report which catalog source the engine for ``spec`` holds in this process.
+
+    Called in the process that scores the element -- a pool worker or the
+    parent -- because each process loads its own catalog and the two need not
+    agree. Returns ``{}`` for mechanisms without a threshold catalog (MM-001 and
+    XM-001 read versioned packs instead) or when the engine cannot say.
+    """
+    module = _CATALOG_ENGINES.get(spec.code)
+    if module is None:
+        return {}
+    try:
+        return dict(module.catalog_source())
+    except Exception:  # pragma: no cover - never let provenance break a finding
+        logger.warning("Catalog source unavailable mechanism=%s", spec.code, exc_info=True)
+        return {}
+
+
+def _provenance(
+    element: ServiceElement,
+    spec: MechanismSpec | None = None,
+    catalog: dict[str, str] | None = None,
+) -> dict[str, str]:
     """Report where this element's material and environment actually came from.
 
     GC-001, CC-001 and MC-001 are decided by ``material_a`` and
@@ -34487,17 +35123,27 @@ def _provenance(element: ServiceElement) -> dict[str, str]:
     ``SPACE_TO_ENV`` keyword yields the module's indoor default. Both then look
     identical to values read off the model by the time an engine scores them.
 
+    Given the mechanism, it also reports where that engine's *thresholds* came
+    from: ``catalog_source`` (``database_rows``, ``stored_payload`` or
+    ``in_memory_fallback``) and ``catalog_payload_source``. The fallback tables
+    band some elements differently from the seeded ruleset, so a finding has to
+    say which one scored it. ``catalog`` is passed in when the element was scored
+    in another process; otherwise it is read here.
+
     Every finding carries this block so a reviewer can see whether a Critical
     band rests on the building or on an assumption — the same question
     ``assumed_nominal_diameter_m`` already answers for MC-001's diameter, asked
     of the two inputs that matter most.
     """
-    return {
+    inputs = {
         "material_source": element.material_source,
         "material_confidence": element.material_confidence,
         "environment_source": element.environment_source,
         "environment_confidence": element.environment_confidence,
     }
+    if spec is None:
+        return inputs
+    return {**inputs, **(catalog if catalog is not None else _catalog_provenance(spec))}
 
 
 def _data_quality_issue(
@@ -34508,6 +35154,7 @@ def _data_quality_issue(
     *,
     check: str = "band_unassessed",
     inputs: dict[str, Any] | None = None,
+    catalog: dict[str, str] | None = None,
 ) -> Issue:
     """Report that a mechanism could not be evaluated for this element.
 
@@ -34553,7 +35200,7 @@ def _data_quality_issue(
             **(inputs or {}),
             # Often the explanation for the absence: an engine that could not
             # resolve a material usually could not because none was read.
-            **_provenance(element),
+            **_provenance(element, spec, catalog),
         },
         citations=[],
     )
@@ -34616,7 +35263,8 @@ def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
     try:
         from app.services.corrosion_rule_catalog import load_mc_catalog
 
-        missing = list(load_mc_catalog().get("temperature_bounds_missing") or [])
+        mc_catalog = load_mc_catalog()
+        missing = list(mc_catalog.get("temperature_bounds_missing") or [])
     except Exception:  # pragma: no cover - a catalog that will not load is
         return []      # already reported by the per-element path
 
@@ -34651,6 +35299,8 @@ def _ruleset_data_quality_issues(allocator: IssueIdAllocator) -> list[Issue]:
                 "check": RULESET_TEMPERATURE_BOUNDS_MISSING,
                 "mechanism_code": MIC.code,
                 "classes": sorted(missing),
+                "catalog_source": mc_catalog.get("catalog_source", ""),
+                "catalog_payload_source": mc_catalog.get("catalog_payload_source", ""),
             },
             citations=[],
         )
@@ -34708,6 +35358,8 @@ def _finding_issue(
     band: RiskBand,
     citations: list[dict],
     allocator: IssueIdAllocator,
+    *,
+    catalog: dict[str, str] | None = None,
 ) -> Issue:
     """Build the Issue for a mechanism that did produce a band."""
     mitigations = list(getattr(result, "mitigations", []) or [])
@@ -34728,8 +35380,8 @@ def _finding_issue(
             "system": element.system,
             "ifc_type": element.ifc_type,
             # Recorded so a reviewer can see which inputs were assumed rather
-            # than read from the model.
-            **_provenance(element),
+            # than read from the model, and which catalog set the thresholds.
+            **_provenance(element, spec, catalog),
             **(
                 {"assumed_nominal_diameter_m": ASSUMED_NOMINAL_DIAMETER_M}
                 if spec is MIC
@@ -34767,23 +35419,31 @@ def _assess_elements_chunk(
     raw_items: list[tuple] = []
     mic_scored = False
     specs = tuple(spec for spec in MECHANISMS if spec.code in specs_codes)
+    # Read in this worker, from the catalog this worker holds: it is the one
+    # that scores these elements, and it need not match the parent's.
+    catalogs = {spec.code: _catalog_provenance(spec) for spec in specs}
 
     for element in elements_chunk:
         for spec in specs:
+            catalog = catalogs[spec.code]
             gated = _preflight(element, spec)
             if gated is not None:
                 check, reason, gate_inputs = gated
-                raw_items.append(("dq", element, spec.code, reason, check, gate_inputs))
+                raw_items.append(("dq", element, spec.code, reason, check, gate_inputs, catalog))
                 continue
 
             result, citations, error = _assess(element, spec)
             if result is None:
-                raw_items.append(("dq", element, spec.code, error or "no result", None, None))
+                raw_items.append(
+                    ("dq", element, spec.code, error or "no result", None, None, catalog)
+                )
                 continue
 
             raw_band = getattr(result, "risk_band", None)
             if raw_band in (None, ""):
-                raw_items.append(("dq", element, spec.code, "engine returned no band", None, None))
+                raw_items.append(
+                    ("dq", element, spec.code, "engine returned no band", None, None, catalog)
+                )
                 continue
 
             band = normalise_band(raw_band, element=element.guid, mechanism=spec.code)
@@ -34793,7 +35453,7 @@ def _assess_elements_chunk(
             if band is RiskBand.LOW and not include_low:
                 continue
 
-            raw_items.append(("finding", element, spec.code, result, band, citations))
+            raw_items.append(("finding", element, spec.code, result, band, citations, catalog))
 
     return raw_items, mic_scored
 
@@ -34888,17 +35548,27 @@ def run_corrosion_analysis(
                     mic_scored = True
                 for item in chunk_items:
                     if item[0] == "dq":
-                        _, elem, code, reason, check, gate_inputs = item
+                        _, elem, code, reason, check, gate_inputs, catalog = item
                         spec = spec_map[code]
                         issues.append(
                             _data_quality_issue(
-                                elem, spec, reason, allocator, check=check, inputs=gate_inputs
+                                elem,
+                                spec,
+                                reason,
+                                allocator,
+                                check=check,
+                                inputs=gate_inputs,
+                                catalog=catalog,
                             )
                         )
                     else:
-                        _, elem, code, result, band, citations = item
+                        _, elem, code, result, band, citations, catalog = item
                         spec = spec_map[code]
-                        issues.append(_finding_issue(elem, spec, result, band, citations, allocator))
+                        issues.append(
+                            _finding_issue(
+                                elem, spec, result, band, citations, allocator, catalog=catalog
+                            )
+                        )
         except Exception as exc:
             logger.warning("Parallel corrosion analysis failed; falling back to sequential: %s", exc)
             use_pool = False
@@ -35200,6 +35870,11 @@ CSV_COLUMNS: tuple[str, ...] = (
     "overlap_volume_mm3",
     "clearance_mm",
     "standards",
+    # Where the engine's thresholds came from: database_rows, stored_payload or
+    # in_memory_fallback (app.services.corrosion_rule_catalog). Blank for
+    # mechanisms without a threshold catalog. Last, so every existing column
+    # keeps its position.
+    "catalog_source",
 )
 
 
@@ -35273,6 +35948,7 @@ def to_csv(result: dict) -> str:
                 "overlap_volume_mm3": issue.metadata.get("overlap_volume_mm3", ""),
                 "clearance_mm": issue.metadata.get("clearance_mm", ""),
                 "standards": _standards(issue),
+                "catalog_source": issue.metadata.get("catalog_source", ""),
             }
         )
     return buffer.getvalue()
@@ -35645,6 +36321,7 @@ def _description(issue: Issue) -> str:
         _line("Band", issue.band.value),
         _line("Score", round(float(issue.score or 0.0), 4)),
         _line("Ruleset", meta.get("ruleset_version")),
+        _line("Catalog source", meta.get("catalog_source")),
         _line("Check", meta.get("check")),
     ]
     assessment = [line for line in assessment if line]
@@ -40381,6 +41058,7 @@ silently disagrees with it.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from rdflib import BNode, Graph, Literal
@@ -40448,6 +41126,33 @@ def rule_is_shacl_eligible(rule: dict[str, Any]) -> bool:
     if operator == "unique_within_scope":
         return str(rule.get("uniqueness_scope") or "building").strip().lower() == "building"
     return operator in _OPERATOR_TO_SHACL or operator in _OPERATOR_TO_SPARQL
+
+
+def rule_row_to_shacl_input(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a raw ``rules`` table row into the shape ``compile_shapes`` expects.
+
+    ``RuleService._build_rule_row`` JSON-encodes several fields as TEXT for
+    storage (``check_value``, ``value_min``, ``value_max``, ``applies_when``,
+    ``exceptions``) -- a raw row therefore carries those as JSON strings, not
+    the Python values ``_add_shape``/``_apply_scope_target`` operate on (the
+    latter calls ``.items()`` on ``applies_when``, which raises on an
+    un-decoded string). Also bridges ``reference`` -> ``rule_id``, the same
+    rename ``RuleResponse`` does for the public API.
+
+    A value that is not a string (already decoded, or genuinely absent) is
+    passed through unchanged, so this is safe to call on a row from any
+    source, decoded or not.
+    """
+    rule = dict(row)
+    rule["rule_id"] = row.get("rule_id") or row.get("reference") or ""
+    for key in ("check_value", "value_min", "value_max", "applies_when", "exceptions"):
+        value = rule.get(key)
+        if isinstance(value, str):
+            try:
+                rule[key] = json.loads(value)
+            except (TypeError, ValueError):
+                pass
+    return rule
 
 
 def compile_shapes(rules: list[dict[str, Any]]) -> Graph:
@@ -45599,11 +46304,38 @@ PRECEDENCE, HIGHEST FIRST
     3. :data:`_FALLBACK_RULESETS`, a hardcoded reduced table kept only for a
        database that is missing, unseeded or unreachable.
 
-    Every step down is a degradation, not an equivalent path, and step 3 is
-    logged at warning level. The fallback tables are strict subsets of the
-    stored payloads -- fewer materials, fewer environment classes -- so a
-    catalog built from them scores real couples against reference data that
-    does not contain them.
+    Every step down is a degradation, not an equivalent path, and both steps
+    down are logged at warning level. The fallback tables are NOT subsets of
+    the stored payloads. They hold fewer materials and environment classes, and
+    where they share an entry with the payload they do not always agree with
+    it: GC-001 agrees on every shared value, but CC-001 differs in 5 threshold
+    values (including all three shared geometry-class risks and JT-001's class)
+    and MC-001 in 16 (flow, temperature, dead-leg and material scores and
+    bounds). The fallback also carries keys the payloads lack (MC-001
+    ``t_min``/``t_max``, ``unknown``/``default`` material scores; GC-001
+    ``zone_to_env``). A catalog built from them therefore scores against
+    different numbers, not merely fewer, and can band the same element
+    differently. Detail: docs/planning/corrosion_provenance_2026-09-13.md and
+    docs/defects/corrosion-catalog-fallback-divergence.md.
+
+    Which step a catalog was built from is recorded on it as
+    ``catalog_source`` (one of :data:`CATALOG_SOURCES`) and carried onto every
+    corrosion finding, so a degraded run is distinguishable from a good one
+    after the fact.
+
+PROVENANCE
+
+    The GC-001, CC-001 and MC-001 numbers served by this module -- from the
+    seeded payloads and from the fallback tables alike -- are a calibration
+    authored for those rulesets. They are NOT quoted from the standards the
+    payloads cite. Each citation names the standard or body of practice that
+    GOVERNS THE MECHANISM, not a document from which the digit was read. None of
+    the cited source documents is held by this project, and no value has been
+    verified against one. The rulesets were generated with AI assistance from
+    NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104). A corrosion
+    engineer must verify every value against the cited source before any value
+    is relied on. MM-001 and XM-001 carry their own equivalent declarations in
+    data/rulesets/.
 """
 
 from __future__ import annotations
@@ -45618,6 +46350,14 @@ from app.services.rules_service import RuleService
 from app.services.static_data_service import StaticDataService
 
 logger = get_logger(__name__)
+
+#: The catalog was built from seeded rule rows (precedence step 1).
+CATALOG_SOURCE_ROWS = "database_rows"
+#: No rows; built from the stored ``static_data_assets`` payload (step 2).
+CATALOG_SOURCE_PAYLOAD = "stored_payload"
+#: No rows and no stored payload; built from :data:`_FALLBACK_RULESETS` (step 3).
+CATALOG_SOURCE_FALLBACK = "in_memory_fallback"
+CATALOG_SOURCES = (CATALOG_SOURCE_ROWS, CATALOG_SOURCE_PAYLOAD, CATALOG_SOURCE_FALLBACK)
 
 
 class RulesetIncompleteError(RuntimeError):
@@ -45882,8 +46622,9 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
         under the fallback, so couples involving them were scored from an
         incomplete table rather than from their real potentials.
 
-    Falling back is logged at warning level. Silently scoring an audit from the
-    reduced table is exactly the condition that needs to be visible in a log.
+    Falling back is logged at warning level by :func:`_catalog_source`, once
+    the rows are known, because the same fallback payload is harmless when rows
+    exist and decisive when they do not.
     """
     asset_map = {
         "galvanic_corrosion_ruleset.json": "ruleset:BIMGUARD-GC-001",
@@ -45909,23 +46650,100 @@ def _load_json_ruleset(filename: str) -> dict[str, Any]:
 
     fallback = _FALLBACK_RULESETS.get(filename)
     if fallback is not None:
-        logger.warning(
-            "Using hardcoded fallback ruleset for %s -- stored asset %s unavailable. "
-            "Scores come from a reduced lookup table.",
-            filename,
-            asset_key or "(unmapped)",
-        )
+        # Not logged here: whether this fallback decides any score depends on
+        # whether the rules table holds rows for the ruleset, which only the
+        # caller knows. :func:`_catalog_source` logs the actual outcome.
         return fallback
 
     raise RuntimeError(f"Missing static ruleset asset: {filename}")
 
 
 def _rules_for(ruleset_id: str) -> list[dict[str, Any]]:
-    """Return stored rows for a ruleset, or an empty list when unseeded."""
+    """Return stored rows for a ruleset, or an empty list when unseeded.
+
+    A failed read still returns ``[]`` -- the loaders' precedence depends on it
+    -- but it is logged, because an unreachable rules table and an unseeded one
+    lead to the same empty list and only the first is a fault.
+    """
     try:
         return RuleService().list_by_ruleset(ruleset_id)
     except Exception:
+        logger.warning(
+            "Rule rows could not be read ruleset_id=%s; the catalog treats the "
+            "ruleset as having no rows",
+            ruleset_id,
+            exc_info=True,
+        )
         return []
+
+
+def _catalog_source(
+    engine: str, filename: str, json_data: dict[str, Any], rows_found: bool
+) -> dict[str, str]:
+    """Name which precedence step a catalog is built from, and log a degradation.
+
+    Args:
+        engine: ``GC-001``, ``CC-001`` or ``MC-001``, for the log line.
+        filename: The ruleset filename passed to :func:`_load_json_ruleset`.
+        json_data: What :func:`_load_json_ruleset` returned. It is the fallback
+            exactly when it *is* the :data:`_FALLBACK_RULESETS` entry.
+        rows_found: Whether :func:`_rules_for` returned any rows.
+
+    Returns:
+        ``catalog_source`` -- the step the lookup tables came from -- and
+        ``catalog_payload_source`` -- where the JSON payload came from. With rows
+        present the payload fills only entries the rows lack (risk bands, and
+        GC-001 area-ratio bands), which is why the two are recorded separately.
+    """
+    payload_source = (
+        CATALOG_SOURCE_FALLBACK
+        if json_data is _FALLBACK_RULESETS.get(filename)
+        else CATALOG_SOURCE_PAYLOAD
+    )
+    ruleset_id = json_data.get("ruleset_id", "")
+    if rows_found:
+        source = CATALOG_SOURCE_ROWS
+        if payload_source == CATALOG_SOURCE_FALLBACK:
+            logger.warning(
+                "Catalog built from database rows engine=%s ruleset_id=%s "
+                "catalog_source=%s catalog_payload_source=%s; stored ruleset "
+                "payload unavailable, so the hardcoded fallback supplies only "
+                "entries the rows do not carry",
+                engine,
+                ruleset_id,
+                source,
+                payload_source,
+            )
+        else:
+            logger.debug(
+                "Catalog built from database rows engine=%s ruleset_id=%s "
+                "catalog_source=%s catalog_payload_source=%s",
+                engine,
+                ruleset_id,
+                source,
+                payload_source,
+            )
+    elif payload_source == CATALOG_SOURCE_PAYLOAD:
+        source = CATALOG_SOURCE_PAYLOAD
+        logger.warning(
+            "No database rows for ruleset engine=%s ruleset_id=%s catalog_source=%s; "
+            "thresholds come from the stored ruleset payload",
+            engine,
+            ruleset_id,
+            source,
+        )
+    else:
+        source = CATALOG_SOURCE_FALLBACK
+        logger.warning(
+            "Using hardcoded fallback ruleset for %s -- no database rows and stored "
+            "payload unavailable engine=%s ruleset_id=%s catalog_source=%s. Scores come "
+            "from a reduced lookup table whose values diverge from the seeded ruleset.",
+            filename,
+            engine,
+            ruleset_id,
+            source,
+        )
+    return {"catalog_source": source, "catalog_payload_source": payload_source}
 
 
 def _risk_band_thresholds(
@@ -46095,6 +46913,7 @@ def load_gc_catalog() -> dict[str, Any]:
     """Load the GC-001 lookup tables from the database or fallback JSON."""
     json_data = _load_json_ruleset("galvanic_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("GC-001", "galvanic_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -46283,6 +47102,7 @@ def load_gc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }
 
 
@@ -46319,6 +47139,7 @@ def load_cc_catalog() -> dict[str, Any]:
     """Load the CC-001 lookup tables from the database or fallback JSON."""
     json_data = _load_json_ruleset("crevice_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("CC-001", "crevice_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -46463,6 +47284,7 @@ def load_cc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }
 
 
@@ -46482,6 +47304,7 @@ def load_mc_catalog() -> dict[str, Any]:
     """
     json_data = _load_json_ruleset("mic_corrosion_ruleset.json")
     rows = _rules_for(json_data["ruleset_id"])
+    source = _catalog_source("MC-001", "mic_corrosion_ruleset.json", json_data, bool(rows))
 
     if not rows:
         rows = []
@@ -46696,6 +47519,7 @@ def load_mc_catalog() -> dict[str, Any]:
             )
         ),
         "rules": rows,
+        **source,
     }
 ```
 
@@ -46717,7 +47541,10 @@ from typing import Any, Callable
 from httpx import TransportError
 from postgrest.exceptions import APIError
 
+from app.logging_config import get_logger
 from app.services.cache import adapter_cache_service
+
+logger = get_logger(__name__)
 
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY_S = 0.2
@@ -46954,6 +47781,28 @@ class SupabaseTableAdapter(DatabaseAdapter):
         else:
             _USE_MEMORY_FALLBACK_TABLES.discard(self._table_name)
 
+    def _degrade_to_memory(self, operation: str, exc: Exception) -> None:
+        """Switch this table to the in-process memory copy, and say so.
+
+        The switch is module-level and nothing clears it, so from here until the
+        process exits every read of the table returns the memory rows (usually
+        none) and every write lands only in this process. It used to happen
+        silently; a run scored from a table in this state could not be told
+        apart from one scored from the database. Logged once per table, on the
+        transition, because the condition is permanent rather than per call.
+        """
+        if not self._use_memory_fallback:
+            logger.warning(
+                "Table degraded to in-process memory table=%s operation=%s "
+                "error_code=%s error=%s; results from this table are no longer "
+                "authoritative for the rest of this process",
+                self._table_name,
+                operation,
+                getattr(exc, "code", None),
+                exc,
+            )
+        self._use_memory_fallback = True
+
     @property
     def columns_dict(self) -> dict[str, Any]:
         """Return known columns from declared schema."""
@@ -46997,7 +47846,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows[0] if rows else None
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("get", exc)
                 return self.get(pk_value)
             raise
 
@@ -47019,7 +47868,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows[0] if rows else payload
         except APIError as exc:
             if self._is_missing_table_error(exc) or getattr(exc, "code", None) == "23503":
-                self._use_memory_fallback = True
+                self._degrade_to_memory("insert", exc)
                 return self.insert(payload)
             if self._should_retry_insert_with_pk(exc, payload):
                 retry_payload = dict(payload)
@@ -47056,7 +47905,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return inserted
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("insert_many", exc)
                 return [self.insert(payload) for payload in payloads]
             raise
 
@@ -47075,7 +47924,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("update", exc)
                 self.update(updates=updates, pk_values=pk_values)
                 return
             raise
@@ -47096,7 +47945,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("delete", exc)
                 self.delete(pk_value)
                 return
             raise
@@ -47124,7 +47973,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("delete_many", exc)
                 pk_set = set(pk_values)
                 pk_str_set = {str(pk) for pk in pk_values}
                 self._memory_rows[:] = [
@@ -47165,7 +48014,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return result
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("rows_where", exc)
                 return self.rows_where(where_sql, params, limit)
             raise
 
@@ -47185,7 +48034,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("select_all", exc)
                 return list(self._memory_rows)
             raise
 
@@ -49469,6 +50318,125 @@ class GraphService:
         self.provider.add_node("Rule", {"rule_id": rule_id})
         self.provider.add_node("IfcClass", {"id": ifc_class, "class_name": ifc_class})
         self.provider.add_edge(rule_id, ifc_class, "APPLIES_TO", from_label="Rule", to_label="IfcClass")
+```
+
+---
+
+### app/services/graph_query_presets.py
+
+```python
+"""Parameterized, server-scoped Cypher presets for the GraphRAG query console.
+
+The property graph `GraphService`/`ingest_ifc_to_graph()` populate (Neo4j or
+Kùzu) has no per-project partitioning the way `GraphTriplestoreService` has
+for the triplestore (`named_graphs` scoping) -- every provider just stamps a
+`project_id` property onto each node. Free-form Cypher would therefore leak
+every project's nodes to whoever ran it (`MATCH (n) RETURN n` has no
+boundary to respect). Rather than accept that, this module is the ONLY way
+the query console reaches the property graph: a small library of preset
+queries, each parameterized by `project_id`, which the caller always injects
+server-side (see `app.api.graph_routes.run_graph_query_preset`) -- it is
+never a value the request body can supply.
+
+Every preset here is written in Cypher syntax portable across both
+providers this repo supports; notably it avoids Neo4j's `type(rel)` /
+Kùzu's `label(rel)` relationship-type functions, which are NOT
+interchangeable between the two dialects (verified against embedded Kùzu),
+rather than special-casing the query text per provider.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from app.services.graph_database import GraphService
+
+
+@dataclass(frozen=True)
+class GraphQueryPreset:
+    """One named, parameterized Cypher query.
+
+    Attributes:
+        key: Stable identifier, used in the route path and as the request's
+            selector -- never treated as trusted Cypher itself.
+        label: Human-readable name for the console's preset picker.
+        description: What the preset shows and why.
+        cypher: The query text. Always references `$project_id`; may
+            reference additional `$`-prefixed params declared in `params`.
+        params: Extra parameter names (besides `project_id`) the caller must
+            supply, e.g. `["guid"]` for a query scoped to one element.
+    """
+
+    key: str
+    label: str
+    description: str
+    cypher: str
+    params: tuple[str, ...] = field(default_factory=tuple)
+
+
+GRAPH_QUERY_PRESETS: tuple[GraphQueryPreset, ...] = (
+    GraphQueryPreset(
+        key="element-counts-by-type",
+        label="Element counts by type",
+        description="How many nodes of each IFC type this project's graph holds.",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "RETURN n.ifc_type AS type, count(n) AS count "
+            "ORDER BY count DESC"
+        ),
+    ),
+    GraphQueryPreset(
+        key="most-connected-elements",
+        label="Most-connected elements",
+        description=(
+            "Elements with the most relationships (degree) -- structural or "
+            "distribution hubs a change to would ripple furthest from."
+        ),
+        cypher=(
+            "MATCH (n)-[r]-(m) WHERE n.project_id = $project_id "
+            "RETURN n.name AS name, n.ifc_type AS type, count(r) AS degree "
+            "ORDER BY degree DESC LIMIT 20"
+        ),
+    ),
+    GraphQueryPreset(
+        key="element-neighbors",
+        label="Elements connected to one element",
+        description="Every node directly connected to the given element (by GUID).",
+        cypher=(
+            "MATCH (n {guid: $guid})-[r]-(m) WHERE n.project_id = $project_id "
+            "RETURN m.name AS name, m.ifc_type AS type LIMIT 50"
+        ),
+        params=("guid",),
+    ),
+)
+
+_PRESETS_BY_KEY = {preset.key: preset for preset in GRAPH_QUERY_PRESETS}
+
+
+def get_preset(key: str) -> GraphQueryPreset | None:
+    """Look up one preset by key, or None if unknown."""
+    return _PRESETS_BY_KEY.get(key)
+
+
+def run_preset(
+    graph_service: GraphService, preset: GraphQueryPreset, *, project_id: int, params: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Execute `preset` against `graph_service`, `project_id` always server-supplied.
+
+    `params` must cover exactly `preset.params` -- an extra or missing key is
+    a caller bug, not a query the preset was written to accept, so it raises
+    rather than silently running with a wrong/absent value.
+    """
+    missing = set(preset.params) - set(params)
+    if missing:
+        raise ValueError(f"Preset {preset.key!r} is missing required params: {sorted(missing)}")
+    extra = set(params) - set(preset.params)
+    if extra:
+        raise ValueError(f"Preset {preset.key!r} does not accept params: {sorted(extra)}")
+
+    query_params = {"project_id": str(project_id), **params}
+    return graph_service.execute(preset.cypher, query_params)
 ```
 
 ---
@@ -55089,12 +56057,18 @@ class EngineSpec:
 #:     ``Status.PENDING`` and instrument it exactly as GC-001 is. Tracking always
 #:     wins over the declared status, so a tracked MC-001 run would report
 #:     ``running`` / ``complete`` regardless of this value.
+#: ``GRAPH-001``
+#:     The theme-agnostic graph engine (``app.engines.bimguard_graph_engine``),
+#:     run from ``orchestrator._run_graph_intelligence`` under the same
+#:     ``enable_graph`` flag as ``graph_summary``. ``pending`` means "no run
+#:     yet", exactly as it does for GC-001/CC-001.
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
     EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
     EngineSpec("MM-001", "Material / media comparator", Status.PENDING),
     EngineSpec("XM-001", "Cross-material comparator", Status.PENDING),
     EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
+    EngineSpec("GRAPH-001", "Graph topology intelligence", Status.PENDING),
 )
 
 #: Lookup by code, built once.
@@ -55108,6 +56082,7 @@ ENGINE_CODES: tuple[str, ...] = tuple(spec.code for spec in ENGINE_SPECS)
 #: site emitting under a name the endpoint does not know.
 GC_ENGINE = "GC-001"
 CC_ENGINE = "CC-001"
+GRAPH_ENGINE = "GRAPH-001"
 
 
 # ---------------------------------------------------------------------------
@@ -55333,8 +56308,9 @@ class PipelineTracker:
     ever existed.
     """
 
-    def __init__(self, project_id: int):
+    def __init__(self, project_id: int, run_key: str = "default"):
         self.project_id = project_id
+        self.run_key = run_key
         self._lock = threading.RLock()
         self._runs: dict[str, EngineRun] = {
             spec.code: EngineRun(code=spec.code, label=spec.label, lock=self._lock)
@@ -55369,6 +56345,7 @@ class PipelineTracker:
         with self._lock:
             return {
                 "project_id": self.project_id,
+                "run_key": self.run_key,
                 "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "engines": {code: run.snapshot() for code, run in self._runs.items()},
             }
@@ -55388,46 +56365,61 @@ MAX_TRACKERS: int = 32
 TTL_SECONDS: float = 900.0
 
 
+#: Store key: a project id plus which concurrent run owns the tracker.
+#: ``"default"`` is the corrosion pipeline's run (the only caller before
+#: per-run keys existed, so it keeps every existing call site's behaviour
+#: unchanged); a second theme run for the same project -- e.g. the graph
+#: engine, or a future Architecture/Seismic pass -- uses its own key so it
+#: gets its own tracker instead of resetting the corrosion run's progress via
+#: ``tracking(project_id, reset=True)``. See the module docstring's warning in
+#: CLAUDE.md about wrapping a second concurrent analysis path without this.
+_TrackerKey = tuple[int, str]
+
+
 class _TrackerStore:
-    """A bounded, expiring, thread-safe map of project id to tracker."""
+    """A bounded, expiring, thread-safe map of (project id, run key) to tracker."""
 
     def __init__(self, max_trackers: int = MAX_TRACKERS, ttl_seconds: float = TTL_SECONDS):
-        self._trackers: OrderedDict[int, PipelineTracker] = OrderedDict()
+        self._trackers: OrderedDict[_TrackerKey, PipelineTracker] = OrderedDict()
         self._max = max_trackers
         self._ttl = ttl_seconds
         self._lock = threading.Lock()
 
-    def get(self, project_id: int) -> Optional[PipelineTracker]:
-        """Return the tracker for ``project_id``, or ``None`` if absent or expired."""
+    def get(self, project_id: int, run_key: str = "default") -> Optional[PipelineTracker]:
+        """Return the tracker for ``(project_id, run_key)``, or ``None`` if absent or expired."""
+        key = (project_id, run_key)
         with self._lock:
-            tracker = self._trackers.get(project_id)
+            tracker = self._trackers.get(key)
             if tracker is None:
                 return None
             if (time.monotonic() - tracker.updated_at) > self._ttl:
-                del self._trackers[project_id]
-                logger.debug("Pipeline tracker expired project_id=%d", project_id)
+                del self._trackers[key]
+                logger.debug(
+                    "Pipeline tracker expired project_id=%d run_key=%s", project_id, run_key
+                )
                 return None
-            self._trackers.move_to_end(project_id)
+            self._trackers.move_to_end(key)
             return tracker
 
-    def get_or_create(self, project_id: int) -> PipelineTracker:
-        """Return the tracker for ``project_id``, creating one if needed."""
-        existing = self.get(project_id)
+    def get_or_create(self, project_id: int, run_key: str = "default") -> PipelineTracker:
+        """Return the tracker for ``(project_id, run_key)``, creating one if needed."""
+        existing = self.get(project_id, run_key)
         if existing is not None:
             return existing
+        key = (project_id, run_key)
         with self._lock:
-            tracker = PipelineTracker(project_id)
-            self._trackers[project_id] = tracker
-            self._trackers.move_to_end(project_id)
+            tracker = PipelineTracker(project_id, run_key)
+            self._trackers[key] = tracker
+            self._trackers.move_to_end(key)
             while len(self._trackers) > self._max:
                 evicted, _ = self._trackers.popitem(last=False)
-                logger.debug("Pipeline tracker evicted project_id=%d", evicted)
+                logger.debug("Pipeline tracker evicted project_id=%d run_key=%s", *evicted)
             return tracker
 
-    def discard(self, project_id: int) -> bool:
-        """Drop one project's tracker. Returns whether one was there."""
+    def discard(self, project_id: int, run_key: str = "default") -> bool:
+        """Drop one project run's tracker. Returns whether one was there."""
         with self._lock:
-            return self._trackers.pop(project_id, None) is not None
+            return self._trackers.pop((project_id, run_key), None) is not None
 
     def clear(self) -> None:
         """Empty the store. For tests and for a deliberate operational reset."""
@@ -55439,13 +56431,19 @@ class _TrackerStore:
 TRACKERS = _TrackerStore()
 
 
-def tracker_for(project_id: int) -> PipelineTracker:
-    """Return (creating if needed) the tracker for ``project_id``."""
-    return TRACKERS.get_or_create(project_id)
+def tracker_for(project_id: int, run_key: str = "default") -> PipelineTracker:
+    """Return (creating if needed) the tracker for ``(project_id, run_key)``.
+
+    ``run_key`` defaults to ``"default"``, the corrosion pipeline's run, so
+    every pre-existing call site is unaffected. Pass a distinct ``run_key``
+    (e.g. ``"graph"``) to track a second, genuinely concurrent analysis path
+    for the same project without resetting the default run's progress.
+    """
+    return TRACKERS.get_or_create(project_id, run_key)
 
 
-def snapshot(project_id: int) -> dict[str, Any]:
-    """Return the workflow payload for ``project_id``.
+def snapshot(project_id: int, run_key: str = "default") -> dict[str, Any]:
+    """Return the workflow payload for ``(project_id, run_key)``.
 
     A project nothing has ever analysed is not an error: it reports every engine
     at its declared status, which is the truthful answer to "how far has this
@@ -55453,9 +56451,9 @@ def snapshot(project_id: int) -> dict[str, Any]:
     case keeps an unbounded stream of polls for unknown ids from filling the
     store with empty entries.
     """
-    tracker = TRACKERS.get(project_id)
+    tracker = TRACKERS.get(project_id, run_key)
     if tracker is None:
-        return PipelineTracker(project_id).snapshot()
+        return PipelineTracker(project_id, run_key).snapshot()
     return tracker.snapshot()
 
 
@@ -55478,21 +56476,29 @@ def active() -> Optional[PipelineTracker]:
 
 
 @contextmanager
-def tracking(project_id: int, *, reset: bool = True) -> Iterator[PipelineTracker]:
-    """Bind a tracker for ``project_id`` for the duration of the block.
+def tracking(
+    project_id: int, *, reset: bool = True, run_key: str = "default"
+) -> Iterator[PipelineTracker]:
+    """Bind a tracker for ``(project_id, run_key)`` for the duration of the block.
 
     Args:
         project_id: Project being analysed.
         reset: Start from a clean tracker. On by default: a second analysis of
-            the same project is a new run, and inheriting the previous run's
-            counters would report an element count that never happened.
+            the same project *run* is a new run, and inheriting the previous
+            run's counters would report an element count that never happened.
+        run_key: Which concurrent run owns this tracker. Defaults to
+            ``"default"``, the corrosion pipeline's run. A second, genuinely
+            concurrent analysis path for the same project (e.g. the graph
+            engine) must pass a distinct ``run_key`` -- otherwise its
+            ``reset=True`` would discard the default run's in-flight progress
+            for the same project id.
 
     Yields:
         The bound :class:`PipelineTracker`.
     """
     if reset:
-        TRACKERS.discard(project_id)
-    tracker = tracker_for(project_id)
+        TRACKERS.discard(project_id, run_key)
+    tracker = tracker_for(project_id, run_key)
     token = _ACTIVE.set(tracker)
     try:
         yield tracker
@@ -57382,6 +58388,10 @@ class RuleDraftService:
             needs_review=payload.needs_review,
             applies_when=payload.applies_when,
             exceptions=payload.exceptions,
+            rase_requirement=payload.rase_requirement,
+            rase_applicability=payload.rase_applicability,
+            rase_selection=payload.rase_selection,
+            rase_exception=payload.rase_exception,
         )
 
         self._drafts.update(updates={"promoted_rule_id": created.get("id")}, pk_values=draft_id)
@@ -58329,6 +59339,11 @@ class RuleService:
         rule_category: str = "property_check",
         category: str = "",
         rule_id: str = "",
+        # RASE (Requirement/Applicability/Selection/Exception) provenance
+        rase_requirement: str | None = None,
+        rase_applicability: dict | None = None,
+        rase_selection: dict | None = None,
+        rase_exception: dict | None = None,
     ) -> dict:
         """Build a rule row dict (no I/O) shared by single and bulk create paths."""
         ref = (rule_id or reference or "").strip()
@@ -58380,6 +59395,10 @@ class RuleService:
             "ruleset_id": self.normalize_ruleset_id(ruleset_id),
             "rule_category": rule_category or "property_check",
             "category": norm_cat,
+            "rase_requirement": rase_requirement or None,
+            "rase_applicability": rase_applicability or None,
+            "rase_selection": rase_selection or None,
+            "rase_exception": rase_exception or None,
             "created_at": now,
             "updated_at": now,
         }
@@ -58466,6 +59485,11 @@ class RuleService:
         # meta
         confidence: float | None = None,
         needs_review: bool = False,
+        # RASE (Requirement/Applicability/Selection/Exception) provenance
+        rase_requirement: str | None = None,
+        rase_applicability: dict | None = None,
+        rase_selection: dict | None = None,
+        rase_exception: dict | None = None,
     ):
         """Update editable fields for an existing rule."""
         existing = self.get_rule(rule_id)
@@ -58501,6 +59525,10 @@ class RuleService:
             "source_text": source_text or (existing or {}).get("source_text", ""),
             "confidence": str(confidence) if confidence is not None else (existing or {}).get("confidence", ""),
             "needs_review": int(bool(needs_review)),
+            "rase_requirement": rase_requirement if rase_requirement is not None else (existing or {}).get("rase_requirement"),
+            "rase_applicability": rase_applicability if rase_applicability is not None else (existing or {}).get("rase_applicability"),
+            "rase_selection": rase_selection if rase_selection is not None else (existing or {}).get("rase_selection"),
+            "rase_exception": rase_exception if rase_exception is not None else (existing or {}).get("rase_exception"),
             "updated_at": now_iso_utc(),
         }
         if category:
@@ -59819,6 +60847,17 @@ def _seed_risk_bands(
         )
 
 
+# ── GC-001, CC-001, MC-001 — provenance of what is seeded below ───────────────
+# Every GC-001, CC-001 and MC-001 row below is written with
+# source_text="Source: <citation>". That citation names the standard or body of
+# practice governing the mechanism; it is NOT the document the number was read
+# from. The numbers are a calibration authored for these rulesets with AI
+# assistance (NotebookLM prompts, April 2026; docs/RESOURCES.md:97-104), none of
+# the cited documents is held, and no value has been verified against one. The
+# "Source:" prefix is left as it is because it is stored rule data; the corrected
+# reading, and proposed wording, are in
+# docs/planning/corrosion_provenance_2026-09-13.md.
+
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
 
@@ -60132,7 +61171,7 @@ def _seed_mc001(svc: RuleService) -> int:
             description=f"{mat['label']}: MIC susceptibility score {mat['score']}",
             check_value=mat["score"],
             keyword=mat_key,
-            source_text=f"Source: {mat.get('reference', 'NACCE TPC 11')}",
+            source_text=f"Source: {mat.get('reference', 'AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration')}",
             parameters=json.dumps({**mat, "material_key": mat_key}),
         )
 
@@ -65700,9 +66739,12 @@ connectivity graph looking for dissimilar-metal couples that GC-001 cannot see,
 because they are two separate elements joined by a fitting rather than one
 element with a declared material pairing.
 
-Each engine produces a normalised 0.0–1.0 composite score from published
+Each engine produces a normalised 0.0–1.0 composite score from its ruleset's
 weightings, bands it Critical / High / Medium / Low, and attaches the standard
-and clause the threshold came from. Elements the engines cannot score do not
+that governs the mechanism. The weightings and thresholds are a calibration
+authored for each ruleset, not values quoted from those standards; none of the
+cited documents is held and no value has been verified against one (see
+`docs/planning/corrosion_provenance_2026-09-13.md`). Elements the engines cannot score do not
 disappear — they raise a `data_quality` finding instead, because "we have not
 assessed this" and "this is compliant" are different claims and the report keeps
 them apart. On a hospital that distinction matters: an unassessed run in a
@@ -65736,7 +66778,7 @@ nothing downstream needs to know about mechanisms:
 | `band` | `critical` / `high` / `medium` / `low` |
 | `score` | Normalised composite, 0.0–1.0 |
 | `mechanism` | Engine label, or `data_quality` for an unassessed element |
-| `citations` | Standard + clause + the reason that clause applies |
+| `citations` | The standard governing the mechanism, and why it applies — not the source of the number |
 | `mitigation` | The engineering action, not a restatement of the problem |
 
 Risk bands are aligned so that Critical means the same thing whichever engine
@@ -65751,6 +66793,10 @@ classes T0–T5), EN 1993-1-4 (structural stainless), BS 8539 (bi-metallic
 assemblies and dielectric separation), CIBSE TM13 and HSE HSG274 (Legionella
 control), BS 8552 (water sampling and monitoring), EN ISO 9308-1 (microbiological
 water quality), EN 12952-12 (feedwater quality) and ASTM B117 (salt spray).
+These name the governing mechanism for each engine. Across all five engines the
+numbers are authored calibration: MM-001 and XM-001 have always said so in their
+rule packs, and GC-001, CC-001 and MC-001 now say so too. A corrosion engineer
+must check a value against its cited source before relying on it.
 
 Mitigations are catalogued rather than generated per finding. A galvanic couple
 returns `MIT-GC-001` — install dielectric isolation at every contact point
@@ -65873,7 +66919,7 @@ A representative Critical finding, and what each part is telling you:
 | voltage gap | ~0.50 V | Large driving force — a specification problem |
 | area ratio | small anode / large cathode | Concentrated attack — accelerates it |
 | environment | `T3_chloride` or worse | Conductive, persistently wet |
-| `citations` | NASA-STD-6012 + clause | The threshold's source, auditable |
+| `citations` | NASA-STD-6012 + clause | The standard governing the mechanism — the threshold itself is authored calibration, not quoted from it |
 | `mitigation` | `MIT-GC-001` | Dielectric isolation at every contact point |
 
 A `GC-001.DATA` finding is a different animal. It is not a verdict — it means an
@@ -65911,8 +66957,8 @@ practically every refurbishment that ties new work into an existing system.
 
 Per finding: the composite score and band, the three contributing terms in the
 finding metadata, the resolved material names on both sides of the couple, the
-environment class applied, the standard and clause behind the threshold, and the
-catalogued mitigation. Aggregate `issue_stats` give totals per band plus a
+environment class applied, the standard governing the mechanism (the threshold
+itself is authored calibration, not quoted from it), and the catalogued mitigation. Aggregate `issue_stats` give totals per band plus a
 separate `data_quality` count, which is deliberately kept out of the band totals
 so an unassessed element is never mistaken for a Low-risk one.
 
@@ -66653,7 +67699,16 @@ analysis domains, so take them separately.
 
 ### Piping corrosion — five engines, published materials standards
 
-| Standard | What it supplies | Engine |
+These standards govern the mechanisms each engine scores. They are not the source
+of the engines' numbers: every weighting, threshold and score in the five corrosion
+rulesets is a calibration authored for BIMGUARD, none of the documents below is
+held by the project, and no value has been verified against one. Two citations are
+suspect as recorded — ASTM G-187 is declared a soil-resistivity practice yet cited
+for MIC material susceptibility, and MC-001's "NACCE TPC 11" misspells the body,
+which is NACE (now AMPP). See
+`docs/planning/corrosion_provenance_2026-09-13.md`.
+
+| Standard | Mechanism it governs | Engine |
 | --- | --- | --- |
 | **NASA-STD-6012** | Galvanic voltage compatibility thresholds by environment class; the compatibility floor definition | GC-001, XM-001 |
 | **BS 8539** | Bi-metallic assemblies; dielectric separation practice | GC-001, XM-001 |
@@ -66667,7 +67722,7 @@ analysis domains, so take them separately.
 | **HSE HSG274 Parts 1–3** | Legionella control; storage temperature regime | MC-001, MM-001 |
 | **BS 8552:2012** | Sampling and monitoring of water | MC-001, MM-001 |
 | **EN ISO 9308-1** | Microbiological water quality | MC-001, MM-001 |
-| **ASTM G-187** | MIC assessment | MC-001 |
+| ASTM G-187 | *Cited by the MC-001 ruleset; not the source of any MC-001 value — see note above* | MC-001 |
 | **WHO Guidelines for Drinking-Water Quality (4th ed.)** | Water quality baseline | MC-001 |
 | **EN 12952-12** | Feedwater and boiler water quality | MM-001 |
 | **ASTM B117** | Salt spray exposure | GC-001, MM-001 |
@@ -66724,9 +67779,13 @@ Rules are stored in a unified database table with typed fields and a JSON
 `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, `BIMGUARD-MC-001`, `BIMGUARD-MM-001`,
 `BIMGUARD-XM-001`, or a custom id for a project pack. Each engine's rule pack
 carries a `schema_version`, a `status`, and an `approval` block naming who signed
-it. Individual parameter entries in the corrosion packs carry their own `cite`
-(the source) and `conf` (confidence: `established` or `provisional`) fields, so
-the confidence grading is per-value rather than per-pack.
+it. In the MM-001 and XM-001 packs, individual parameter entries carry their own
+`cite` (the standard governing the mechanism) and `conf` (confidence:
+`established` or `provisional`) fields, so the confidence grading there is
+per-value rather than per-pack. GC-001, CC-001 and MC-001 carry no `conf` field.
+In all five corrosion rulesets the numbers are a calibration authored for the
+ruleset, not values quoted from the cited standards, and none of those documents
+is held (see `docs/planning/corrosion_provenance_2026-09-13.md`).
 
 Seeding is idempotent per rule rather than all-or-nothing, so a pack can be
 extended or resumed without duplicating what is already loaded, and engine
@@ -66741,8 +67800,10 @@ version should be archived together.
 1. **Read the citation on the finding.** Every finding carries `citations` — a
    standard, a clause, and the reason that clause applies. That is the claim.
 2. **Open the rule in the rules view** and read its `ref` field and its
-   `parameters`. For corrosion rules, read the `cite` and `conf` on the specific
-   parameter that drove the score, not just the pack-level reference.
+   `parameters`. For MM-001 and XM-001 rules, read the `cite` and `conf` on the
+   specific parameter that drove the score, not just the pack-level reference.
+   For any corrosion rule, treat the citation as the governing standard, not the
+   source of the number.
 3. **Check the `conf` grading.** A `provisional` value is one the authors have
    flagged as not fully established. Several MM-001 and XM-001 parameters are
    graded provisional deliberately, and the packs carry an
@@ -67106,8 +68167,10 @@ deliberately because rules are live — edited rules take effect on the next run
 - **Diff before adopting.** Run V11 and V12 against the same model and compare
   the results. That difference is what changed in the standard, expressed as
   findings, and it is usually more informative than the operator's change log.
-- **Grade confidence.** The corrosion packs carry per-value `cite` and `conf`
-  fields distinguishing `established` from `provisional`. The same discipline
+- **Grade confidence.** The MM-001 and XM-001 corrosion packs carry per-value
+  `cite` and `conf` fields distinguishing `established` from `provisional`
+  (GC-001, CC-001 and MC-001 do not, and in all five the numbers are authored
+  calibration rather than quoted values). The same discipline
   applied to extracted rules — marking which have been reviewed against source
   and which have not — prevents an unreviewed extraction being read as settled.
 
@@ -68669,6 +69732,132 @@ An earlier copy with the same §9.3 text, the same input-list line, the same "Ge
 
 ---
 
+### docs/defects/corrosion-catalog-fallback-divergence.md
+
+```markdown
+# Corrosion catalog fallback diverges from the seeded ruleset, and a degraded run was undetectable
+
+**Recorded:** 13 September 2026, on `fix/catalog-source-provenance` (base `8cd6b22`).
+**Engines:** GC-001, CC-001, MC-001. MM-001 and XM-001 read versioned rule packs and are not affected.
+**Status:** partly mitigated. Degradation is now recorded on every finding and logged. The fallback tables are still wrong, and pool workers can still hold a different catalog from their parent.
+
+Companion record: `docs/planning/corrosion_provenance_2026-09-13.md` is expected from a parallel session on the corrosion provenance audit. It did not exist on `origin/main` when this record was written.
+
+---
+
+## 1. How a catalog is loaded: three states, not two
+
+`app/services/corrosion_rule_catalog.py` builds each engine's lookup tables in precedence order:
+
+| State | `catalog_source` | When | What scores the element |
+| --- | --- | --- | --- |
+| 1 | `database_rows` | `_rules_for(ruleset_id)` returns rows | The seeded rule rows. The JSON payload fills only entries the rows lack (risk bands, and GC-001 area-ratio bands). |
+| 2 | `stored_payload` | No rows, but the `static_data_assets` payload loads | Rows synthesised from the stored payload. |
+| 3 | `in_memory_fallback` | No rows and no stored payload | Rows synthesised from `_FALLBACK_RULESETS`, a hardcoded table in the module. |
+
+The loader calls `_load_json_ruleset` first (payload, else fallback) and `_rules_for` second. It builds from rows when any exist and synthesises rows from the JSON otherwise (`load_gc_catalog`, `load_cc_catalog`, `load_mc_catalog`).
+
+A transport failure, an unseeded ruleset and a degraded rules table all reach the loader the same way: `_rules_for` returns `[]`. So "unreachable database" means state 3.
+
+## 2. The fallback tables are not equivalent to the seeded ruleset
+
+The audit behind this record compared `_FALLBACK_RULESETS` with the seeded payloads:
+
+- **21 value mismatches** on keys both sources carry: GC-001 **0**, CC-001 **5**, MC-001 **16**. 18 of them are large enough to move a finding across a band.
+- **119 keys present in only one source.** Two effects:
+  - **GC-001:** couples involving materials the fallback lacks lose their potentials, so they are scored from an incomplete galvanic series.
+  - **CC-001:** elements in pool or external zones map to environment classes the fallback lacks. That raises a `KeyError` in the engine, and the element becomes a data-quality note instead of a verdict.
+
+Measured offline on 13 September 2026 against the 1917 demo model (`data/test_hospital_mep_demo.ifc`, regenerated by `scripts/generate_demo_mep_model.py`, stable GUIDs). Engines GC-001, CC-001 and MC-001 ran sequentially, once from seeder-built rows and once from `_FALLBACK_RULESETS`:
+
+| Engine | Band moves, rows → fallback |
+| --- | --- |
+| GC-001 | Medium → High: 21 |
+| CC-001 | none on this model (no pool or external zones) |
+| MC-001 | Medium → Low: 156; High → Medium: 22; Medium → High: 8; **Critical → High: 6** |
+
+**6 of project 1917's 10 MC-001 Critical verdicts drop to High under the fallback.** The other 4 stay Critical.
+
+## 3. Project 1917's frozen figures are seeded, not fallback
+
+Three independent lines of evidence:
+
+1. **Classes.** The frozen findings name classes that exist only in the seeded tables.
+2. **Exact scores.** The reconstruction for this record reproduced every GC-001, CC-001 and MC-001 issue in the stored export `bimguard-corrosion-project-1917.json` (exported 2026-09-09) exactly.
+   - 378 + 42 GC-001, 378 + 42 CC-001 and 294 + 126 MC-001 verdicts and data-quality notes.
+   - Maximum score deviation 0.000000, 0 band mismatches, 0 mitigation mismatches.
+   - The rows were built by the real startup seeder (`ruleset_seeder._seed_gc001/_seed_cc001/_seed_mc001`) from the payloads in `supabase/migrations/20260806180500_seed_static_data_assets.sql`.
+   - The same model scored from the fallback does *not* reproduce it (section 2).
+3. **Logs.** The 9 September verification logged `static_data_assets … 200 OK` with no fallback warning.
+
+This is therefore a forward-looking risk, not a retrospective one.
+
+**Payload-only is not enough for MC-001 either.** Scored from the stored payload alone (state 2), MC-001 also fails to reproduce 1917: 0 Critical instead of 10. The payload carries temperature classes without numeric `t_min`/`t_max`. Only the seeded rows carry them (`ruleset_seeder._TEMPERATURE_BOUNDS`, and migration `20260905220000_mc001_temperature_bounds.sql`). State 2 is a degradation for MC-001 too.
+
+## 4. Why a degraded run could not be told apart afterwards
+
+Before this change, nothing a run produced recorded which state its catalogs were in:
+
+- **`ruleset_version` is a hardcoded engine constant** (`"BIMGUARD-CC-001 v1.0.0"`), identical in all three states.
+- **The only log line was ambiguous.** `_load_json_ruleset` warned "Using hardcoded fallback ruleset" whenever the *payload* was unavailable. That included runs where the rows were live and the fallback supplied nothing, which trains a reader to ignore it.
+- **The rows switch was silent.** `_rules_for` turned any exception into `[]` without a log line.
+- **`app/services/db_adapters.py` had no logger.** `SupabaseTableAdapter` switches a table to an in-process memory copy on a missing-table error (and, for `insert`, on a foreign-key error), at eight sites, without a word.
+- **The degrade flag lasts for the process lifetime.** `_USE_MEMORY_FALLBACK_TABLES` is a module-level set that nothing clears. Once a table degrades, every later read of it in that process returns the memory rows, usually none, until the process exits.
+- **Empty results are cached.** `CacheService.cached_query` (`app/services/cache.py`) skips caching only `None`. `RuleService.list_by_ruleset` is cached under `bimguard:rules:ruleset` with the default 24-hour TTL, so an `[]` read from a degraded table is served back for up to a day unless a rule write invalidates `bimguard:rules`.
+- **Pool workers keep their own catalog** (section 5).
+
+Together these meant a run could be partly live and partly fallback, produce different bands, and look identical to a good run afterwards.
+
+## 5. Pool workers: can a worker hold a different catalog from its parent? Yes.
+
+- **The pool.** `app/services/compute_pool.py:22` holds a module-global `ProcessPoolExecutor`, created lazily by `get_compute_pool()` (`:55-66`) with no `mp_context` and no `initializer`. On this deployment (`win32`) the start method is **spawn**. Workers do not inherit the parent's memory; each is a fresh interpreter.
+- **Order of events in a run** (`run_corrosion_analysis`, `app/modules/phase_6/phase_6c_corrosion_ui.py`):
+  1. `reload_all_catalogs()` runs in the parent (`:1276`).
+  2. For 30 or more elements (`:1290`), chunks go to `pool.submit(_assess_elements_chunk, …)` (`:1312`).
+- **What a worker does.** Unpickling `_assess_elements_chunk` imports `phase_6c_corrosion_ui`. That imports the three engines (`:85`), whose module bodies run `load_gc_catalog()` / `load_cc_catalog()` / `load_mc_catalog()` at import (`bimguard_corrosion_engine.py:48`, `bimguard_crevice_engine.py:61`, `bimguard_mic_engine.py:42`). This is a separate database read, from the worker's own adapter cache, its own `_USE_MEMORY_FALLBACK_TABLES` and its own network conditions.
+- **Why they diverge.**
+  - `reload_all_catalogs()` (`corrosion_rule_catalog.py`, the `importlib.import_module` / `reload_rules()` loop) reloads only the modules of the process that calls it. Nothing in `_assess_elements_chunk` reloads.
+  - Workers are reused across runs for the life of the pool, and spawned on demand, so different workers in one pool can have imported at different times.
+  - A worker that imported while the database was briefly unreachable scores from the fallback for as long as it lives, while its parent reloads live tables on every run.
+  - A rule edited in Supabase after a worker started never reaches that worker.
+- **What this session changed.** `_assess_elements_chunk` now reads `catalog_source()` in the worker, from the catalog that worker holds, and carries it on each result tuple. A worker in a different *state* is therefore visible per finding. A worker holding *stale rows* (both sides `database_rows`, different content) is still invisible.
+- **What a fix would involve** (not done here):
+  - Either reload in the worker at the start of each chunk (one catalog read per chunk),
+  - or, preferably, have the parent pass its already-loaded catalogs to each submitted chunk and install them before scoring, so a run is scored from exactly one catalog.
+  - Either way, `_narrative_catalog` (`phase_6c_corrosion_ui.py:1102`), which builds description text in the parent from its own load, should use the same catalog as the scores.
+- **Demo build unaffected.** The pool arrived in `0502e19` (2026-09-10), which is not an ancestor of the demo build `1450960`. Everything in section 5 applies to `main` and later builds.
+
+## 6. What this session changed
+
+1. **Every GC-001, CC-001 and MC-001 finding and data-quality note now records its catalog source.**
+   - The new metadata keys are `catalog_source` (the three states above) and `catalog_payload_source` (`stored_payload` or `in_memory_fallback`).
+   - They are added through the existing `_provenance()` in `phase_6c_corrosion_ui.py`, alongside material and environment provenance, and on the run-level MC-001 temperature-bounds note.
+   - `ruleset_version` is unchanged.
+   - Where the field appears: the JSON export's `metadata`, a new last CSV column `catalog_source`, and a `Catalog source:` line in the BCF topic description's ASSESSMENT section.
+2. **Logging.**
+   - `_catalog_source()` logs the outcome once rows are known:
+     - rows live: debug
+     - rows live with the fallback payload: warning, not worded as a fallback
+     - no rows with the stored payload: warning
+     - no rows and no payload: warning, keeping the phrase `Using hardcoded fallback ruleset` that `docs/demo/RUNBOOK.md`'s gate searches for
+   - The old unconditional payload warning is gone.
+   - `_rules_for` logs a failed read.
+   - `SupabaseTableAdapter._degrade_to_memory()` logs each table's switch once, naming the table, operation and error.
+3. **Tests.** `tests/test_catalog_source_provenance.py` covers each source state, the log wording, per-engine sources on a mixed run, reading the source in the scoring process, score invariance, the three exports, and the adapter degrade log.
+
+**No threshold, weight, band cut-off, scoring formula, fallback table, cache key or caching behaviour changed.** Evidence: the 1917 reconstruction (section 3) gives byte-identical score, band and mitigation lists at `origin/main` and on this branch, from seeded rows and from the stored payload alike.
+
+## 7. What remains open
+
+- **The fallback tables still diverge** (section 2). Patching the 21 values was rejected: it would leave the 119 one-sided keys and look fixed without being fixed.
+- **Degraded runs still complete.** Failing loudly on state 3 was deferred as too large a behavioural change this close to submission.
+- **The degrade flag is still permanent** for the process lifetime, and **`[]` results are still cached.** Both are now logged, not changed.
+- **Pool workers can still hold a different or stale catalog** from their parent (section 5).
+- **Existing exports carry no `catalog_source`.** Absence of the field means "produced before this change", not "database rows".
+```
+
+---
+
 ### docs/defects/defect_report_anode_convention.md
 
 ````markdown
@@ -69484,7 +70673,7 @@ Every pipe that gets checked comes out with one of these:
 
 That last one matters. A lot of software would fill in the blanks with an assumption and give you an answer anyway. BIMGUARD doesn't. If the model doesn't say what a pipe is made of, the check says "I can't tell you" and explains what's missing. A wrong answer that looks confident is worse than an honest "don't know".
 
-Every result also shows its working: which rule was applied, which published engineering standard the rule came from, and where each piece of data came from. Anyone can trace a result back to the page in the standard that justifies it.
+Every result also shows its working: which rule was applied, which published engineering standard governs that kind of corrosion, and where each piece of data came from. The numbers behind the rules are BIMGUARD's own calibration written against those standards, not figures copied from them, so a corrosion engineer should check them before a result is relied on.
 
 ---
 
@@ -69563,7 +70752,7 @@ Neither family is better; they see different things. Together they cover the fiv
 
 ## What comes out the other end
 
-Every pipe scored Medium or worse becomes an *issue* in a standard file format that any building-design program can open. Each issue points at the exact pipe in the 3D model, says which check raised it, gives the score and the reason, names the standard the rule came from, and suggests a fix. The designer opens the file, clicks an issue, and the model jumps to the pipe in question.
+Every pipe scored Medium or worse becomes an *issue* in a standard file format that any building-design program can open. Each issue points at the exact pipe in the 3D model, says which check raised it, gives the score and the reason, names the standard that governs that kind of corrosion, and suggests a fix. The designer opens the file, clicks an issue, and the model jumps to the pipe in question.
 
 Pipes scored Low go into a spreadsheet instead — an asset register — so there's a complete record of everything that was checked, including the ones that passed and the ones the model didn't contain enough data to judge.
 ```
@@ -69577,7 +70766,8 @@ Pipes scored Low go into a spreadsheet instead — an asset register — so ther
 
 For the person driving the demo. Every command is PowerShell, run from the repo
 root unless a step says otherwise. Numbers quoted here were measured on
-2026-09-05/06 and are recorded in `docs/validation/final-audit-2026-09-06.md`.
+2026-09-05/06 and are recorded in `docs/validation/final-audit-2026-09-06.md`,
+except where a later measurement date is given next to them.
 
 ---
 
@@ -69588,15 +70778,24 @@ verified commit, so nothing merged this week can change what the audience sees.
 
 | | |
 | --- | --- |
-| Tag | `fmp-demo` |
-| Commit | `a55b70a` |
-| Worktree | `D:\Zigurat Masters\bim-guard-fmpdemo` |
-| Verified by | `docs/validation/final-verification-2026-09-09.md`, including the 2026-09-08 freeze spot-check |
+| Tag | `fmp-demo-hotfix-3d-deployed` |
+| Commit | `1450960` (`1450960ae4e2f32895352ef4f13fef1c4cd0c8aa`) |
+| Worktree | `D:\Zigurat Masters\bim-guard-fmpdemo`, detached at `1450960` |
+| Verified by | `docs/validation/final-verification-2026-09-09.md`, including the 2026-09-08 freeze spot-check, for the backend; the 2026-09-13 warm below re-verified the demo counts on `1450960` |
 
-The worktree was created with `git worktree add "D:\Zigurat Masters\bim-guard-fmpdemo" fmp-demo`,
-then `.env` and `frontend\.env` copied in, `uv sync`, `npm ci` and
-`npx vite build` run inside it. It already has its dependencies and its build.
-Nothing below needs repeating unless the worktree is deleted.
+**What `1450960` is.** The original freeze, tag `fmp-demo` at `a55b70a`, plus the
+four 3D-isolate hotfix commits — `d73f076`, `aafafa9`, `414d0b7`, `decb782` —
+and a Vite proxy change (`1450960` itself, which makes the proxy target and port
+configurable and defaults to 8000 and 5173). No `.py` file differs between
+`a55b70a` and `1450960`, so everything the backend computes, and every count in
+the walkthrough, is unchanged from the freeze; the difference is the 3D viewer
+and the dev proxy.
+
+The worktree was created with `git worktree add "D:\Zigurat Masters\bim-guard-fmpdemo" fmp-demo`
+(`a55b70a`), then `.env` and `frontend\.env` copied in, `uv sync`, `npm ci` and
+`npx vite build` run inside it, and has since been moved to `1450960` for the
+hotfix. It already has its dependencies and its build. Nothing below needs
+repeating unless the worktree is deleted.
 
 **Everything in this runbook runs from the worktree, not from the repo root** --
 with one exception, noted under Pre-warm.
@@ -69609,9 +70808,16 @@ commands verbatim; the working directory inside each is what makes
 than the reduced fallback table.
 
 ```powershell
-Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo'; `$env:BIMGUARD_CACHE_TTL_SECONDS='2592000'; `$env:BIMGUARD_CACHE_ENTRIES='128'; uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 *>&1 | Tee-Object -FilePath 'docs\validation\demo-backend.log'"
-Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo\frontend'; npx vite --port 5173"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo'; `$env:BIMGUARD_CACHE_TTL_SECONDS='2592000'; `$env:BIMGUARD_CACHE_ENTRIES='128'; uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 *>&1 | Tee-Object -FilePath 'docs\validation\demo-backend.log'"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"cd 'D:\Zigurat Masters\bim-guard-fmpdemo\frontend'; npm run dev"
 ```
+
+The directory, variables, host, port and frontend command match how the current
+servers were started by hand on 2026-09-13: backend from `D:\Zigurat Masters\bim-guard-fmpdemo` with
+`BIMGUARD_CACHE_TTL_SECONDS = "2592000"` and `BIMGUARD_CACHE_ENTRIES = "128"`,
+host `0.0.0.0`, port 8000; frontend `npm run dev` from `frontend\`, which on
+`1450960` serves on 5173 and proxies to 8000 unless `PORT` or
+`BIMGUARD_BACKEND_URL` say otherwise.
 
 **Why the two cache variables.** Left alone, `analysis_cache` keeps entries for
 24 hours (`BIMGUARD_CACHE_TTL_SECONDS`, default 86400) and holds only 64 of them
@@ -69623,13 +70829,27 @@ restart: the cache lives *inside* the uvicorn process, so a reboot, a crash or a
 deliberate restart empties it no matter how the variables are set. **Warm again
 after every restart.**
 
-PIDs from the 2026-09-10 restart: backend window **37452** (uvicorn worker
-**41008**), frontend window **36736** (vite **34392**). These are the processes
-holding the current warm cache — do not stop them. (Both earlier sets are gone
-along with their caches: 2026-09-09 backend window 54648 / worker 26168 and
-frontend window 74556 / vite 75828; 2026-09-08 backend window 33220 / worker
-29148 and frontend window 68816 / vite 45348.) Yours will differ after any
-restart; note them so you can stop the right windows afterwards.
+The servers holding the current warm cache, started 2026-09-13 from the
+`1450960` worktree — do not stop them:
+
+| Server | Port | PID | Process | Started |
+| --- | --- | --- | --- | --- |
+| Backend | 8000 | **56624** | python | 13/09/2026 15:52:43 |
+| Frontend | 5173 | **66180** | node | 13/09/2026 15:52:49 |
+
+Check they are alive, without sending a request to either port:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000,5173 -State Listen | Select-Object LocalPort,OwningProcess
+# expect 8000=56624, 5173=66180
+```
+
+**Killing PID 56624 destroys the cache.** (Earlier sets are gone along with
+their caches: 2026-09-10 backend window 37452 / uvicorn worker 41008 and
+frontend window 36736 / vite 34392; 2026-09-09 backend window 54648 / worker
+26168 and frontend window 74556 / vite 75828; 2026-09-08 backend window 33220 /
+worker 29148 and frontend window 68816 / vite 45348.) Yours will differ after
+any restart; note them so you can stop the right processes afterwards.
 
 Wait for `http://127.0.0.1:8000/api/health` to answer 200, then run the FALLBACK
 gate before anything else:
@@ -69804,6 +71024,40 @@ What to expect:
   back as hits in 3.3 min, every entry 2.8–4.3 s. Three cold runs now agree on
   the shape: 1917 under ten minutes, 1542 about a quarter of an hour, and 1540
   more than two hours on its own — budget two and a half hours for the lot.
+- Measured 2026-09-13 on the current servers (PIDs 56624 / 66180, build
+  `1450960`): **100.1 minutes** (6,004 s), 16:07:09 → 17:47:13, `Entries
+  verified 63/63; misses 0; warm errors 0`, 0 × 401, exit code 0. Three token
+  mints, all on the 40-minute timer, none 401-triggered. Cache TTL 30 days,
+  entry limit 128. **This was not a fully cold start**: 1917's five-engine entry
+  was already a cache HIT before the run began. The genuinely cold runs above
+  took 145.1 and 158.7 minutes — budget about **150 minutes** for a cold warm,
+  never 100.
+- Counts verified from that warm, each read back as a cache HIT:
+
+  | Project | Measured | Frozen | Cache HIT |
+  | --- | --- | --- | --- |
+  | 1917 five-engine | 1,988 (10 Critical / 168 High / 1,206 Medium / 322 Low / 282 data-quality) | 1,988 | 3.4–5.8 s |
+  | 1542 seismic | 2,937 (783 / 314 / 1,840) | 2,937 | 3.3–4.8 s |
+  | 1540 five-engine | 29,183, all data-quality | 29,181 ±2 | 3.3–3.4 s |
+
+  1540's 29,183 against the frozen 29,181 is the known ±2 run-to-run variation
+  (see Known limitations), not a regression.
+
+**The pre-warm script must be `main`'s.** The copy of `scripts/prewarm_demo.py`
+at `1450960` has no auth fix — on 2026-09-08 every warm request it made returned
+401 — so do not run it from the demo worktree. If you run `main`'s script from a
+copy outside the repo, note that it resolves `frontend\.env` from `parents[1]`,
+the directory *one level above the script's own folder*: the directory junction
+to the demo worktree's `frontend` folder must sit there, not beside the script.
+
+**Sleep prevention, applied for the 2026-09-13 warm and required for any warm.**
+On mains power throughout, and in addition to the per-thread hold below:
+
+```powershell
+powercfg /change standby-timeout-ac 0
+powercfg /change monitor-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
+```
 
 **Do not let the laptop sleep during the warm.** Windows Modern Standby drops
 the network, and a warm that loses it mid-run cannot re-mint its token and
@@ -69867,16 +71121,18 @@ Run this before every rehearsal and before the demo itself. It takes seconds
 and it is the difference between a cached page and a five-minute wait in front
 of the audience.
 
-1. **Confirm the uvicorn worker is still alive.** The warm cache lives inside
+1. **Confirm the backend process is still alive.** The warm cache lives inside
    that one process, so the PID is the cache.
 
    ```powershell
-   Get-Process -Id 41008 -ErrorAction SilentlyContinue
+   Get-NetTCPConnection -LocalPort 8000,5173 -State Listen | Select-Object LocalPort,OwningProcess
+   # expect 8000=56624, 5173=66180
    ```
 
-   41008 is the worker from the 2026-09-10 restart, recorded at the top of this
-   runbook — substitute the current one after any restart. **If it returns no
-   process the cache is cold and a re-warm is needed.** Budget **2.6 hours**,
+   56624 and 66180 are the servers started on 2026-09-13, recorded at the top of
+   this runbook — substitute the current ones after any restart. **If 8000 is not
+   listening, or is owned by a different PID, the cache is cold and a re-warm is
+   needed.** Budget **2.6 hours**,
    hold the machine awake with `SetThreadExecutionState` as documented under
    Pre-warm, and run from the repo root, not the worktree:
 
@@ -69945,6 +71201,38 @@ all.
 Open one finding's Details to show the citations and the provenance fields —
 `material_source`, `environment_source`, `ruleset_version` (e.g.
 `BIMGUARD-CC-001 v1.0.0`), and on GC-001 the `galvanic_couple` basis.
+
+### 1b. Open a finding in 3D (1917)
+
+Still on 1917's Piping results, click the blue **3D** button on a finding row.
+Use a **CRITICAL, HIGH or MEDIUM** row; do not promise the 3D selection on a
+DATA QUALITY row.
+
+**Then wait, and say so.** Expect roughly **20–25 seconds** on a warm page, and
+up to **45 seconds** on the first load after a restart. While it works, the
+viewer opens with the model; the element then turns red and **ISOLATE** becomes
+available. A pause with the model on screen is the viewer locating the finding,
+not a failure. Under the hood it asks for the project's latest BCF, which
+returns 404 after about 12 seconds, falls back to an export of about 7 seconds,
+then filters the archive to that element, selects it and fits the camera.
+**The second finding you click is faster than the first.** Click ISOLATE only
+once the element is red.
+
+Measured 13 September 2026 on project 1917, deep link `20KeDvTYrO59MhDS4MnkZ9`,
+fresh page load each time, mount to fit:
+
+| Build | Run | Mount → fit |
+| --- | --- | --- |
+| `decb782` | cold | 46.5 s |
+| `decb782` | warm | 22.9 s |
+| `15a72dd` | run 1 | 22.6 s |
+| `15a72dd` | run 2 | 19.4 s |
+
+The demo build is `1450960`, which carries the `decb782` hotfix. Earlier notes
+promising a much shorter wait were never reproduced under measurement; that
+figure most likely came from a stack where a persisted BCF already existed. A
+federated three-model project measured 58 s, 50.2 s of it model loading — a
+different path from this one, and not part of the demo.
 
 ### 2. Piping on a real model with no materials (1540)
 
@@ -70100,8 +71388,9 @@ State these plainly if asked; every one is measured, not estimated.
   `43780b5`.** It sent no `Authorization` header, and `47cf29b` made every
   `/api/analyze` route require one, so on 2026-09-08 all 63 warm requests
   returned `HTTP 401` and nothing was cached. It now mints and re-mints the dev
-  token itself. The fix is on `main`, not in the `fmp-demo` worktree, which is
-  why Pre-warm is the one step that runs from the repo root.
+  token itself. The fix is on `main`, not in the demo worktree at `1450960`,
+  whose script is still the unfixed one, which is why Pre-warm is the one step
+  that runs from the repo root.
 - **The Project Registry has a live per-row Delete with a weak confirmation.**
   On 2026-09-08 at 21:58 five projects were deleted by hand through the SPA
   (`DELETE /api/projects/{id}` → 204: 322, 1540, 1541, 1591, 1542), two of them
@@ -70181,6 +71470,14 @@ State these plainly if asked; every one is measured, not estimated.
   box and status-change comments are not generated.
 - **"Missing bearer token" appears when viewing an audit with no project
   selected** — select a project name from the dropdown to recover.
+- **Switching project inside the 3D viewer without a page reload returns
+  nothing the first time.** The first fetch still uses the previous project id;
+  a retry succeeds. This predates the 3D hotfix. **Reload the page when changing
+  project in the viewer.**
+- **Every CC-001 finding reads "Joint Unknown / unclassified … Tight geometry"
+  and states a 20 °C operating temperature.** That is a documented defect in
+  CC-001's scoring inputs, not a display fault — see
+  `docs/defects/CC-001-scoring-inputs-inert.md`.
 ````
 
 ---
@@ -86401,6 +87698,600 @@ Which area would you like to prioritize first?
 
 ---
 
+### docs/planning/corrosion_provenance_2026-09-13.md
+
+```markdown
+# GC-001, CC-001 and MC-001 provenance declaration — 2026-09-13
+
+Scope: the galvanic (BIMGUARD-GC-001), crevice (BIMGUARD-CC-001) and
+microbiologically influenced (BIMGUARD-MC-001) corrosion rulesets. No threshold,
+weight, band cut-off, score or scoring logic changed. No applied migration was
+edited. No value was checked against a source document in this session.
+
+## 1. What was wrong
+
+MM-001 and XM-001 have said since their approval that their numbers are authored
+calibration and that each citation names the standard governing a mechanism, not
+the page a digit was read from. GC-001, CC-001 and MC-001 carried the same kind of
+numbers and cited standards in the same way, but said nothing of the sort. Their
+code, their seeded payloads, the client documentation and the product UI presented
+the citations as the source of the thresholds:
+
+- the Piping Checks explainer told users they could "trace a result back to the
+  page in the standard that justifies it";
+- Q01 said the composite came "from published weightings" and that each finding
+  "attaches the standard and clause the threshold came from";
+- Q02 labelled the citation "The threshold's source, auditable";
+- the glossary reference lines listed standards with no qualification;
+- the GC-001 seeded payload records `"source": "NASA-STD-6012 Table 1"` against
+  the voltage thresholds.
+
+None of the cited documents is held by the project (§3), and none of the values
+has been checked against one. The rulesets were generated with AI assistance from
+NotebookLM prompts in April 2026; the rule-generation prompt is recorded at
+`docs/RESOURCES.md:95-105` and asks for "approximate" voltage gaps from two
+secondary sources. What the rulesets actually contain is a calibration authored
+for BIMGUARD, organised under the standards that govern each mechanism. That is a
+legitimate thing to ship. Presenting it as quoted standard values was not.
+
+## 2. Where these rulesets live
+
+Unlike MM-001 and XM-001, none of the three has a JSON file under
+`data/rulesets/`. Their content exists in two places.
+
+| Location | What it holds |
+| --- | --- |
+| `supabase/migrations/20260806180500_seed_static_data_assets.sql` | Seeded static-asset payloads: GC-001 at :583, CC-001 at :736, MC-001 at :918. Applied; not editable. |
+| `app/services/corrosion_rule_catalog.py:125` (`_FALLBACK_RULESETS`) | Fallback tables served when the stored payload is missing or unreadable. |
+
+`app/services/ruleset_seeder.py:84-86` maps the three `ruleset_id`s to payload
+file names, and writes one `rules` row per class with
+`source_text="Source: <citation>"`.
+
+## 3. Citations and whether each document is held
+
+"Held" means a copy of the cited document exists on disk. The search covered PDF,
+DOCX and EPUB files by name across the drive, and tracked files in this repository.
+It did not cover untracked caches inside the other worktrees, which were out of
+bounds for this session. Nothing matched.
+
+### GC-001 — `standards_referenced` (8)
+
+| Citation | Held |
+| --- | --- |
+| NASA-STD-6012 | No |
+| WorldStainless / Euro Inox (2025) | No |
+| AUCSC Basic Corrosion Course (2024) | No |
+| IMOA Design Manual, 4th Ed. | No |
+| Prosoco Technical Note 104 | No |
+| American Galvanizers Association (2023) | No. `docs/scraped_standards/corrosion_mil_std_889_galvanic.md` holds a scraped AGA web page on galvanised steel in contact with other metals. It is not the coating-life data cited. |
+| ISO 19650 | No (information management, no corrosion values) |
+| buildingSMART BCF 2.1 | Not a document of values (exchange format) |
+
+MIL-STD-889B is held in part, as `data/reference/mil_std_889b_table_ii.json`, and
+the engine reads it (`app/engines/bimguard_corrosion_engine.py:130,155`). The
+GC-001 payload does not cite it, so it gives no provenance to any GC-001 payload
+value.
+
+### CC-001 — `standards_referenced` (9) plus field-level sources
+
+| Citation | Held |
+| --- | --- |
+| EN ISO 15329:2007 | No |
+| ASTM G48, Method B | No |
+| CIRIA C692 | No |
+| CIBSE Guide G | No |
+| IMOA Design Manual, 4th Ed. | No |
+| EN 1993-1-4 | No |
+| BS 8539 | No |
+| buildingSMART BCF 2.1 | Not a document of values |
+| ISO 19650 | Not a document of values |
+| Sandvik Corrosion Handbook (field source, migration :780) | No |
+| Fontana & Greene (1967) (field source) | No |
+
+### MC-001 — `standards_referenced` (11)
+
+| Citation | Held |
+| --- | --- |
+| CIBSE TM13:2013 | No |
+| HSE HSG274 Part 1 | No |
+| HSE HSG274 Part 2 | No |
+| HSE HSG274 Part 3 | No |
+| BS 8552:2012 | No |
+| ASTM G-187 | No — suspect, §5 |
+| EN ISO 9308-1 | No |
+| WHO Guidelines for Drinking-Water Quality, 4th Ed. (2011) | No |
+| NACCE TPC 11 | No — suspect, §5 |
+| NACE SP0198 | No |
+| CIBSE Guide G | No |
+
+## 4. Threshold counts and status
+
+Status vocabulary follows SB-001 (`docs/planning/sb001_provenance_2026-09-13.md`
+§5):
+
+- **sourced** — stated in a held document, cited by section and page;
+- **derived** — arithmetic on other values in the same ruleset;
+- **authored** — BIMGUARD's own calibration.
+
+The counts below were measured from the seeded payloads at origin/main 8cd6b22.
+They count every numeric leaf in the payload, plus both ends of every numeric risk
+band range. They exclude the pset schema, `ifc_data_sources`, the mitigation
+catalogue and `ruleset_version`.
+
+| Ruleset | Values | Sourced | Derived | Authored |
+| --- | --- | --- | --- | --- |
+| GC-001 | 79 | 0 | 10 | 69 |
+| CC-001 | 60 | 0 | 5 | 55 |
+| MC-001 | 69 structured, plus 27 embedded in threshold text | 0 | 0 | 96 (69 + 27) |
+
+What the derived values are:
+
+- **GC-001, 10 derived:** `common_mep_pairings[*].gap_v`, each equal to the
+  absolute difference of the two materials' potentials in the ruleset's own
+  galvanic series. All 10 reproduced exactly.
+- **CC-001, 5 derived:** `high_risk_configurations[*].expected_score`, each
+  reproduced by the ruleset's own weighted formula. All 5 reproduced.
+
+The derivation is internal arithmetic. It makes those ten and five values
+consistent with the rest of the ruleset; it does not give them any external
+source.
+
+**MC-001's 27 text-embedded numbers.** These are numbers written inside strings
+rather than as JSON numbers: 7 in the dead-leg ratio bands (for example `"10–20"`),
+12 in `high_risk_configurations`, and 8 in the temperature classes (for example
+`"25–45°C"`). The engine parses the strings, so they are thresholds. They are
+counted separately so the structured count is comparable across the three rulesets.
+
+**Zero sourced, in all three.** A value can only be sourced against a document that
+is held (§3), and none is. This does not mean the values are wrong. Some sit in
+ranges commonly quoted in secondary literature, such as a 20–45 °C Legionella
+growth range and a CCT ordering of 304 < 316 < 2205. But no value has been checked
+against a source here, so agreement cannot be claimed.
+
+## 5. The two suspect citations
+
+Both appear in MC-001 and are recorded exactly as written. Neither was changed:
+they are citation text, and removing them was out of scope.
+
+### ASTM G-187
+
+The MC-001 seeded payload names it itself as "ASTM G-187 — Standard Practice for
+Measurement of Soil Resistivity" (migration :929). It then cites it for things
+soil resistivity does not govern:
+
+- flow-class reference: migration :961 (`"ASTM G-187 / NACCE TPC 11"`);
+- material MIC susceptibility scores: migration :1013 (carbon steel), :1016
+  (ss304), :1017 (ss316), :1018 (duplex 2205), :1022 (titanium, "exceptional MIC
+  resistance").
+
+The ruleset contradicts itself: by its own declaration the document measures soil
+resistivity, and it is not a source for the MIC susceptibility of stainless or
+titanium pipe in building water.
+
+Live code that still carries the citation:
+
+- `app/engines/bimguard_mic_engine.py:9` — module docstring; now annotated as
+  suspect;
+- `app/engines/bimguard_mic_engine.py:538` — BCF issue body, "ASTM G-187 — MIC
+  Assessment Standard Practice";
+- `app/modules/phase_6/phase_6c_corrosion_ui.py:399` — finding citation, standard
+  "ASTM G-187", clause "MIC assessment standard practice";
+- `app/services/ruleset_seeder.py:681` — `source_text` fallback reference.
+
+The strings at `:538` and `:399` are emitted into findings and BCF output. They
+were **not** changed, because changing them changes output and this session was
+limited to declarations. They are the first thing to fix in the follow-up (§9).
+
+### "NACCE TPC 11"
+
+Recorded at migration :932 as "NACCE TPC 11 — MIC in Industrial Water Systems", and
+cited at :961, :969, :977, :1013, :1014 and :1015. The corrosion body is NACE
+International, now AMPP; "NACCE" is not its name. Whether a document with that
+number and title exists under NACE has not been verified. As written, the citation
+cannot be looked up.
+
+It also appears at `app/engines/bimguard_mic_engine.py:15` (now annotated) and as
+the default reference in `app/services/ruleset_seeder.py:681`.
+
+## 6. What MM-001 and XM-001 already declare
+
+MM-001, `data/rulesets/mm_001_material_media.json:34-47` (PROVENANCE_WARNING):
+
+> The RANKINGS in this matrix reflect established corrosion-engineering consensus:
+> which material/media pairings are benign and which are known failure modes.
+>
+> The NUMBERS - compatibility_score to two decimals and predicted_lifespan_years -
+> are a calibration authored for this ruleset. They are NOT quoted from the cited
+> standards. The citation on each cell identifies the standard that GOVERNS THAT
+> MECHANISM, not a document from which the digit was read.
+>
+> A corrosion engineer must verify every cell against the cited source, and against
+> project water chemistry, before this pack drives any compliance verdict.
+
+And at `:20`: "The digits remain a calibration authored for this ruleset, not values
+quoted from the cited standards. Citations name the standard governing each
+mechanism."
+
+XM-001, `data/rulesets/xm_001_cross_material.json:19`:
+
+> As with MM-001: the separation, mitigation and normalisation values remain a
+> calibration authored for this ruleset, not values quoted from the cited
+> standards. Approval covers the convention and the structure, not the digits.
+
+**XM-001 inherits GC-001's voltages.** XM-001 does not carry its own galvanic series
+or voltage thresholds. It reads GC-001's at runtime, through the GC-001 engine
+(`app/modules/phase_6/phase_6c_corrosion_ui.py:666-715`). XM-001's declaration
+therefore covered its own separation and mitigation values, but the potentials and
+voltage limits behind every XM-001 galvanic couple were GC-001 numbers, and GC-001
+declared nothing. The GC-001 declaration added here closes that gap: it states that
+the same provenance applies to the potentials and voltages XM-001 scores.
+
+## 7. Fallback versus seeded divergence
+
+Cross-referenced from the fallback audit rather than restated. The audit found:
+
+- **21 value mismatches** between `_FALLBACK_RULESETS` and the seeded payloads:
+  GC-001 0, CC-001 5, MC-001 16;
+- **119 keys present in only one source**.
+
+This session reproduced the 21 mismatches by the same breakdown. With lists matched
+by identity (class key or label), there are 0 / 4 / 13 numeric mismatches. Adding
+the CC-001 JT-001 geometry class (Tight vs Open) and three MC-001 text thresholds
+gives 0 / 5 / 16:
+
+- DL3_LONG: `>10` vs `10–20`;
+- T2_DANGER: `20–45` vs `25–45°C`;
+- T4_SAFE_HOT: `>45` vs `>55°C`.
+
+The key comparison was not reproduced. This method counted 22 keys present only in
+the fallback (GC-001 9, CC-001 2, MC-001 11). The different figure reflects a
+different key-matching method; the audit's 119 stands as the audit's figure.
+
+The module docstring at `app/services/corrosion_rule_catalog.py:17-20` said the
+fallback tables were "strict subsets" of the stored payloads. That was false on
+both counts: the values differ, and the fallback carries keys the payloads lack.
+The docstring now states the divergence and points here. The divergence itself was
+not resolved, because resolving it moves numbers. Every fallback value is
+authored, exactly as the seeded values are.
+
+## 8. What changed in this branch
+
+Declarations, added to docstrings and comments only:
+
+- `app/engines/bimguard_corrosion_engine.py` — PROVENANCE block in the module
+  docstring, including the XM-001 inheritance.
+- `app/engines/bimguard_crevice_engine.py` — PROVENANCE block. The "Based on EN ISO
+  15329:2007" comment on the severity classes now says the classes are named after
+  the framework and the figures are authored.
+- `app/engines/bimguard_mic_engine.py` — PROVENANCE block. The two suspect
+  citations are annotated in the standards list. `classify_dead_leg` no longer says
+  its bands are "per HSE HSG274".
+- `app/services/corrosion_rule_catalog.py` — "strict subsets" replaced by the
+  divergence statement; PROVENANCE section added.
+- `app/services/ruleset_seeder.py` — comment stating that `Source: <citation>` rows
+  name the governing standard, not the source of the digit.
+
+These are docstrings and comments only; the changed modules are identical to
+origin/main by AST with docstrings stripped.
+
+Live user-facing claims corrected, with citations kept:
+
+- `frontend/src/lib/components/PipingChecksExplainer.svelte`
+- `frontend/src/lib/glossary.ts` (GC/CC/MC reference lines)
+- `docs/demo/piping-checks-plain-english.md`
+- `docs/client-qa/Q01_What_Is_Piping_Corrosion_Analysis.md`
+- `docs/client-qa/Q02_Interpreting_GC001_Galvanic_Findings.md`
+- `docs/client-qa/Q12_Which_Building_Codes_Does_BIMGUARD_Reference.md`
+- `docs/client-qa/Q14_Customising_The_Architecture_Ruleset.md`
+- `README.md` (the compliance-module list also mislabelled GC-001 as seismic and
+  CC-001 as atmospheric)
+
+Deck source text, annotated so the next build does not reprint the claim:
+
+- `scripts/build/build_deck_a.py:140` and `:164`
+- `scripts/build/build_deck_c.py:172`
+
+### Seeded wording recorded here, not edited
+
+The applied migration keeps this wording. It is the stored payload, and migrations
+are not edited once applied. A future migration that re-seeds these payloads should
+replace it.
+
+| Ruleset | Migration line | Current wording | Proposed replacement |
+| --- | --- | --- | --- |
+| GC-001 | :587 | description: "BIMGUARD AI compliance ruleset for galvanic corrosion risk assessment…" | Append: "Thresholds are a calibration authored for this ruleset; citations name the governing standard, not the source of the digit." |
+| GC-001 | :613 | `"source": "WorldStainless / Euro Inox (2025) and AUCSC Basic Corrosion Course (2024)"` | `"governing_reference": …` (same text) plus `"provenance": "authored"` |
+| GC-001 | :639 | `"source": "NASA-STD-6012 Table 1"` | `"governing_reference": "NASA-STD-6012"`, `"provenance": "authored"`. Do not name a table until it has been read. |
+| GC-001 | :649 | `"source": "Prosoco Technical Note 104 / AUCSC Basic Corrosion Course (2024)"` | As above |
+| GC-001 | :660 | `"source": "IMOA Design Manual 4th Ed."` | As above |
+| CC-001 | :740 | ruleset description | Same appended sentence as GC-001 :587 |
+| CC-001 | :769-770 | weighting rationale and CCT interpolation description | Keep; add that the weights and the 20 / 30 °C interpolation points are authored |
+| CC-001 | :779-780 | `"source": "ASTM G48 Method B / CIRIA C692 / Sandvik Corrosion Handbook"` | `"governing_reference": …`, `"provenance": "authored"` |
+| CC-001 | :794 | "Source: CIBSE Guide G / CIRIA C692." | "Governing guidance: CIBSE Guide G / CIRIA C692; class scores authored." |
+| CC-001 | :820-821 | "Seven severity classes per EN ISO 15329:2007 wetting classification framework." / `"source": "EN ISO 15329:2007"` | "Seven severity classes named after the EN ISO 15329:2007 wetting-class framework; severity figures authored." |
+| MC-001 | :929, :932 | the two suspect standard entries | Resolve per §5 before re-seeding; do not carry forward as written |
+| MC-001 | :946 | weighting rationale | Keep; add that the weights are authored |
+| MC-001 | :955-1022 | per-cell `"reference"` | Rename to `"governing_reference"`; replace the ASTM G-187 and NACCE entries once §5 is resolved |
+| MC-001 | :1025-1033 | system-modifier `rationale` | Keep; add that multipliers are authored |
+
+## 9. What this does not fix
+
+- **Output strings still cite ASTM G-187 as an MIC standard practice**
+  (`bimguard_mic_engine.py:538`, `phase_6c_corrosion_ui.py:399`). Every MC-001
+  finding and BCF issue carries it. *Fixed 2026-09-14, §12.*
+- **Findings cannot say a value is authored.** Citations are built per engine from
+  standard names. A finding does not carry per-threshold status; the declaration
+  lives in the code and this document.
+- **No per-value status in the payloads.** GC-001, CC-001 and MC-001 have no `cite`,
+  `conf` or `provenance` field. Adding one means re-seeding through a new migration.
+- **The fallback divergence** (§7) is documented, not resolved.
+- **Historical and generated records are unchanged.**
+  - Dated validation records under `docs/validation/`, including the
+    `engine-showcase-2026-09-08` samples, which quote ASTM G-187 as produced.
+  - `docs/submissions/`.
+  - The NotebookLM corpora: `docs/bimguard_corrosion_rules.md` quotes the old
+    "strict subsets" docstring at :45603 and the old engine docstrings.
+    `docs/bimguard_seismic_rules.md` includes shared files.
+- **Out of scope, found in passing:** `app/services/ruleset_seeder.py` still
+  describes seismic brace spacing as "per EN 1998-1 / DIN 4149", which SB-001's
+  correction established is not a source. The README seismic line cites ASCE 7-22,
+  while SB-001 cites ASCE/SEI 7-10. *Both examined 2026-09-14, §12: the seeder
+  observation was a misreading; the README is corrected.*
+
+### Needs rebuilding afterwards
+
+- **Deck A and Deck C:** from `scripts/build/build_deck_a.py` and
+  `build_deck_c.py`.
+- **NotebookLM corpora:** `docs/bimguard_corrosion_rules.md` and
+  `docs/bimguard_seismic_rules.md`, via `scripts/compile_for_notebooklm.py`.
+- **Frontend production bundle:** the explainer and glossary text changed.
+
+None was rebuilt in this session.
+
+## 10. Moving a value from authored to sourced
+
+For each value:
+
+1. Obtain the document.
+2. Find the table or clause that states the value, for the same condition: alloy,
+   environment class, temperature, geometry.
+3. Record section and page.
+4. Either confirm the value, or change it through a reviewed change with its own
+   test expectations.
+
+Values the document does not state stay authored, however close they are.
+
+Roughly what that costs:
+
+- **Documents.** About 20 of the citations in §3 are paid standards or guides:
+  ASTM G48, EN ISO 15329, EN 1993-1-4, BS 8539, BS 8552, EN ISO 9308-1, CIBSE TM13,
+  CIBSE Guide G, CIRIA C692, NACE SP0198 and the like. Individual prices typically
+  run from tens to a few hundred euros each, so the set is on the order of
+  €2,000–€4,000.
+  - NASA-STD-6012, the HSE HSG274 parts and the WHO guidelines are free.
+  - The IMOA Design Manual and the Euro Inox / WorldStainless publications are
+    free to download.
+  - The AUCSC course is paid training rather than a document.
+  - Prices were not checked in this session.
+- **Effort.** 244 values (79 + 60 + 96), less the 15 derived. Most cannot be sourced
+  at all: weights, band cut-offs and composite scores are design choices no standard
+  states. A realistic target is the physical inputs:
+  - the galvanic series potentials and voltage limits (GC-001, and through it
+    XM-001);
+  - the CCT table (CC-001);
+  - the temperature and dead-leg regime (MC-001).
+
+  That is on the order of 60–80 values. With the documents in hand, reading and
+  recording them is a few days of a corrosion engineer's time.
+- **Consequence.** Any value that changes on sourcing moves findings. Each would
+  need the same treatment SB-001's two value changes received: record the change,
+  measure the effect, and update test expectations.
+
+## 11. Limitation statement (for the thesis)
+
+The corrosion engines GC-001 (galvanic), CC-001 (crevice) and MC-001
+(microbiologically influenced) score risk from thresholds, weights and band
+boundaries that are a calibration authored for BIMGUARD. They are not values quoted
+from the standards the rulesets cite. Each citation names the standard or body of
+practice that governs the mechanism being scored, not a document from which a
+number was read. None of the cited documents was held by the project, and no value
+was verified against one. The rulesets were generated with AI assistance and then
+organised under the governing standards. Of the numeric values in the three seeded
+rulesets, 15 are derived arithmetically from other values in the same ruleset, and
+the remainder are authored; none is sourced. The same holds for the material-media
+(MM-001) and cross-material (XM-001) rulesets, which declared it from the outset;
+XM-001's galvanic potentials and voltage limits are GC-001's. Two MC-001 citations
+are defective as recorded: ASTM G-187 is a soil-resistivity practice by the
+ruleset's own description yet is cited for MIC material susceptibility, and "NACCE
+TPC 11" does not name an identifiable document. The fallback tables used when a
+stored ruleset is unavailable diverge from the seeded rulesets in 21 values.
+Corrosion findings therefore rank relative risk under a stated calibration. They do
+not certify that a design meets any cited standard, and a corrosion engineer must
+verify the governing values against the source documents before a finding is
+relied on.
+
+## 12. Follow-up, 2026-09-14: emitted MIC citations, the seismic remnant, the README
+
+Branch `fix/corrosion-provenance`, from 4f8adc7. No threshold, weight, band
+cut-off or scoring formula changed. No migration was edited, and no SQL was
+written or run.
+
+### 12.1 MC-001 citations no longer attribute a threshold to a named standard
+
+**Option chosen: name the mechanism and the body of practice, and mark the
+threshold authored.** Keeping the citation behind an "unverified" qualifier was
+rejected. A reader of a finding sees a standard designation first and a qualifier
+second. Leaving "ASTM G-187" in the standard field would still read as a source
+for a number, and the ruleset's own description rules the document out. AMPP
+(formerly NACE) is named as a body of practice only, and no document number is
+given. The ruleset already names NACE for MIC (`"NACE / ASTM G-187"`,
+`NACE SP0198`), and "NACCE" is a misspelling of that body. So nothing is named
+that the ruleset does not already point to. No document title was substituted
+for "TPC 11", because none can be confirmed.
+
+| Location | Old | New |
+| --- | --- | --- |
+| `app/engines/bimguard_mic_engine.py:542-543` (BCF issue description) | `ASTM G-187 — MIC Assessment Standard Practice` | `AMPP (formerly NACE) industry practice — MIC mechanism only` / `MC-001 thresholds are authored calibration, not values quoted from any standard above` |
+| `app/modules/phase_6/phase_6c_corrosion_ui.py:405-406` (finding citation) | standard `ASTM G-187`, clause `MIC assessment standard practice` | standard `AMPP (formerly NACE) industry practice`, clause `MIC mechanism only; MC-001 flow-class threshold is authored calibration, not a standard value` |
+| `app/services/ruleset_seeder.py:681` (`source_text` default) | `NACCE TPC 11` | `AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration` |
+
+The citation `reason` (`flow class <key>`) is unchanged. The module docstring now
+says neither suspect citation is emitted.
+`tests/test_mc001_citation_provenance.py` holds this: all six cases fail against
+4f8adc7's code and pass after the change.
+
+The seeder default only applies to a material with no `reference`. All ten seeded
+materials carry one, so seeding the current payload does not use the default.
+
+**Effect on project 1917** (frozen export `bimguard-corrosion-project-1917.json`,
+exported 2026-09-09T09:25:45Z). All **294** MC-001 findings (critical 10, high 64,
+medium 220) carry the changed citation, one each. The export contains no "NACCE"
+string. No MC-001 narrative quotes G-187: the flow, temperature and dead-leg
+references the narrative prints are other citations.
+
+**Score invariance, offline.** Method:
+
+1. Parse the MC-001 `content_json` literal out of migration `20260806180500` at
+   :918.
+2. Serve it through a patched `StaticDataService.get_asset_json`.
+3. Build the rule rows with `_seed_mc001` against a fake service. The fake uses
+   the real `RuleService._build_rule_row` and captures 57 rows.
+4. Serve those rows through a patched `RuleService.list_by_ruleset`.
+5. Reload the engine catalog.
+6. For each finding, rebuild the `MICElement` from the export. Flow velocity,
+   operating temperature and dead-leg length come from the narrative. The
+   material comes from the narrative's resolved catalog label, mapped back to its
+   key. System and IFC type come from metadata, and diameter is metadata's
+   `assumed_nominal_diameter_m`.
+7. Score with `assess_mic_risk` and build the citations with `_mic_citations`.
+
+No database, network or running server was used. Run at 4f8adc7 and again after
+the change:
+
+| | 4f8adc7 | after |
+| --- | --- | --- |
+| findings reconstructed | 294 / 294 | 294 / 294 |
+| max abs score deviation | 0.0 | 0.0 |
+| band / mitigation / class-key mismatches | 0 / 0 / 0 | 0 / 0 / 0 |
+| citation `reason` equal to export | 294 | 294 |
+| first citation standard | `ASTM G-187` × 294 | `AMPP (formerly NACE) industry practice` × 294 |
+
+Finding ids are taken from the export and are unaffected. A first pass that
+ignored the material label deviated on 23 findings, by up to 0.037. Those were
+copper elements scored as unknown, a flaw in the reconstruction script rather
+than a code difference. It was corrected before any code was changed.
+
+**Dated evidence left as recorded.** These still show the old string, as produced
+at the time:
+
+- the 1917 frozen export;
+- the `docs/validation/engine-showcase-2026-09-08/` samples and README;
+- `docs/validation/final-godmode-audit-2026-09-07.md`.
+
+### 12.2 Seeded wording recorded, not edited
+
+Migration `20260806180500_seed_static_data_assets.sql` is applied and unchanged.
+A future migration that re-seeds the MC-001 payload should use:
+
+| Line | Current | Proposed |
+| --- | --- | --- |
+| :929 | `"ASTM G-187 — Standard Practice for Measurement of Soil Resistivity"` in `standards_referenced` | Remove from the MC-001 list. By its own description it has no bearing on MIC. |
+| :932 | `"NACCE TPC 11 — MIC in Industrial Water Systems"` | `"AMPP (formerly NACE) — MIC industry practice (no document verified)"` |
+| :961 | SRB `"reference": "ASTM G-187 / NACCE TPC 11"` | `"governing_reference": "AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :969 | IOB `"reference": "NACCE TPC 11"` | as :961 |
+| :977 | APB `"reference": "CIBSE Guide G / NACCE TPC 11"` | `"governing_reference": "CIBSE Guide G / AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :1013 | carbon_steel `"ASTM G-187 / NACCE TPC 11"` | `"governing_reference": "AMPP (formerly NACE) industry practice"`, `"provenance": "authored"` |
+| :1014 | cast_iron `"NACCE TPC 11"` | as :1013 |
+| :1015 | galv_steel `"NACCE TPC 11"` | as :1013 |
+| :1016 | ss304 `"ASTM G-187"` | as :1013 |
+| :1017 | ss316 `"ASTM G-187"` | as :1013 |
+| :1018 | duplex2205 `"NACE / ASTM G-187"` | as :1013 |
+| :1022 | titanium `"ASTM G-187 — exceptional MIC resistance"` | as :1013. Drop "exceptional MIC resistance" as a sourced claim. |
+
+**Stored `rules` rows carrying the same text.** `_seed_mc001` writes
+`source_text = "Source: <reference>"`. So a database seeded from this payload holds
+seven MC-001 rows whose `source_text` repeats a suspect citation:
+
+- `MC-001.MAT.CARBON_STEEL`
+- `.CAST_IRON`
+- `.GALV_STEEL`
+- `.SS304`
+- `.SS316`
+- `.DUPLEX2205`
+- `.TITANIUM`
+
+They appear in the rules catalog, not in findings. A code change cannot reach
+them, because the insert pass skips existing references. Correcting them needs a
+new migration. It should update `source_text` for exactly those seven references
+in `ruleset_id = 'BIMGUARD-MC-001'`, and only where `source_text` still equals
+the seeded value, to `Source: AMPP (formerly NACE) industry practice, MIC
+mechanism only; score is MC-001 authored calibration`. It should also re-seed
+the `ruleset:BIMGUARD-MC-001` static asset with the payload wording above. That
+migration was not written.
+
+### 12.3 The seismic "remnant" in `ruleset_seeder.py` is neither a second site nor an incomplete fix
+
+§9 recorded that `ruleset_seeder.py` "still describes seismic brace spacing as
+per EN 1998-1 / DIN 4149". That was a misreading of a search hit.
+
+- The only occurrences in the file at 4f8adc7 are :768 and :775, plus the comment
+  at :760. They sit inside `_SB001_SUPERSEDED`, as the **old** half of each
+  `(old, new)` pair. `_correct_superseded_seismic_rows` (:792) looks for exactly
+  that string and replaces it with the calibration wording. The string is the
+  correction's match key, not seeded text.
+- `seed_seismic_rules` (:841 onward) seeds no description containing EN 1998-1 or
+  DIN 4149.
+- The correction is in this branch: `fdafd86`, "stop seeding EN 1998-1 / DIN 4149
+  attributions and correct stored rows", is an ancestor of 4f8adc7.
+- `git log -S "DIN 4149" -- app/services/ruleset_seeder.py` shows one commit that
+  introduced the wording, `eaf2afd`. Its two description strings are identical to
+  the match keys, so no other variant was ever seeded from this file. Migration
+  `20260913131052` matches the same two strings, plus the folder-description
+  variant from `20260830001000`.
+
+Changing those strings would stop both the in-place correction and
+`tests/test_sb001_seeded_provenance.py` from matching pre-correction rows. They
+were left unchanged. **No additional SQL is needed.** Any production row seeded
+from this file carries exactly the string that `_correct_superseded_seismic_rows`
+and migration `20260913131052` already target. Whether that migration has been
+applied was not checked (no SQL run).
+
+Found in passing, not changed:
+
+- `.github/ISSUE_TEMPLATE/compliance_defect.yml:22` labels Blue Halo "EN 1998 /
+  DIN 4149".
+
+### 12.4 README seismic edition
+
+`README.md:30` cited "FEMA E-74, ASCE 7-22". It now cites FEMA E-74 and ASCE/SEI
+7-10 §13.6 as cited by it, and says the thresholds are screening calibration
+except where marked sourced. That matches `sb001_seismic_clearance.json`.
+
+Other files with the ASCE 7-22 mismatch, reported and not changed:
+
+| File | What it says | Why left |
+| --- | --- | --- |
+| `app/constants.py:522-528` | standards registry entry "ASCE 7-22", applicable to Halo | Executable; outside this change's permitted differences |
+| `scripts/NOTEBOOK_STANDARDS.py:108-114` | same registry entry | Same data, NotebookLM tooling |
+| `docs/ISO19650/BIMGuard-ISO19650-Requirements.md:83` | Tier 4 row cites ASCE 7-22 and labels GC-001 as seismic bracing | Separate doc correction |
+| `docs/HERMES_CONTEXT.md:67` | ASCE 7-22 in the Hermes brief | Headered Hermes artifact |
+| `app/modules/blue_halo/generate_expanded_config.py`, `hermes_config_expanded.py` | the retired Hermes ASCE 7-22 + NFPA 13 pair | Accurate historical description |
+
+### 12.5 Needs rebuilding
+
+- **NotebookLM corpora:** `docs/bimguard_corrosion_rules.md` quotes the old BCF
+  string, the old `_mic_citations` and the old seeder default. Rebuild via
+  `scripts/compile_for_notebooklm.py`.
+- **Decks:** no deck source changed in this follow-up. Deck A and Deck C are
+  still pending from §9.
+- **Frontend bundle:** no frontend file changed.
+- **Running demo:** the live backend serves the old citation until it restarts on
+  this code. The warm cache holds findings with the old string.
+```
+
+---
+
 ### docs/planning/enhancements-plan-20260407.md
 
 ```markdown
@@ -93133,608 +95024,6 @@ workspace: `*seismic*` -> Seismic, `*corrosion*` / `*iso*` -> Corrosion.
 
     python scripts/fetch_standards.py <url> <output_stem> --seismic|--corrosion
 ```
-
----
-
-## docs/submissions
-
-### docs/submissions/BIMGuard_3rd_Submission_REVISED.md
-
-````markdown
-MODULE 10 — FINAL MASTER'S PROJECT · 3rd PARTIAL SUBMISSION
-
-# BIMGUARD AI
-### An openBIM Compliance Platform: AI Rule Extraction, Generic Rule Comparison, and Corrosion Risk Validation
-*Comprehensive Technical Draft (Near-Final Report) — Revised for factual accuracy against the current codebase*
-
-**Group 5**
-Letícia Cristovam Clemente · Malak Yaseen · Marc Azzam · Mark Shane Haines · Osama Ata
-
-Master's in Artificial Intelligence for Architecture & Construction (MAICEN-1125)
-ZIGURAT Institute of Technology · 2026
-
----
-
-> **Editorial note on this revision.** This draft was produced by auditing the codebase file-by-file against every specific claim made in earlier versions of this report. Two corrections matter most. First, an earlier draft described "Module 4" as if it were a single corrosion-checking component; the codebase actually contains **two conceptually distinct engines** sharing that folder — a generic, source-independent **compliance comparator** (any extracted rule vs. any IFC/Revit property) and a specialist **corrosion risk-scoring engine** (weighted, standards-derived composite scores for galvanic/crevice/MIC mechanisms). This revision treats them as the separate concepts they are, each with its own methods subsection, results, and validation status. Second, historical run-history records now stored in `public.issue_history` show the project's headline corrosion figures (9 Critical / 7 High / 9 Medium, 25 open issues) are **genuine measured output from an earlier working version of the pipeline**, not invented numbers — though that version predates the current FastHTML architecture and its exact code path is no longer present in this repository, so the run cannot yet be reproduced on demand. Both corrections are explained in detail where they arise below, and every remaining gap is named explicitly rather than smoothed over, consistent with a 3rd partial submission being a near-complete draft, not a finished one.
->
-> **Addendum to this revision.** Three gaps raised at examination are addressed here, in each case by producing an artefact rather than an assurance. **(1)** The claim that the geometric engine could generate clearance ("Halo") volumes for thousands of elements is now measured rather than asserted: a prototype generator, verified against analytic ground truth, was benchmarked against real IFC models to 2 000 elements and synthetic populations to 20 000 (new §1.4.4, with implementation pseudocode and complexity analysis in §1.2.5). The measurement contradicted the framing of the question — Halo generation is 1.2% of wall-clock and IFC triangulation is 93.6% — and that finding has been carried into the limitations and the improvement priorities rather than presented as a vindication. **(2)** The "expert review" referred to in earlier drafts is now a defined process with roles, separation of duties, a state machine, a five-dimension acceptance rubric, a classified failure taxonomy and a weekly feedback cadence (new §1.2.9), together with a plain statement of how much of it exists in code, which is less than the earlier phrasing implied. **(3)** The LLM feedback loop is shown end-to-end on one clause rather than described in the abstract (new §1.3.4), and doing so surfaced two previously unrecorded defects in the rule-enrichment layer, now listed as limitations 21 and 22.
-
----
-
-## Table of Contents
-1. Abstract
-2. Introduction
-3. 1.1 Research and Technology Review
-4. 1.2 Methods and Tools
-5. 1.3 Development Process
-6. 1.4 Results and Discussion
-7. 1.5 References and Appendices
-
----
-
-## Abstract
-
-BIMGuard AI is an openBIM automated compliance-checking platform that ingests vendor-neutral IFC models — from any authoring tool, Revit included — alongside regulatory PDF documents, and returns vendor-neutral BCF 2.1 issues. An optional live pyRevit integration additionally lets Revit users push element data directly, without an IFC export step, but this is a convenience layered on top of the IFC-first pipeline, not a dependency of it. It addresses two persistent gaps in AECO digital delivery — the *interpretation gap* (existing BIM tools cannot derive checks from unstructured regulatory text — building codes, BEPs — written as prose, not from software code) and the *corrosion-blindness gap* (no mainstream BIM coordination tool evaluates material compatibility or corrosion risk at design stage) — through **three distinct, purpose-built computational components**, not a single undifferentiated pipeline:
-
-1. An **LLM-assisted rule-extraction service** (Docling document parsing, spaCy/TF-IDF candidate filtering, a semantic-annotation layer, and a provider-agnostic LLM converter built on `litellm`) that turns regulatory PDF text into structured, machine-readable rules.
-2. A **generic compliance comparator** (`ComplianceComparator`) that evaluates *any* structured rule — however it was authored — against IFC or Revit element properties using ten comparison operators, and is source-independent: the same evaluator runs unchanged whether elements arrive via an uploaded IFC file or a live pyRevit push from inside Revit.
-3. A **standards-based corrosion risk engine** that computes weighted composite risk scores (0–1 scale, four risk bands) for three electrochemical/biological degradation mechanisms — galvanic, crevice, and microbially-influenced corrosion (MIC) — each term traceable to a named engineering standard.
-
-These three components are architecturally and conceptually separate because they solve different problems with different logic: component 2 is deterministic *threshold evaluation* against rules of arbitrary origin; component 3 is deterministic *multi-factor weighted scoring* against a fixed, standards-derived model that has no notion of a "rule" at all. Today, component 1 and component 2 are fully live in the web application; two of the three corrosion mechanisms (galvanic, crevice) are live via a dedicated compliance runner, while the third (MIC) is implemented and standards-referenced but not yet wired into the live pipeline. A persisted issue-history log shows the corrosion engine has previously produced a genuine, measured result of 25 open issues (9 Critical, 7 High, 9 Medium) — real output from an earlier version of the pipeline — but reproducing that run on today's codebase, and completing the rule-extraction accuracy evaluation (precision/recall/F1 and LLM-as-judge scoring), are the two work items scheduled ahead of final submission. This draft reports only what is genuinely implemented and evidenced today, and states what remains open rather than presenting it as already achieved.
-
-**Keywords:** BIM compliance checking; openBIM; IFC; BCF 2.1; NLP rule extraction; rule-based compliance comparator; automated code compliance; galvanic corrosion; crevice corrosion; MIC; MEP coordination; responsible AI.
-
----
-
-## Introduction
-
-This document is the comprehensive technical draft (3rd partial submission) of the BIMGuard AI Final Master's Project. It consolidates the research context, methods, development history, results and references. The project targets the weekly BIM coordination cycle of large, MEP-intensive buildings, where "model-drop day" compliance is still verified by manual checklists against the BIM Execution Plan and technical codes. BIMGuard AI reframes that manual gatekeeping as an automated, traceable, tool-independent service.
-
-A methodological point carried through the whole document: **rule extraction, rule comparison, and corrosion risk scoring are three separate concerns**, and conflating them (as an earlier draft did, by describing all of "Module 4" as "the corrosion engine") obscures what each component actually contributes. Rule extraction (§1.2.2) is about *authorship* — turning prose into structured rules. Rule comparison (§1.2.3) is about *evaluation* — checking any structured rule, from any source, against a model. Corrosion risk scoring (§1.2.4) is about *domain-specific engineering judgement* — a fixed, standards-derived scoring model that does not consume "rules" in the rule-extraction sense at all. Keeping these three separate in the write-up mirrors how they are separate in the code, and makes it possible to assess each on its own merits. The remainder follows the required structure: research and technology review (1.1), methods and tools (1.2), development process (1.3), results and discussion (1.4), and references and appendices (1.5).
-
----
-
-## 1.1 Research and Technology Review
-
-### 1.1.1 Context: the cost of fragmented compliance in AECO
-
-The Architecture, Engineering, Construction and Operations (AECO) sector loses an estimated USD 15.8 billion annually in the U.S. capital-facilities segment to inadequate interoperability, driven by rework, manual data re-entry and fragmented information flows (Gallaher et al., 2004). A substantial share of this waste originates not in geometry but in compliance verification — the manual, error-prone reconciliation of a model against requirements held in building codes, standards and BIM Execution Plans (BEPs). As openBIM delivery matures under ISO 19650 (ISO, 2018) and the IFC schema (ISO 16739-1; buildingSMART, 2020), the industry has standardised how models are exchanged, but not how they are checked.
-
-### 1.1.2 State of practice: model-coordination and clash-detection tools
-
-Commercial coordination platforms — Autodesk Navisworks, Solibri Model Checker and BIMcollab — represent the current state of practice for automated model review. They are mature at hard-clash detection and support clearance-based soft clashes through manually configured tests. Two limitations recur in the literature and in practice. First, the rules these tools enforce must be authored by hand: they cannot ingest a code or BEP document and derive checks automatically — this is the limitation BIMGuard's rule-extraction service (§1.2.2) targets. Second, their checks are predominantly geometric; they do not reason over material, electrochemical or information-completeness properties — this is the limitation the corrosion risk engine (§1.2.4) targets. Notably, once a rule exists (by any authoring route), the *evaluation* of that rule against a model — Solibri's rule-checking core, for instance — is itself a well-understood, largely solved problem; BIMGuard's own generic comparator (§1.2.3) occupies this same solved space, deliberately kept simple and separate from the two harder, more novel problems either side of it. The buildingSMART BCF standard (buildingSMART, 2020) established a vendor-neutral issue-exchange format that this project adopts as its output, but the rule-authoring bottleneck and the corrosion-blindness gap remain unaddressed by commercial tooling.
-
-### 1.1.3 Automated rule-based compliance checking (research lineage)
-
-Automated code compliance checking (ACCC) has a two-decade research history. Eastman et al. (2009) formalised the four-stage ACCC pipeline — rule interpretation, building-model preparation, rule execution, reporting — and identified rule interpretation as the persistent bottleneck, while noting that rule *execution* (comparing a formalised rule to a model) is comparatively tractable once the rule exists in structured form. Early systems (Singapore's CORENET, the SMARTcodes initiative) relied on hard-coded or manually structured rules, costly to maintain and brittle across jurisdictions (Eastman et al., 2009; Dimyadi & Amor, 2013). Subsequent work explored semantic-web representations (SHACL/RDF) and, more recently, Natural Language Processing to automate the interpretation stage specifically: from rule-based/machine-learning extraction (Zhang & El-Gohary, 2017) to transformer- and LLM-based extraction that better handles the linguistic variability of regulatory text (Zheng et al., 2022; Fuchs et al., 2023). The consensus is that LLMs materially reduce interpretation effort but require human-in-the-loop verification before rules enter production, owing to hallucination and traceability risk — a finding this project's own architecture had to contend with directly (see §1.4.6).
-
-### 1.1.4 Technologies and datasets leveraged
-
-The project builds on an open-source stack, verified against `pyproject.toml` and the modules that actually import each library: **IfcOpenShell** — including its `geom` and `util.shape` native mesh engine — for IFC parsing, geometry derivation and spatial-adjacency analysis (used throughout `app/modules/ifc_reader/`, detailed in §1.2.5), supplemented by **shapely** for 2-D polygon analysis (room/corridor width) and **numpy** for the underlying array math (`trimesh` is not currently used but is recorded as a planned future geometry backend, §1.2.5, §1.4.6); **Docling** for PDF document-structure extraction (`docling_extractor.py`); **spaCy** for lemmatisation and sentence segmentation in the live extraction path; **litellm** as the provider-agnostic LLM transport for the production rule-extraction service (`app/services/llm_client.py`), supporting OpenAI, Gemini and Anthropic model strings; and **FastHTML/MonsterUI** with a **Supabase** (Postgres + object storage) backend. A `transformers`-based BERT/DistilBERT classifier is also implemented (`bert_classifier.py`) but is not yet part of the active dependency set or the production pipeline (§1.2.2). No ML/statistical model is used anywhere in the compliance-comparison or corrosion-scoring components — both are deterministic, rule-/formula-based systems by design (§1.2.3, §1.2.4).
-
-Test data comprises openly available IFC reference models stored in the private Supabase Storage bucket and materialized into the disposable `data/cache/supabase-storage/` cache when needed: the buildingSMART/IFC sample set, the Pacific Continental Residence model in both IFC4.3 Reference View and IFC2x3 Coordination View, `AC20-Institute`, and `Infra-Plumbing`, among others. The Ontario Building Code (CODE), Part 9 and selected Part 3 clauses, is the regulatory corpus for rule extraction, seeded as 45 machine-readable rules at application startup (§1.2.2). Corrosion knowledge is drawn from primary engineering standards rather than learned data: NASA-STD-6012 (galvanic voltage thresholds), EN ISO 15329 and ASTM G48 (crevice corrosion), CIBSE TM13/HSE HSG274/BS 8552 (microbially-influenced corrosion), and the IMOA PREN formulation for stainless-steel grade adequacy — plus, less commonly cited elsewhere in the literature, the AUCSC Basic Corrosion Course (2024) and American Galvanizers Association (2023) as sources for galvanic-series and coating-life data respectively (stored as DB-backed static assets in `public.static_data_assets`).
-
-Notably, no corrosion-science or materials-science library is used anywhere in the codebase — a repo-wide check of every corrosion engine file's imports (`bimguard_corrosion_engine.py`, `bimguard_crevice_engine.py`, `bimguard_mic_engine.py`, `compliance_runner.py`, `galvanic.py`) shows only Python's standard library (`csv`, `dataclasses`, `datetime`, `enum`, `typing`, `uuid`, `zipfile`). The engineering knowledge itself — galvanic-series potentials, PREN formulas, CCT/environment-class thresholds, risk-band-to-BCF-action rules — is transcribed directly into versioned JSON specifications (now persisted as DB-backed static assets, each carrying a `ruleset_id` such as `"BIMGUARD-GC-001"` and a semantic `ruleset_version`) and Python constants, rather than computed by any external numerical or domain package. This makes the "white-box, standards-traceable" claim in the abstract literal at the implementation level: every scored term is a lookup or a documented formula over data, not logic hidden inside a black-box dependency. The one data-modelling library used is Python's own `enum`/`dataclasses` — `piping_schema.py`'s `EnvironmentClass`, `PipingSystem` and `JointType` are all string-backed enums (`class X(str, Enum)`), serialising as plain strings with no separate mapping layer, alongside a mix of frozen (`Point3D`, `BoundingBox`) and mutable (`PipingElement`) dataclasses and a small hand-written recursive JSON serialiser — no schema-validation library such as Pydantic is used.
-
-### 1.1.5 The knowledge gaps this project addresses
-
-Two gaps emerge, and BIMGuard AI addresses each with a purpose-fit pair or single component rather than one monolithic engine:
-
-1. **The interpretation gap.** Existing BIM tools enforce only hand-authored, geometric rules and cannot derive checks from unstructured regulatory text — building codes and BEPs, written as prose for human readers, not as software code or a structured rule format. This is closed by *two* cooperating components: rule extraction (§1.2.2) turns text into structured rules, and the generic comparator (§1.2.3) evaluates those rules — or any manually authored rule of the same shape — against a model. Separating them means the extraction quality and the evaluation correctness can be assessed independently: a rule can fail because the LLM mis-read the code section, or because the comparator mis-applied a correct rule, and the architecture makes it possible to tell which.
-2. **The corrosion-blindness gap.** Despite corrosion being a leading cause of premature MEP failure (corrosion costing ~3.4% of global GDP; Koch et al., 2016), no automated BIM coordination tool evaluates material compatibility, galvanic potential or crevice/MIC risk at the design stage, when mitigation is cheapest. This is closed by the corrosion risk engine (§1.2.4), a self-contained scoring system that does not route through the rule-extraction or generic-comparator components at all — it consumes element material/geometry/environment data directly and applies a fixed, published scoring formula.
-
----
-
-## 1.2 Methods and Tools
-
-### 1.2.1 System architecture: three components, two shared infrastructure modules
-
-BIMGuard AI is implemented as a modular pipeline. The diagram below groups the codebase by what each part actually is, not by folder name — this matters because the real repository structure puts the generic comparator and the corrosion engine in the same `comparator/` package even though they share no code and solve different problems.
-
-```
-┌─ COMPONENT 1: Rule extraction (turns text into structured rules) ─────────┐
-│ Web app (LIVE):                                                            │
-│   PDF upload → RuleExtractionService (M1 components + M1b annotator)       │
-│              → LiteLLMRuleExtractor (litellm, provider-agnostic)           │
-│              → RuleService.create_rule() → rules table (Supabase)           │
-│ CLI prototype :                              │
-│   PDF path  → orchestrator.run_pipeline()                                  │
-│              → DoclingExtractor → TableRuleBuilder → SectionChunker        │
-│              → KeywordFilter → RuleConverter / RegexRuleConverter          │
-│              → RuleGenerator (validate/enrich) → RuleStore                 │
-└──────────────────────────────────────────────────────────────────────────┘
-                                    │  structured rules (any source)
-                                    ▼
-┌─ COMPONENT 2: Generic compliance comparator (evaluates rules vs a model) ──┐
-│  IFC upload — any authoring tool: Revit, ArchiCAD, Tekla, Vectorworks, …   │
-│              → Module 2 (ifc_parser.py, ifc_geometry.py, ifc_spatial.py) ─┐│
-│                                            ├─→ extraction_results (list)  ││
-│  pyRevit push (optional, Revit-only convenience, not the primary path) ──┘│
-│              → RevitSyncService              (source-independent shape)   │
-│                                            │                                │
-│                                            ▼                                │
-│                          ComplianceComparator.validate_metadata()            │
-│                          (>=, <=, >, <, ==, !=, between, exists, …)         │
-│                                            │                                │
-│                                            ▼                                │
-│         ComplianceReporter.render_visual_report(), grouped by discipline     │
-│                    (Architecture / MEP — RuleService.list_by_theme)        │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ COMPONENT 3: Corrosion risk engine (weighted scoring, no "rules") ────────┐
-│   IFC/element data → ComplianceComparator's sibling: compliance_runner.py    │
-│                       (galvanic GC-001 + crevice CC-001, LIVE)             │
-│                       — MIC MC-001 implemented separately in app/engines/, │
-│                         standards-referenced, not yet wired in             │
-│                                            │                                │
-│                                            ▼                                │
-│                       BCF issue + cost (£) + schedule (days) generation    │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-Three honest notes on this diagram. First, rule extraction (Component 1) exists as two parallel implementations, and only the `RuleExtractionService` path is reachable from the web UI — the CLI orchestrator (`app/modules/orchestrator.py::run_pipeline`) is complete and offline-capable but nothing in `app/routes/` calls it. Second, `orchestrator.py` also contains a class called `BIMGuard_App`, which *is* live and drives both Component 2 (generic comparator) and Component 3 (corrosion engine) from the same web request — this is why an earlier draft blurred the two together. This revision treats them separately from here on. Third, and worth stating plainly since it is easy to misread the pyRevit integration as central: BIMGuard's primary and only required input is a standard IFC file, exportable from any authoring tool that supports the schema — Revit, ArchiCAD, Tekla Structures, Vectorworks, Bentley, and others — which is what makes the platform openBIM and vendor-neutral in the first place. The pyRevit push described below is an additional, optional convenience for teams already working natively in Revit who want to skip the export step; it is not a dependency of the IFC-reading pipeline, and removing it entirely would not change how BIMGuard reads or checks an IFC file.
-
-### 1.2.2 Component 1 — AI-assisted rule extraction (Modules 1, 1b, 3)
-
-**Document structure extraction (M1).** `DoclingExtractor` genuinely parses source PDFs into prose text and per-table `DataFrame`s using Docling's `DocumentConverter`; used by both the live and CLI paths. `TableRuleBuilder` converts requirement tables directly into rules deterministically (no LLM call), also wired into both paths.
-
-**Sectioning and filtering (M1).** `SectionChunker` segments a document into up to 13 fixed CODE sections via a regex-based heading detector. `KeywordFilter` performs spaCy lemmatisation and weighted keyword/bigram scoring, classifying paragraphs into HIGH/MEDIUM/LOW confidence bands. A `TfidfAnalyzer` (`sklearn.feature_extraction.text.TfidfVectorizer`) compares rule vs non-rule paragraph vocabularies — in the live service this runs in **discovery/reporting mode only** and does not change which paragraphs are routed to the LLM. A `confidence_scorer` combines keyword, dependency-parser and (optionally) BERT signals into a weighted SEND/SKIP decision, wired into the live service.
-
-**Semantic annotation (M1b).** The `nlp_annotation` package is wired into the *live* web pipeline (not the CLI orchestrator). A `deontic_extractor` identifies obligation modality ("shall/must/should", with negation handling); a `dimension_extractor` captures quantities, units, and min/max/range/exact constraint types via regex; a `condition_parser` splits applicability/exception/qualification clauses; a `cross_ref_resolver` resolves seven families of inter-clause references. Together these build a structured "NLP pre-analysis" block prepended to the LLM prompt.
-
-**Rule conversion — a dual-path design that exists, but in two different places.** A `USE_GPT4O` flag genuinely exists in the CLI path and switches between `RegexRuleConverter` (free, offline, deterministic) and `RuleConverter` (OpenAI SDK directly, default `gpt-4o-mini`). The live web service instead uses `LiteLLMRuleExtractor`, genuinely provider-agnostic — the UI lets a user select `openai`/`gemini`/`anthropic` model strings per request, defaulting to `gpt-4o-mini`. The regex-vs-LLM comparison central to the project's narrative is currently only demonstrable end-to-end through the CLI script; the live path has no regex-only fallback yet.
-
-**Validation, enrichment and persistence.** `RuleGenerator` validates required fields per rule type and enriches target/property-set defaults before calling `RuleStore.save_rule`, but this gate is exercised only by the CLI path and the test suite — the live web save flow calls `RuleService.create_rule()` directly, bypassing `RuleGenerator`. The live rule schema (`rules_service.py`) has roughly 19 fields (including `property_set`, `value_min`/`value_max`, `applies_when`, `compliance_type`, `confidence`, `extraction_method`), materially larger than a minimal `{target_ifc_class, property_name, operator, check_value, unit, reference, severity, needs_review}` subset.
-
-**Human-in-the-loop.** A `needs_review` field exists end-to-end: set by the LLM extractor, editable in the rule-review UI, shown as a warning badge before saving. What is not yet implemented is a "pending vs. active" rulebase gate — once a rule is saved, `needs_review=True` does not exclude it from the rule set the comparator (§1.2.3) checks against.
-
-**Seed rules.** `code_seed_rules.py` contains 31 pre-built CODE Part 9 rules, and `code_extended_rules.py` adds 14 more CODE Part 9/Part 3 rules, both seeded automatically at application startup — **45 pre-built rules** in total, each with a real CODE section reference. These seed rules are consumed identically by the generic comparator in §1.2.3, regardless of whether they were seeded, LLM-extracted, or regex-extracted — a direct benefit of keeping extraction and evaluation separate.
-
-### 1.2.3 Component 2 — the generic compliance comparator (Module 4: `ComplianceComparator`)
-
-This component answers one question only: *given a structured rule and a set of model elements, does each element pass?* It has no knowledge of where the rule came from (LLM, regex, seed file, or a person typing it into the Rule Library UI) and no domain-specific corrosion logic — it is a general-purpose evaluator, and this generality is its main design value.
-
-**Supported operators.** `>=`, `<=`, `>`, `<`, `==`, `!=`, `between`, `exists`, `not_exists`, `matches` (regex). Numeric comparisons coerce the property's actual value to `float` (stripping thousands separators); non-numeric values fall back to string equality/inequality or regex matching for `matches`.
-
-**Per-rule result status.** Each rule, evaluated against every matching element, resolves to one of five statuses: `PASS` (all elements satisfy the rule), `FAIL` (at least one element violates it — the dominant status), `MISSING_DATA` (the property is absent on every matching element), `PARTIAL` (present-but-failing plus some missing), or `NO_ELEMENTS` (no elements of the target IFC class exist in the model). Each `FAIL`/`PARTIAL` result carries a per-element failure list (element name, GUID, storey, space, actual value, and a human-readable reason string, e.g. `"820mm < required 860mm"`).
-
-**Property resolution (feeding the comparator from Module 2).** For each rule, `IFCReader.extract_for_compliance()` searches, in order: (1) the rule's nominated property set, (2) all Psets and `Qto_` quantity sets on the element, (3) direct IFC schema attributes (e.g. `OverallHeight`, `OverallWidth`). This fallback order is what lets a single CODE rule match property data authored inconsistently across different IFC exporters.
-
-**Source-independence — a genuine, distinctive architectural feature, with IFC as the primary and only required path.** The comparator's default and primary input is a standard, vendor-neutral IFC file — from Revit, ArchiCAD, Tekla, Vectorworks, or any other IFC-exporting tool — parsed by Module 2 (§1.2.5). A second, optional input path exists for teams already working natively in Revit; the comparator is invoked from two different live routes, on two structurally different inputs, without any change to `ComplianceComparator` itself:
-- `app/routes/analyze.py` → `IFCReader.extract_for_compliance(library_rules)` (from an uploaded IFC file — the primary, tool-agnostic path) → `ComplianceComparator().validate_metadata(extraction)`.
-- `app/routes/revit_sync.py` → an *optional* pyRevit script running inside Revit POSTs live element JSON (`{"ifc_class": "IfcStairFlight", "properties": {"Width": 900.0, "RiserHeight": 175.0}, ...}`) to `/revit-sync` → `RevitSyncService.build_extraction_results()` reshapes it into the *same* `list[dict]` contract `extract_for_compliance()` produces → `ComplianceComparator().validate_metadata(...)` runs unchanged. `RevitSyncService`'s own docstring states the intent directly: *"Converts pyRevit push data into Module 4's expected input format so the compliance pipeline runs unchanged regardless of whether data came from an IFC file... or directly from Revit."*
-
-`ComplianceComparator` itself has no notion of "Revit" anywhere in its code — it only ever consumes the same generic `list[dict]` shape, however it was produced. This is what makes the IFC path and the Revit convenience path equally valid, rather than the platform being a Revit-first tool with an IFC side door.
-
-**Measures covered today.** Across the 45 seed rules (§1.2.2), the comparator already checks five categories of regulatory measure: *dimensional* (Width, OverallWidth/Height, RiserHeight, TreadLength, FlightHeight, HandrailHeight, RequiredHeadroom, Area/NetFloorArea), *angular* (PitchAngle, WinderTurnAngle, IndividualWinderAngle), *fire/life-safety* (FireRating, present on three explicit rules covering doors, walls and slabs), *slope* (RequiredSlope), and *boolean/classification* (IsExternal, HasNonSkidSurface, PredefinedType, OperationType). One notable gap: wall/slab **thickness** is not yet an explicit checked rule, even though the `ifc_quality` improver already carries a default `Thickness: 0.15` m for `IfcWall` (§1.2.5) — extending the seed set to check thickness against fire-compartmentation or structural minimums is a natural, low-effort addition (§1.4.6).
-
-**Discipline-based result sorting (Architecture / MEP) — real and live.** `RuleService` defines `THEMES = {"Architecture", "MEP"}` and an `infer_theme()` classifier: a rule is tagged MEP if its `mechanism` is one of the corrosion codes (`GC-001`/`CC-001`/`MC-001`) or its target IFC class starts with an MEP prefix (`IfcFlow*`, `IfcPipe*`, `IfcDuct*`, `IfcCable*`, `IfcDistribution*`); everything else defaults to Architecture. `list_by_theme()` filters the active rule set before a compliance run, and both `analyze.py` and `revit_sync.py` accept a `theme` parameter, so a run's results are already scoped to one discipline by construction. Not yet built: a single combined report view that runs both themes together and groups the results side by side — today a user selects one discipline per run rather than seeing an Architecture/MEP-sorted breakdown of one combined run. This is scoped as a near-term UI improvement (§1.4.6); the classification logic behind it already exists and does not need to be rebuilt.
-
-**Rule and modelling-guidance hyperlinks — planned, not yet built.** Today, a rule's source citation (`ref`, e.g. `"9.8.2.1.(2)"`) is a plain text string, not a link — confirmed against the rule schema and the Rule Library UI. The planned feature adds two hyperlinks per checked rule in the results view: (1) a citation link back to the specific source clause (the regulatory PDF section, or an official code portal where licensing permits), extending the same traceability the `needs_review` workflow already gives at the extraction stage through to the results the user actually reads; and (2) a modelling-guidance link, combining buildingSMART's own official IFC/MVD authoring documentation with BIMGuard's own written guidance, explaining how to model the relevant element correctly (e.g., which property set a stair flight's `RiserHeight` should be authored under) so that a `MISSING_DATA` result becomes actionable rather than opaque. This directly targets the false-negative risk described in §1.2.5 — many `MISSING_DATA`/`NO_ELEMENTS` results are a modelling-quality problem rather than a genuine compliance failure, and the UI does not currently help a user tell the difference or fix it.
-
-**Extending human-in-the-loop from rules to results — planned.** `needs_review` (§1.2.2) currently covers only extracted *rules*, before they are saved. The planned extension applies the same review discipline to *results*: a reviewer would be able to mark an individual comparator or corrosion-engine issue as reviewed/accepted/dismissed, with a comment, before it is included in a finalised report or BCF export — mirroring the rule-review workflow at the results end of the pipeline. No such field or workflow currently exists on `ComplianceComparator`'s result objects or the corrosion engine's issue objects (§1.2.4); this is a design gap listed in §1.4.6, not a partially-built feature.
-
-**Worked example.** CODE seed rule (`code_seed_rules.py`): *"Private stair riser height — min 125 mm, max 200 mm"*, `target_ifc_class="IfcStairFlight"`, `property_name="RiserHeight"`, `operator="between"`, `value_min=125`, `value_max=200`. Given an uploaded model containing a stair flight with `RiserHeight=175mm`, the comparator resolves `actual=175`, evaluates `125 <= 175 <= 200` → `True`, and the rule status is `PASS` for that element. A second stair flight with `RiserHeight=210mm` would fail with reason `"210mm outside [125mm–200mm]"`, contributing to a `FAIL` status for the rule and a `ComplianceReporter` entry citing the specific element GUID and storey.
-
-**Current validation status.** No dedicated unit tests currently assert `ComplianceComparator`'s operator logic against hand-picked cases in isolation (the closest existing test, `test_compliance.py`, targets a `/api/v1/compliance/...` REST shape that does not exist in the current FastHTML app and predates this architecture). This is flagged as a concrete, low-effort item for §1.4.6 — the class itself is short and pure-functional, so covering all ten operators with unit tests is a same-day task.
-
-### 1.2.4 Component 3 — standards-based corrosion risk engines (galvanic, crevice, MIC)
-
-This component answers a structurally different question: *given an element's material, its neighbours' materials, its geometry, and its service environment, what is the deterministic, standards-derived risk that it will corrode?* There is no "rule" being checked here in the Component-2 sense — the scoring model, its weights, and its risk bands are fixed by engineering standards, not authored per-project.
-
-Three engines are designed and implemented, each computing a weighted composite score on a 0–1 scale mapped to four risk bands. Every term is traceable to a published standard; there is no trained model and no hidden weighting.
-
-| Engine | Composite score | Risk bands | Key standards | Status |
-|---|---|---|---|---|
-| Galvanic (GC-001) | 0.50·voltage + 0.30·area-ratio + 0.20·environment | Low <0.35 / Med / High / Crit >0.85 | NASA-STD-6012; WorldStainless galvanic series; IMOA PREN; Prosoco TN-104 | **Live** (production tables) + fuller reference implementation |
-| Crevice (CC-001) | 0.35·geometry + 0.40·CCT-adequacy + 0.25·environment | Low <0.30 / Med / High / Crit >0.80 | EN ISO 15329; ASTM G48 Method B; CIRIA C692; CIBSE Guide G; EN 1993-1-4 | **Live** (production tables) + fuller reference implementation |
-| MIC (MC-001) | 0.35·flow + 0.30·temperature + 0.25·dead-leg + 0.10·material | Low <0.25 / Med / High / Crit >0.75 | CIBSE TM13; HSE HSG274; BS 8552; ASTM G-187; WHO DWQ | Implemented, **not yet integrated** into the live pipeline |
-
-*Table 1. The three corrosion engines: composite scoring formulas, risk bands and referenced standards, as implemented in `app/engines/`.*
-
-**Two implementations exist for galvanic and crevice.** A fuller, standards-annotated *reference implementation* of all three mechanisms lives in `app/engines/` (`bimguard_corrosion_engine.py`, `bimguard_crevice_engine.py`, `bimguard_mic_engine.py`) with matching documentation payloads now persisted as static assets in `public.static_data_assets`. This is where the formulas in Table 1 are drawn from, including the galvanic voltage-risk normalisation `voltage_risk = min(1.0, gap / (2 × threshold))` and the PREN-failure floor of 0.35. **This reference implementation is not currently imported by any live route** — reachable only by running its files directly, and a broken relative import between the crevice and galvanic reference files means even its own cross-engine logic degrades silently outside `app/engines/`.
-
-Each ruleset JSON is a versioned specification, not just a data dump: `galvanic_corrosion_ruleset.json` carries a `ruleset_id` (`"BIMGUARD-GC-001"`), a semantic `ruleset_version` (`"1.0.0"`), a `standards_referenced` list of eight named, described sources, the composite formula written both as a human-readable string and a machine-readable `weights` dict, and — the most operationally significant part — an explicit mapping from each risk band to a BCF action: Low → *"Asset register only — no BCF issue"*, Medium → *"BCF Normal priority"*, High → *"BCF Major priority"*, Critical → *"BCF Critical priority — immediate remediation"*. This is the exact, auditable rule connecting a numeric composite score to an output decision, and it is documented as data rather than buried in conditional code.
-
-The engine actually invoked when a user runs a compliance check in the web app is `app/modules/comparator/compliance_runner.py` (a sibling file to, but sharing no logic with, `ComplianceComparator`), called from `BIMGuard_App.orchestrate_workflow()`. It independently implements galvanic and crevice scoring against its own, hand-authored material/PREN/CCT tables — numerically close to, but not identical to, the reference implementation's tables — and **does not implement MIC**.
-
-A fourth implementation, `comparator/galvanic.py`, is more substantial than a simple superseded stub and deserves its own mention: it is a complete, correct galvanic comparator built against `app/modules/ifc_reader/piping_schema.py`, a genuinely rich `PipingElement` data contract — 22 canonical materials, a 23-member `PipingSystem` enum (covering everything from domestic hot water to medical gases and pool circulation), a `T0`–`T5` `EnvironmentClass` wetting scale, a 14-member `JointType` enum matching a dedicated `JT-001`–`JT-014` ruleset, and explicit mass/area fields for both galvanic and seismic checks. This is the most rigorously modelled data contract in the codebase. Implementation-wise, `EnvironmentClass`, `PipingSystem` and `JointType` are all string-backed Python enums (`class X(str, Enum)`) — type-checked in code but serialising as plain strings with no separate translation layer — alongside a deliberate split between frozen, immutable dataclasses for geometric primitives (`Point3D`, `BoundingBox`) and a mutable dataclass for the element record itself (`PipingElement`), with a small hand-written recursive `to_json()` walker rather than a schema library such as Pydantic. It is, however, entirely disconnected from the live pipeline in both directions: nothing in `ifc_parser.py` constructs a `PipingElement` from real IfcOpenShell data (only three hand-written example fixtures exist, inside `piping_schema.py` itself), and `galvanic.py` is never imported by `compliance_runner.py` or any route. Closing this gap — having `ifc_parser.py` populate real `PipingElement` objects and routing them through `galvanic.py` — would be a more standards-faithful path to a unified corrosion engine than continuing to maintain `compliance_runner.py`'s separate hand-authored tables (§1.4.6).
-
-**Worked logic (galvanic, reference implementation).** For a dissimilar-metal pair, the engine looks up each metal's potential in a galvanic series (V vs. Ag/AgCl), computes the voltage gap, and normalises it against an environment-class threshold (controlled 0.50 V → normal 0.25 V → harsh 0.15 V): `voltage_risk = min(1.0, gap / (2 × threshold))`. A small anode-to-cathode area ratio escalates risk (Prosoco TN-104), and a PREN adequacy failure for the specified stainless grade floors the composite score at 0.35 (Medium).
-
-**Current validation status.** No unit tests currently assert engine output against hand-calculated ground truth for known material pairs — this is the methodology the assignment expects (§1.2.8) but it is not yet coded. What does exist is a persisted historical run (§1.4.2) showing the engine has previously executed and produced measured, non-trivial results — real evidence the design works, even without a repeatable test suite behind it yet.
-
-### 1.2.5 Shared infrastructure — IFC ingestion, geometry and spatial analysis (Module 2)
-
-This module is fully implemented and live, and feeds both Component 2 and Component 3. It has also grown well beyond a simple property reader, and is described here in more depth than earlier drafts gave it.
-
-**Core parsing.** `ifc_parser.py` (built on a genuine `ifcopenshell.open()` call) extracts service elements, materials, property sets and spatial structure into a `ServiceElement` schema. The `ifc_quality` sub-package (`validator.py`, `improver.py`, `generator.py`) checks and repairs missing/under-specified attributes before checking, and `validator.py` produces a genuine 0–100% completeness score. The parser explicitly branches on IFC schema version and flags IFC4-only MEP classes unavailable when reading an IFC2x3 file — dual-schema support is a real, handled code path.
-
-**Geometry stack — corrected from an earlier draft.** BIMGuard does not use `trimesh` today; the real, verified stack (`ifc_geometry.py`, `ifc_spatial.py`) is `ifcopenshell.geom` and `ifcopenshell.util.shape` — IfcOpenShell's own native mesh-processing engine (v0.8+) — for 3-D mesh operations, `shapely` for 2-D polygon analysis (room/corridor minimum-width via minimum-rotated-rectangle), and `numpy` for the underlying array math. Adding `trimesh` as a further geometry backend — for boolean mesh operations or watertightness checks the current stack does not cover, relevant to the planned "Halo" volumetric-clearance feature (§1.4.6) — is recorded here as a named future addition, not a currently-used library.
-
-**Tier 1 — architectural geometry derivation (`ifc_geometry.py`).** This module has two responsibilities, per its own header docstring: (1) pipe surface-area estimation for the galvanic corrosion engine (Component 3), reading actual mesh geometry where available and falling back to nominal-diameter estimation otherwise; and (2) deriving architectural measurements — `Height`, `Width`, `SillHeight`, `HandrailHeight`, `Slope`, `Volume`, `FootprintArea`, `SurfaceArea`, and `CorridorWidth` — directly from element geometry *when those values are absent from property sets*. In practice this means a rule such as the riser-height check (§1.2.3) can still be evaluated even when an IFC export omits the `RiserHeight` property outright, because the geometry engine derives it from the stair flight's mesh instead of requiring it to be authored. This is a genuine, non-trivial fallback layer, not simple bounding-box math.
-
-**Tier 2 — spatial adjacency engine (`ifc_spatial.py`).** A second, structurally different capability: this module parses `IfcRelSpaceBoundary` relationships to map every `IfcSpace` to the walls, doors and windows that bound it, and identifies party walls shared between two spaces. Three compliance checks are built on top of this adjacency map, and are genuinely wired into the live pipeline (`ifc_reader/__init__.py` imports and calls all three): `check_daylight_ratios()` (CODE 9.7.2 — window area ÷ floor area ≥ 1/10), `check_fire_separation()` (CODE 9.10.9 — party walls must carry `FireRating` ≥ 45 minutes), and `check_garage_separation()`. These are relationship-aware checks that Component 2's simple operator-based comparator (§1.2.3) cannot express on its own, since they depend on which elements bound which spaces, not just a single element's own properties — a good illustration of why Module 2 has grown beyond being "just" an IFC reader.
-
-**Tier 3 — egress and circulation analysis (`ifc_egress.py`) — real, live, and graph-based.** This is the most algorithmically sophisticated part of Module 2 and was absent from earlier drafts of this report. It builds a `networkx` graph of the building's circulation topology: nodes are `IfcSpace` GUIDs weighted by the square root of floor area (an estimated per-space traversal cost), edges connect spaces that share a physical `IfcDoor` boundary, and spaces touching an exterior door are marked as exits. Two CODE checks run on top of this graph: `check_exit_count()` (CODE 9.9.4.1 — at least one exit per storey, checked directly from `IsExternal` doors without needing the graph) and `check_egress_travel_distance()` (CODE 9.9.10.1 — runs Dijkstra's shortest-path algorithm from every habitable space to its nearest exit, flagging any path over 25 m). Habitable-space classification uses a keyword list (bedroom/living-room-type names count, bathroom/corridor-type names don't, ambiguous names default to habitable). This is genuinely wired into the live pipeline — `ifc_reader/__init__.py` builds the egress graph on IFC load and exposes `extract_egress_checks()`, which `app/routes/analyze.py` calls and renders on the results page. Unlike Component 2's per-element rule checks (§1.2.3) or even Tier 2's pairwise adjacency checks, this is a genuinely global, path-based analysis — no other part of the platform reasons about the building as a connected graph the way this module does.
-
-**A related, complete capability that exists but is currently switched off: the IFC relationship graph (`ifc_graph.py`).** Separately from egress, `ifc_graph.py` builds a full `networkx` directed graph of the model's containment, aggregation and connectivity relationships (`IfcRelContainedInSpatialStructure`, `IfcRelAggregates`, `IfcRelConnectsElements`) and renders it as an interactive `pyvis` HTML visualisation, with violated elements highlighted in red. The code is complete and correct, but `app/routes/analyze.py` currently renders a hardcoded placeholder card ("Graph visualisation is temporarily disabled") in its place, behind an explicit `# TODO: Re-enable the PyVis IFC graph` comment — `ifc_graph.py` itself is never imported. Re-enabling it is a low-effort, high-visual-value improvement (§1.4.6), since the underlying graph-building logic already works.
-
-**Architectural element detection — a known limitation, under active development.** Both tiers above assume an element is already correctly classified in the source IFC (a real `IfcDoor`, a real `IfcStairFlight`, and so on) and, at most, is missing a *property*. The `ifc_quality` improver already handles that specific case well: it carries default-property tables for `IfcWall` (including `Thickness: 0.15` m), `IfcDoor` (`FireRating`, `SmokeStop`, `IsExternal`, `Acoustic`), `IfcWindow` (`FireRating`, `IsExternal`, `Acoustic`, `ThermalTransmittance`), `IfcSpace`, and `IfcSlab`, injecting sensible defaults when a recognised element is missing a property. What is **not** yet handled, and is a genuine, currently unmitigated source of false negatives, is an element that is missing or *mis-classified* altogether — for example, a door modelled as an undifferentiated `IfcBuildingElementProxy` or a generic opening rather than a proper `IfcDoor`, a common real-world authoring error, especially from tools with weaker IFC mapping. In that case, Component 2 does not fail the rule — it reports `NO_ELEMENTS` (§1.2.3), silently under-counting rather than flagging a problem. Improving architectural-element detection — heuristics or geometry-based reclassification to catch elements that behave like a door/window/stair but are not tagged as one — to close this false-negative path is scoped as priority work ahead of final submission (§1.4.6).
-
-
-**Tier 4 — Halo spatial reservation (prototype, benchmarked, not yet integrated).** Earlier drafts described the "Halo" volumetric-clearance capability as conceptual. A working generator and benchmark harness now exist in `performance_benchmark.py`; the capability is still not wired into any route or module, so it is reported here as a prototype whose cost is characterised (§1.4.4) rather than as a live feature.
-
-A Halo is the clearance volume that must remain unobstructed around an element — the 500 mm seismic-bracing and maintenance-access allowance a specification typically demands. Geometrically it is a **Minkowski sum**: the element's solid swollen by a sphere of the buffer radius. The prototype approximates that sum from the element's axis-aligned bounding box, choosing one of three primitives by IFC class — a cylinder about the dominant axis for linear distribution runs (`IfcPipeSegment`, `IfcDuctSegment`, cable segments and carriers), a sphere for point-like components (fittings, valves, junctions, terminals, flanges, accessories), and an offset box with filleted edges for everything prismatic.
-
-The design decision that governs performance is that **the Halo is derived from the bounding box, not from the element's triangulation**. Halo cost is therefore constant in the source element's polygon count, which is what makes high-poly input tractable: the source model's polygon count is paid once, during ingestion, and never again per Halo (§1.4.4).
-
-```text
-function GENERATE_HALO(centroid, bbox, buffer_m, lod, ifc_class):
-    # 1. Level of detail selects tessellation density only.
-    #    segments  = 8 | 16 | 32          for LOD 200 | 300 | 400
-    #    arc_segs  = 0 |  2 |  4          segments per 90-degree fillet arc
-    segments, arc_segs <- LOD_TABLE[lod]
-
-    half <- bbox.dimensions / 2                    # O(1): no mesh access
-
-    # 2. Primitive selection by element behaviour, not by geometry size.
-    kind <- CLASSIFY(ifc_class)                    # cylinder | sphere | box
-
-    if kind = cylinder:
-        axis   <- argmax(half)                     # dominant run direction
-        radius <- max(half over the two cross-axes) + buffer_m
-        mesh   <- CLOSED_CYLINDER(radius, half[axis] + buffer_m, axis, segments)
-
-    else if kind = sphere:
-        mesh   <- UV_SPHERE(norm(half) + buffer_m, segments)
-
-    else:                                          # prismatic element
-        if arc_segs = 0:                           # LOD 200: coarse, conservative
-            mesh <- BOX(half + buffer_m)           # +11.8% volume vs. exact offset
-        else:                                      # LOD 300/400: true offset surface
-            mesh <- ROUNDED_BOX(half, buffer_m, arc_segs)
-
-    return TRANSLATE(mesh, centroid)               # world coordinates, metres
-
-
-function ROUNDED_BOX(half, radius, arc_segs):
-    # The exact offset of a box is six flat faces, twelve quarter-cylinder edge
-    # fillets and eight spherical corner patches. Rather than special-casing
-    # three surface types, generate one latitude/longitude grid in which the
-    # three coordinate planes are DUPLICATED, and place each grid vertex at
-    #     corner_of_its_octant + radius * direction
-    # Duplicating the seams is what opens the flat faces and fillets out of what
-    # would otherwise collapse to a sphere: faces, fillets and corners all fall
-    # out of one quad mesh. Cost is O(arc_segs^2).
-    lat  <- [-90..0 in arc_segs steps] ++ [0..90 in arc_segs steps]   # equator twice
-    lon  <- concat over 4 quadrants of [0..90 in arc_segs steps]      # meridians twice
-    for each (row, col):
-        octant_corner <- (sign_x[col]*half.x, sign_y[col]*half.y, sign_z[row]*half.z)
-        vertex[row][col] <- octant_corner + radius * DIRECTION(lat[row], lon[col])
-    faces <- QUADS(rows x cols, wrapping in col) ++ POLE_FANS(top, bottom)
-    return DROP_DEGENERATE_AND_ORIENT_OUTWARD(vertex, faces)   # convex: exact
-```
-
-**Complexity.** Per Halo, the generator is O(`segments`) for a cylinder, O(`segments`²) for a sphere and O(`arc_segs`²) for a rounded box — bounded by 960 triangles at LOD 400 and independent of the source element. Over *n* elements the pipeline is O(*n*) for generation and O(*n*) expected for interference detection via a uniform spatial hash grid, against O(*n*²) for exhaustive pair testing; §1.4.4 reports where that asymptotic advantage actually begins to pay, which is later than theory alone suggests.
-
-**Correctness.** Because the generator's output feeds a clearance decision, it is verified before it is timed: `performance_benchmark.py --validate` asserts that every primitive at every LOD is watertight, and checks box Halos against the analytic Steiner-formula volume for a box Minkowski-summed with a sphere (§1.4.4). Adding `trimesh` as a further geometry backend, recorded above as a named future addition, is on the benchmark evidence not needed for generation; its case would be exact boolean narrow-phase testing (§1.4.6).
-
-### 1.2.6 Shared infrastructure — reporting: BCF, cost and schedule (Module 5)
-
-Module 5 provides two distinct outputs, consumed differently by Components 2 and 3. `ComplianceReporter.render_visual_report()` renders an on-screen HTML summary of comparator results (§1.2.3) — pass/fail counts, per-rule failure detail — and is genuinely called from both `analyze.py` and `revit_sync.py`. For BCF export, `bcf_generator.py` implements a well-formed BCF 2.1 ZIP writer (GlobalId, viewpoint, risk score, mitigation text per issue; `snapshot.png` is currently a hardcoded 1×1 placeholder pixel, a known limitation). A second BCF writer, `app/services/bcf_exporter.py`, is **broken, not just unused**: it imports `ComplianceIssue` from `app.models.compliance_models`, a module that does not exist anywhere in the repository, so this file would raise `ModuleNotFoundError` if anything tried to call it — which nothing does (zero callers found anywhere). **Neither writer is currently invoked by the live download route**: `app/routes/analyze.py`'s `/reports/bcf/{project_id}` endpoint only reads a pre-existing file named `data/compliance_project_{id}.bcf` from disk if one happens to exist — it does not generate one. The two such files that do exist (`compliance_project_1.bcf`, `compliance_project_3.bcf`, both genuine, well-formed, non-empty BCF archives) were produced by an earlier version of the pipeline whose write step is not present in the current codebase (§1.4.2). `cost_model.py` implements a configurable `CostModel` with CSV-upload support, shipping with UK MEP default rates hardcoded in Python rather than a checked-in CSV. `schedule_impact.py` computes cost (£) and programme-delay (days) per issue, keyed by risk band × mechanism, against a 10-activity baseline MEP programme (a modelling assumption, not measured project data).
-
-### 1.2.7 Software and environment
-
-Python 3.12, managed with `uv`. Application: FastHTML + MonsterUI (server-rendered UI + HTMX), with a full supporting application shell beyond the three compliance components — project management (`projects.py`/`projects_service.py`: create/edit/delete, MD5-hashed IFC upload) and document management (`library.py`/`documents_service.py`: MD5-based upload de-duplication, no versioning) — both genuinely wired and functional. Data: Supabase (Postgres + object storage) is the backend for both data and file storage, with a transparent local cache for remote Supabase Storage objects (`data/cache/supabase-storage/`, `object_storage.py`) so files can be parsed/served locally without re-downloading on every request. Production hosting is Render.com (`render.yaml`: single Docker web service, starter plan, autoDeploy from the repository) — there is no separate managed database container in either deployment config, since Supabase is an external hosted dependency. AI/ML: Docling, spaCy, scikit-learn (TF-IDF), `litellm`; a `transformers`-based BERT classifier is implemented but not active in production. Note on default LLM model: `docker-compose.yml`/`render.yaml` set `BIM_GUARD_RULE_MODEL=gemini/gemini-2.0-flash` for the deployed environment, distinct from `config.py`'s `gpt-4o-mini` default used by the CLI path (§1.2.2) — the two rule-extraction implementations do not currently share a default model, a further argument for reconciling them (§1.4.6). BIM: IfcOpenShell. Testing: a real pytest suite exists (`app/modules/tests/`, 57 test functions across `test_document_parsing.py`, `test_rule_builder.py`, `test_compliance.py`, `test_integration.py`) with genuine `@pytest.mark.slow`/`llm`/`integration` markers (not yet registered in `pyproject.toml`); one file (`test_compliance.py`) targets a REST API shape that predates the current FastHTML architecture and needs rewriting. A custom LLM-as-judge evaluation harness (`eval_harness.py`) also exists (§1.2.8). Containerisation: a working multi-stage `Dockerfile` exists at the repo root, orchestrated locally by `docker-compose.yml`. **Continuous integration is not yet implemented** — no `.github/workflows/` directory exists, so the test suite runs manually only. An in-browser IFC 3D viewer (`app/routes/viewer.py`, `static/js/ifc-viewer.js`) supports visual issue inspection — corrected from an earlier draft, which repeated an inaccurate claim from `CLAUDE.md` that it uses `@thatopen/fragments`/`@thatopen/components`; the real, verified stack is **three.js r160 + `web-ifc-three@0.0.126` + `web-ifc@0.0.68`**, loaded from CDN, with orbit controls and automatic camera-fit to the loaded model.
-
-### 1.2.8 Data analysis and validation metrics, per component
-
-**Component 1 (rule extraction).** `eval_harness.py` implements a golden set of 8 hand-authored `EVAL_CASES` and a genuine LLM-as-judge harness scoring each generated rule 1–5 on Correctness, Completeness and Executability. **Precision/recall/F1 per rule field is not yet implemented** — the methodology (confusion matrix over element/property/operator/value/unit) is specified but not coded, and a call to a `RuleGenerator.generate_rules()` method that does not exist on the current class would raise an `AttributeError` if the harness were run as-is. Both must be fixed before a live evaluation run (§1.4.3).
-
-**Component 2 (generic comparator).** Intended validation regime: unit tests exercising all ten operators against synthetic element/rule pairs, plus integration coverage confirming identical output whether elements arrive via `IFCReader` or `RevitSyncService`. Neither currently exists as passing, up-to-date test coverage (§1.2.3).
-
-**Component 3 (corrosion engines).** Intended validation regime: agreement with hand-calculated ground truth for known material pairs, environments and geometries (unit tests), plus expert review of aggregate risk-band distribution on a benchmark element set — the process by which that review is conducted, and its acceptance criteria, are now formally defined in §1.2.9. Hand-calculated unit tests do not yet exist. A real, measured historical run does exist, evidenced by a persisted issue-history log (§1.4.2) — genuine output, but not yet reproducible from the current codebase on demand, and not backed by a repeatable automated test.
-
-
-### 1.2.9 The Expert Review process — roles, criteria, states and feedback cycle
-
-Two of the three components produce output that no test can validate. A unit test can prove that an extracted rule is schema-valid and executable; only a domain expert can judge whether it *means what the clause means*. A unit test can prove that a corrosion composite score matches its published formula; only an engineer can judge whether the resulting risk band is *credible* for that element. Earlier drafts asserted that "expert review" performed this function (§1.2.8) and that human-in-the-loop review guarded against LLM hallucination (§1.3.2), without defining who reviews, against what criteria, at what cadence, or what happens to the finding afterwards. This section supplies that definition. The full specification, including the process diagram, is in `docs/expert_review_process.md`.
-
-**Scope.** There are two review objects: **(A)** a candidate rule from Component 1, and **(B)** a compliance finding from Component 3 (a corrosion issue with a composite score and band) or Component 2. Component 2's evaluator is deliberately excluded as a review object: it is deterministic threshold logic whose correctness is fully decidable by unit tests, and spending scarce specialist attention on it would be a misallocation.
-
-**Roles.** Five, defined as functions rather than people, with two separation-of-duty constraints: the Extraction Author (the system itself — the LLM converter plus `RuleGenerator`) may never approve anything, and the Accountable Approver may never be the author of the amendment being approved. Between them sit the **Reviewing Expert** (a fire, MEP/public-health or corrosion specialist, depending on the clause) who scores and decides; the **BIM Coordinator**, who holds a veto on one question only — is this rule checkable against the model actually being delivered, at the agreed LOIN; the **Accountable Approver** (lead engineer or ISO 19650 Information Manager), who publishes and owns the audit trail; and the **Process Owner**, who aggregates rejections into systematic improvements and owns the extraction prompt and the engine tables. For any rule of `severity: mandatory`, the Reviewing Expert must be independent of the author of the specification being checked, so the process cannot degenerate into self-certification.
-
-**States.** Every review object moves through one state machine — `DRAFT` → `IN_REVIEW` → (`AMENDED` → `IN_REVIEW`)* → `APPROVED` → `PUBLISHED` → `SUPERSEDED`, with `REJECTED` terminal. The state is a property of the record rather than of somebody's inbox, which is what makes the process auditable after the fact. **Only `PUBLISHED` rules are evaluated by Component 2.** That single constraint is the enforcement gate whose absence is limitation #4 (§1.4.6): today `needs_review` is set, persisted and displayed, but it does not gate evaluation, so a saved-but-unreviewed rule is still checked.
-
-**Acceptance criteria.** A Reviewing Expert scores each candidate rule 1–5 on five dimensions, and a rule is approved only if every dimension scores at least 4 *and* Traceability scores 5 — there is no "approved with reservations":
-
-| Dimension | The question the expert answers |
-|---|---|
-| **Traceability** | Can I find this requirement in the cited clause, verbatim? |
-| **Semantic fidelity** | Does the rule mean what the clause means — threshold, operator, unit, scope? |
-| **IFC mappability** | Do `target`, `property_set` and `property_name` exist in the delivered model? |
-| **Executability** | Does it pass `RuleGenerator._validate()` and return PASS/FAIL, not `MISSING_DATA`? |
-| **Scope correctness** | Do `applies_when` and `exceptions` reflect the clause's qualifications? |
-
-*Table 2. The rule review rubric. For review object B the rubric becomes Input fidelity, Term plausibility, Band credibility and Action proportionality, at the same threshold.*
-
-**Coverage and agreement.** 100% of `mandatory` rules are reviewed; the remainder by a 20% random sample stratified by `rule_type`, because the failure modes observed in development cluster by rule type rather than by clause. A 20% overlap is double-reviewed to measure inter-rater agreement (Cohen's κ), and a κ below 0.6 on any dimension is treated as a defect in the *rubric* rather than in the reviewers.
-
-**The feedback cycle — the part that makes this more than a filter.** Every Reject or Amend decision is tagged with one of seven failure classes, and each class routes to a different owner: `F1-CITATION` and `F4-SCOPE` to the extraction prompt; `F2-SEMANTIC` to the prompt plus the RAG few-shot pool served by `RuleStore.get_rules_sample()`; `F3-MAPPING` to the enrichment maps in `app/modules/config.py`; `F5-GRANULARITY` to Module 1's chunking; `F6-ENGINE` to the corrosion ruleset thresholds, with the standard cited; and `F7-INPUT` to Module 2's parsing. The cycle runs on the weekly coordination rhythm — extract Monday, review Tuesday–Wednesday, triage Thursday (any failure class exceeding 10% of that week's decisions becomes a corrective action with a named owner), regress and publish Friday. The regression step is the safeguard against over-fitting: **a prompt or table change is kept only if the golden set (`eval_harness.py`'s `EVAL_CASES`) does not regress.** Five metrics are tracked per cycle — first-pass acceptance rate, amendment rate, rejection rate by class, median review time per item (target: under four minutes, which is what makes 100% coverage of mandatory rules affordable), and κ — plus a lagging sixth, defect escape rate.
-
-**Implementation status, stated plainly.** Implemented today: the `needs_review` flag and per-rule `confidence` (`RuleGenerator._apply_defaults()`), clause traceability via required `ref`/`source_text` fields in the extraction prompt, the awaiting-review query (`RuleStore.fetch_needs_review()`), the rule-type-aware schema and executability pre-check (`RuleGenerator._validate()`), and a review UI that displays rules for human inspection. Not implemented: the state machine, the enforcement gate, any record of reviewer identity, decision, rationale or failure class, and review of compliance findings (object B) as opposed to rules. The golden-set regression step is blocked by the `eval_harness.py` defect described in §1.2.8. The minimum viable implementation is small and is prioritised accordingly in §1.4.6: add a `review_state` column and gate Component 2's rule query on it, then add a review record. The first of those two schema changes, on its own, converts the human-in-the-loop claim from partially true to true.
-
----
-
-## 1.3 Development Process
-
-### 1.3.1 Model iterations and experimental evolution
-
-- **Iteration 0, Streamlit prototype.** The team's first working end-to-end system was a Streamlit application. It is not present in this repository's git history, but its influence is: the corrosion module's own `issue_tracker.py` file still carries a `"Usage in Streamlit: from modules.issue_tracker import IssueTracker"` docstring and an embedded Streamlit integration snippet, and it produced historical run-history data now represented in `public.issue_history` (see §1.4.2).
-- **Iteration 1, Mock-first pipeline.** The rule-extraction path was first built with `rule_builder_mock.py` and the CODE seed rules, letting Components 2 and 3 be developed end-to-end before the NLP layer was reliable. This mock module is now orphaned dead code.
-- **Iteration 2, Regex baseline; Iteration 3, LLM converter.** As described in §1.2.2 — a free offline regex baseline, then an OpenAI-SDK-based GPT converter behind a `USE_GPT4O` flag (CLI path), later superseded in the live web app by a separate, `litellm`-based, genuinely provider-agnostic converter. The two have not yet been reconciled (§1.4.6).
-- **Iteration 4, NLP enrichment.** Module 1 grew from keyword filtering to a layered approach, and a Module 1b semantic-annotation layer was added and wired into the live extraction service.
-- **Iteration 5, splitting the comparator from the corrosion engine.** Originally, a single galvanic-only file (`comparator/galvanic.py`) handled both roles implicitly. As crevice and MIC logic were added, the team recognised these needed a fundamentally different evaluation model (weighted composite scoring against fixed standards) from ordinary rule checking (threshold evaluation against extracted rules) — leading to `ComplianceComparator` being generalised into the operator-based evaluator described in §1.2.3, while corrosion-specific logic moved into its own `compliance_runner.py`. A fuller three-mechanism reference implementation was developed separately in `app/engines/`, but has not yet been re-integrated as the pipeline's single source of truth for corrosion (§1.4.6).
-- **Iteration 6, source-independence.** `RevitSyncService` was added specifically so `ComplianceComparator` could serve a live pyRevit integration without any change to the comparator itself — the clearest evidence in the codebase that the team was deliberately designing Component 2 as a generic, reusable evaluator rather than an IFC-only or corrosion-only tool.
-- **Iteration 7, reporting & commercial impact.** The reporter matured to include a configurable `cost_model` and `schedule_impact`, connecting each corrosion issue to a £ cost and programme-delay figure.
-- **Iteration 8, geometry-derivation and spatial-adjacency tiers.** As real IFC exports proved inconsistent about which properties were authored, `ifc_geometry.py` was extended to derive architectural dimensions (height, width, sill height, slope, corridor width, and others) directly from mesh geometry when a property was absent, and `ifc_spatial.py` was added as a separate spatial-adjacency layer (`IfcRelSpaceBoundary` parsing) to support relationship-aware checks — daylight ratio, fire separation, garage separation — that a single-element operator rule cannot express (§1.2.5).
-- **Iteration 9, discipline-based rule sorting.** As the rule library grew to include both CODE dimensional rules and corrosion mechanisms, `RuleService` gained a `THEMES`/`infer_theme()` classifier so a compliance run can be scoped to Architecture or MEP rules specifically, rather than always evaluating the full combined rule set (§1.2.3).
-- **Iteration 10, egress and graph analysis.** `ifc_egress.py` and `ifc_graph.py` were added to reason about the model as a connected graph rather than a flat element list — the former (live) for exit-count and travel-distance life-safety checks, the latter (currently disabled in the UI) for general relationship visualisation (§1.2.5).
-- **Iteration 11, from claimed capability to measured capability.** Two claims in earlier drafts were carried on assertion rather than evidence: that the geometric engine could generate clearance ("Halo") volumes for thousands of elements, and that "expert review" validated the corrosion engine's output. Both were converted into artefacts in this revision. `performance_benchmark.py` was built as a standalone harness — a Halo generator verified against analytic ground truth, then timed against real IFC models at 100/500/1 000/2 000 elements and against synthetic populations to 20 000 — and it produced a result that changed the roadmap rather than confirming the claim: Halo generation costs 1.2% of wall-clock, IFC triangulation costs 93.6%, so the highest-value optimisation is an ingestion cache, not faster geometry (§1.4.4). The Expert Review process was written up as a formal workflow with roles, a five-dimension rubric, a state machine and a classified feedback cycle (§1.2.9), which had the same clarifying effect: most of that workflow turns out not to exist in code, and naming the missing pieces made them small and schedulable rather than vague.
-- **A note on internal documentation drift.** A dated internal planning document, `docs/enhancements-plan-20260407.md`, records Modules 3, 4 and 5 as returning placeholders as of 2026-04-07; as of this submission, all three have substantial real implementations (§1.2.2–§1.2.4). This is left in the repository as an accurate record of the project's state at that date, and is cited here only to show how much of the current implementation work happened after it was written — it should not be read as a current architecture reference, and neither should `docs/INTEGRATION_GUIDE.md`, which is self-labelled as describing the pre-migration Streamlit architecture.
-
-### 1.3.2 Technical challenges and mitigation strategies
-
-- **Messy, incomplete IFC models.** Mitigation: the `ifc_quality` sub-package detects and, where safe, repairs or flags missing attributes before checking (Component 2's input quality).
-- **Architectural elements missing or mis-classified in the source model.** Beyond missing properties (handled by `ifc_quality`), some real IFC exports omit or mis-tag entire elements — a door authored as a generic proxy rather than `IfcDoor`, for instance — which silently produces a `NO_ELEMENTS` result rather than a flagged failure. Mitigation: not yet implemented; this is an open, acknowledged risk (§1.2.5) rather than a solved one, and is prioritised in §1.4.6 because it directly undermines the white-box/auditability claim if a real non-compliance goes unflagged simply because an element was tagged incorrectly upstream.
-- **Distinguishing "checking a rule" from "scoring a corrosion risk."** Not an anticipated challenge — it emerged during development, when corrosion logic outgrew what a simple operator-based rule (`>=`, `between`, etc.) could express (a composite of four weighted, standards-derived sub-scores has no natural representation as a single threshold rule). Mitigation: accept them as two separate computational models, described separately here rather than forced into one abstraction.
-- **LLM hallucination and traceability.** Mitigation in place: every extracted rule carries a `needs_review` flag and a source-clause reference, shown to a human reviewer before saving; the review process that consumes them is specified in §1.2.9 and shown working on a single clause in §1.3.4. **Not yet in place:** the flag does not currently prevent a saved-but-unreviewed rule from being evaluated by Component 2 — an open gap, prioritised in §1.4.6. §1.3.4 also shows the sharper version of this challenge: the most damaging LLM output observed was not a hallucination at all but a schema-valid, high-confidence rule pointed at the wrong IFC class, which no traceability mechanism would have caught.
-- **LLM cost and reproducibility.** Mitigation: a regex converter provides a zero-cost, fully reproducible default in the CLI path; the live path currently always calls an LLM, so this trade-off is designed but not fully realised end-to-end in production yet.
-- **Cross-jurisdiction variability.** Mitigation: rulesets are stored as named static assets in `public.static_data_assets`, so jurisdictions can in principle be added without touching engine logic — though today these assets are consumed mainly for documentation/Rule Library display, not as the live parametrisation of the corrosion engine (§1.2.4), so this mitigation is partially realised.
-- **Corrosion knowledge without training data.** Mitigation: the engines are deterministic and standards-derived, sidestepping the need for training data while remaining fully auditable.
-- **Legacy data artifacts from the Streamlit-to-FastHTML migration.** The corrosion issue-history log and the two on-disk BCF files are real but were generated by code no longer present in this repository. Mitigation in progress: treat them as historical validation evidence (§1.4.2), and re-wire `IssueTracker.record_run()` (currently defined but never called by the live app) into `compliance_runner.py` so future runs persist their own history going forward.
-- **Distributed team, many time zones.** Mitigation: a GitHub-centred workflow (issue templates, agent instruction files, Docker for reproducibility) and modular ownership per member.
-
-### 1.3.3 Key design decisions
-
-1. openBIM (IFC-in / BCF-out) over a proprietary plugin, for tool-independence and vendor-neutrality — extended by a live pyRevit push path (§1.2.3) that adds convenience without weakening the IFC-first, vendor-neutral default.
-2. **Keep rule extraction, rule comparison, and corrosion scoring as three separate components**, not one pipeline, because they solve different problems (text interpretation; arbitrary threshold evaluation; fixed standards-derived multi-factor scoring) with different failure modes and different validation regimes. This is the central architectural decision this revision makes explicit.
-3. Deterministic corrosion engines over a trained model, for auditability and because no adequate training data exists.
-4. Dual regex/LLM rule conversion, to balance cost, reproducibility and linguistic coverage — realised in the CLI path; the live web path still needs a regex fallback added to complete this design intent in production.
-5. Human-in-the-loop rule review, a responsible-AI safeguard against hallucination — the review UI exists; the enforcement gate does not yet, and is the single most important remaining item for the white-box claim to be fully true end-to-end.
-6. Composite weighted scoring with published, per-term weights for corrosion, so risk is explainable term-by-term, not a black box.
-7. **Pending decision, named explicitly:** consolidate the two rule-extraction pipelines and the multiple corrosion-engine implementations onto one canonical code path each before final submission.
-
-
-### 1.3.4 Worked example — the SS316 rule-extraction feedback loop
-
-§1.3.2 records "LLM hallucination and traceability" as a challenge mitigated by a `needs_review` flag and a source-clause reference. That is an accurate description of a mechanism and a poor description of a *process*, because it does not show what the loop actually catches. This section follows one specification clause end-to-end through extraction, validation, expert review and correction, with the artefact at each step. The full version, with every rule payload in full, is in `docs/ss316_feedback_loop_case_study.md`.
-
-**Provenance, stated before any claim is made.** Content here falls into three classes and is marked accordingly. **[verified]** — produced by executing or statically evaluating the current codebase; every claim below about `CODE_TO_IFC_MAP`, `IFC_PROPERTY_SET_MAP`, the crevice-engine tables and the `PipingElement` fixture is in this class and is reproducible from the file and symbol cited. **[designed]** — the LLM responses at each iteration; no live LLM call was made, because the API-key-dependent path cannot run in the analysis environment, so these are the failure modes the loop exists to catch, written to the schema the real prompt enforces. **[open]** — steps specified but not implemented. This section is therefore a worked example of a defined mechanism, not a transcript of a measured run, and it should be read as such.
-
-**The clause.** From a leisure-centre MEP specification: *"Pool circulation pipework within plant rooms shall be stainless steel to ASTM A312 Grade TP316L. Flanged joints shall be full-face gasketed. Pipework shall be installed with a minimum 500 mm clearance to permit seismic bracing and maintenance access."* One sentence, three requirements, and — as the loop discovers — one of them wrong. SS316 was chosen because it is the single point where all three components collide: Component 1 extracts the rule, Component 2 evaluates it, and Component 3 independently scores the same element.
-
-**Iteration 1 — a rule that was schema-valid, high-confidence, and useless.** The model returned a `standard_conformance` rule with `target: "pipework in the pool plant room"` **[designed]**. `RuleGenerator._enrich_target()` walks `CODE_TO_IFC_MAP` in insertion order and returns on the first substring match; statically evaluating that map gives `_enrich_target('pipework in the pool plant room') → 'IfcSpace'`, because the key `"room"` sits at index 39 of the 81-entry map while `"pipe"` sits at index 79 **[verified]**. The rule was silently retargeted from the pipework to the room containing it, `_enrich_property_set()` filled in the space Pset, and `_validate()` passed — `standard_conformance` requires only `target` and `desc` (`RULE_TYPE_REQUIRED_FIELDS`). The rule saved with `confidence: 0.91` and `needs_review: false`, and Component 2 returned `NO_ELEMENTS` on every subsequent run: a mandatory material requirement, silently unchecked. Rubric: T5 · S4 · **M1** · **X1** · C3 → **Rejected**, class `F3-MAPPING`. The expert's rationale is the point — *the rule is semantically right and structurally useless* — and no automated check the system has would have caught it. Two genuine defects were exposed and remain **[open]**: first-match-wins ordering lets a generic keyword pre-empt a specific one, and `IFC_PROPERTY_SET_MAP` carries **no property set for any distribution element** **[verified]**. Both are written up as a work order with a reproduction script, a proposed fix and the tests that would pin it, in `docs/defects/defect_report_map_ordering.md`, which also records a sharper instance found while preparing it: `_enrich_target('duct in the riser room')` returns `IfcStairFlight`, because `"riser"` is a stair keyword at index 3 and a services term in every MEP specification written.
-
-**Iteration 2 — a rule that checked the wrong scope.** With `target: "IfcPipeSegment"`, the rule became structurally sound but carried `applies_when.location: "any"` and had dropped the gasket requirement entirely **[designed]**. Rubric: T5 · S4 · M4 · X4 · **C2** → **Amended**, class `F4-SCOPE`. A scoped requirement turned into a blanket one generates false failures on every pipe in the building, which destroys reviewer trust faster than a missed check does. Per the state machine (§1.2.9), the amendment required a second independent reviewer rather than self-approving.
-
-**Iteration 3 — where the loop earned its keep.** The third iteration passed the rubric, was published, and Component 2 returned **PASS**: the modelled material is SS316L, exactly as specified. Component 3 scored the same element **Critical**. Both are correct. The `PipingElement` fixture for this case carries `pren: 25.2`, `EnvironmentClass.T3_CHLORIDE`, `JT004_FLANGED_FULL_GASKET` and 28 °C **[verified, `piping_schema.py`]**; a full-face gasketed flange in chloride service is a textbook crevice geometry, and CC-001's own validation suite contains the directly comparable scenario *"SS316 weld-neck flange in pool plant room, 35 °C — expected: Critical"* **[verified, `bimguard_crevice_engine.py`]**. The contractor installed exactly what was specified, and SS316 at PREN 25.2 is under-specified for chloride service — which is why `compliance_runner.py`'s mitigation path recommends duplex 2205 for `swimming_pool` and `coastal` environments **[verified]**. **The specification itself was the defect.** That finding is only visible because rule evaluation and standards-derived scoring were kept as separate components (§1.3.3, decision 2); a single merged pipeline treating the specification as ground truth would have returned PASS and stopped. This is the strongest evidence in the project for that architectural decision.
-
-**Iteration 4 — the correction.** The clause was revised to a performance requirement and re-extracted, and the published rule changed shape in three ways that generalise **[designed]**: `standard_conformance`/`conforms_to` became `numeric_comparison` on `PREN >= 32`, because a named grade is a proxy for a property and only the property is genuinely checkable; `fallback_property: "Material"` was populated so the rule degrades to a grade check rather than to `MISSING_DATA` on the majority of IFC exports that will not carry a `PREN` property — the same property-then-geometry fallback philosophy `ifc_geometry.py` applies to architectural dimensions (§1.2.5); and the expert set `needs_review: true` *despite* `confidence: 0.88`, overriding the model's own confidence in the conservative direction because the exception clause is a judgement call. Re-scoring the amended element (duplex 2205, PREN 35) moves the CC-001 band from Critical to Medium, consistent with the engine's own `CC-VAL-003` scenario **[verified]**.
-
-**Three transferable findings.** (1) A rule can be schema-valid, high-confidence and useless; the only thing between iteration 1 and a silently unchecked mandatory requirement was a human asking whether it could be checked against the model, which is why IFC-mappability is a rubric dimension with its own veto holder. (2) The most valuable output of the whole example was a *disagreement between components*, not a failure — the case for keeping the three components separate. (3) `standard_conformance` rules are a smell: any clause naming a grade, product or standard should be interrogated for the underlying measurable property, because a grade-based rule can only string-match and therefore cannot detect correct compliance with an incorrect specification.
-
-**And one uncomfortable finding.** The loop as exercised here depends at four separate points on a human doing something the codebase does not record: assigning a review, scoring a rubric, tagging a failure class, and promoting an amended rule into the RAG example pool. Those four gaps are exactly the minimum viable implementation listed in §1.2.9, and this example is the argument for building them.
-
----
-
-## 1.4 Results and Discussion
-
-**Data-provenance note.** This section separates results by component, and distinguishes three evidence tiers used throughout: **(a) reproducible today** — running current code now produces this; **(b) genuine historical evidence** — real, measured output exists on disk from an earlier working version of the pipeline, but current code cannot yet regenerate it; **(c) pending** — specified but not yet executed.
-
-### 1.4.1 Component 2 — generic comparator: what is genuinely demonstrated today
-
-**Tier (a).** The comparator is live and exercised by two independent, real entry points: an uploaded-IFC flow (`analyze.py`) and a live pyRevit push (`revit_sync.py`), both producing the same `ComplianceReporter` visual summary. This demonstrates the source-independence design goal (§1.2.3) is genuinely met, not just intended. What is not yet available is an aggregate accuracy benchmark — e.g., "of N rule × element evaluations, M matched an independently hand-checked expected result" — because no such benchmark has been built yet (§1.2.8). This is scoped as pre-final-submission work.
-
-### 1.4.2 Component 3 — corrosion engine: what is genuinely demonstrated today
-
-**Tier (b), corrected from an earlier draft of this report.** Historical run-history records now represented in `public.issue_history` were inspected directly. They contain tracked elements (`IfcPipeSegment`, `IfcPipeFitting`, `IfcFastener`, `IfcHeatExchanger`, `IfcDuctSegment`, `IfcValve`, and others) with per-element event logs (`raised`/`resolved`, each carrying a real `composite_score` and `risk_band`), timestamped **2026-04-09, 18:44–18:47 UTC**. Filtering to currently-open (unresolved) issues gives exactly:
-
-| Risk band | Open issue count |
-|---|---|
-| Critical | 9 |
-| High | 7 |
-| Medium | 9 |
-| **Total open** | **25** |
-
-*Table 3. Currently-open corrosion issues, computed from historical records now represented in `public.issue_history`.*
-
-This **exactly matches** the "9 Critical / 7 High / 9 Medium, 25 issues" figures repeated in earlier drafts — those numbers are not invented. They are genuine measured output from a real compliance run. However: the module that wrote this file (`issue_tracker.py`) explicitly documents itself as a Streamlit-era component (`"Usage in Streamlit: from modules.issue_tracker import IssueTracker"`), and a repo-wide search confirms `IssueTracker.record_run()` is **never called anywhere in the current FastHTML `app/`** — meaning this specific result predates the present architecture and cannot be regenerated by running today's code. The two genuine, non-empty BCF export files on disk (`data/compliance_project_1.bcf`, 77 zip entries; `data/compliance_project_3.bcf`, 146 entries — both dated to the same session) are consistent with this same historical run. The modelled £170,600 cost and 162-working-day schedule-delay figures reported in earlier drafts could not be independently re-derived from any persisted file in the repository (cost/schedule outputs are not saved to disk by the current `cost_model.py`/`schedule_impact.py`), so they are reported here as **unverified pending figures**, distinct from the risk-band counts above, which are verified.
-
-**Interpretation.** The corrosion scoring design works, and has been proven to work once, on real (or realistic) MEP element data — that is a stronger claim than "the code is untested," and a fairer one than "the numbers are fabricated." The concrete, scoped task before final submission is to (1) restore or reimplement the write path so a fresh run of `compliance_runner.py` persists its own BCF export and issue history the way the Streamlit prototype did, (2) re-run it — ideally against the same input data if it can be identified, or a clearly-labelled new benchmark otherwise — and (3) regenerate the cost/schedule figures from that fresh run so every number in this report is tier (a), reproducible today.
-
-**Planned visualisations (to render once the fresh run above is complete):** stacked bar of risk-band counts by mechanism (GC/CC/MIC); heatmap of galvanic voltage-gap × environment class; cost/schedule waterfall by risk band.
-
-### 1.4.3 Component 1 — rule-extraction accuracy: structure final, execution pending
-
-**Tier (c).** Both scoring regimes described in §1.2.8 are specified and partially coded, not executed:
-
-**(a) Information-extraction metrics (per rule field, regex vs. LLM):**
-
-| Path | Precision | Recall | F1 | Notes |
-|---|---|---|---|---|
-| Regex baseline (CLI path) | *pending* | *pending* | *pending* | Metric computation not yet coded in `eval_harness.py` |
-| LLM converter (live path, `gpt-4o-mini` default) | *pending* | *pending* | *pending* | Same |
-
-**(b) LLM-as-judge scores (1–5 per dimension):**
-
-| Dimension | Regex | LLM |
-|---|---|---|
-| Correctness | *pending* | *pending* |
-| Completeness | *pending* | *pending* |
-| Executability | *pending* | *pending* |
-
-*Tables 3–4. Methodology and golden set (8 `EVAL_CASES`) are finalised; a known `AttributeError` bug and the missing precision/recall/F1 computation must be fixed before these can be populated with a genuine run.*
-
-**Expected finding (hypothesis to confirm with the run):** the regex baseline should show higher precision but lower recall; the LLM path should improve recall at a per-call cost and with occasional over-extraction — the trade-off, not a single "best" path, remains the intended result.
-
-### 1.4.4 Shared infrastructure — Halo spatial reservation: measured performance
-
-**Tier (a), and new in this revision.** An earlier draft recorded the "Halo" volumetric-clearance capability as conceptual. It is no longer purely conceptual: a working generator and a benchmark harness now exist (`performance_benchmark.py`), and this section reports what they measure. Two boundaries must be stated before any figure is read. First, the generator is a **standalone prototype** — it is not imported by any route or module, and producing clearance volumes is not part of any user-facing workflow today. Second, the *ingestion* figures below are not prototype figures at all: they measure the same `ifcopenshell.geom` path the live pipeline already uses for every compliance check, so they characterise the platform as it stands.
-
-The question being answered is a specific one, raised at examination: how does the geometric engine handle high-poly IFC geometry when generating thousands of Halo volumes simultaneously? The full characterisation, including threats to validity, is in `docs/benchmarks/halo_performance_analysis.md`; the headline results follow.
-
-**Statistical treatment.** Every scenario was run **n = 7 times end to end**, re-parsing and re-triangulating the source model on each repeat, and results are reported as the **median with the inter-quartile range**. The median and IQR are used rather than the mean and standard deviation because a benchmark timing is bounded below by the true cost of the work and unbounded above by scheduler interference on a shared virtual host: the distribution is right-skewed, and a single stall drags the mean while leaving the median untouched. Quantities that must not vary between repeats — triangle counts, volumes, interfering-pair counts — are checked for agreement across all seven runs rather than averaged, and **that check passed without exception on every scenario**, confirming that only wall-clock and resident memory vary between runs. Two metrics out of 88 exceeded a 20%-of-median IQR and are named in §1.4.6, limitation 20; neither carries an argument made here.
-
-**Correctness before performance.** Timing an incorrect generator measures nothing, so `performance_benchmark.py --validate` first verifies every primitive at every level of detail against analytic ground truth. All nine primitive/LOD combinations are watertight (every directed edge matched against its reverse by vertex position). Box Halos are checked against the Steiner formula for a box Minkowski-summed with a sphere: LOD 200 gives 13.4640 m³ against an exact 12.0434 m³ (**+11.8%**, a systematic and deliberately conservative over-reservation, since a plain enlarged box has square corners where the true offset surface is filleted), while LOD 300 and LOD 400 converge upward from below at 0.9613 and 0.9900 of exact, as inscribed polyhedral approximations must.
-
-**Measured scaling.** Host: 4-core x86-64 Linux VM, 15.7 GB RAM, Python 3.12, IfcOpenShell 0.8.5. Source model for the single-model scenarios is `BUILDING_R4.ifc` (IFC4, 2 602 products, 2 589 carrying geometry).
-
-| Scenario | Source | Elements | Parse (s) | Triangulate (s) | Halo gen (s) | Halos/s | Halo arrays (MB) |
-|---|---|---:|---:|---:|---:|---:|---:|
-| S-100 | IFC | 100 | 1.53 (0.14) | 1.84 (0.07) | 0.038 (0.001) | 2,660 | 0.21 |
-| S-500 | IFC | 500 | 1.54 (0.10) | 14.43 (0.33) | 0.202 (0.032) | 2,479 | 1.06 |
-| S-1000 | IFC | 1,000 | 1.55 (0.09) | 30.10 (1.54) | 0.386 (0.007) | 2,591 | 2.13 |
-| S-federated | IFC ×4 | 1,999 | 6.29 (0.62) | 53.42 (2.29) | 0.755 (0.026) | 2,647 | 4.23 |
-| S-scale2000 | synthetic | 2,000 | — | — | 0.468 (0.004) | 4,274 | 4.15 |
-| S-scale10000 | synthetic | 10,000 | — | — | 2.460 (0.096) | 4,065 | 20.74 |
-| S-scale20000 | synthetic | 20,000 | — | — | 5.116 (0.169) | 3,910 | 41.47 |
-
-*Table 4. Halo generation at increasing element counts, LOD 300, 500 mm buffer. Medians of n = 7 runs, inter-quartile range in parentheses. The federated scenario loads four genuinely distinct IFC files — architectural, institutional, residential and infrastructure-plumbing — and detects interference across model boundaries (3 916 cross-model interfering pairs). Synthetic scenarios use a deterministic element lattice and are reported separately because the repository's largest fixture cannot supply more than 2 589 elements; they are never averaged with the IFC-backed rows. Resident-memory growth stayed at or below 0.3 MB in every scenario and is omitted for that reason.*
-
-**The principal finding is that the premise of the concern was inverted.** Halo generation is not the bottleneck and is not close to being it:
-
-| Scenario | IFC ingest (parse + triangulate) | Halo generation | Interference detection |
-|---|---:|---:|---:|
-| S-100 | **98.8%** | 1.10% | 0.06% |
-| S-1000 | **98.6%** | 1.20% | 0.23% |
-| S-federated | **98.5%** | 1.25% | 0.25% |
-| S-scale20000 (no ingest stage) | — | 87.5% | 12.5% |
-
-*Table 5. Share of wall-clock by pipeline stage, computed from the stage medians. Shares are taken against the sum of the stage medians rather than the median of the per-run totals, because medians are not additive. IFC ingestion dominates every run that touches a real model; Halo generation is a rounding error against it.*
-
-![Stage share of wall-clock across every benchmark scenario](benchmarks/fig6_bottleneck.png)
-
-*Figure 1. Share of wall-clock by stage across all eleven scenarios, from the medians of n = 7 runs. The IFC-backed runs (left) are dominated by ingestion; the synthetic scale-out runs (right) have no ingestion stage by construction, which is what exposes the true relative cost of generation and interference detection.*
-
-The 2 000-element federated coordination run completes in a median 60.6 s end-to-end, of which 0.76 s is spent generating Halos and 53.4 s reading geometry out of IFC. The risk in "thousands of Halo volumes" is not the Halos; it is that thousands of high-poly elements must first be triangulated — a cost the platform already pays today for every compliance check, whether or not Halos are involved.
-
-**Why high-poly source geometry does not propagate.** Two measured properties explain this, and together they constitute the answer to the examiner's question:
-
-1. **Halo cost is O(1) in the source element's polygon count**, because the Halo is generated from the element's bounding box rather than from its triangulation. A 40 000-triangle imported valve and a 12-triangle extruded pipe produce identically priced Halos. Per-element generation cost is close to constant across a tenfold range: 234 µs at 2 000 elements rising to 256 µs at 20 000, a **9% drift** consistent with allocator and cache pressure as the retained mesh population grows, and small enough that a linear model remains a good predictor.
-2. **The Halo layer is smaller than the geometry it wraps.** Generating a Halo for all 1 000 elements of a 533 320-triangle model adds 112 000 Halo triangles — an amplification of **0.21×** at LOD 300 and 0.02× at LOD 200. Halos do not multiply high-poly geometry; they replace it with a small, uniform-cost proxy. Peak memory tracks element count, not source polygon count: resident growth during generation stayed at or below 0.3 MB in every scenario, because source triangulations are discarded as consumed and only a centroid and bounding box (roughly 100 bytes) are retained per element.
-
-**A negative result, reported because it changes the recommendation.** Interference detection was implemented twice — a uniform spatial hash grid (expected O(n) for bounded spatial density) and an exhaustive O(n²) AABB test — and both were measured. At the scales the real fixtures supply, **the grid is slower**: 0.5×–0.9× of exhaustive testing below 2 000 volumes, because a pure-Python O(n) algorithm loses on constant factors to a NumPy-vectorised O(n²) one. The crossover sits between 1 000 and 2 000 volumes, after which the asymptotics assert themselves: 3.2× at 2 000, 5.5× at 5 000, 8.8× at 10 000, and 12.9× at 20 000 (a median 0.73 s against 9.41 s). The correct design is therefore a hybrid — vectorised exhaustive testing below ~2 000 Halos, hash-grid broad-phase above — and committing to the grid unconditionally, as an asymptotic argument alone would suggest, would have made ordinary coordination runs measurably slower.
-
-![Scale-out to 20 000 Halo volumes and the broad-phase crossover](benchmarks/fig7_scaleout.png)
-
-*Figure 2. Scale-out to 20 000 Halo volumes (log–log axes), medians of n = 7 with inter-quartile error bars. The crossover where the spatial hash grid overtakes vectorised exhaustive pair testing sits between 1 000 and 2 000 volumes; generation remains close to linear throughout. The remaining figures — stage cost, throughput, memory footprint, and the level-of-detail trade-off — are in `docs/benchmarks/` (`fig1`–`fig5`), with ready-to-paste captions in `halo_benchmark_summary.md`.*
-
-**Level of detail is the main available cost lever.** LOD 200 produces 12 triangles per box Halo against LOD 300's 112 and LOD 400's 336, and runs **19× faster** (a median 0.020 s against 0.386 s per 1 000 Halos) — at the cost of the +11.8% over-reservation quantified above. This supports a two-pass strategy: LOD 200 across the whole model, escalating to LOD 400 only on flagged elements.
-
-**Extrapolation, and the verdict on the claim.** Holding hardware constant, and marking measured against extrapolated: 10 000 Halos take a median 2.46 s to generate (measured) and occupy 20.7 MB (measured), with interference detection at 0.27 s (measured); 50 000 would take approximately 12.8 s and 104 MB (extrapolated from the 256 µs per-element cost measured at 20 000). The claim that the engine can generate thousands of Halo volumes simultaneously therefore **holds, with a large margin**. What does not hold is the implicit assumption that generation is the difficult part: at 10 000 elements a cold run spends roughly 301 s in triangulation against 2.46 s making Halos, a ratio of about **122:1**.
-
-**What this implies for the roadmap.** The highest-value optimisation is not in the geometry code at all. Halo generation needs only `(guid, centroid, bbox, ifc_type)` per element — about 100 bytes. Persisting that per model version turns every run after the first from ~301 s into ~2.5 s at 10 000 elements, removing 98% of wall-clock without writing any new geometry. Incremental re-triangulation of only the GUIDs that changed between model drops compounds it, and fits the weekly coordination cycle the platform targets. On this evidence, evaluating `trimesh` as an additional backend (§1.4.6, improvement 13) is premature for *generation* — the current `ifcopenshell.geom` + NumPy stack produces roughly 4 000 watertight Halos/s — though it would earn its place for exact narrow-phase boolean testing, which the current conservative AABB mid-phase does not provide.
-
-**Threats to validity, stated plainly.** Seven repeats give a stable median and a usable IQR but say little about worst-case latency, which is what a user feels on a bad run; nothing here models a tail percentile. The first repeat of each scenario is systematically the slowest — cold file cache, cold allocator — and was deliberately not discarded as a warm-up, since a user's first run is also cold, which slightly inflates the reported spread. Measurements come from a single 4-core host, and the interpreter changed between this run and the earlier single-run draft (Python 3.12 against 3.12.3), so the two sets must not be mixed; every figure in this section comes from the n = 7 run. The source models are architectural rather than MEP-dense, so most Halos took the rounded-box path; a real plant room would be faster per element but spatially denser. The synthetic elements sit on a uniform lattice, whereas real buildings cluster, which flatters the uniform grid — so the crossover point above should be re-measured on a large real model before being treated as settled. Interfering-pair counts are upper bounds, because the mid-phase is a conservative AABB overlap test rather than exact mesh intersection. And bounding-box-derived Halos over-reserve for diagonal braces and swept bends — the correct direction for a clearance check, but a source of false positives that swept-solid Halos would avoid.
-
-### 1.4.5 Interpretation in relation to AECO workflows
-
-BIMGuard AI is designed to slot into the weekly BIM coordination cycle ("model-drop day") as an automated digital inspector, closing the interpretation gap through Components 1+2 together and the corrosion-blindness gap through Component 3 alone. The source-independent comparator (§1.4.1) already demonstrates that a coordination team could run the same rule checks whether their workflow is IFC-export-based or native-Revit-based — a practical convenience beyond the strict openBIM framing. The corrosion engine's historical run (§1.4.2) demonstrates, on real measured output, the core value claim of the corrosion-blindness gap: 25 open issues spanning Critical to Medium bands on a modest element set is a materially large hit rate, supporting the argument that dissimilar-metal and crevice conditions are common enough to justify systematic, design-stage checking — precisely the class of risk invisible to geometric clash detection.
-
-### 1.4.6 Implications, limitations and potential improvements
-
-**Implications.** Design-stage detection of corrosion and code non-compliance shifts intervention left, where it is cheapest, and creates a machine-readable, auditable compliance record aligned with ISO 19650 and, for UK higher-risk buildings, the Building Safety Act "golden thread." Keeping rule extraction, rule comparison, and corrosion scoring as separate, independently-assessable components (rather than one pipeline) is itself a defensible architectural contribution: each can be validated, improved, or replaced without destabilising the others.
-
-**Limitations, stated plainly:**
-1. Component 3's corrosion engine covers two of three designed mechanisms live (galvanic, crevice); MIC is implemented but not integrated.
-2. Four independent implementations of galvanic/crevice-style scoring exist across the codebase, with only `compliance_runner.py` live; consolidation is needed, ideally parametrised directly from static asset payloads in `public.static_data_assets`.
-3. Component 1 has two implementations (CLI orchestrator vs. live `RuleExtractionService`); only the latter is reachable from the web UI.
-4. `needs_review` (Component 1) does not yet gate which rules Component 2 evaluates.
-5. Component 3's headline validation figures are genuine historical measurements (§1.4.2) but from a predecessor codebase; the current FastHTML pipeline has not yet reproduced them, and its BCF/issue-history write path needs restoring.
-6. Precision/recall/F1 for Component 1 is not implemented in `eval_harness.py`, which also has a blocking bug.
-7. Component 2 has no dedicated unit tests for its ten operators, despite being simple, pure-functional code that would be cheap to cover.
-8. No continuous integration is configured; the existing 57-function pytest suite runs manually only, and `test_compliance.py` targets a stale REST API shape.
-9. The BERT-based normative-sentence classifier (Component 1) ships with no fine-tuned model artifact and is not active in production.
-10. Rule extraction is validated only on CODE dimensional clauses, not the full breadth of codes; cost/schedule figures rely on hardcoded default UK rates rather than a checked-in, editable CSV.
-11. Architectural elements that are missing or mis-classified in the source IFC (e.g., a door modelled as a generic proxy) are not detected — the comparator reports `NO_ELEMENTS` rather than flagging a likely false negative (§1.2.5).
-12. Rule citations (`ref`) are plain text, not hyperlinks — there is no click-through to the source clause or to modelling guidance for elements that return `MISSING_DATA` (§1.2.3).
-13. Human-in-the-loop review currently covers extracted rules only; compliance results (comparator failures and corrosion issues) have no reviewer sign-off field or workflow (§1.2.3).
-14. Wall/slab thickness is not yet an explicit checked rule despite being a common regulatory measure (fire compartmentation, structural minimums) and despite a default value already existing in the `ifc_quality` improver's repair table (§1.2.5).
-15. The IFC relationship graph visualisation (`ifc_graph.py`) is fully built (networkx + pyvis, violation highlighting) but is currently switched off behind a placeholder card in the live results page (§1.2.5).
-16. `app/services/bcf_exporter.py` has a broken import (`app.models.compliance_models` does not exist) and would fail if anything called it; it currently has no callers, so the break is latent rather than user-facing, but it is dead code that should be fixed or removed (§1.2.6).
-17. The richest corrosion data contract in the codebase, `PipingElement` (`piping_schema.py`), has no producer — `ifc_parser.py` never constructs one from real IFC data — so its one real consumer, `galvanic.py`, can only ever run against three hand-written example fixtures (§1.2.4).
-18. The two rule-extraction implementations default to different LLM models (`gemini/gemini-2.0-flash` in the deployed environment vs. `gpt-4o-mini` in the CLI path's `config.py`), which is a further symptom of the two paths never having been reconciled (§1.2.7).
-19. The Halo generator is a benchmarked prototype, not a feature: `performance_benchmark.py` is not imported by any route or module, so no user can currently produce a clearance volume through the application (§1.2.5, §1.4.4).
-20. The benchmark now reports medians and inter-quartile ranges over n = 7 repeats, which removes the single-run caveat of the previous draft, but it still runs on a single 4-core host and reports no tail percentile, so worst-case latency is uncharacterised. Two metrics out of 88 exceeded a 20%-of-median IQR: broad-phase interference in the LOD 200 scenario (21% of a 0.049 s median — host noise, since the same figure is stable at LOD 300 and 400 in that scenario), and resident-memory growth at 20 000 volumes (107% of a 0.29 MB median — a relative spread that is large only because the absolute value is near zero). Neither carries a conclusion. The broad-phase crossover point was located partly on synthetic elements laid out on a uniform lattice, which flatters a uniform spatial grid relative to the spatial clustering of a real building, and should be re-measured on a large real model.
-21. `RuleGenerator._enrich_target()` resolves an element name by first-substring-match over `CODE_TO_IFC_MAP` in insertion order, so a generic keyword pre-empts a specific one: `'pipework in the pool plant room'` resolves to `IfcSpace`, because `"room"` sits at index 39 of the 81-entry map and `"pipe"` at index 79. The rule then validates, saves and silently returns `NO_ELEMENTS` forever (§1.3.4).
-22. `IFC_PROPERTY_SET_MAP` carries no property set for any distribution element. Of its 20 keys, four are MEP terminals (`IfcSanitaryTerminal`, `IfcAlarm`, `IfcSensor`, `IfcFlowTerminal`), but `IfcPipeSegment` and `IfcDuctSegment` are reachable from `CODE_TO_IFC_MAP` with no Pset entry, and `IfcValve`, `IfcPump` and `IfcPipeFitting` appear in neither map — so `_enrich_property_set()` cannot auto-fill a property set for a pipe, duct, valve, pump or fitting rule (§1.3.4, `docs/defects/defect_report_map_ordering.md`).
-23. The Expert Review process is now formally defined (§1.2.9) but largely unbuilt: there is no state machine, no enforcement gate, no record of reviewer identity, decision, rationale or failure class, and no review path for compliance findings as opposed to rules.
-
-**Improvements, in priority order for the final submission:**
-1. Add unit tests for `ComplianceComparator`'s ten operators (Component 2) — cheapest, highest-confidence item on this list.
-2. Restore/reimplement the corrosion engine's BCF and issue-history write path, then re-run it and the aggregate benchmark to convert §1.4.2 from tier (b)/(c) evidence to tier (a).
-3. Fix `eval_harness.py` (the `generate_rules` bug), implement precision/recall/F1, then run it to populate §1.4.3.
-4. Wire the MIC engine into `compliance_runner.py`, ideally reading tables from static asset payloads in `public.static_data_assets` instead of hardcoded Python tables.
-5. Reconcile the two rule-extraction pipelines into one, and add a regex-only fallback mode to the live LLM path.
-6. Add the `needs_review` gate to Component 2's rule query so only approved rules are evaluated.
-7. Add a GitHub Actions workflow to run the existing pytest suite on every push, and fix or retire `test_compliance.py`.
-8. Validate on a real federated data-centre model; expand the golden rule set across jurisdictions; render a real BCF snapshot image instead of the placeholder pixel.
-9. Build heuristics or geometry-based reclassification to catch architectural elements that behave like a door/window/stair but are not correctly tagged in the source IFC, closing the false-negative path described in §1.2.5.
-10. Add the two planned hyperlinks per rule result — source-clause citation and buildingSMART/BIMGuard modelling guidance — so a `MISSING_DATA` result becomes actionable rather than opaque (§1.2.3).
-11. Extend `needs_review`-style human sign-off from rules to results, so a reviewer can accept/dismiss individual comparator and corrosion issues before a report is finalised (§1.2.3).
-12. Add explicit thickness rules (wall/slab) to the seed set, and extend the discipline-sorted results view (§1.2.3) to show a combined Architecture + MEP report rather than one theme at a time.
-13. Do **not** add `trimesh` as a geometry backend for Halo generation. The benchmark settles a question earlier drafts left open: the current `ifcopenshell.geom` + NumPy stack produces 3 900 watertight Halos per second and generation is 1.2% of wall-clock (§1.4.4), so a second backend would optimise the wrong stage. Reconsider it only for exact boolean narrow-phase intersection testing, which the current conservative AABB mid-phase does not provide (§1.2.5).
-14. Re-enable `ifc_graph.py`'s pyvis visualisation in `analyze.py` — the graph-building logic already works, so this is presentation wiring, not new engineering (§1.2.5).
-15. Fix or remove `bcf_exporter.py`'s broken `app.models.compliance_models` import (§1.2.6).
-16. Give `ifc_parser.py` a real `PipingElement` producer so `galvanic.py` (§1.2.4) can run against actual parsed IFC data instead of only its example fixtures — the more standards-faithful path to a single, unified corrosion engine.
-17. Standardise on one default LLM model across both rule-extraction paths (§1.2.7), and document the choice explicitly rather than leaving it implicit in environment variables.
-18. **Cache IFC ingestion per model version.** On the benchmark evidence this is the single highest-value optimisation available anywhere in the platform, and it is not a geometry change: Halo generation needs only `(guid, centroid, bbox, ifc_type)` — roughly 100 bytes per element — so persisting that turns every run after the first from ~290 s into ~2.5 s at 10 000 elements, removing 93% of wall-clock (§1.4.4). Compound it with incremental re-triangulation of only the GUIDs that changed between model drops.
-19. Fix the `_enrich_target()` ordering defect — match longest key first, or on word boundaries — and add MEP property sets to `IFC_PROPERTY_SET_MAP`. Both are small, and limitations 21 and 22 show they cause silent false negatives rather than visible errors, which is the worst failure mode for a compliance tool.
-20. Adopt the hybrid interference strategy the benchmark identifies: vectorised exhaustive AABB testing below ~2 000 Halos, hash-grid broad-phase above it (§1.4.4). Committing to the grid unconditionally, as an asymptotic argument alone would suggest, measurably slows ordinary coordination runs.
-21. Build the Expert Review minimum viable implementation in the order given in §1.2.9 — `review_state` column and evaluation gate first, review record second. The first item alone converts improvement 6 above from a flag into an enforced control, and is the smallest change on this list with the largest effect on the white-box claim.
-22. Integrate the Halo prototype behind the existing analysis route so clearance volumes become a user-facing capability rather than a benchmarked one, defaulting to LOD 200 for the whole-model pass and escalating to LOD 400 on flagged elements, with the +11.8% conservative bias of the coarse pass documented in the UI (§1.4.4).
-
----
-
-## 1.5 References and Appendices
-
-### References (APA 7th ed., to be finalised)
-
-buildingSMART International. (2020). *Industry Foundation Classes (IFC) and BIM Collaboration Format (BCF 2.1)*. https://www.buildingsmart.org/
-
-Dimyadi, J., & Amor, R. (2013). Automated building code compliance checking, where is it at? *Proceedings of CIB WBC 2013*.
-
-Eastman, C., Lee, J., Jeong, Y., & Lee, J. (2009). Automatic rule-based checking of building designs. *Automation in Construction, 18*(8), 1011–1033.
-
-Fuchs, S., et al. (2023). *[LLM-based extraction of building-code requirements — full citation to be verified before final submission]*.
-
-Gallaher, M. P., O'Connor, A. C., Dettbarn, J. L., & Gilday, L. T. (2004). *Cost analysis of inadequate interoperability in the U.S. capital facilities industry* (NIST GCR 04-867). NIST.
-
-ISO. (2018). *ISO 19650-1:2018, Organisation and digitisation of information about buildings and civil engineering works*. International Organization for Standardization.
-
-ISO. (2018). *ISO 16739-1:2018, Industry Foundation Classes (IFC)*. International Organization for Standardization.
-
-Koch, G., et al. (2016). *International measures of prevention, application, and economics of corrosion technologies (IMPACT)*. NACE International.
-
-NFPA. (2023). *NFPA 70: National Electrical Code*. National Fire Protection Association.
-
-Zhang, J., & El-Gohary, N. M. (2017). Integrating semantic NLP and logic reasoning into a unified system for fully automated code checking. *Automation in Construction, 73*, 45–57.
-
-Zheng, Z., et al. (2022). *[LLM/transformer rule extraction for compliance — full citation to be verified before final submission]*.
-
-**Engineering standards referenced by the corrosion engines:** NASA-STD-6012; EN ISO 15329:2007; ASTM G48 Method B; CIRIA C692; IMOA Design Manual (4th ed.); CIBSE Guide G; CIBSE TM13:2013; HSE HSG274; BS 8552:2012; ASTM G-187; EN 1993-1-4; EN ISO 9308-1; WHO Guidelines for Drinking-Water Quality (4th ed.).
-
-### Appendices
-
-- **Appendix A — Source code repository.** `github.com/maicen/bim-guard` (verified `origin` remote). Component map: rule extraction (`app/services/rule_extraction_service.py`, `app/modules/document_parsing/`, `nlp_annotation/`, `rule_builder/`); generic comparator (`app/modules/comparator/__init__.py`, `app/services/revit_sync_service.py`); IFC ingestion, geometry, spatial adjacency and egress analysis (`app/modules/ifc_reader/ifc_parser.py`, `ifc_geometry.py`, `ifc_spatial.py`, `ifc_egress.py`, `ifc_graph.py`, `ifc_quality/`, `piping_schema.py`); corrosion engine (`app/modules/comparator/compliance_runner.py`, `galvanic.py`, `app/engines/`); application shell (`app/routes/projects.py`, `viewer.py`, `app/services/documents_service.py`, `object_storage.py`).
-- **Appendix B — Rulesets (JSON).** DB-backed static assets for `ruleset:BIMGUARD-GC-001`, `ruleset:BIMGUARD-CC-001`, and `ruleset:BIMGUARD-MC-001` in `public.static_data_assets` — each a versioned specification (`ruleset_version: "1.0.0"`) with real, detailed material tables, thresholds, weights, an explicit risk-band-to-BCF-action mapping, and 6–8 cited standards per mechanism. Currently consumed for Rule Library documentation/display, not as the live parametrisation of the corrosion engine itself (§1.2.4, §1.4.6 improvement #4).
-- **Appendix C — Scoring models.** GC-001, CC-001, MC-001 composite formulas and risk-band definitions as implemented in `app/engines/` (reference implementation) — see §1.2.4 for how these differ from the tables actually executed by `compliance_runner.py` in production.
-- **Appendix D — Evaluation harness, tests, and historical run data.** The maintained pytest suite is in `tests/`; the research-only golden-set and LLM-as-judge harness remains in `app/modules/tests/eval_harness.py` — see §1.2.8 and §1.4.6 for fixes needed. Historical corrosion-engine run history is now represented in `public.issue_history`, the evidentiary basis for §1.4.2.
-- **Appendix E — Sample data.** IFC reference models in the private `bim-guard-artifacts` Supabase Storage bucket, materialized only into the ignored runtime cache: Pacific Continental Residence (IFC4.3 RV + IFC2x3 CV), AC20-Institute, Infra-Plumbing, and others. Genuine BCF outputs: `data/compliance_project_1.bcf`, `data/compliance_project_3.bcf`.
-- **Appendix F — Performance benchmark and process documentation.** `performance_benchmark.py` (Halo generator, analytic self-validation via `--validate`, and the scenario harness) with its outputs in `docs/benchmarks/`: `halo_benchmark_results.json` (including host metadata for reproducibility), `halo_benchmark_results.csv`, `halo_benchmark_summary.md`, seven figures (`fig1`–`fig7`), and the full characterisation with threats to validity in `halo_performance_analysis.md` — the evidentiary basis for §1.4.4. Process documentation: `docs/expert_review_process.md` (roles, state machine, rubric, failure taxonomy, cadence and process diagram — §1.2.9) and `docs/ss316_feedback_loop_case_study.md` (the worked feedback-loop example — §1.3.4). Benchmark dependencies are declared in the `bench` group of `pyproject.toml`; reproduce with `uv sync --group bench && uv run python performance_benchmark.py`.
-````
 
 ---
 
