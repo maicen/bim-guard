@@ -96,14 +96,10 @@ def test_graph_routes_endpoints():
     app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
 
     try:
-        # Test proof graph endpoint
+        # Proof graph endpoint: no analysis has ever run for this project, so
+        # no slug's cached result contains ISSUE-99 -- 404, not a fabricated stand-in.
         res = client.get("/api/graph/101/proof/ISSUE-99")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["issue_id"] == "ISSUE-99"
-        assert "nodes" in data
-        assert "edges" in data
-        assert "explanation" in data
+        assert res.status_code == 404
 
         # Test status endpoint with no file (graceful fallback)
         with patch("app.services.models_service.ModelsService.resolve_primary_path", return_value=None):
@@ -121,5 +117,41 @@ def test_graph_routes_endpoints():
             assert tree_data["project_id"] == 101
             assert tree_data["root"] is None
 
+    finally:
+        app.dependency_overrides.pop(get_project_access_checker, None)
+
+
+def test_get_issue_proof_uses_the_real_stored_issue_not_a_dummy():
+    from app.modules.comparator.issue_schema import Issue, RiskBand
+
+    real_issue = Issue(
+        id="GC-001-WALL-GUID-1",
+        element_id="WALL-GUID-1",
+        rule_id="GC-001",
+        title="Galvanic corrosion risk between dissimilar metals",
+        band=RiskBand.HIGH,
+        score=0.82,
+        mechanism="GC-001",
+        mitigation="Insert a dielectric isolator between the two metals.",
+    )
+
+    client = TestClient(app)
+    app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
+
+    def fake_run_analysis(slug, project_id, **kwargs):
+        if slug == "corrosion":
+            return {"audit_issues": [real_issue]}
+        return {"audit_issues": []}
+
+    try:
+        with patch("app.services.analysis_runner.run_analysis", side_effect=fake_run_analysis):
+            res = client.get("/api/graph/202/proof/GC-001-WALL-GUID-1")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["issue_id"] == "GC-001-WALL-GUID-1"
+            assert data["rule_id"] == "GC-001"
+            assert data["element_id"] == "WALL-GUID-1"
+            # Not the old hardcoded dummy's fixed values
+            assert data["element_id"] != "2O2Fr$t4X7Zf8NOew3FL9r"
     finally:
         app.dependency_overrides.pop(get_project_access_checker, None)

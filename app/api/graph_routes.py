@@ -238,32 +238,27 @@ def get_issue_proof(
     issue_id: str,
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
 ) -> IssueProofGraphContract:
-    """Generate or retrieve the 4-layer deductive proof graph explaining why an issue was flagged."""
+    """Generate the 4-layer deductive proof graph explaining why an issue was flagged.
+
+    Looks the issue up in each runnable analysis slug's result
+    (``run_analysis``, the same cache every other analyze.py endpoint reads)
+    rather than fabricating one: a UI only ever asks this for an issue it is
+    already showing, which means some prior analysis run produced it and
+    ``run_analysis(..., use_cache=True)`` should find it in cache. 404s if no
+    slug's result contains a matching issue id -- never a synthetic stand-in.
+    """
     project_access(project_id)
 
-    # Construct proof graph from issue data or synthetic template
-    dummy_issue = {
-        "id": issue_id,
-        "rule_id": "ARCH-SPATIAL-001",
-        "element_id": "2O2Fr$t4X7Zf8NOew3FL9r",
-        "title": f"Compliance issue {issue_id} verified against regulatory threshold",
-        "band": "high",
-        "score": 0.75,
-        "metadata": {
-            "measured_value": 750.0,
-            "required_value": 800.0,
-            "deficit_mm": 50.0,
-            "domain": "Spatial & Architectural",
-        },
-        "citations": [
-            {
-                "standard": "BUILDING-CODE-PART9",
-                "clause": "9.9.10.1",
-                "reason": "Minimum clear opening dimensions",
-            }
-        ],
-        "mitigation": "Increase opening dimensions to exceed required minimum standard.",
-    }
+    from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 
-    proof_data = build_issue_proof_graph(dummy_issue)
-    return IssueProofGraphContract(**proof_data)
+    for slug in RUNNABLE_SLUGS:
+        result = run_analysis(slug, project_id, use_cache=True)
+        for issue in result.get("audit_issues", []):
+            if getattr(issue, "id", None) == issue_id:
+                proof_data = build_issue_proof_graph(issue)
+                return IssueProofGraphContract(**proof_data)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"No issue {issue_id!r} found for project {project_id}.",
+    )
