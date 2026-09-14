@@ -32,6 +32,12 @@
     ifcFiles?: Model[];
     /** Called with the id the user picked from the ribbon's model switcher. */
     onSelectFile?: (id: number) => void;
+    /**
+     * Set when a findings deep link named an element the viewer could not end
+     * up highlighting. Bindable so the host view can show it alongside its own
+     * GUID banner rather than inside the viewport chrome.
+     */
+    notFoundMessage?: string | null;
   }
 
   let {
@@ -42,6 +48,7 @@
     fileName = "",
     ifcFiles = [],
     onSelectFile,
+    notFoundMessage = $bindable(null),
   }: Props = $props();
 
   let viewportHost: HTMLDivElement = $state();
@@ -91,23 +98,72 @@
   let loadedProjectId: number | null = $state(null);
   let loadedFileId: number | null = $state(null);
   let loadedBcfArtifactId: number | null = $state(null);
-  let elementNotFound = $state(false);
   let isInitialized = false;
 
-  // A BCF topic carries its own selection; a bare element_guid deep link
-  // needs a direct GlobalId lookup against the loaded model instead. Tries
-  // the topic match first (cheap, and preserves the topic detail panel when
-  // one exists) and falls back to selectByGuid so links without a BCF
-  // artifact still land on the element instead of silently doing nothing.
-  async function selectElementByGuid(guid: string) {
-    elementNotFound = false;
-    const topic = viewerAPI.findTopicByElementGuid(guid);
-    if (topic) {
-      await viewerAPI.selectTopic(topic);
-      return;
+  /**
+   * `${projectId}::${elementGuid}` of the deep link already attempted. The
+   * archive is fetched at most once per pair — both reactive entry points
+   * below can fire repeatedly for one navigation, and the fallback leg can
+   * cost a full analysis run.
+   */
+  let focusAttempted: string | null = null;
+
+  /**
+   * Highlight, frame and make isolatable the element a findings row linked to.
+   *
+   * The viewer can only select through a BCF topic — a topic's viewpoint is
+   * what carries the element's GlobalId as a component selection, and
+   * `Viewpoint.go()` is what publishes the selection map that the red
+   * highlight and the ISOLATE button both read. On the findings path no
+   * archive is loaded, which is why the element used to arrive unhighlighted
+   * with ISOLATE greyed out. So: fetch an archive first, then select from it.
+   */
+  async function focusElement(id: number, guid: string) {
+    if (!viewerAPI) return;
+    const key = `${id}::${guid}`;
+    if (focusAttempted === key) return;
+    focusAttempted = key;
+
+    notFoundMessage = null;
+
+    try {
+      loading = true;
+      loadingMessage = "Locating element in BCF viewpoints...";
+
+      // The project's persisted artifact first: it is a stored file, so it
+      // costs a download and nothing more. Only the architectural pipeline
+      // writes one (ArchAnalysisService.run_analysis -> persist_bcf), so for
+      // a corrosion or seismic project this 404s and the export below is what
+      // actually answers. Exporting regenerates the archive from the cached
+      // run, which is why it is second rather than first.
+      //
+      // The viewer owns the rest: it cuts the archive down to this element
+      // before parsing any of it, then loads, selects and frames it, logging
+      // each stage under [bimguard-3d]. Never throws -- a failed stage comes
+      // back as a reason, so the spinner clears on one path either way.
+      const result = await viewerAPI.loadBcfForElement(
+        [
+          { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
+          { label: "export", url: analyzeApi.getExportUrl(id, "corrosion", "bcf") },
+        ],
+        guid,
+        authHeaders,
+      );
+
+      if (!result?.ok) {
+        notFoundMessage =
+          `Element ${guid} could not be located in this model` +
+          `${result?.reason ? ` (${result.reason})` : ""}. ` +
+          `Run the audit for this project, then retry.`;
+      }
+    } catch (err: any) {
+      // Belt and braces: loadBcfForElement is written not to throw, but the
+      // spinner must clear and the user must be told even if it ever does.
+      console.warn("[bimguard-3d] focus failed:", err);
+      notFoundMessage = `Element ${guid} could not be located in this model.`;
+    } finally {
+      loading = false;
     }
-    const found = await viewerAPI.selectByGuid?.(guid);
-    elementNotFound = !found;
   }
 
   async function init() {
@@ -118,7 +174,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-guid-select-camera-autofit-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-camera-autofit-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer({
         viewport: viewportHost,
@@ -177,7 +233,7 @@
         await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
         loadedBcfArtifactId = bcfArtifactId;
       } else if (elementGuid) {
-        await selectElementByGuid(elementGuid);
+        await focusElement(id, elementGuid);
       }
     } catch (err: any) {
       console.error("Failed to load project IFC:", err);
@@ -231,8 +287,19 @@
   });
 
   run(() => {
-    if (viewerAPI && elementGuid && loadedProjectId) {
-      selectElementByGuid(elementGuid);
+    // Only the standalone element deep link. With a bcfArtifactId the effect
+    // above already loads that archive and selects from it.
+    if (viewerAPI && elementGuid && !bcfArtifactId && loadedProjectId) {
+      focusElement(loadedProjectId, elementGuid);
+    }
+  });
+
+  // Clearing the banner (or linking to a different element) re-arms the
+  // lookup, so a retry after a failure is one click rather than a reload.
+  run(() => {
+    if (!elementGuid) {
+      notFoundMessage = null;
+      focusAttempted = null;
     }
   });
 
@@ -276,26 +343,6 @@
           <span>Retry</span>
         </button>
       {/if}
-    </div>
-  {/if}
-
-  <!-- Element-not-found notice: the deep-linked element_guid isn't in the
-       loaded model (wrong file, different storey/model, or a stale link) -->
-  {#if elementNotFound}
-    <div
-      class="z-20 flex shrink-0 items-center justify-between border-b border-warning-border bg-warning-bg p-3.5 text-xs text-warning"
-    >
-      <div class="flex items-center gap-2">
-        <AlertCircle class="h-4 w-4 shrink-0 text-warning" />
-        <span>Could not find the linked element in this model.</span>
-      </div>
-      <button
-        type="button"
-        onclick={() => (elementNotFound = false)}
-        class="rounded-lg px-2.5 py-1 text-caption font-medium transition-opacity hover:opacity-90"
-      >
-        Dismiss
-      </button>
     </div>
   {/if}
 
