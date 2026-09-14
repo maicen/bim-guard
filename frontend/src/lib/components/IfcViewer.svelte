@@ -64,6 +64,14 @@
       // Best-effort only (private browsing, storage disabled, etc.)
     }
   });
+
+  let rightDockCollapsed = $state(true);
+  function openRightSection(id: string) {
+    rightDockCollapsed = false;
+    if (!openRightSections.includes(id)) {
+      openRightSections = [...openRightSections, id];
+    }
+  }
   let viewerAPI: any = $state(null);
   let loading = $state(false);
   let loadingMessage = $state("Initializing OpenBIM 3D Viewport...");
@@ -281,11 +289,29 @@
       icon={ListTree}
       side="right"
       id="viewer-right-dock"
-      collapsed={true}
+      bind:collapsed={rightDockCollapsed}
       resizable
       initialSize={340}
       maxSize={720}
     >
+      {#snippet collapsedRail()}
+        {#each [{ id: "spatial-tree", label: "Spatial Hierarchy", icon: ListTree }, { id: "layers", label: "Layers", icon: LayoutGrid }, { id: "drawings", label: "Drawings", icon: PenTool }] as section (section.id)}
+          <button
+            type="button"
+            onclick={() => openRightSection(section.id)}
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent {openRightSections.includes(
+              section.id,
+            )
+              ? 'bg-surface-selected text-accent'
+              : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
+            aria-label={section.label}
+            title={section.label}
+          >
+            <section.icon class="h-4 w-4" />
+          </button>
+        {/each}
+      {/snippet}
+
       <AccordionRoot
         type="multiple"
         bind:value={openRightSections}

@@ -17,6 +17,8 @@
     minSize?: number;
     maxSize?: number;
     headerExtra?: Snippet;
+    /** When set, replaces the default icon+chevron header entirely while collapsed (e.g. a rail of per-section icon buttons). The panel keeps rendering its normal title header + content once expanded. */
+    collapsedRail?: Snippet;
     children?: Snippet;
   }
 
@@ -31,6 +33,7 @@
     minSize = 200,
     maxSize = 520,
     headerExtra,
+    collapsedRail,
     children,
   }: Props = $props();
 
@@ -58,8 +61,13 @@
 
   function toggle() {
     collapsed = !collapsed;
-    persist(":collapsed", collapsed ? "1" : "0");
   }
+
+  // Persists whenever collapsed changes, whether toggled locally or set by
+  // the parent (e.g. a collapsedRail icon expanding straight to a section).
+  $effect(() => {
+    persist(":collapsed", collapsed ? "1" : "0");
+  });
 
   const storedSize = loadStored(":size");
   // Only the STARTING value of initialSize matters -- size becomes
@@ -159,8 +167,21 @@
     style:width={side !== "bottom" && showHandle ? `${size}px` : undefined}
     style:height={side === "bottom" && showHandle ? `${size}px` : undefined}
   >
+    <!-- Rail stays mounted (hidden via the hidden attribute) alongside the
+         normal header/content, rather than replacing them with an {#if},
+         so nothing about the header/content mount lifecycle changes. -->
+    {#if collapsedRail}
+      <div
+        class="flex min-h-0 flex-1 flex-col items-center gap-1 py-2"
+        hidden={!collapsed}
+      >
+        {@render collapsedRail()}
+      </div>
+    {/if}
+
     <div
       class="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border-subtle bg-surface-overlay px-2.5"
+      hidden={collapsed && !!collapsedRail}
     >
       <button
         type="button"
