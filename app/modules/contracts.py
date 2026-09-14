@@ -1001,6 +1001,22 @@ class RuleSourceResponse(BaseModel):
     )
 
 
+class RuleShaclShapeResponse(BaseModel):
+    """A rule's compiled W3C SHACL shape, for the Rule Inspection Studio."""
+
+    rule_id: int
+    eligible: bool = Field(
+        ..., description="Whether this rule's requirement can be expressed as a SHACL shape at all"
+    )
+    turtle: str = Field(
+        default="", description="The compiled shape, Turtle-serialized. Empty when not eligible."
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Why the rule is not SHACL-eligible, when eligible is False",
+    )
+
+
 class RuleDraftReviewRequest(BaseModel):
     """Payload for reviewing (accepting/rejecting/editing) one extraction draft."""
 

@@ -103,6 +103,62 @@ def test_create_and_update_rule_persists_rase_fields():
         client.delete(f"/api/rules/{created['id']}")
 
 
+def test_get_rule_shacl_shape_for_an_eligible_rule():
+    create_res = client.post(
+        "/api/rules",
+        json={
+            "rule_id": "SHACL-SHAPE-TEST-01",
+            "target_ifc_class": "IfcDoor",
+            "property_name": "calculatedClearWidth",
+            "operator": ">=",
+            "check_value": "900",
+            "unit": "mm",
+            "mechanism": "CODE",
+            "category": "Arch",
+            "severity": "mandatory",
+            "ruleset_id": "BUILDING-CODE-PART9",
+        },
+    )
+    assert create_res.status_code == 201
+    created = create_res.json()
+    try:
+        res = client.get(f"/api/rules/{created['id']}/shacl-shape")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["rule_id"] == created["id"]
+        assert data["eligible"] is True
+        assert "sh:NodeShape" in data["turtle"]
+        assert "sh:minInclusive" in data["turtle"]
+    finally:
+        client.delete(f"/api/rules/{created['id']}")
+
+
+def test_get_rule_shacl_shape_for_an_ineligible_rule():
+    create_res = client.post(
+        "/api/rules",
+        json={
+            "rule_id": "SHACL-SHAPE-TEST-02",
+            # No target_ifc_class/property_name -- rule_is_shacl_eligible
+            # requires both.
+            "mechanism": "CODE",
+            "category": "Arch",
+            "severity": "mandatory",
+            "ruleset_id": "BUILDING-CODE-PART9",
+        },
+    )
+    assert create_res.status_code == 201
+    created = create_res.json()
+    try:
+        res = client.get(f"/api/rules/{created['id']}/shacl-shape")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["eligible"] is False
+        assert data["turtle"] == ""
+        assert data["reason"]
+    finally:
+        client.delete(f"/api/rules/{created['id']}")
+
+
 @pytest.mark.slow
 def test_rule_folder_crud():
     """Verify complete CRUD lifecycle for ruleset folders via REST API."""

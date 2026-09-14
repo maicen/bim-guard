@@ -35,6 +35,7 @@ silently disagrees with it.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from rdflib import BNode, Graph, Literal
@@ -102,6 +103,33 @@ def rule_is_shacl_eligible(rule: dict[str, Any]) -> bool:
     if operator == "unique_within_scope":
         return str(rule.get("uniqueness_scope") or "building").strip().lower() == "building"
     return operator in _OPERATOR_TO_SHACL or operator in _OPERATOR_TO_SPARQL
+
+
+def rule_row_to_shacl_input(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a raw ``rules`` table row into the shape ``compile_shapes`` expects.
+
+    ``RuleService._build_rule_row`` JSON-encodes several fields as TEXT for
+    storage (``check_value``, ``value_min``, ``value_max``, ``applies_when``,
+    ``exceptions``) -- a raw row therefore carries those as JSON strings, not
+    the Python values ``_add_shape``/``_apply_scope_target`` operate on (the
+    latter calls ``.items()`` on ``applies_when``, which raises on an
+    un-decoded string). Also bridges ``reference`` -> ``rule_id``, the same
+    rename ``RuleResponse`` does for the public API.
+
+    A value that is not a string (already decoded, or genuinely absent) is
+    passed through unchanged, so this is safe to call on a row from any
+    source, decoded or not.
+    """
+    rule = dict(row)
+    rule["rule_id"] = row.get("rule_id") or row.get("reference") or ""
+    for key in ("check_value", "value_min", "value_max", "applies_when", "exceptions"):
+        value = rule.get(key)
+        if isinstance(value, str):
+            try:
+                rule[key] = json.loads(value)
+            except (TypeError, ValueError):
+                pass
+    return rule
 
 
 def compile_shapes(rules: list[dict[str, Any]]) -> Graph:

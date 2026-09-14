@@ -47,6 +47,7 @@ from app.modules.contracts import (
     RuleFolderUpdateRequest,
     RuleResponse,
     RuleSeedResponse,
+    RuleShaclShapeResponse,
     RuleSnapshotCreateRequest,
     RuleSnapshotResponse,
     RuleSourceResponse,
@@ -866,6 +867,53 @@ def get_rule_source(
         snippet=snippet,
         bbox=rule.get("source_bbox"),
     )
+
+
+@router.get(
+    "/{rule_id}/shacl-shape",
+    response_model=RuleShaclShapeResponse,
+    summary="Compile a rule's W3C SHACL shape, for the Rule Inspection Studio",
+)
+def get_rule_shacl_shape(
+    rule_id: int,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleShaclShapeResponse:
+    """Compile one rule into its SHACL shape.
+
+    Uses the same compiler the orchestrator's SHACL side-channel
+    (`_run_shacl_compliance`) runs over a whole ruleset with.
+
+    Not every rule can be expressed as a SHACL shape (`rule_is_shacl_eligible`
+    narrows this relative to the procedural comparator -- see its docstring);
+    an ineligible rule 200s with `eligible=False` and a reason rather than a
+    404 or an empty shape, since "not SHACL-eligible" is a legitimate,
+    informative answer for the inspector to show, not an error.
+    """
+    from app.modules.rule_builder.shacl_generator import (
+        compile_shapes,
+        rule_is_shacl_eligible,
+        rule_row_to_shacl_input,
+    )
+
+    row = service.get_rule(rule_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Rule with ID {rule_id} not found.")
+
+    rule = rule_row_to_shacl_input(row)
+    if not rule_is_shacl_eligible(rule):
+        return RuleShaclShapeResponse(
+            rule_id=rule_id,
+            eligible=False,
+            reason=(
+                "This rule's requirement (operator, scope, or uniqueness "
+                "configuration) has no faithful SHACL translation yet and "
+                "stays on the procedural comparator path."
+            ),
+        )
+
+    shapes = compile_shapes([rule])
+    turtle = shapes.serialize(format="turtle")
+    return RuleShaclShapeResponse(rule_id=rule_id, eligible=True, turtle=turtle)
 
 
 @router.get(

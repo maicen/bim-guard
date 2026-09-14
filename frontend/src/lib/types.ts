@@ -467,6 +467,14 @@ export interface RuleSourceResponse {
   bbox?: BoundingBox | null;
 }
 
+/** Mirrors RuleShaclShapeResponse in app/modules/contracts.py. */
+export interface RuleShaclShapeResponse {
+  rule_id: number;
+  eligible: boolean;
+  turtle: string;
+  reason?: string | null;
+}
+
 export interface RuleFolder {
   id?: number | null;
   ruleset_id: string;

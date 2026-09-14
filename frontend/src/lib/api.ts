@@ -97,6 +97,7 @@ import type {
   RulesetCategory,
   RuleSnapshot,
   RuleSnapshotCreatePayload,
+  RuleShaclShapeResponse,
   RuleSourceResponse,
   SpatialTreeResponse,
   UserProfile,
@@ -877,6 +878,11 @@ export const rulesApi = {
   async getSource(id: number): Promise<RuleSourceResponse> {
     const res = await apiFetch(`${API_BASE}/rules/${id}/source`);
     return handleResponse<RuleSourceResponse>(res);
+  },
+
+  async getShaclShape(id: number): Promise<RuleShaclShapeResponse> {
+    const res = await apiFetch(`${API_BASE}/rules/${id}/shacl-shape`);
+    return handleResponse<RuleShaclShapeResponse>(res);
   },
 
   async create(payload: Partial<Rule>): Promise<Rule> {

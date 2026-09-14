@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { ListChecks, Edit3 } from "lucide-svelte";
+  import { ListChecks, Edit3, ShieldCheck, FileCode2 } from "lucide-svelte";
   import Modal from "../Modal.svelte";
-  import type { Rule } from "../../types";
+  import LoadingState from "../LoadingState.svelte";
+  import { rulesApi } from "../../api";
+  import type { Rule, RuleShaclShapeResponse } from "../../types";
 
   interface Props {
     isOpen: boolean;
@@ -11,6 +13,36 @@
   }
 
   let { isOpen = false, rule, onClose, onEdit }: Props = $props();
+
+  const hasRase = $derived(
+    !!(
+      rule?.rase_requirement ||
+      rule?.rase_applicability ||
+      rule?.rase_selection ||
+      rule?.rase_exception
+    ),
+  );
+
+  let shaclShape: RuleShaclShapeResponse | null = $state(null);
+  let isLoadingShacl = $state(false);
+  let shaclError = $state("");
+
+  async function loadShaclShape(ruleId: number) {
+    isLoadingShacl = true;
+    shaclError = "";
+    shaclShape = null;
+    try {
+      shaclShape = await rulesApi.getShaclShape(ruleId);
+    } catch (err: any) {
+      shaclError = err?.message || "Could not compile this rule's SHACL shape.";
+    } finally {
+      isLoadingShacl = false;
+    }
+  }
+
+  $effect(() => {
+    if (isOpen && rule) loadShaclShape(rule.id);
+  });
 </script>
 
 <Modal
@@ -96,6 +128,62 @@
           <div class="pt-1 font-mono text-caption text-amber-300">
             Compare with: {rule.compare_property}
           </div>
+        {/if}
+      </div>
+
+      {#if hasRase}
+        <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/70 p-3.5">
+          <span
+            class="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-wider text-fg-muted"
+          >
+            <ShieldCheck class="h-3.5 w-3.5" />
+            RASE Breakdown
+          </span>
+          <dl class="space-y-2 font-mono text-caption">
+            {#if rule.rase_requirement}
+              <div>
+                <dt class="text-fg-muted">Requirement</dt>
+                <dd class="text-fg-secondary">{rule.rase_requirement}</dd>
+              </div>
+            {/if}
+            {#if rule.rase_applicability}
+              <div>
+                <dt class="text-fg-muted">Applicability</dt>
+                <dd class="text-fg-secondary">{JSON.stringify(rule.rase_applicability)}</dd>
+              </div>
+            {/if}
+            {#if rule.rase_selection}
+              <div>
+                <dt class="text-fg-muted">Selection</dt>
+                <dd class="text-fg-secondary">{JSON.stringify(rule.rase_selection)}</dd>
+              </div>
+            {/if}
+            {#if rule.rase_exception}
+              <div>
+                <dt class="text-fg-muted">Exception</dt>
+                <dd class="text-fg-secondary">{JSON.stringify(rule.rase_exception)}</dd>
+              </div>
+            {/if}
+          </dl>
+        </div>
+      {/if}
+
+      <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/70 p-3.5">
+        <span
+          class="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-wider text-fg-muted"
+        >
+          <FileCode2 class="h-3.5 w-3.5" />
+          SHACL Shape
+        </span>
+        {#if isLoadingShacl}
+          <LoadingState message="Compiling SHACL shape…" />
+        {:else if shaclError}
+          <p class="text-caption text-critical">{shaclError}</p>
+        {:else if shaclShape && shaclShape.eligible}
+          <pre
+            class="max-h-48 overflow-auto rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption text-fg-secondary">{shaclShape.turtle}</pre>
+        {:else if shaclShape}
+          <p class="text-caption text-fg-muted">{shaclShape.reason}</p>
         {/if}
       </div>
 
