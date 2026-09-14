@@ -343,8 +343,24 @@ app.include_router(api_events.router, prefix="/api", tags=["Events"])
     summary="API Gateway Health Check",
 )
 def health_check() -> HealthCheckResponse:
-    """Return API gateway operational status."""
-    return HealthCheckResponse(status="ok", service="bim-guard-api", version="1.0.0")
+    """Return API gateway operational status, including which graph backend is live."""
+    from app.bootstrap import get_container
+    from app.services.kuzu_provider import KuzuDatabaseProvider
+    from app.services.neo4j_provider import Neo4jDatabaseProvider
+
+    graph_backend = "none"
+    try:
+        provider = get_container().graph_service.provider
+        if isinstance(provider, Neo4jDatabaseProvider):
+            graph_backend = "neo4j"
+        elif isinstance(provider, KuzuDatabaseProvider):
+            graph_backend = "kuzu"
+    except Exception:
+        pass
+
+    return HealthCheckResponse(
+        status="ok", service="bim-guard-api", version="1.0.0", graph_backend=graph_backend
+    )
 
 
 @app.get("/download/{fmt}/{project_id}", tags=["Analysis"], summary="Download report endpoint alias")

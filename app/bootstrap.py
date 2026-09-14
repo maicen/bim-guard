@@ -651,8 +651,17 @@ def build_default_container() -> ApplicationContainer:
                 password=os.environ.get("NEO4J_PASSWORD", None),
                 database=os.environ.get("NEO4J_DATABASE", "neo4j"),
             )
-            graph_service = GraphService(provider=neo4j_provider)
-            logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)
+            # Explicitly checked rather than passed as verify_connectivity=True
+            # to the constructor: that flag's own check swallows a failed
+            # connectivity probe into a logged warning and keeps going, so a
+            # bad/unreachable NEO4J_URI would otherwise produce a GraphService
+            # that only fails on its first real query instead of falling
+            # through to Kùzu below, the way every other init failure here does.
+            if neo4j_provider.verify_connectivity():
+                graph_service = GraphService(provider=neo4j_provider)
+                logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)
+            else:
+                logger.warning("Neo4j at %s is unreachable; falling back to Kùzu", neo4j_uri)
         except Exception as e:
             logger.warning("Could not initialize Neo4jDatabaseProvider: %s", e)
 

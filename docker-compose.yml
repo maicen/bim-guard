@@ -44,14 +44,14 @@ services:
       # not the host-published DOCLING_LOCAL_PORT — in your .env.
       - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-}
 
-      # ── Graph Database — Neo4j (Optional) ──────────────────────────────────
-      # For a local Docker-launched instance (started via --profile neo4j):
-      #   NEO4J_URI=bolt://neo4j:7687
-      # For a hosted instance (e.g. Neo4j Aura):
-      #   NEO4J_URI=neo4j+s://<dbid>.databases.neo4j.io
-      - NEO4J_URI=${NEO4J_URI:-}
+      # ── Graph Database — Neo4j (default) ────────────────────────────────────
+      # The neo4j service below starts automatically with a plain
+      # `docker compose up`, so NEO4J_URI defaults to it. Point at a hosted
+      # instance instead (e.g. Neo4j Aura) by overriding NEO4J_URI in your
+      # .env: NEO4J_URI=neo4j+s://<dbid>.databases.neo4j.io
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
-      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-bimguardpassword}
       - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
 
       # ── Terminal Agent Configuration ────────────────────────────────────────
@@ -76,6 +76,10 @@ services:
       # Persistent application logs
       - bim-guard-logs:/app/data/logs
 
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
       interval: 30s
@@ -85,16 +89,16 @@ services:
 
     restart: unless-stopped
 
-  # ── Optional: local self-hosted Neo4j graph database ────────────────────────
-  # Neo4j Community Edition (GraphRAG / topological queries).
-  # Not started by default — bring it up explicitly with:
-  #   docker compose --profile neo4j up -d
-  # Or connect to a hosted instance (e.g. Neo4j Aura) by setting NEO4J_URI
-  # to your remote cloud database.
+  # ── Default: local self-hosted Neo4j graph database ─────────────────────────
+  # Neo4j Community Edition (GraphRAG / topological queries), backing the
+  # theme-agnostic graph engine and giving Neo4j Browser (http://localhost:7474)
+  # something to show by default. Starts automatically with `docker compose up`.
+  # To use a hosted instance instead (e.g. Neo4j Aura), set NEO4J_URI in your
+  # .env to point at it and this service is simply unused (still starts, but
+  # nothing reads from it).
   neo4j:
     image: neo4j:5.26-community
     container_name: bim-guard-neo4j
-    profiles: ["neo4j"]
     ports:
       - "${NEO4J_HTTP_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"

@@ -43,6 +43,21 @@ services:
       - key: OPENAI_API_KEY
         sync: false
 
+      # ── Graph Database — Neo4j ───────────────────────────────────────────────
+      # Render has no bundled Neo4j service, so production points at a hosted
+      # instance (e.g. Neo4j Aura: https://neo4j.com/product/auradb/) you
+      # provision separately and set below. Left unset, the app falls back to
+      # the embedded Kùzu database automatically (app/bootstrap.py) -- no
+      # deploy-breaking dependency either way.
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USERNAME
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: NEO4J_DATABASE
+        sync: false
+
     # Render free/starter tier has ephemeral storage — the Supabase Storage
     # file cache (data/cache) will be rebuilt on first access after each deploy.
     # Add a Render Disk here if you want cache to persist across deploys:
