@@ -805,3 +805,37 @@ Verification blocked: The open_browser_url tool failed multiple times because th
 - [x] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Added migration `20260909185000_add_doclang_archive_path.sql` (applied to Supabase DB). Document creation and metadata updates automatically pre-build and persist `archive_{id}.dclx` in Supabase Storage (`sb://bim-guard-artifacts/doclang/archive_{id}.dclx`) and delete cached archives on document deletion.
 - [x] **Pre-Signed & Cached Storage Streaming for `.dclx`**: Updated `GET /api/documents/{id}/export-doclang` with `redirect=true` support issuing 307 temporary redirects to Supabase Storage signed URLs, and serving pre-cached archive bytes from object storage to prevent in-memory re-zipping.
 - [x] **Multimodal Asset Extraction Support**: Implemented `DocLangAssetManager` in `app/modules/document_parsing/doclang_asset_manager.py` to decouple inline base64 image data URIs from DocLang XML, offload them to Supabase Storage (`sb://bim-guard-artifacts/doclang/{id}/assets/`), sanitize XML with relative asset paths (`assets/asset_1.png`), and bundle assets directly into `.dclx` archives.
+
+---
+
+20260914
+
+## Stale branches needing manual triage — Owner: Shane
+
+Two remote branches predate the 2026-08-29 legacy-UI removal (`a48a4f1`,
+"eliminate FastHTML and MonsterUI residuals in favor of decoupled Svelte 5
+SPA") and build features entirely on top of the now-deleted `app/components/`
+/ `app/routes/` FastHTML/MonsterUI stack. They do not merge cleanly against
+the current FastAPI (`app/api/`) + Svelte SPA architecture and were left
+undeleted pending a decision on whether any of the underlying feature ideas
+are still wanted (rebuilt against the current stack) before the branches
+themselves are deleted:
+
+- [ ] `claude/wizard-ifc-upload-integration-6ih4n0` — wizard IFC upload
+      integration, multi-model viewer routes, sidebar nav for all analysis
+      types. Built on `app/components/project_setup_wizard.py`,
+      `app/components/viewer_ui.py`, `app/routes/viewer_routes.py`,
+      `app/routes/workflow_page.py` — all removed.
+- [ ] `ready/fmp-async-tracking` — 5-step project setup wizard, seismic (Blue
+      Halo) analysis page, piping/corrosion analysis page, multi-select
+      analysis types, project nav restructure. Built on
+      `app/components/project_setup_wizard.py`,
+      `app/components/piping_analysis_ui.py`,
+      `app/components/seismic_analysis_ui.py`, `app/routes/analyze.py`,
+      `app/routes/piping_routes.py`, `app/routes/seismic_routes.py`,
+      `app/routes/wizard_routes.py` — all removed. Also carries its own
+      `UPSTREAM_BLOCKING_ISSUES.md` noting known blockers from when the
+      branch was last active.
+
+Decide per branch: reimplement the feature against `app/api/` +
+`frontend/src/routes/` (if still wanted) or delete outright.
