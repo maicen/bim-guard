@@ -37,7 +37,7 @@ which is NACE (now AMPP). See
 | **HSE HSG274 Parts 1–3** | Legionella control; storage temperature regime | MC-001, MM-001 |
 | **BS 8552:2012** | Sampling and monitoring of water | MC-001, MM-001 |
 | **EN ISO 9308-1** | Microbiological water quality | MC-001, MM-001 |
-| **ASTM G-187** | MIC assessment | MC-001 |
+| ASTM G-187 | *Cited by the MC-001 ruleset; not the source of any MC-001 value — see note above* | MC-001 |
 | **WHO Guidelines for Drinking-Water Quality (4th ed.)** | Water quality baseline | MC-001 |
 | **EN 12952-12** | Feedwater and boiler water quality | MM-001 |
 | **ASTM B117** | Salt spray exposure | GC-001, MM-001 |

@@ -162,7 +162,7 @@ def build():
     note(s, "R3 is the highest-value item on the measured evidence: 35,609 elements carry material text the normaliser cannot map, so widening the rule table converts unusable text into scoreable input.", y=3.20, bold=True)
 
     s = slide(p, "Standards compliance", "Standards governing each mechanism; the thresholds are authored calibration", NAVY)
-    table(s, ["Standard", "Mechanism it governs", "Where it is applied"],
+    table(s, ["Standard", "Mechanism addressed", "Where it is applied"],
         [["NASA-STD-6012", "Galvanic couple voltage thresholds", "Voltage risk term, band boundaries"],
          ["WorldStainless / Euro Inox", "Electrochemical series, corrosion data", "22-material potential table"],
          ["IMOA Design Manual", "PREN formula and grade selection", "PREN adequacy check"],
