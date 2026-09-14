@@ -527,6 +527,16 @@ mechanism only; score is MC-001 authored calibration`. It should also re-seed
 the `ruleset:BIMGUARD-MC-001` static asset with the payload wording above. That
 migration was not written.
 
+**Update, 2026-09-14, branch `fix/mic-material-citations`.** The rows half is now
+written, and it is **unapplied**:
+`supabase/migrations/20260914195107_correct_mc001_material_citations.sql`. It has
+one `UPDATE` per reference. Each matches `ruleset_id = 'BIMGUARD-MC-001'`, the
+reference, and the exact seeded `source_text`, and sets the wording above. The
+seven old strings were checked byte for byte against `_seed_mc001` output built
+offline from the `20260806180500` payload. Only `source_text` changes. The
+`parameters` JSON of those rows still carries the old `reference` key, and the
+static asset re-seed is still not written. No SQL was run.
+
 ### 12.3 The seismic "remnant" in `ruleset_seeder.py` is neither a second site nor an incomplete fix
 
 §9 recorded that `ruleset_seeder.py` "still describes seismic brace spacing as
