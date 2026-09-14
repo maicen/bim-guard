@@ -118,7 +118,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-guid-select-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-guid-select-camera-autofit-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer({
         viewport: viewportHost,
