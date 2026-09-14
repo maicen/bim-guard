@@ -416,6 +416,38 @@ static_dir = Path("static")
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+def _resolve_public_html(filename: str) -> Path | None:
+    """Resolve a public static HTML document across dist, public, or static folders."""
+    for candidate in [
+        Path("frontend/dist") / filename,
+        Path("frontend/public") / filename,
+        Path("static") / filename,
+    ]:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+@app.get("/privacy", response_class=FileResponse, include_in_schema=False)
+@app.get("/privacy.html", response_class=FileResponse, include_in_schema=False)
+async def privacy_page():
+    """Serve standalone privacy policy for Google OAuth branding compliance and public access."""
+    target = _resolve_public_html("privacy.html")
+    if target:
+        return FileResponse(target, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Privacy policy not found.")
+
+
+@app.get("/terms", response_class=FileResponse, include_in_schema=False)
+@app.get("/terms.html", response_class=FileResponse, include_in_schema=False)
+async def terms_page():
+    """Serve standalone terms of service for Google OAuth branding compliance and public access."""
+    target = _resolve_public_html("terms.html")
+    if target:
+        return FileResponse(target, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Terms of service not found.")
+
+
 # Production SPA Client Serving & Fallback
 frontend_dist = Path("frontend/dist")
 if (frontend_dist / "index.html").exists():
@@ -431,6 +463,9 @@ if (frontend_dist / "index.html").exists():
         file_candidate = frontend_dist / full_path
         if full_path and file_candidate.is_file():
             return FileResponse(file_candidate)
+        html_candidate = frontend_dist / f"{full_path}.html"
+        if full_path and html_candidate.is_file():
+            return FileResponse(html_candidate)
         return FileResponse(frontend_dist / "index.html")
 else:
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)

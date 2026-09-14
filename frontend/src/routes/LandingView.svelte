@@ -103,7 +103,13 @@
   <footer
     class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-border-default px-6 py-6 text-xs text-fg-muted"
   >
-    <span>BIM Guard OpenBIM Compliance Engine</span>
-    <span>&copy; {new Date().getFullYear()} BIM Guard</span>
+    <div class="flex items-center gap-3">
+      <span>BIM Guard OpenBIM Compliance Engine</span>
+      <span>&copy; {new Date().getFullYear()} BIM Guard</span>
+    </div>
+    <div class="flex items-center gap-6">
+      <a href="/terms" class="text-fg-secondary hover:text-fg-primary transition-colors">Terms of Service</a>
+      <a href="/privacy" class="text-fg-secondary hover:text-fg-primary transition-colors">Privacy Policy</a>
+    </div>
   </footer>
 </div>
