@@ -51,9 +51,9 @@
   function loadOpenRightSections(): string[] {
     try {
       const raw = localStorage.getItem(RIGHT_DOCK_SECTIONS_KEY);
-      return raw ? JSON.parse(raw) : ["spatial-tree"];
+      return raw ? JSON.parse(raw) : ["bcf-topics"];
     } catch {
-      return ["spatial-tree"];
+      return ["bcf-topics"];
     }
   }
   let openRightSections: string[] = $state(loadOpenRightSections());
@@ -65,7 +65,17 @@
     }
   });
 
-  let rightDockCollapsed = $state(true);
+  const RIGHT_DOCK_SECTION_ICONS = [
+    { id: "bcf-topics", label: "BCF Topics", icon: ClipboardList },
+    { id: "spatial-tree", label: "Spatial Hierarchy", icon: ListTree },
+    { id: "layers", label: "Layers", icon: LayoutGrid },
+    { id: "drawings", label: "Drawings", icon: PenTool },
+  ];
+
+  // Historically BCF Topics lived in its own always-open left panel; default
+  // the merged dock to open (with just BCF Topics expanded) so that visibility
+  // carries over for anyone without a stored preference yet.
+  let rightDockCollapsed = $state(false);
   function openRightSection(id: string) {
     rightDockCollapsed = false;
     if (!openRightSections.includes(id)) {
@@ -268,25 +278,13 @@
     />
   {/if}
 
-  <!-- Docked workspace: collapsible BCF/Layers/Drawings panels around the 3D viewport -->
+  <!-- Docked workspace: one collapsible Properties dock (BCF/Spatial/Layers/Drawings) around the 3D viewport -->
   <div class="flex min-h-0 flex-1">
-    <CollapsiblePanel
-      title="BCF Topics"
-      icon={ClipboardList}
-      side="left"
-      id="viewer-details"
-      collapsed={false}
-      resizable
-      initialSize={320}
-    >
-      <div bind:this={detailsHost} class="min-h-0"></div>
-    </CollapsiblePanel>
-
     <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
 
     <CollapsiblePanel
       title="Properties"
-      icon={ListTree}
+      icon={ClipboardList}
       side="right"
       id="viewer-right-dock"
       bind:collapsed={rightDockCollapsed}
@@ -295,7 +293,7 @@
       maxSize={720}
     >
       {#snippet collapsedRail()}
-        {#each [{ id: "spatial-tree", label: "Spatial Hierarchy", icon: ListTree }, { id: "layers", label: "Layers", icon: LayoutGrid }, { id: "drawings", label: "Drawings", icon: PenTool }] as section (section.id)}
+        {#each RIGHT_DOCK_SECTION_ICONS as section (section.id)}
           <button
             type="button"
             onclick={() => openRightSection(section.id)}
@@ -317,6 +315,9 @@
         bind:value={openRightSections}
         class="w-full rounded-none border-0 divide-y divide-border-subtle bg-transparent"
       >
+        <PropertiesSection value="bcf-topics" title="BCF Topics" icon={ClipboardList}>
+          <div bind:this={detailsHost} class="min-h-0"></div>
+        </PropertiesSection>
         <PropertiesSection value="spatial-tree" title="Spatial Hierarchy" icon={ListTree}>
           <SpatialTreePanel {projectId} />
         </PropertiesSection>
