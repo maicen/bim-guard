@@ -12,6 +12,8 @@
   import LayersPanel from "./viewer/LayersPanel.svelte";
   import DrawingsPanel from "./viewer/DrawingsPanel.svelte";
   import SpatialTreePanel from "./viewer/SpatialTreePanel.svelte";
+  import PropertiesSection from "./viewer/PropertiesSection.svelte";
+  import { AccordionRoot } from "./ui";
 
   interface Props {
     projectId?: number | null;
@@ -44,6 +46,24 @@
   let viewportHost: HTMLDivElement = $state();
   let detailsHost: HTMLDivElement = $state();
   let drawingsSheetBoardHost: HTMLDivElement | undefined = $state();
+
+  const RIGHT_DOCK_SECTIONS_KEY = "bimguard-collapsible-panel:viewer-right-dock:open-sections";
+  function loadOpenRightSections(): string[] {
+    try {
+      const raw = localStorage.getItem(RIGHT_DOCK_SECTIONS_KEY);
+      return raw ? JSON.parse(raw) : ["spatial-tree"];
+    } catch {
+      return ["spatial-tree"];
+    }
+  }
+  let openRightSections: string[] = $state(loadOpenRightSections());
+  $effect(() => {
+    try {
+      localStorage.setItem(RIGHT_DOCK_SECTIONS_KEY, JSON.stringify(openRightSections));
+    } catch {
+      // Best-effort only (private browsing, storage disabled, etc.)
+    }
+  });
   let viewerAPI: any = $state(null);
   let loading = $state(false);
   let loadingMessage = $state("Initializing OpenBIM 3D Viewport...");
@@ -257,38 +277,30 @@
     <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
 
     <CollapsiblePanel
-      title="Spatial Hierarchy"
+      title="Properties"
       icon={ListTree}
       side="right"
-      id="viewer-spatial-tree"
+      id="viewer-right-dock"
       collapsed={true}
       resizable
-    >
-      <SpatialTreePanel {projectId} />
-    </CollapsiblePanel>
-
-    <CollapsiblePanel
-      title="Layers"
-      icon={LayoutGrid}
-      side="right"
-      id="viewer-layers"
-      collapsed={true}
-      resizable
-    >
-      <LayersPanel {viewerAPI} />
-    </CollapsiblePanel>
-
-    <CollapsiblePanel
-      title="Drawings"
-      icon={PenTool}
-      side="right"
-      id="viewer-drawings"
-      collapsed={true}
-      resizable
-      initialSize={360}
+      initialSize={340}
       maxSize={720}
     >
-      <DrawingsPanel {viewerAPI} bind:sheetBoardHost={drawingsSheetBoardHost} />
+      <AccordionRoot
+        type="multiple"
+        bind:value={openRightSections}
+        class="w-full rounded-none border-0 divide-y divide-border-subtle bg-transparent"
+      >
+        <PropertiesSection value="spatial-tree" title="Spatial Hierarchy" icon={ListTree}>
+          <SpatialTreePanel {projectId} />
+        </PropertiesSection>
+        <PropertiesSection value="layers" title="Layers" icon={LayoutGrid}>
+          <LayersPanel {viewerAPI} />
+        </PropertiesSection>
+        <PropertiesSection value="drawings" title="Drawings" icon={PenTool}>
+          <DrawingsPanel {viewerAPI} bind:sheetBoardHost={drawingsSheetBoardHost} />
+        </PropertiesSection>
+      </AccordionRoot>
     </CollapsiblePanel>
   </div>
 </div>

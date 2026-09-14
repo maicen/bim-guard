@@ -37,7 +37,7 @@
   }
 </script>
 
-<div class="flex h-full flex-col text-xs">
+<div class="flex h-full min-h-[420px] flex-col text-xs">
   {#if drawings.length > 1}
     <div class="flex shrink-0 flex-wrap gap-1 border-b border-border-default p-2">
       {#each drawings as drawing (drawing.id)}
