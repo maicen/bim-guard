@@ -44,6 +44,9 @@ from app.api import (
     events as api_events,
 )
 from app.api import (
+    graph_routes as api_graph,
+)
+from app.api import (
     llm_provider_instances as api_llm_provider_instances,
 )
 from app.api import (
@@ -69,9 +72,6 @@ from app.api import (
 )
 from app.api import (
     settings as api_settings,
-)
-from app.api import (
-    graph_routes as api_graph,
 )
 from app.api import (
     sparql_routes as api_sparql,
@@ -237,11 +237,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS
-allowed_origins_env = os.getenv("BIM_GUARD_ALLOWED_ORIGINS", "")
-allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
-if not allowed_origins:
-    allowed_origins = [
+def _resolve_allowed_origins(env_str: str | None = None) -> list[str]:
+    """Resolve CORS origins by unioning default local origins with any custom domains."""
+    default_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000",
@@ -249,6 +247,14 @@ if not allowed_origins:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+    raw = os.getenv("BIM_GUARD_ALLOWED_ORIGINS", "") if env_str is None else env_str
+    custom = [o.strip() for o in raw.split(",") if o.strip()]
+    if "*" in custom:
+        return ["*"]
+    return list(dict.fromkeys(default_origins + custom))
+
+
+allowed_origins = _resolve_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,

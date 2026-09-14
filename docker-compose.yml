@@ -8,6 +8,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-${SUPABASE_URL}}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_KEY:-}}}
     image: bim-guard:latest
     container_name: bim-guard-app
     ports:
@@ -140,6 +143,30 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+
+  # ── Optional: Cloudflare Tunnel for secure public domain routing ───────────
+  # Official cloudflared client container (https://hub.docker.com/r/cloudflare/cloudflared).
+  # Establishes an outbound encrypted tunnel to Cloudflare's edge without opening
+  # router ports or managing local origin certificates.
+  #
+  # Quickstart:
+  # 1. Create a tunnel in Cloudflare Zero Trust (Networks > Tunnels > Create a Tunnel).
+  # 2. Add a Public Hostname pointing to `http://bim-guard:8000` (internal compose network).
+  # 3. Set TUNNEL_TOKEN in your .env.
+  # 4. Start with:
+  #      docker compose --profile tunnel up -d
+  #    or set COMPOSE_PROFILES=tunnel in your .env to run with standard `docker compose up -d`.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: bim-guard-cloudflared
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
+    depends_on:
+      bim-guard:
+        condition: service_healthy
 
 volumes:
   bim-guard-cache:
