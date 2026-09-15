@@ -59,9 +59,18 @@ class GitHubRepoService:
         self._models_service = models_service
         self._tree_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
-    def list_repos(self) -> list[dict[str, Any]]:
-        """Retrieve all registered GitHub repositories ordered newest first."""
+    def list_repos(self, organization_ids: Optional[set[int]] = None) -> list[dict[str, Any]]:
+        """Retrieve registered GitHub repositories ordered newest first.
+
+        Args:
+            organization_ids: When given, restrict results to repositories
+                owned by one of these organizations. ``None`` returns every
+                repository (callers must apply their own authorization,
+                e.g. a superadmin bypass).
+        """
         rows = list(self._repos.rows)
+        if organization_ids is not None:
+            rows = [r for r in rows if r.get("organization_id") in organization_ids]
         return sorted(rows, key=lambda r: int(r.get("id") or 0), reverse=True)
 
     def get_repo(self, repo_id: int) -> dict[str, Any] | None:
@@ -79,6 +88,7 @@ class GitHubRepoService:
     def create_repo(
         self,
         url: str,
+        organization_id: int,
         name: Optional[str] = None,
         branch: str = "main",
         description: str = "",
@@ -101,6 +111,7 @@ class GitHubRepoService:
             "branch": branch.strip() or "main",
             "description": description.strip(),
             "is_active": True,
+            "organization_id": organization_id,
             "created_at": now,
             "updated_at": now,
         }

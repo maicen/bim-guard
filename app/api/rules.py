@@ -25,7 +25,7 @@ from app.api.dependencies import (
     get_rules_service,
     get_ruleset_access_service,
 )
-from app.api.organizations import _require_superadmin
+from app.api.organizations import _require_membership, _require_superadmin
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -482,15 +482,20 @@ async def import_ids_rules(
     status_code=status.HTTP_201_CREATED,
     summary="Save a named, timestamped snapshot of a ruleset's current rules",
 )
-def create_rule_snapshot(payload: RuleSnapshotCreateRequest) -> RuleSnapshotResponse:
+def create_rule_snapshot(
+    payload: RuleSnapshotCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> RuleSnapshotResponse:
     """Freeze the current rules of a ruleset into a persisted, reusable snapshot."""
+    ruleset_check(payload.ruleset_id)
     try:
         row = RuleSnapshotService().create_snapshot(
             ruleset_id=payload.ruleset_id,
             name=payload.name or payload.ruleset_id,
             source_mode=payload.source_mode or "manual",
             notes=payload.notes or "",
-            created_by=payload.created_by or "",
+            created_by=payload.created_by or current_user.email or current_user.id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -498,34 +503,65 @@ def create_rule_snapshot(payload: RuleSnapshotCreateRequest) -> RuleSnapshotResp
 
 
 @router.get("/snapshots", response_model=list[RuleSnapshotResponse], summary="List rule configuration snapshots")
-def list_rule_snapshots() -> list[RuleSnapshotResponse]:
-    """Return all saved rule-configuration snapshots, newest first."""
-    return [RuleSnapshotResponse(**r) for r in RuleSnapshotService().list_snapshots()]
+def list_rule_snapshots(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> list[RuleSnapshotResponse]:
+    """Return saved rule-configuration snapshots accessible to caller's organizations."""
+    all_snapshots = RuleSnapshotService().list_snapshots()
+    if profiles.is_superadmin(current_user.id):
+        return [RuleSnapshotResponse(**r) for r in all_snapshots]
+    org_ids = memberships.org_ids_for_user(current_user.id)
+    allowed_rulesets = set()
+    for org_id in org_ids:
+        allowed_rulesets.update(ruleset_access.list_org_grants(org_id))
+    return [
+        RuleSnapshotResponse(**r)
+        for r in all_snapshots
+        if (r.get("source_ruleset_id") or r.get("ruleset_id") or "") in allowed_rulesets
+    ]
 
 
 @router.get("/snapshots/{snapshot_id}", response_model=RuleSnapshotResponse, summary="Get one rule snapshot")
-def get_rule_snapshot(snapshot_id: int) -> RuleSnapshotResponse:
+def get_rule_snapshot(
+    snapshot_id: int,
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> RuleSnapshotResponse:
     """Retrieve one saved rule-configuration snapshot by ID."""
     row = RuleSnapshotService().get_snapshot(snapshot_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+    ruleset_check(row.get("source_ruleset_id") or row.get("ruleset_id"))
     return RuleSnapshotResponse(**row)
 
 
 @router.delete("/snapshots/{snapshot_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a rule snapshot")
-def delete_rule_snapshot(snapshot_id: int) -> None:
+def delete_rule_snapshot(
+    snapshot_id: int,
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> None:
     """Delete a saved rule-configuration snapshot."""
-    if not RuleSnapshotService().delete_snapshot(snapshot_id):
+    svc = RuleSnapshotService()
+    existing = svc.get_snapshot(snapshot_id)
+    if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+    ruleset_check(existing.get("source_ruleset_id") or existing.get("ruleset_id"))
+    svc.delete_snapshot(snapshot_id)
 
 
 @router.get("/snapshots/{snapshot_id}/pdf", summary="Download a rule snapshot as a structured PDF")
-def download_rule_snapshot_pdf(snapshot_id: int):
+def download_rule_snapshot_pdf(
+    snapshot_id: int,
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+):
     """Render and return a snapshot's frozen rule configuration as a PDF spec sheet."""
     svc = RuleSnapshotService()
     snapshot = svc.get_snapshot(snapshot_id)
     if not snapshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Snapshot {snapshot_id} not found.")
+    ruleset_check(snapshot.get("source_ruleset_id") or snapshot.get("ruleset_id"))
     rules = svc.get_snapshot_rules(snapshot_id)
 
     from app.services.pdf_report_service import render_snapshot_pdf
@@ -1055,12 +1091,18 @@ def delete_rule(
 
 @router.post("/extract", response_model=RuleExtractionResponse, summary="Extract rules from document text or file")
 async def extract_rules(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
     model: Optional[str] = Form(None),
     organization_id: Optional[int] = Form(None),
 ) -> RuleExtractionResponse:
     """Extract compliance rules from uploaded document or provided raw text via LLM."""
+    if organization_id is not None:
+        _require_membership(organization_id, current_user, memberships, profiles)
+
     text = ""
     if file is not None and file.filename:
         content_bytes = await file.read()
@@ -1095,12 +1137,23 @@ async def extract_rules(
     response_model=RuleExtractionDraft,
     summary="Review (accept/reject/edit) one rule extraction draft",
 )
-def review_rule_draft(draft_id: int, payload: RuleDraftReviewRequest) -> RuleExtractionDraft:
+def review_rule_draft(
+    draft_id: int,
+    payload: RuleDraftReviewRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> RuleExtractionDraft:
     """Record a review decision on one extraction draft."""
     from app.services.rule_draft_service import RuleDraftService
 
+    svc = RuleDraftService()
+    draft = svc.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Draft {draft_id} not found.")
+    prop_rule = draft.get("proposed_rule") or {}
+    ruleset_check(prop_rule.get("ruleset_id"))
     try:
-        row = RuleDraftService().review_draft(draft_id, payload)
+        row = svc.review_draft(draft_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return RuleExtractionDraft.model_validate(row)
@@ -1111,12 +1164,21 @@ def review_rule_draft(draft_id: int, payload: RuleDraftReviewRequest) -> RuleExt
     response_model=RuleResponse,
     summary="Promote an accepted/edited rule extraction draft into the rule library",
 )
-def promote_rule_draft(draft_id: int) -> dict:
+def promote_rule_draft(
+    draft_id: int,
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> dict:
     """Insert an accepted/edited draft's proposed rule into `public.rules`."""
     from app.services.rule_draft_service import RuleDraftService
 
+    svc = RuleDraftService()
+    draft = svc.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Draft {draft_id} not found.")
+    prop_rule = draft.get("proposed_rule") or {}
+    ruleset_check(prop_rule.get("ruleset_id"))
     try:
-        created = RuleDraftService().promote_draft(draft_id)
+        created = svc.promote_draft(draft_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return created

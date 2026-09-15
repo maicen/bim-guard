@@ -222,5 +222,12 @@
         Sign in as dev test user
       </button>
     {/if}
+
+    <p class="border-t border-border-default/50 pt-3 text-micro text-fg-muted">
+      By signing in, you agree to our
+      <a href="/terms" class="text-fg-secondary underline transition-colors hover:text-accent">Terms of Service</a>
+      and
+      <a href="/privacy" class="text-fg-secondary underline transition-colors hover:text-accent">Privacy Policy</a>.
+    </p>
   </div>
 </div>

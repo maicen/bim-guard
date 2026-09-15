@@ -12,8 +12,12 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response as RawResponse
 
-from app.api.dependencies import get_projects_service
-from app.auth import get_current_user
+from app.api.dependencies import (
+    get_membership_service,
+    get_profile_service,
+    get_projects_service,
+)
+from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     BCFCommentCreatePayload,
@@ -26,23 +30,45 @@ from app.modules.contracts import (
     BCFViewpointResponse,
 )
 from app.services.bcf_sync_service import DEFAULT_BCF_SYNC_SERVICE, BCFSyncService
+from app.services.membership_service import MembershipService
+from app.services.profile_service import ProfileService
+from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
-# ``project_id`` here is the BCF spec's opaque string id, not necessarily one
-# of our own numeric project ids (see get_bcf_project's fallback), so this
-# can't reuse projects.py's per-project ownership dependency the way
-# analyze.py and naming_config.py do. Requiring sign-in at the router level
-# closes the "anyone, unauthenticated" gap this API previously had; scoping
-# it further to "signed-in users may only touch their own project's BCF
-# topics" is a follow-up, not attempted here.
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def get_bcf_sync_service() -> BCFSyncService:
     """Dependency provider for BCF synchronization service."""
     return DEFAULT_BCF_SYNC_SERVICE
+
+
+def _require_bcf_project_access(
+    project_id: str,
+    current_user: CurrentUser,
+    projects_service: ProjectsService,
+    memberships: MembershipService,
+    profiles: ProfileService,
+) -> None:
+    """Ensure caller has access to the project if it corresponds to an existing DB project."""
+    if profiles.is_superadmin(current_user.id):
+        return
+    try:
+        pid = int(project_id)
+    except ValueError:
+        return
+
+    project = projects_service.get_project(pid)
+    if project:
+        from app.api.projects import _can_access_project
+
+        if not _can_access_project(project, current_user.id, memberships):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project {project_id} not found.",
+            )
 
 
 # ------------------------------------------------------------------------------
@@ -57,10 +83,20 @@ def get_bcf_sync_service() -> BCFSyncService:
     tags=["BCF API v2.1"],
 )
 def list_bcf_projects(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> list[BCFProjectResponse]:
-    """Return all projects enabled for BCF issue exchange."""
-    projects = projects_service.list_projects()
+    """Return all projects enabled for BCF issue exchange, scoped to caller's organizations."""
+    all_projects = projects_service.list_projects()
+    projects = visible_project_rows(
+        all_projects,
+        user_id=current_user.id,
+        organization_id=None,
+        memberships=memberships,
+        profiles=profiles,
+    )
     return [
         BCFProjectResponse(
             project_id=str(p["id"]),
@@ -78,7 +114,10 @@ def list_bcf_projects(
 )
 def get_bcf_project(
     project_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> BCFProjectResponse:
     """Return BCF project metadata and authorization capabilities."""
     try:
@@ -87,14 +126,22 @@ def get_bcf_project(
     except ValueError:
         project = None
 
-    if not project:
-        # Fallback for string/UUID projects
-        return BCFProjectResponse(project_id=str(project_id), name=f"Project {project_id}")
+    if project:
+        if not profiles.is_superadmin(current_user.id):
+            from app.api.projects import _can_access_project
 
-    return BCFProjectResponse(
-        project_id=str(project["id"]),
-        name=project.get("name", f"Project {project['id']}"),
-    )
+            if not _can_access_project(project, current_user.id, memberships):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project {project_id} not found.",
+                )
+        return BCFProjectResponse(
+            project_id=str(project["id"]),
+            name=project.get("name", f"Project {project['id']}"),
+        )
+
+    # Fallback for string/UUID projects
+    return BCFProjectResponse(project_id=str(project_id), name=f"Project {project_id}")
 
 
 # ------------------------------------------------------------------------------
@@ -110,6 +157,10 @@ def get_bcf_project(
 )
 def list_topics(
     project_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
     topic_status: Optional[str] = Query(None, alias="topic_status", description="Filter by topic status"),
     topic_type: Optional[str] = Query(None, alias="topic_type", description="Filter by topic type"),
@@ -118,6 +169,7 @@ def list_topics(
     cde_state: Optional[str] = Query(None, alias="cde_state", description="Filter by ISO 19650 CDE state"),
 ) -> list[BCFTopicResponse]:
     """Retrieve all BCF topics for a given project with filtering support."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.get_topics(
         project_id=project_id,
         topic_status=topic_status,
@@ -138,10 +190,14 @@ def list_topics(
 def create_topic(
     project_id: str,
     payload: BCFTopicCreatePayload,
-    service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFTopicResponse:
     """Create a new BCF topic with ISO 19650 metadata container linking."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     project_code = ""
     originator = ""
     try:
@@ -170,9 +226,14 @@ def create_topic(
 def get_topic(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFTopicResponse:
     """Fetch details of a single BCF topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     topic = service.get_topic(project_id, topic_guid)
     if not topic:
         raise HTTPException(
@@ -192,9 +253,14 @@ def update_topic(
     project_id: str,
     topic_guid: str,
     payload: BCFTopicUpdatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFTopicResponse:
     """Update status, priority, description, or ISO 19650 metadata of a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     updated = service.update_topic(project_id, topic_guid, payload)
     if not updated:
         raise HTTPException(
@@ -213,9 +279,14 @@ def update_topic(
 def delete_topic(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> None:
     """Delete a BCF topic and all associated viewpoints/comments."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     deleted = service.delete_topic(project_id, topic_guid)
     if not deleted:
         raise HTTPException(
@@ -239,9 +310,14 @@ def delete_topic(
 def list_comments(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> list[BCFCommentResponse]:
     """List all comments attached to a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.get_comments(topic_guid)
 
 
@@ -256,9 +332,14 @@ def create_comment(
     project_id: str,
     topic_guid: str,
     payload: BCFCommentCreatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFCommentResponse:
     """Add a new comment to a BCF topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.create_comment(topic_guid=topic_guid, payload=payload)
 
 
@@ -276,9 +357,14 @@ def create_comment(
 def list_viewpoints(
     project_id: str,
     topic_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> list[BCFViewpointResponse]:
     """Retrieve 3D camera viewpoints associated with a topic."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.get_viewpoints(topic_guid)
 
 
@@ -293,9 +379,14 @@ def create_viewpoint(
     project_id: str,
     topic_guid: str,
     payload: BCFViewpointCreatePayload,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFViewpointResponse:
     """Create a new camera viewpoint with component highlighting."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     return service.create_viewpoint(topic_guid=topic_guid, payload=payload)
 
 
@@ -309,9 +400,14 @@ def get_viewpoint(
     project_id: str,
     topic_guid: str,
     viewpoint_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> BCFViewpointResponse:
     """Fetch camera viewpoint definition."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     vps = service.get_viewpoints(topic_guid)
     target = next((v for v in vps if v.guid.upper() == viewpoint_guid.upper()), None)
     if not target:
@@ -333,9 +429,14 @@ def get_viewpoint_snapshot(
     project_id: str,
     topic_guid: str,
     viewpoint_guid: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[BCFSyncService, Depends(get_bcf_sync_service)],
 ) -> RawResponse:
     """Return raw snapshot PNG image binary for viewpoint."""
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
     img_bytes = service.get_snapshot(viewpoint_guid)
     if not img_bytes:
         # Generate 1x1 transparent PNG fallback

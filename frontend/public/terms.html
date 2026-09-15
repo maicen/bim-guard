@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service - BIM Guard</title>
+  <meta name="description" content="Terms of Service for BIM Guard OpenBIM automated compliance and coordination platform." />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <style>
+    :root {
+      --bg-canvas: #090d16;
+      --bg-card: #0f172a;
+      --border: #1e293b;
+      --border-focus: #3b82f6;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --badge-bg: rgba(59, 130, 246, 0.1);
+      --badge-border: rgba(59, 130, 246, 0.25);
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 1rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2.5rem 0 5rem;
+    }
+    header.site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    }
+    .brand-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .back-link {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      background-color: var(--bg-card);
+      transition: all 0.2s ease;
+    }
+    .back-link:hover {
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background-color: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: var(--accent);
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+    .last-updated {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+    .content-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 0.85rem;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+    h2:first-of-type {
+      margin-top: 0;
+    }
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      font-size: 0.975rem;
+    }
+    ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+      margin-bottom: 1.25rem;
+      color: var(--text-secondary);
+    }
+    li {
+      margin-bottom: 0.45rem;
+      font-size: 0.95rem;
+    }
+    strong {
+      color: var(--text-primary);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    a:hover {
+      color: var(--accent-hover);
+    }
+    .warning-box {
+      background: rgba(234, 179, 8, 0.08);
+      border-left: 4px solid #eab308;
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      color: var(--text-primary);
+      font-size: 0.925rem;
+    }
+    footer.site-footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .footer-links a:hover {
+      color: var(--text-primary);
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 1.5rem 0 3rem;
+      }
+      .content-card {
+        padding: 1.25rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <a href="/" class="brand">
+        <div class="brand-icon">BG</div>
+        <span class="brand-name">BIM Guard</span>
+      </a>
+      <a href="/" class="back-link">&larr; Return to Application</a>
+    </header>
+
+    <main>
+      <div class="badge">Legal Terms</div>
+      <h1>Terms of Service</h1>
+      <div class="last-updated">Effective Date: September 15, 2026 &bull; Last Updated: September 15, 2026</div>
+
+      <div class="content-card">
+        <h2>1. Acceptance of Terms</h2>
+        <p>
+          These Terms of Service ("Terms") constitute a legally binding agreement between you ("User", "you", or "your") and <strong>BIM Guard</strong> ("BIM Guard", "we", "us", or "our"), governing your access to and use of the website located at <a href="https://bim-guard.xyz">https://bim-guard.xyz</a>, along with all associated application services, APIs, and data coordination features (collectively, the "Service").
+        </p>
+        <p>
+          By creating an account, signing in through Google OAuth, accessing, or using our Service, you confirm that you have read, understood, and agree to be bound by these Terms and our <a href="/privacy">Privacy Policy</a>. If you do not agree to these Terms, you must not access or use the Service.
+        </p>
+
+        <h2>2. Description of the Service</h2>
+        <p>
+          BIM Guard is an automated OpenBIM verification and Common Data Environment (CDE) management platform. The Service allows users to:
+        </p>
+        <ul>
+          <li>Parse, inspect, and visualize 3D Industry Foundation Classes (IFC) models in web browsers.</li>
+          <li>Execute automated compliance audits for architectural code compliance, spatial clearances, and corrosion engineering risks (including galvanic, crevice, and microbiological corrosion physics engines).</li>
+          <li>Govern document and model lifecycles according to ISO 19650 conventions (WIP, SHARED, PUBLISHED, ARCHIVED).</li>
+          <li>Export, route, and synchronize BCF (BIM Collaboration Format) topics and compliance deliverables with external BIM authoring and issue-tracking tools.</li>
+        </ul>
+
+        <h2>3. User Accounts &amp; Authentication</h2>
+        <p>
+          To access the features of BIM Guard, you must register an account either by authenticating through Google OAuth 2.0 or by providing a valid email address and password. You agree to:
+        </p>
+        <ul>
+          <li>Provide accurate, current, and complete information during registration.</li>
+          <li>Maintain the security and confidentiality of your credentials.</li>
+          <li>Promptly notify us of any unauthorized access or security breach involving your account.</li>
+          <li>Accept full responsibility for all activities and transactions that occur under your account.</li>
+        </ul>
+
+        <h2>4. User Data &amp; Intellectual Property Rights</h2>
+        <p>
+          <strong>Your Data Stays Yours:</strong> You retain 100% of all intellectual property rights, ownership, and title in and to any IFC models, drawings, BCF topics, project metadata, specifications, and files that you upload, submit, or store on BIM Guard ("User Data").
+        </p>
+        <p>
+          By uploading User Data, you grant BIM Guard a non-exclusive, worldwide, royalty-free license solely to host, parse, cache, and execute automated audits on such data as necessary to provide and operate the Service for you and your designated organization members.
+        </p>
+        <p>
+          <strong>Platform Intellectual Property:</strong> BIM Guard and its licensors retain all right, title, and interest in and to the Service, including all software, source code, user interfaces, compliance engine algorithms, documentation, logos, and trademarks.
+        </p>
+
+        <h2>5. Engineering Disclaimer &amp; Verification Notice</h2>
+        <div class="warning-box">
+          <strong>CRITICAL ENGINEERING DISCLAIMER:</strong><br />
+          BIM Guard's automated rule checks, corrosion heuristics (GC-001, CC-001, MC-001), and compliance audit reports are provided solely as design-assist and coordination tools. The Service does not provide licensed architectural, structural, MEP, or fire safety engineering certifications. Automated findings must be reviewed and verified by qualified, licensed engineering professionals prior to construction, fabrication, or procurement.
+        </div>
+
+        <h2>6. Acceptable Use Policy</h2>
+        <p>You agree not to use the Service to:</p>
+        <ul>
+          <li>Violate any applicable local, state, national, or international law or building regulation.</li>
+          <li>Upload files containing malicious code, viruses, trojans, or harmful automated scripts.</li>
+          <li>Attempt to gain unauthorized access to the Service, other accounts, or computer systems connected to the Service.</li>
+          <li>Probe, scan, or test the vulnerability of the system or breach security measures without explicit written authorization.</li>
+          <li>Reverse engineer, decompile, or disassemble any portion of the BIM Guard platform or compute kernels.</li>
+        </ul>
+
+        <h2>7. Disclaimers of Warranties</h2>
+        <p>
+          THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR UNINTERRUPTED AVAILABILITY. WE DO NOT WARRANT THAT THE AUDIT RESULTS WILL BE ERROR-FREE OR DETECT EVERY POSSIBLE CODE NON-COMPLIANCE.
+        </p>
+
+        <h2>8. Limitation of Liability</h2>
+        <p>
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL BIM GUARD, ITS AFFILIATES, OFFICERS, OR DEVELOPERS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOSS OF PROFITS, DATA, USE, GOODWILL, OR CONSTRUCTION DELAYS, ARISING OUT OF OR IN CONNECTION WITH YOUR ACCESS TO OR USE OF (OR INABILITY TO USE) THE SERVICE.
+        </p>
+
+        <h2>9. Modifications to Terms and Service</h2>
+        <p>
+          We reserve the right to modify these Terms at any time. When changes are made, we will update the "Last Updated" date at the top of this document. Continued use of the Service after any such changes constitutes your acceptance of the revised Terms.
+        </p>
+
+        <h2>10. Governing Law</h2>
+        <p>
+          These Terms and any disputes arising out of or related to them shall be governed by and construed in accordance with the laws of the jurisdiction in which BIM Guard operates, without regard to conflict of law principles.
+        </p>
+
+        <h2>11. Contact Information</h2>
+        <p>
+          If you have any questions or feedback regarding these Terms of Service, please contact our team at:
+        </p>
+        <ul>
+          <li><strong>Email:</strong> <a href="mailto:support@bim-guard.xyz">support@bim-guard.xyz</a></li>
+          <li><strong>Legal:</strong> <a href="mailto:privacy@bim-guard.xyz">privacy@bim-guard.xyz</a></li>
+          <li><strong>Website:</strong> <a href="https://bim-guard.xyz">https://bim-guard.xyz</a></li>
+        </ul>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div>&copy; 2026 BIM Guard. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="https://bim-guard.xyz">Home</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
+

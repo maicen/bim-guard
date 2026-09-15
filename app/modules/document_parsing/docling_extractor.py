@@ -67,8 +67,13 @@ class DoclingExtractor:
             resolved_key = api_key if api_key is not None else DOCLING_API_KEY
             resolved_url = api_url if api_url is not None else DOCLING_SERVICE_URL
         else:
+            from app.modules.config import DOCLING_LOCAL_URL
+
             resolved_key = api_key or ""
-            resolved_url = api_url or ""
+            if DOCLING_LOCAL_URL and (not api_url or "localhost" in api_url or "127.0.0.1" in api_url):
+                resolved_url = DOCLING_LOCAL_URL
+            else:
+                resolved_url = api_url or DOCLING_LOCAL_URL or "http://localhost:5001"
 
         if not resolved_url:
             raise RuntimeError(
@@ -276,27 +281,28 @@ class DoclingExtractor:
         """
         if not xml_content or not xml_content.strip():
             return False
-        import tempfile
         import sys
+        import tempfile
         from pathlib import Path
         try:
-            import doclang
             import os
+
+            import doclang
             if sys.platform == "win32":
                 try:
                     import doclang.backends.saxonche as sc
                     if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
                         def _patched_saxon_validate(self, xml_path, *, schema_path, allow_empty_namespace=False, verbose=False):
+                            from doclang.backends.saxonche import (
+                                _ensure_namespace,
+                                _parse_doclang_document,
+                                _require_saxonche_backend,
+                                _svrl_failed_asserts_to_violations,
+                                _transpile_schematron_to_xslt,
+                                _write_xml_without_dtd,
+                            )
                             from lxml import etree
                             from saxonche import PySaxonProcessor
-                            from doclang.backends.saxonche import (
-                                _require_saxonche_backend,
-                                _parse_doclang_document,
-                                _ensure_namespace,
-                                _write_xml_without_dtd,
-                                _transpile_schematron_to_xslt,
-                                _svrl_failed_asserts_to_violations,
-                            )
                             _require_saxonche_backend()
                             with open(xml_path, "rb") as f:
                                 xml_doc = _parse_doclang_document(f)

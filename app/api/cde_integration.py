@@ -23,8 +23,15 @@ from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
-from app.api.dependencies import get_documents_service, get_models_service, get_projects_service
-from app.api.projects import get_authorized_project
+from app.api.dependencies import (
+    get_documents_service,
+    get_membership_service,
+    get_models_service,
+    get_profile_service,
+    get_projects_service,
+)
+from app.api.projects import get_authorized_project, require_project_access
+from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEAuthConfigResponse,
@@ -43,7 +50,9 @@ from app.services.cde_state_machine import CDEStateMachine
 from app.services.documents_service import DocumentService
 from app.services.exchange_disposition import DispositionInput, compute_disposition
 from app.services.ids_validation_service import IDSValidationService
+from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
+from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.report_artifacts import ReportArtifactService
 
@@ -244,8 +253,30 @@ def list_cde_documents(
             }
         )
 
-    # 2. Project specification documents
-    docs = documents_service.list_documents()
+    # 2. Project specification documents (scoped to project bindings, client documents, or matching project_code)
+    try:
+        from app.bootstrap import get_container
+
+        document_access = get_container().document_access_service
+        bound_ids = set(document_access.list_project_bindings(project_id))
+    except Exception:
+        bound_ids = set()
+
+    try:
+        client_docs = projects_service.get_client_documents_by_project(project_id)
+        client_doc_ids = {cd.get("document_id") for cd in client_docs if cd.get("document_id")}
+    except Exception:
+        client_doc_ids = set()
+
+    project_code = project.get("project_code")
+    all_docs = documents_service.list_documents()
+    docs = [
+        d
+        for d in all_docs
+        if d.get("id") in bound_ids
+        or d.get("id") in client_doc_ids
+        or (project_code and d.get("project_code") == project_code)
+    ]
     for d in docs:
         d_id = str(d.get("id"))
         etag = f'"{hashlib.sha256(str(d_id).encode()).hexdigest()[:16]}"'
@@ -361,17 +392,16 @@ def handle_cde_webhook(
 )
 def promote_gate1(
     payload: CDEPromoteRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> CDEPromoteResponse:
     """Promote a project's CDE state from WIP to SHARED if there are no critical errors."""
     state_machine = CDEStateMachine(projects_service=projects_service)
-
-    project = projects_service.get_project(payload.project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {payload.project_id} not found."
-        )
+    require_project_access(
+        payload.project_id, current_user, projects_service, memberships, profiles
+    )
 
     # Real Tier-1/Tier-4 signal: the project's most recently persisted audit
     # report's issue count. This counts every open finding rather than only

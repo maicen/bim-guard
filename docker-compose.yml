@@ -21,9 +21,17 @@ services:
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY:-}
+      - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL:-}
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-bim-guard-artifacts}
       - SUPABASE_STORAGE_PREFIX=${SUPABASE_STORAGE_PREFIX:-}
       - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN:-}
+
+      # ── S3 Storage Configuration ────────────────────────────────────────────
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_REGION=${S3_REGION:-}
 
       # ── LLM Extraction & Agent Providers ────────────────────────────────────
       - BIM_GUARD_LLM_MODEL=${BIM_GUARD_LLM_MODEL:-openrouter/auto}
@@ -37,15 +45,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
 
-      # ── Document Parsing — Docling ───────────────────────────────────────────
-      # Hosted Docling Serve account (e.g. https://developer.dcls.saas.ibm.com).
+      # Document Parsing — Docling (self-hosted by default)
       - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}
       - DOCLING_API_KEY=${DOCLING_API_KEY:-}
-      # Leave unset unless the `docling-serve` service below is enabled
-      # (`docker compose --profile docling up -d`); then set this to
-      # http://docling-serve:5001 — its internal compose network address,
-      # not the host-published DOCLING_LOCAL_PORT — in your .env.
-      - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-}
+      - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-http://docling-serve:5001}
 
       # ── Graph Database — Neo4j (default) ────────────────────────────────────
       # The neo4j service below starts automatically with a plain
@@ -81,6 +84,8 @@ services:
 
     depends_on:
       neo4j:
+        condition: service_healthy
+      docling-serve:
         condition: service_healthy
 
     healthcheck:
@@ -120,17 +125,13 @@ services:
   # ── Optional: local self-hosted Docling parsing engine ───────────────────────
   # Open-source `docling-serve` REST server
   # (https://github.com/docling-project/docling-serve). Not started by
-  # default — bring it up explicitly with:
-  #   docker compose --profile docling up -d
-  # Then register it as a parsing engine instance in Settings > Parsing
-  # Engines (kind "docling-local", API URL http://localhost:${DOCLING_LOCAL_PORT:-5001}
-  # from the host, or http://docling-serve:5001 from inside this compose
-  # network — e.g. set DOCLING_LOCAL_URL above to that and restart bim-guard
-  # to have it seeded automatically on first boot). No API key by default.
+  # ── Default: local self-hosted Docling parsing engine ───────────────────────
+  # Open-source `docling-serve` REST server
+  # (https://github.com/docling-project/docling-serve). Starts automatically
+  # by default alongside bim-guard and neo4j.
   docling-serve:
     image: quay.io/docling-project/docling-serve-cpu:latest
     container_name: bim-guard-docling
-    profiles: ["docling"]
     ports:
       - "${DOCLING_LOCAL_PORT:-5001}:5001"
     environment:

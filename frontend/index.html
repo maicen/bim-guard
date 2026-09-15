@@ -3,13 +3,84 @@
 
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIM Guard — Automated OpenBIM Code Compliance &amp; Corrosion Physics</title>
+  
+  <!-- Primary SEO Meta Tags -->
+  <meta name="description" content="Automated OpenBIM code compliance, 3D clearance auditing, corrosion physics (galvanic, crevice, microbiological), and ISO 19650 CDE coordination for IFC models and BCF workflows." />
+  <meta name="keywords" content="OpenBIM, IFC, BCF, BIM compliance, code checking, ISO 19650, CDE, building code audit, corrosion engineering, galvanic corrosion, BIM coordination, IfcOpenShell" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="author" content="BIM Guard" />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="canonical" href="https://bim-guard.xyz/" />
+
+  <!-- Favicons & App Icons -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIM Guard</title>
+
+  <!-- Open Graph / Facebook / LinkedIn / Slack -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bim-guard.xyz/" />
+  <meta property="og:site_name" content="BIM Guard" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="BIM Guard — Automated OpenBIM Code Compliance &amp; Corrosion Physics" />
+  <meta property="og:description" content="Automated OpenBIM code compliance, 3D clearance auditing, corrosion physics (galvanic, crevice, microbiological), and ISO 19650 CDE coordination directly on your IFC models." />
+  <meta property="og:image" content="https://bim-guard.xyz/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="BIM Guard OpenBIM Compliance Platform Banner" />
+
+  <!-- Twitter / X Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://bim-guard.xyz/" />
+  <meta name="twitter:title" content="BIM Guard — Automated OpenBIM Code Compliance &amp; Corrosion Physics" />
+  <meta name="twitter:description" content="Automated OpenBIM code compliance, 3D clearance auditing, corrosion physics, and ISO 19650 CDE coordination directly on your IFC models." />
+  <meta name="twitter:image" content="https://bim-guard.xyz/og-image.png" />
+
+  <!-- Schema.org JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://bim-guard.xyz/#software",
+        "name": "BIM Guard",
+        "applicationCategory": "BusinessApplication, DesignApplication",
+        "operatingSystem": "Web Browser",
+        "url": "https://bim-guard.xyz",
+        "description": "Automated OpenBIM compliance verification and corrosion engineering platform for IFC models and ISO 19650 CDE governance.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "OpenBIM IFC 3D Model Clearance & Spatial Verification",
+          "ISO 19650 CDE Workflow State Machine (WIP, SHARED, PUBLISHED, ARCHIVED)",
+          "Galvanic, Crevice, and Microbiological Corrosion Physics (GC-001, CC-001, MC-001)",
+          "BIM Collaboration Format (BCF 2.1) Issue Coordination",
+          "buildingSMART Data Dictionary (bSDD) Semantic Classification"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://bim-guard.xyz/#organization",
+        "name": "BIM Guard",
+        "url": "https://bim-guard.xyz",
+        "logo": "https://bim-guard.xyz/android-chrome-512x512.png",
+        "sameAs": [
+          "https://github.com/maicen/bim-guard"
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Typography & Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -43,8 +114,25 @@
 </head>
 
 <body
-  class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-200">
-  <div id="app"></div>
+  class="bg-surface-canvas text-fg-primary antialiased selection:bg-accent/30 selection:text-accent transition-colors duration-200">
+  <div id="app">
+    <!-- Server-side semantic crawl fallback (hydrated and replaced by Svelte 5 upon mount) -->
+    <header class="sr-only">
+      <h1>BIM Guard — Automated OpenBIM Code Compliance &amp; Corrosion Physics</h1>
+      <p>Automated code compliance for the models you already have. BIM Guard reads IFC models directly, runs galvanic, crevice, and microbiological corrosion checks alongside architectural code rules, and routes findings as BCF issues.</p>
+    </header>
+  </div>
+  <noscript>
+    <div style="max-width: 800px; margin: 2rem auto; padding: 2rem; font-family: sans-serif; color: #f8fafc; background: #0f172a; border-radius: 12px; border: 1px solid #1e293b;">
+      <h2>JavaScript Required for BIM Guard</h2>
+      <p>BIM Guard is an automated OpenBIM compliance verification and coordination platform that performs 3D building code checks, corrosion physics analysis (GC-001, CC-001, MC-001), and ISO 19650 CDE coordination for IFC models.</p>
+      <p>Please enable JavaScript in your browser to access the 3D model viewer, rule extraction studio, and compliance audit dashboards.</p>
+      <p style="margin-top: 1.5rem;">
+        <a href="/privacy" style="color: #3b82f6; margin-right: 1.5rem;">Privacy Policy</a>
+        <a href="/terms" style="color: #3b82f6;">Terms of Service</a>
+      </p>
+    </div>
+  </noscript>
   <script type="module" src="/src/main.ts"></script>
 </body>
 

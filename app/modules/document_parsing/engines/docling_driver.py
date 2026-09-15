@@ -33,8 +33,14 @@ class _DoclingDriverBase(ParsingEngineDriver):
     def test_connection(self, *, api_key: str, api_url: str) -> EngineConnectionResult:
         from docling.service_client import DoclingServiceClient
 
+        from app.modules.config import DOCLING_LOCAL_URL
+
+        target_url = api_url
+        if self.kind == "docling-local" and DOCLING_LOCAL_URL and (not target_url or "localhost" in target_url or "127.0.0.1" in target_url):
+            target_url = DOCLING_LOCAL_URL
+
         try:
-            with DoclingServiceClient(url=api_url, api_key=api_key or "") as client:
+            with DoclingServiceClient(url=target_url, api_key=api_key or "") as client:
                 health = client.health()
             return EngineConnectionResult(ok=True, detail=str(health))
         except Exception as exc:

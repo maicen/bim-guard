@@ -255,15 +255,53 @@ def _resolve_allowed_origins(env_str: str | None = None) -> list[str]:
 
 
 allowed_origins = _resolve_allowed_origins()
+allow_creds = "*" not in allowed_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if "*" not in allowed_origins else ["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add standard defense-in-depth HTTP security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            # script-src keeps 'unsafe-inline' deliberately, not by default:
+            # frontend/index.html ships a small inline dark-mode bootstrap
+            # <script> (runs before Svelte hydrates, to avoid a flash of the
+            # wrong theme) and a `type="importmap"` block pinning the web-ifc
+            # CDN import, both of which CSP treats as inline script elements.
+            # Neither is user-controlled, so this doesn't open an injection
+            # vector for reflected/stored XSS payloads elsewhere on the page,
+            # but it does mean script-src doesn't block inline <script>
+            # injected by an XSS bug. Tightening this further would require
+            # moving both scripts to hashed/nonced sources tracked in lockstep
+            # with the built frontend/dist/index.html.
+            "default-src 'self'; "
+            "img-src 'self' data: blob: https:; "
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "connect-src 'self' ws: wss: https: http:; "
+            "font-src 'self' data:; "
+            "frame-ancestors 'none'; "
+            "object-src 'none';",
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -416,6 +454,65 @@ static_dir = Path("static")
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+def _resolve_public_html(filename: str) -> Path | None:
+    """Resolve a public static HTML document across dist, public, or static folders."""
+    for candidate in [
+        Path("frontend/dist") / filename,
+        Path("frontend/public") / filename,
+        Path("static") / filename,
+    ]:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+@app.get("/privacy", response_class=FileResponse, include_in_schema=False)
+@app.get("/privacy.html", response_class=FileResponse, include_in_schema=False)
+async def privacy_page():
+    """Serve standalone privacy policy for Google OAuth branding compliance and public access."""
+    target = _resolve_public_html("privacy.html")
+    if target:
+        return FileResponse(target, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Privacy policy not found.")
+
+
+@app.get("/terms", response_class=FileResponse, include_in_schema=False)
+@app.get("/terms.html", response_class=FileResponse, include_in_schema=False)
+async def terms_page():
+    """Serve standalone terms of service for Google OAuth branding compliance and public access."""
+    target = _resolve_public_html("terms.html")
+    if target:
+        return FileResponse(target, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Terms of service not found.")
+
+
+@app.get("/sitemap.xml", response_class=FileResponse, include_in_schema=False)
+async def sitemap_xml():
+    """Serve sitemap.xml for search engine indexing."""
+    target = _resolve_public_html("sitemap.xml")
+    if target:
+        return FileResponse(target, media_type="application/xml")
+    raise HTTPException(status_code=404, detail="Sitemap not found.")
+
+
+@app.get("/robots.txt", response_class=FileResponse, include_in_schema=False)
+async def robots_txt():
+    """Serve robots.txt for search engine crawler governance."""
+    target = _resolve_public_html("robots.txt")
+    if target:
+        return FileResponse(target, media_type="text/plain")
+    raise HTTPException(status_code=404, detail="Robots.txt not found.")
+
+
+@app.get("/og-image.png", response_class=FileResponse, include_in_schema=False)
+async def og_image():
+    """Serve Open Graph social sharing preview image."""
+    target = _resolve_public_html("og-image.png")
+    if target:
+        return FileResponse(target, media_type="image/png")
+    raise HTTPException(status_code=404, detail="Open Graph image not found.")
+
+
 # Production SPA Client Serving & Fallback
 frontend_dist = Path("frontend/dist")
 if (frontend_dist / "index.html").exists():
@@ -428,9 +525,19 @@ if (frontend_dist / "index.html").exists():
         """Serve Svelte 5 Single Page Application client-side routing."""
         if full_path.startswith("api/") or full_path.startswith("static/") or full_path.startswith("download/"):
             raise HTTPException(status_code=404, detail="Endpoint not found.")
-        file_candidate = frontend_dist / full_path
-        if full_path and file_candidate.is_file():
-            return FileResponse(file_candidate)
+        dist_resolved = frontend_dist.resolve()
+        if full_path:
+            file_candidate = (frontend_dist / full_path).resolve()
+            if not file_candidate.is_relative_to(dist_resolved):
+                raise HTTPException(status_code=404, detail="Endpoint not found.")
+            if file_candidate.is_file():
+                return FileResponse(file_candidate)
+
+            html_candidate = (frontend_dist / f"{full_path}.html").resolve()
+            if not html_candidate.is_relative_to(dist_resolved):
+                raise HTTPException(status_code=404, detail="Endpoint not found.")
+            if html_candidate.is_file():
+                return FileResponse(html_candidate)
         return FileResponse(frontend_dist / "index.html")
 else:
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
