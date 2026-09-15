@@ -59,6 +59,9 @@ from app.api import (
     organizations as api_organizations,
 )
 from app.api import (
+    parsing_engine_instances as api_parsing_engine_instances,
+)
+from app.api import (
     parsing_engines as api_parsing_engines,
 )
 from app.api import (
@@ -370,6 +373,11 @@ app.include_router(
 app.include_router(
     api_parsing_engines.router,
     prefix="/api/parsing-engines",
+    tags=["Parsing Engines"],
+)
+app.include_router(
+    api_parsing_engine_instances.router,
+    prefix="/api/organizations",
     tags=["Parsing Engines"],
 )
 app.include_router(
