@@ -44,6 +44,11 @@ data/cache/standards-pdf/
 # and re-downloadable from the GitHub mirror recorded in that script.
 data/cache/ifc-release/
 
+# Official IFC 2x3 TC1 EXPRESS + Pset archive cached by
+# ingest_ifc2x3_release.py. Re-downloadable from the GitHub mirror recorded
+# in that script.
+data/cache/ifc2x3-release/
+
 # Validation sweep inputs/outputs: ~1.8 GB, fully regenerable.
 # Models re-download from the URLs in the validation dataset doc; BCF
 # archives re-export from the cached per-model results. The evidentiary
