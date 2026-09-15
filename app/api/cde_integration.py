@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.api.dependencies import (
     get_documents_service,
@@ -52,9 +53,11 @@ from app.services.exchange_disposition import DispositionInput, compute_disposit
 from app.services.ids_validation_service import IDSValidationService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
+from app.services.opencde_client import OpenCDEClientError, OpenCDEDocumentsClient
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.report_artifacts import ReportArtifactService
+from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 
@@ -322,28 +325,105 @@ def list_cde_documents(
     summary="Synchronize external CDE documents & models",
     tags=["OpenCDE Documents"],
 )
-def sync_external_cde_documents(
+async def sync_external_cde_documents(
     project_id: int,
     payload: CDESyncRequest,
+    request: Request,
     project: Annotated[dict, Depends(get_authorized_project)],
+    documents_service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> CDESyncResponse:
-    """Pull & link external CDE documents/models into BIMGuard project."""
-    synced_files = []
-    for doc_id in payload.document_ids or ["DOC-001"]:
-        synced_files.append(f"{payload.cde_server_url}/documents/{doc_id}.ifc")
+    """Pull an external openCDE Documents API server's project documents into BIM-Guard.
+
+    Lists the external project's documents via the CDE's admin REST API
+    (``GET /api/projects/{id}/documents``), optionally narrowed to
+    ``payload.document_ids``, downloads each one's content
+    (``GET .../documents/{id}/content``), and ingests it through the same
+    extract/store/create path as a regular upload -- one bad document does not
+    abort the batch, matching the Google Drive import endpoint's behavior.
+    """
+    auth_header = request.headers.get("authorization", "")
+    caller_token = auth_header.removeprefix("Bearer ").strip() if auth_header else ""
+    access_token = payload.access_token or caller_token
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No access token available for the external CDE -- pass one in "
+            "the request body, or call this endpoint with your own bearer token.",
+        )
+
+    client = OpenCDEDocumentsClient(base_url=payload.cde_server_url, access_token=access_token)
+
+    try:
+        documents = await run_in_threadpool(client.list_project_documents, payload.external_project_id)
+    except OpenCDEClientError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if payload.document_ids:
+        wanted_ids = set(payload.document_ids)
+        documents = [d for d in documents if str(d.get("id")) in wanted_ids]
+
+    synced_files: list[str] = []
+    errors: list[str] = []
+    for document in documents:
+        document_id = str(document.get("id") or "")
+        if not document_id or not document.get("contentAvailable", True):
+            continue
+        try:
+            filename, content_type, content = await run_in_threadpool(
+                client.download_document, payload.external_project_id, document_id
+            )
+            clean_filename = safe_upload_name(filename or document.get("fileName") or document_id)
+            error_msg = validate_document_upload(clean_filename, content_type, content)
+            if error_msg:
+                errors.append(f"{clean_filename}: {error_msg}")
+                continue
+
+            row, _created = await run_in_threadpool(
+                documents_service.ingest_uploaded_bytes,
+                clean_filename,
+                content,
+                doc_type="Specification",
+                project_code=project.get("project_code", "") or "",
+            )
+            synced_files.append(clean_filename)
+        except OpenCDEClientError as exc:
+            logger.warning(
+                "OpenCDE sync download failed project_id=%d document_id=%s error=%s",
+                project_id,
+                document_id,
+                exc,
+            )
+            errors.append(f"{document_id}: {exc}")
+        except Exception as exc:  # noqa: BLE001 - one bad document must not abort the batch
+            logger.exception(
+                "OpenCDE sync ingestion failed unexpectedly project_id=%d document_id=%s",
+                project_id,
+                document_id,
+            )
+            errors.append(f"{document_id}: {exc}")
+
+    if payload.auto_analyze and synced_files:
+        logger.info(
+            "OpenCDE sync requested auto_analyze project_id=%d, but automatic analysis "
+            "triggering is not wired up yet -- run analysis manually for now.",
+            project_id,
+        )
 
     logger.info(
-        "OpenCDE sync executed project_id=%d cde_url=%s count=%d",
+        "OpenCDE sync executed project_id=%d cde_url=%s synced=%d errors=%d",
         project_id,
         payload.cde_server_url,
         len(synced_files),
+        len(errors),
     )
 
     return CDESyncResponse(
-        success=True,
+        success=len(errors) == 0,
         synced_documents_count=len(synced_files),
         synced_files=synced_files,
-        message=f"Successfully synchronized {len(synced_files)} document(s) from external CDE.",
+        errors=errors,
+        message=f"Synchronized {len(synced_files)} document(s) from external CDE."
+        + (f" {len(errors)} failed." if errors else ""),
     )
 
 

@@ -1394,12 +1394,14 @@ export interface CDESyncRequest {
   external_project_id: string;
   document_ids?: string[];
   auto_analyze?: boolean;
+  access_token?: string | null;
 }
 
 export interface CDESyncResponse {
   success: boolean;
   synced_documents_count: number;
   synced_files: string[];
+  errors: string[];
   message: string;
 }
 

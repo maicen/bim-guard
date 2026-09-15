@@ -2176,6 +2176,13 @@ class CDESyncRequest(BaseModel):
     external_project_id: str = Field(..., description="Project ID in external CDE")
     document_ids: list[str] = Field(default_factory=list, description="Specific external document IDs to pull")
     auto_analyze: bool = Field(False, description="Automatically trigger compliance analysis upon sync")
+    access_token: str | None = Field(
+        None,
+        description="Bearer token for the external CDE. Defaults to the caller's own "
+        "BIM-Guard access token when omitted -- works when the external CDE validates "
+        "the same identity provider (e.g. a self-hosted openCDE test server configured "
+        "against this same Supabase project).",
+    )
 
 
 class CDESyncResponse(BaseModel):
@@ -2184,6 +2191,7 @@ class CDESyncResponse(BaseModel):
     success: bool
     synced_documents_count: int = 0
     synced_files: list[str] = []
+    errors: list[str] = []
     message: str = ""
 
 
