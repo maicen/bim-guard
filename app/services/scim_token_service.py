@@ -4,7 +4,7 @@ Distinct from Supabase-JWT human auth (app.auth): each organization gets one
 rotatable, hashed bearer token that an external IdP (Okta, Azure AD, ...)
 presents on every /api/scim/v2/* request. The raw token is generated once at
 mint time and never stored -- only its SHA-256 hash lives in
-public.scim_tokens (see supabase/migrations/20260915140000_create_scim_tokens.sql).
+public.scim_tokens (see supabase/migrations/20260915104053_create_scim_tokens.sql).
 """
 
 from __future__ import annotations
