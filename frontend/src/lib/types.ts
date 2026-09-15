@@ -1289,6 +1289,8 @@ export interface BSDDDictionaryItem {
   organization_code_owner: string;
   language_iso_code: string;
   classes_count: number;
+  is_curated?: boolean;
+  domain?: string | null;
 }
 
 export interface BSDDValidationViolation {

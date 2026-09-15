@@ -2070,6 +2070,8 @@ class BSDDDictionaryItem(BaseModel):
     organization_code_owner: str = Field("buildingSMART", description="Owner organization code")
     language_iso_code: str = Field("en-GB", description="Language code")
     classes_count: int = Field(0, description="Number of classes in dictionary")
+    is_curated: bool = Field(False, description="Whether this dictionary is a vetted BIM-Guard curated ontology standard")
+    domain: Optional[str] = Field(None, description="Engineering or regulatory domain classification")
 
 
 class BSDDValidationViolation(BaseModel):

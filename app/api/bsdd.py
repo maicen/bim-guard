@@ -34,13 +34,17 @@ router = APIRouter()
 )
 def list_dictionaries(
     client: Annotated[BSDDClient, Depends(get_bsdd_client)],
+    curated_only: bool = Query(
+        default=False,
+        description="Filter to only curated BIM-Guard compliance, regulatory, and corrosion dictionaries",
+    ),
 ) -> list[BSDDDictionaryItem]:
-    """Return the catalog of bSDD dictionaries (IFC, Uniclass, OmniClass, ...).
+    """Return the catalog of bSDD dictionaries (IFC, ACCORD, RIR, Uniclass, OmniClass, ...).
 
     Used by project settings to let a user pick the classification standard
     a project should be coded against.
     """
-    return client.list_dictionaries()
+    return client.list_dictionaries(curated_only=curated_only)
 
 
 @router.get(

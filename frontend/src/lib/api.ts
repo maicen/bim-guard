@@ -2276,8 +2276,9 @@ const BSDD_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const bsddApi = {
   /** Classification standards a project can be coded against (Uniclass, OmniClass, IFC, ...). */
-  async listDictionaries(): Promise<BSDDDictionaryItem[]> {
-    const res = await apiFetch(`${API_BASE}/bsdd/dictionaries`);
+  async listDictionaries(curatedOnly: boolean = false): Promise<BSDDDictionaryItem[]> {
+    const query = curatedOnly ? "?curated_only=true" : "";
+    const res = await apiFetch(`${API_BASE}/bsdd/dictionaries${query}`);
     return handleResponse<BSDDDictionaryItem[]>(res);
   },
 

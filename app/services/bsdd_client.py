@@ -41,8 +41,65 @@ FALLBACK_BSDD_BASE_URL = "https://test.bsdd.buildingsmart.org"
 _IFC_TERM_RE = re.compile(r"\[\[(Ifc[A-Za-z0-9]+)\]\]")
 
 # ------------------------------------------------------------------------------
-# Built-in Resilient Fallback Dictionaries (for offline & air-gapped operations)
+# Curated and Resilient Fallback Dictionaries (offline, air-gapped & compliance)
 # ------------------------------------------------------------------------------
+
+CURATED_DICTIONARY_METADATA: dict[str, dict[str, Any]] = {
+    "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3": {
+        "code": "ifc_4.3",
+        "name": "buildingSMART IFC 4.3 Standard Property and Classification Dictionary",
+        "version": "4.3",
+        "organization_code_owner": "buildingsmart",
+        "language_iso_code": "en-GB",
+        "classes_count": 800,
+        "domain": "Core IFC Model & Spatial Topology",
+    },
+    "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0": {
+        "code": "ACCORD",
+        "name": "ACCORD Automated Regulatory Compliance Checking Dictionary",
+        "version": "1.0",
+        "organization_code_owner": "accord",
+        "language_iso_code": "en-GB",
+        "classes_count": 21,
+        "domain": "Regulatory & Permitting Compliance (AEC3PO)",
+    },
+    "https://identifier.buildingsmart.org/uri/bsird/rir/1.0": {
+        "code": "rir",
+        "name": "Regulatory Information Requirements (RIR)",
+        "version": "1.0",
+        "organization_code_owner": "bsird",
+        "language_iso_code": "en-GB",
+        "classes_count": 154,
+        "domain": "Statutory Code Requirements & Fire Safety",
+    },
+    "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1": {
+        "code": "subsea-flexible-pipes",
+        "name": "Oil & Gas Subsea Flexible Pipes & Corrosion Specification",
+        "version": "2.1",
+        "organization_code_owner": "bs-energy",
+        "language_iso_code": "en-GB",
+        "classes_count": 106,
+        "domain": "Corrosion Protection & Materials (GC/CC/MC-001)",
+    },
+    "https://identifier.buildingsmart.org/uri/nbs/uniclass2015/1": {
+        "code": "uniclass2015",
+        "name": "Uniclass 2015 Classification System",
+        "version": "1",
+        "organization_code_owner": "nbs",
+        "language_iso_code": "en-GB",
+        "classes_count": 14328,
+        "domain": "ISO 19650 Information Management & CDE",
+    },
+    "https://identifier.buildingsmart.org/uri/etim/etim/10.1": {
+        "code": "etim",
+        "name": "ETIM International Technical Information Model",
+        "version": "10.1",
+        "organization_code_owner": "etim",
+        "language_iso_code": "en-GB",
+        "classes_count": 5000,
+        "domain": "MEP & Building Services (SAREF4BLDG)",
+    },
+}
 
 FALLBACK_DICTIONARIES: list[dict[str, Any]] = [
     {
@@ -53,6 +110,41 @@ FALLBACK_DICTIONARIES: list[dict[str, Any]] = [
         "organization_code_owner": "buildingSMART",
         "language_iso_code": "en-GB",
         "classes_count": 8,
+        "is_curated": True,
+        "domain": "Core IFC Model & Spatial Topology",
+    },
+    {
+        "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
+        "code": "ACCORD",
+        "name": "ACCORD Automated Regulatory Compliance Checking Dictionary",
+        "version": "1.0",
+        "organization_code_owner": "accord",
+        "language_iso_code": "en-GB",
+        "classes_count": 21,
+        "is_curated": True,
+        "domain": "Regulatory & Permitting Compliance (AEC3PO)",
+    },
+    {
+        "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+        "code": "rir",
+        "name": "Regulatory Information Requirements (RIR)",
+        "version": "1.0",
+        "organization_code_owner": "bsird",
+        "language_iso_code": "en-GB",
+        "classes_count": 154,
+        "is_curated": True,
+        "domain": "Statutory Code Requirements & Fire Safety",
+    },
+    {
+        "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+        "code": "subsea-flexible-pipes",
+        "name": "Oil & Gas Subsea Flexible Pipes & Corrosion Specification",
+        "version": "2.1",
+        "organization_code_owner": "bs-energy",
+        "language_iso_code": "en-GB",
+        "classes_count": 106,
+        "is_curated": True,
+        "domain": "Corrosion Protection & Materials (GC/CC/MC-001)",
     },
     {
         "uri": "https://identifier.buildingsmart.org/uri/bs-ag/uniclass-2015",
@@ -62,6 +154,8 @@ FALLBACK_DICTIONARIES: list[dict[str, Any]] = [
         "organization_code_owner": "NBS",
         "language_iso_code": "en-GB",
         "classes_count": 5,
+        "is_curated": True,
+        "domain": "ISO 19650 Information Management & CDE",
     },
     {
         "uri": "https://identifier.buildingsmart.org/uri/omniclass/omniclass-2020",
@@ -71,6 +165,8 @@ FALLBACK_DICTIONARIES: list[dict[str, Any]] = [
         "organization_code_owner": "CSI",
         "language_iso_code": "en-US",
         "classes_count": 4,
+        "is_curated": True,
+        "domain": "North American Classification Standard",
     },
 ]
 
@@ -204,6 +300,81 @@ FALLBACK_CLASSES: dict[str, dict[str, Any]] = {
         "description": "OmniClass Table 23 - Plumbing and Piping.",
         "properties": [],
     },
+    "Compression_Member": {
+        "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/class/Compression_Member",
+        "code": "Compression_Member",
+        "name": "Compression Member",
+        "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
+        "related_ifc_entities": ["IfcColumn", "IfcMember"],
+        "description": "Structural member subject to axial compression according to Eurocode checks.",
+        "properties": [
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/NEd",
+                "name": "NEd",
+                "property_set": "Pset_AccordStructuralCapacity",
+                "data_type": "IfcForceMeasure",
+                "units": "kN",
+                "allowed_values": [],
+                "description": "Design value of the axial compression force.",
+            },
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/NBRd",
+                "name": "NBRd",
+                "property_set": "Pset_AccordStructuralCapacity",
+                "data_type": "IfcForceMeasure",
+                "units": "kN",
+                "allowed_values": [],
+                "description": "Design buckling resistance of the compression member.",
+            },
+        ],
+    },
+    "AnodeCollarSet": {
+        "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AnodeCollarSet",
+        "code": "AnodeCollarSet",
+        "name": "Anode Collar Set",
+        "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+        "related_ifc_entities": ["IfcPipeSegment", "IfcElementAssembly"],
+        "description": "Sacrificial anode collar assembly for cathodic protection against subsea corrosion.",
+        "properties": [
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AnodeMaterial",
+                "name": "AnodeMaterial",
+                "property_set": "Pset_CathodicProtection",
+                "data_type": "IfcLabel",
+                "units": None,
+                "allowed_values": ["Zinc Alloy", "Aluminium-Zinc-Indium", "Magnesium"],
+                "description": "Sacrificial galvanic anode alloy type.",
+            },
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DesignLifeYears",
+                "name": "DesignLifeYears",
+                "property_set": "Pset_CathodicProtection",
+                "data_type": "IfcTimeMeasure",
+                "units": "year",
+                "allowed_values": [],
+                "description": "Design service life of sacrificial galvanic anodes.",
+            },
+        ],
+    },
+    "Alarm.FIREALARMPANEL": {
+        "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.FIREALARMPANEL",
+        "code": "Alarm.FIREALARMPANEL",
+        "name": "Fire Alarm Panel",
+        "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+        "related_ifc_entities": ["IfcAlarm"],
+        "description": "Regulatory Information Requirements (RIR) statutory specification for fire alarm control units.",
+        "properties": [
+            {
+                "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/prop/FireRatingStandard",
+                "name": "FireRatingStandard",
+                "property_set": "Pset_RegulatoryFireSafety",
+                "data_type": "IfcLabel",
+                "units": None,
+                "allowed_values": ["EN 54-2", "NFPA 72", "BS 5839-1"],
+                "description": "Statutory fire detection and alarm system compliance standard.",
+            }
+        ],
+    },
 }
 
 
@@ -252,7 +423,7 @@ class BSDDClient:
 
         return None
 
-    def list_dictionaries(self) -> list[BSDDDictionaryItem]:
+    def list_dictionaries(self, curated_only: bool = False) -> list[BSDDDictionaryItem]:
         """Fetch list of available dictionaries from bSDD or offline catalog."""
         api_data = self._http_get("/api/Dictionary/v1")
         # A live GET /api/Dictionary/v1 wraps the list in {"dictionaries": [...]}
@@ -267,21 +438,35 @@ class BSDDClient:
         if dictionaries:
             res = []
             for item in dictionaries:
+                uri = item.get("uri", "")
+                curated_meta = CURATED_DICTIONARY_METADATA.get(uri)
+                is_curated = curated_meta is not None
+                domain = curated_meta.get("domain") if curated_meta else None
+                if curated_only and not is_curated:
+                    continue
                 res.append(
                     BSDDDictionaryItem(
-                        uri=item.get("uri", ""),
+                        uri=uri,
                         code=item.get("dictionaryCode") or item.get("code", ""),
                         name=item.get("dictionaryName") or item.get("name", ""),
                         version=item.get("dictionaryVersion") or item.get("version", "1.0"),
                         organization_code_owner=item.get("organizationCodeOwner", "buildingSMART"),
                         language_iso_code=item.get("languageIsoCode", "en-GB"),
                         classes_count=item.get("classCount", item.get("classesCount", 0)),
+                        is_curated=is_curated,
+                        domain=domain,
                     )
                 )
-            return res
+            if res:
+                return res
 
         # Fallback catalog
-        return [BSDDDictionaryItem(**d) for d in FALLBACK_DICTIONARIES]
+        fallback = []
+        for d in FALLBACK_DICTIONARIES:
+            if curated_only and not d.get("is_curated", False):
+                continue
+            fallback.append(BSDDDictionaryItem(**d))
+        return fallback
 
     @staticmethod
     def _class_uri(dictionary_uri: str, class_code: str) -> str:
