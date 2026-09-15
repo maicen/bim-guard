@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -405,21 +407,30 @@ class BSDDClient:
         if not self.enable_network:
             return None
 
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "BIMGuard-AI/1.0 (buildingSMART-Integration)",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode("utf-8"))
-                    self._cache[cache_key] = data
-                    return data
-        except Exception as exc:
-            logger.debug("bSDD HTTP request failed for %s: %s", url, exc)
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "Accept": "application/json",
+                        "User-Agent": "BIMGuard-AI/1.0 (buildingSMART-Integration)",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode("utf-8"))
+                        self._cache[cache_key] = data
+                        return data
+            except urllib.error.HTTPError as exc:
+                if exc.code == 429 and attempt < 2:
+                    backoff = 1.5 * (attempt + 1)
+                    time.sleep(backoff)
+                    continue
+                logger.debug("bSDD HTTP request failed for %s: %s", url, exc)
+                break
+            except Exception as exc:
+                logger.debug("bSDD HTTP request failed for %s: %s", url, exc)
+                break
 
         return None
 
