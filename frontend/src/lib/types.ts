@@ -877,6 +877,24 @@ export interface RuleDraftReviewRequest {
   edited_rule?: RuleCreateRequest | null;
 }
 
+/** Mirrors app/modules/property_confidence.py's CONFIDENCE_CATEGORIES —
+ * which resolution pass supplied a property's value, ranked 1 (most
+ * authoritative) to 7 (unresolved). */
+export interface PropertyConfidence {
+  id:
+    | "authored"
+    | "derived"
+    | "type_inherited"
+    | "alias"
+    | "fallback"
+    | "geometry_estimate"
+    | "unresolved";
+  label: string;
+  description: string;
+  rank: number;
+  meter_level: number;
+}
+
 export interface RuleElementResult {
   element_name?: string;
   guid?: string;
@@ -891,6 +909,11 @@ export interface RuleElementResult {
    * computed) — present on ANY status, including PASS, since a caveat
    * matters most when a value looks compliant but wasn't reliably measured. */
   data_quality_warnings?: string[] | null;
+  /** Which resolution pass supplied `actual` — authored / derived /
+   * type-inherited / alias / fallback / geometry-estimate / unresolved. See
+   * lib/propertyConfidence.ts. Present on ANY status, same reasoning as
+   * data_quality_warnings. */
+  property_confidence?: PropertyConfidence | null;
 }
 
 export interface RuleComplianceResult {

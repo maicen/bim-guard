@@ -21,6 +21,8 @@ PARTIAL rather than an asserted FAIL.
 
 import re
 
+from app.modules.property_confidence import classify_property_confidence
+
 # Case-insensitive string forms a rule's check_value might use for a boolean
 # IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
 _BOOL_ALIASES = {"true": True, "false": False, "yes": True, "no": False}
@@ -747,6 +749,13 @@ class ComplianceComparator:
             # data_quality_warnings comment for why this rides on every
             # status, not just failures.
             "data_quality_warnings": el.get("data_quality_warnings"),
+            # Which resolution pass actually supplied `actual` (authored /
+            # derived / type-inherited / alias / fallback / geometry-estimate
+            # / unresolved) — see property_confidence.py. Rides on every
+            # status for the same reason data_quality_warnings does: a value
+            # that looks compliant but came from a geometry guess is exactly
+            # what a reviewer needs flagged, not just a failure.
+            "property_confidence": classify_property_confidence(el.get("found_pset")),
         }
 
     @staticmethod
@@ -765,6 +774,7 @@ class ComplianceComparator:
             # can still offer a "View in 3D" link.
             "position_mm": el.get("position_mm"),
             "data_quality_warnings": el.get("data_quality_warnings"),
+            "property_confidence": classify_property_confidence(el.get("found_pset")),
         }
 
     @staticmethod
