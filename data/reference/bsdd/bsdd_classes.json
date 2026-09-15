@@ -178489,5 +178489,2007 @@
     "related_ifc_entities": [],
     "definition": null,
     "description": ""
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.FIREALARMPANEL",
+    "code": "Alarm.FIREALARMPANEL",
+    "name": "Fire alarm panel",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAlarm"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.HOMEFIREALARMDEVICE",
+    "code": "Alarm.HOMEFIREALARMDEVICE",
+    "name": "Home fire alarm device",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAlarm"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.MANUALALARMCALLPOINT",
+    "code": "Alarm.MANUALALARMCALLPOINT",
+    "name": "Manual alarm call point",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAlarm"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.SOUNDER",
+    "code": "Alarm.SOUNDER",
+    "name": "Sounder",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAlarm"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Alarm.VISUALALARM",
+    "code": "Alarm.VISUALALARM",
+    "name": "Visual alarm",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAlarm"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Annotation.SITEBOUNDARY",
+    "code": "Annotation.SITEBOUNDARY",
+    "name": "Site boundary",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcAnnotation"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.HOUSEHOLDSHELTER",
+    "code": "BuiltSystem.HOUSEHOLDSHELTER",
+    "name": "Household shelter",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PRECASTEXTERNALWALLWITHCASTINWINDOWS",
+    "code": "BuiltSystem.PRECASTEXTERNALWALLWITHCASTINWINDOWS",
+    "name": "Precast external wall with castin windows",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDANDPREFINISHEDCEILING",
+    "code": "BuiltSystem.PREFABRICATEDANDPREFINISHEDCEILING",
+    "name": "Prefabricated and prefinished ceiling",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDANDPREFINISHEDFLOOR",
+    "code": "BuiltSystem.PREFABRICATEDANDPREFINISHEDFLOOR",
+    "name": "Prefabricated and prefinished floor",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDANDPREFINISHEDWALL",
+    "code": "BuiltSystem.PREFABRICATEDANDPREFINISHEDWALL",
+    "name": "Prefabricated and prefinished wall",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDBATHROOMUNIT",
+    "code": "BuiltSystem.PREFABRICATEDBATHROOMUNIT",
+    "name": "Prefabricated bathroom unit",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDMEPHORIZONTALMODULE",
+    "code": "BuiltSystem.PREFABRICATEDMEPHORIZONTALMODULE",
+    "name": "Prefabricated mep horizontal module",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDMEPPLANTMODULE",
+    "code": "BuiltSystem.PREFABRICATEDMEPPLANTMODULE",
+    "name": "Prefabricated mep plant module",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDMEPVERTICALMODULE",
+    "code": "BuiltSystem.PREFABRICATEDMEPVERTICALMODULE",
+    "name": "Prefabricated mep vertical module",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.PREFABRICATEDPUMPSKID",
+    "code": "BuiltSystem.PREFABRICATEDPUMPSKID",
+    "name": "Prefabricated pump skid",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/BuiltSystem.WASTEMANAGEMENT",
+    "code": "BuiltSystem.WASTEMANAGEMENT",
+    "name": "Waste management",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuiltSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Burner.FIREPLACE",
+    "code": "Burner.FIREPLACE",
+    "name": "Fireplace",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBurner"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Burner.FUELBURNINGEQUIPMENT",
+    "code": "Burner.FUELBURNINGEQUIPMENT",
+    "name": "Fuel burning equipment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBurner"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Burner.INCINERATOR",
+    "code": "Burner.INCINERATOR",
+    "name": "Incinerator",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBurner"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Chimney.AIR",
+    "code": "Chimney.AIR",
+    "name": "Air",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcChimney"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Chimney.FLUE",
+    "code": "Chimney.FLUE",
+    "name": "Flue",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcChimney"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Chimney.GAS",
+    "code": "Chimney.GAS",
+    "name": "Gas",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcChimney"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Covering.FIRECURTAIN",
+    "code": "Covering.FIRECURTAIN",
+    "name": "Fire curtain",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCovering"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Covering.PIPESLEEVE",
+    "code": "Covering.PIPESLEEVE",
+    "name": "Pipe sleeve",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCovering"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Covering.PWCSINSPECTIONCHAMBERCOVER",
+    "code": "Covering.PWCSINSPECTIONCHAMBERCOVER",
+    "name": "PWCS inspection chamber cover",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCovering"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Covering.PWCSMANHOLECOVER",
+    "code": "Covering.PWCSMANHOLECOVER",
+    "name": "PWCS manhole cover",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCovering"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Covering.SOFFIT",
+    "code": "Covering.SOFFIT",
+    "name": "Soffit",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCovering"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/CurtainWall.FACADESYSTEM",
+    "code": "CurtainWall.FACADESYSTEM",
+    "name": "Facade system",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCurtainWall"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/CurtainWall.GLAZINGSYSTEM",
+    "code": "CurtainWall.GLAZINGSYSTEM",
+    "name": "Glazing system",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCurtainWall"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/CurtainWall.PARTITIONSYSTEM",
+    "code": "CurtainWall.PARTITIONSYSTEM",
+    "name": "Partition system",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCurtainWall"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DiscreteAccessory.GRATING",
+    "code": "DiscreteAccessory.GRATING",
+    "name": "Grating",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDiscreteAccessory"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DiscreteAccessory.PIPESUPPORT",
+    "code": "DiscreteAccessory.PIPESUPPORT",
+    "name": "Pipe support",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDiscreteAccessory"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionChamberElement.PWCSINSPECTIONCHAMBER",
+    "code": "DistributionChamberElement.PWCSINSPECTIONCHAMBER",
+    "name": "PWCS inspection chamber",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionChamberElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionChamberElement.PWCSMANHOLE",
+    "code": "DistributionChamberElement.PWCSMANHOLE",
+    "name": "PWCS manhole",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionChamberElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionChamberElement.SAMPLINGSUMP",
+    "code": "DistributionChamberElement.SAMPLINGSUMP",
+    "name": "Sampling sump",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionChamberElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionChamberElement.SCREENCHAMBER",
+    "code": "DistributionChamberElement.SCREENCHAMBER",
+    "name": "Screen chamber",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionChamberElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.DRAINAGE",
+    "code": "DistributionSystem.DRAINAGE",
+    "name": "Drainage",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.DRYRISER",
+    "code": "DistributionSystem.DRYRISER",
+    "name": "Dry riser",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.FOAMFIREEXTINGUISHING",
+    "code": "DistributionSystem.FOAMFIREEXTINGUISHING",
+    "name": "Foam fire extinguishing",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.FOAMSPRINKLER",
+    "code": "DistributionSystem.FOAMSPRINKLER",
+    "name": "Foam sprinkler",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.POTABLEWATER",
+    "code": "DistributionSystem.POTABLEWATER",
+    "name": "Potable water",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.SMOKECONTROL",
+    "code": "DistributionSystem.SMOKECONTROL",
+    "name": "Smoke control",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.SMOKEPURGING",
+    "code": "DistributionSystem.SMOKEPURGING",
+    "name": "Smoke purging",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.SMOKEVENT",
+    "code": "DistributionSystem.SMOKEVENT",
+    "name": "Smoke vent",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.SPRINKLER",
+    "code": "DistributionSystem.SPRINKLER",
+    "name": "Sprinkler",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/DistributionSystem.WETRISER",
+    "code": "DistributionSystem.WETRISER",
+    "name": "Wet riser",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionSystem"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Door.ACCESSHATCH",
+    "code": "Door.ACCESSHATCH",
+    "name": "Access hatch",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Door.BLASTDOOR",
+    "code": "Door.BLASTDOOR",
+    "name": "Blast door",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Door.ROLLERSHUTTER",
+    "code": "Door.ROLLERSHUTTER",
+    "name": "Roller shutter",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Door.WASTEHATCH",
+    "code": "Door.WASTEHATCH",
+    "name": "Waste hatch",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/FireSuppressionTerminal.FOAMINLET",
+    "code": "FireSuppressionTerminal.FOAMINLET",
+    "name": "Foam inlet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFireSuppressionTerminal"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/FireSuppressionTerminal.FOAMOUTLET",
+    "code": "FireSuppressionTerminal.FOAMOUTLET",
+    "name": "Foam outlet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFireSuppressionTerminal"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/FireSuppressionTerminal.STANDBYFIREHOSE",
+    "code": "FireSuppressionTerminal.STANDBYFIREHOSE",
+    "name": "Standby firehose",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFireSuppressionTerminal"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.BENCH",
+    "code": "Furniture.BENCH",
+    "name": "Bench",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.BICYCLERACK",
+    "code": "Furniture.BICYCLERACK",
+    "name": "Bicycle rack",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.CABINET",
+    "code": "Furniture.CABINET",
+    "name": "Cabinet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.CHANGINGBED",
+    "code": "Furniture.CHANGINGBED",
+    "name": "Changing bed",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.CHILDPROTECTIONSEAT",
+    "code": "Furniture.CHILDPROTECTIONSEAT",
+    "name": "Child protection seat",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.CLEANINGCABINET",
+    "code": "Furniture.CLEANINGCABINET",
+    "name": "Cleaning cabinet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.COUNTER",
+    "code": "Furniture.COUNTER",
+    "name": "Counter",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.CUBICLE",
+    "code": "Furniture.CUBICLE",
+    "name": "Cubicle",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.DIAPERCHANGINGTABLE",
+    "code": "Furniture.DIAPERCHANGINGTABLE",
+    "name": "Diaper changing table",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.HANDICAPACCESSORY",
+    "code": "Furniture.HANDICAPACCESSORY",
+    "name": "Handicap accessory",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.KITCHENCABINET",
+    "code": "Furniture.KITCHENCABINET",
+    "name": "Kitchen cabinet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.NOTICEBOARD",
+    "code": "Furniture.NOTICEBOARD",
+    "name": "Notice board",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.PLANTERBOX",
+    "code": "Furniture.PLANTERBOX",
+    "name": "Planter box",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.PORTABLEFIREEXTINGUISHER",
+    "code": "Furniture.PORTABLEFIREEXTINGUISHER",
+    "name": "Portable fire extinguisher",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.RECYCLABLECOMPACTOR",
+    "code": "Furniture.RECYCLABLECOMPACTOR",
+    "name": "Recyclable compactor",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.RECYCLABLECONTAINER",
+    "code": "Furniture.RECYCLABLECONTAINER",
+    "name": "Recyclable container",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.SHOWERSCREEN",
+    "code": "Furniture.SHOWERSCREEN",
+    "name": "Shower screen",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.WASTEBIN",
+    "code": "Furniture.WASTEBIN",
+    "name": "Waste bin",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.WASTECOMPACTOR",
+    "code": "Furniture.WASTECOMPACTOR",
+    "name": "WASTECOMPACTOR",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Furniture.WASTECONTAINER",
+    "code": "Furniture.WASTECONTAINER",
+    "name": "Waste container",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcFurniture"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.CADASTRALLOT",
+    "code": "GeographicElement.CADASTRALLOT",
+    "name": "Cadastral lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.EXISTINGEARTHWORKS",
+    "code": "GeographicElement.EXISTINGEARTHWORKS",
+    "name": "Existing earthworks",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.GREENVERGE",
+    "code": "GeographicElement.GREENVERGE",
+    "name": "Green verge",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.PLANTINGAREA",
+    "code": "GeographicElement.PLANTINGAREA",
+    "name": "Planting area",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.SHRUB",
+    "code": "GeographicElement.SHRUB",
+    "name": "Shrub",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/GeographicElement.TREE",
+    "code": "GeographicElement.TREE",
+    "name": "Tree",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcGeographicElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Interceptor.POLLUTIONCONTROLEQUIPMENT",
+    "code": "Interceptor.POLLUTIONCONTROLEQUIPMENT",
+    "name": "Pollution control equipment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcInterceptor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Kerb.KERB",
+    "code": "Kerb.KERB",
+    "name": "Kerb",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcKerb"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Kerb.ROADKERB",
+    "code": "Kerb.ROADKERB",
+    "name": "Road kerb",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcKerb"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Pavement.DRIVEWAY",
+    "code": "Pavement.DRIVEWAY",
+    "name": "Drive way",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPavement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Pavement.ENTRANCECULVERT",
+    "code": "Pavement.ENTRANCECULVERT",
+    "name": "Entrance culvert",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPavement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Pavement.FOOTPATH",
+    "code": "Pavement.FOOTPATH",
+    "name": "Footpath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPavement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeFitting.DRAINCHANNELBEND",
+    "code": "PipeFitting.DRAINCHANNELBEND",
+    "name": "Drain channel bend",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeFitting.FLANGEADAPTOR",
+    "code": "PipeFitting.FLANGEADAPTOR",
+    "name": "Flange adaptor",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeFitting.FLEXIBLECOUPLING",
+    "code": "PipeFitting.FLEXIBLECOUPLING",
+    "name": "Flexible coupling",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeFitting.PIPESILENCER",
+    "code": "PipeFitting.PIPESILENCER",
+    "name": "Pipe silencer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeFitting.SHORTPIECE",
+    "code": "PipeFitting.SHORTPIECE",
+    "name": "Short piece",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeSegment.FLARESTACK",
+    "code": "PipeSegment.FLARESTACK",
+    "name": "Flare stack",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeSegment.FOUNDATION",
+    "code": "PipeSegment.FOUNDATION",
+    "name": "Foundation",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeSegment.RAINWATEROUTLET",
+    "code": "PipeSegment.RAINWATEROUTLET",
+    "name": "Rainwater outlet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/PipeSegment.SCUPPERDRAIN",
+    "code": "PipeSegment.SCUPPERDRAIN",
+    "name": "Scupper drain",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Railing.BOLLARD",
+    "code": "Railing.BOLLARD",
+    "name": "Bollard",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRailing"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Railing.ROOFRAIL",
+    "code": "Railing.ROOFRAIL",
+    "name": "Roof rail",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRailing"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Ramp.ACCESSIBLEROUTE",
+    "code": "Ramp.ACCESSIBLEROUTE",
+    "name": "Accessible route",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRamp"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Ramp.CURVEDRAMP",
+    "code": "Ramp.CURVEDRAMP",
+    "name": "Curved ramp",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRamp"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Ramp.DRIVEWAY",
+    "code": "Ramp.DRIVEWAY",
+    "name": "Driveway",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRamp"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Ramp.FLAREDKERBRAMP",
+    "code": "Ramp.FLAREDKERBRAMP",
+    "name": "Flared kerb ramp",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcRamp"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Sensor.AIRIMPURITIESSENSOR",
+    "code": "Sensor.AIRIMPURITIESSENSOR",
+    "name": "Air impurities sensor",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSensor"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/ShadingDevice.LOUVREDPANEL",
+    "code": "ShadingDevice.LOUVREDPANEL",
+    "name": "Louvred panel",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcShadingDevice"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Sign.SIGNAGEEXIT",
+    "code": "Sign.SIGNAGEEXIT",
+    "name": "Signage exit",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSign"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Slab.ACCESSIBLEROUTE",
+    "code": "Slab.ACCESSIBLEROUTE",
+    "name": "Accessible route",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSlab"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Slab.SERVICEPLATFORM",
+    "code": "Slab.SERVICEPLATFORM",
+    "name": "Service platform",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSlab"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Slab.SURFACESLAB",
+    "code": "Slab.SURFACESLAB",
+    "name": "Surface slab",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSlab"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.APARTMENT",
+    "code": "Space.APARTMENT",
+    "name": "Apartment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.BICYCLELOT",
+    "code": "Space.BICYCLELOT",
+    "name": "Bicycle lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.BUSLOT",
+    "code": "Space.BUSLOT",
+    "name": "Bus lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.CARLOT",
+    "code": "Space.CARLOT",
+    "name": "Car lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.CHASE",
+    "code": "Space.CHASE",
+    "name": "Chase",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.COACHLOT",
+    "code": "Space.COACHLOT",
+    "name": "Coach lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.LA",
+    "code": "Space.LA",
+    "name": "Level area",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.LANDSCAPE",
+    "code": "Space.LANDSCAPE",
+    "name": "Landscape",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.LORRYLOT",
+    "code": "Space.LORRYLOT",
+    "name": "Lorry lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.MOTORCYCLELOT",
+    "code": "Space.MOTORCYCLELOT",
+    "name": "Motorcycle lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.NFA",
+    "code": "Space.NFA",
+    "name": "Net floor area",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.RENTABLE",
+    "code": "Space.RENTABLE",
+    "name": "Rentable area",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.RLA",
+    "code": "Space.RLA",
+    "name": "Regulatory level area",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.SHAFT",
+    "code": "Space.SHAFT",
+    "name": "Shaft",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.WASHROOM",
+    "code": "Space.WASHROOM",
+    "name": "Washroom",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Space.WASTECHUTE",
+    "code": "Space.WASTECHUTE",
+    "name": "Waste chute",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpace"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.ACCESSIBLEROUTE",
+    "code": "SpatialZone.ACCESSIBLEROUTE",
+    "name": "Accessible route",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.ACCESSROAD",
+    "code": "SpatialZone.ACCESSROAD",
+    "name": "Access road",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.ACCESSWAY",
+    "code": "SpatialZone.ACCESSWAY",
+    "name": "Accessway",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.ESCAPEROUTE",
+    "code": "SpatialZone.ESCAPEROUTE",
+    "name": "Escape route",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.FIREENGINEACCESSWAY",
+    "code": "SpatialZone.FIREENGINEACCESSWAY",
+    "name": "Fire engine accessway",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.FIREENGINELOT",
+    "code": "SpatialZone.FIREENGINELOT",
+    "name": "Fire engine lot",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.VEHICLEACCESS",
+    "code": "SpatialZone.VEHICLEACCESS",
+    "name": "Vehicle access",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/SpatialZone.VEHICULARSERVICEROAD",
+    "code": "SpatialZone.VEHICULARSERVICEROAD",
+    "name": "Vehicular service road",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSpatialZone"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.BALANCINGTANK",
+    "code": "Tank.BALANCINGTANK",
+    "name": "Balancing tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.DETENTIONTANK",
+    "code": "Tank.DETENTIONTANK",
+    "name": "Detention tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.EJECTORTANK",
+    "code": "Tank.EJECTORTANK",
+    "name": "Ejector tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.IRRIGATIONTANK",
+    "code": "Tank.IRRIGATIONTANK",
+    "name": "Irrigation tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.POTABLEWATER",
+    "code": "Tank.POTABLEWATER",
+    "name": "Potable water",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.RAINWATERHARVESTINGTANK",
+    "code": "Tank.RAINWATERHARVESTINGTANK",
+    "name": "Rainwater harvesting tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.RECHARGEWELL",
+    "code": "Tank.RECHARGEWELL",
+    "name": "Recharge well",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.SECTIONAL",
+    "code": "Tank.SECTIONAL",
+    "name": "Sectional",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.SPRINKLERTANK",
+    "code": "Tank.SPRINKLERTANK",
+    "name": "Sprinkler tank",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Tank.WASTEHANDLINGEQUIPMENT",
+    "code": "Tank.WASTEHANDLINGEQUIPMENT",
+    "name": "Waste handling equipment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTank"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/TransportElement.BINLIFTER",
+    "code": "TransportElement.BINLIFTER",
+    "name": "Bin lifter",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTransportElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/TransportElement.GOODSLIFT",
+    "code": "TransportElement.GOODSLIFT",
+    "name": "Goods lift",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTransportElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/TransportElement.LIFTINGPLATFORM",
+    "code": "TransportElement.LIFTINGPLATFORM",
+    "name": "Lifting platform",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTransportElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/TransportElement.MAINTENANCEPLATFORM",
+    "code": "TransportElement.MAINTENANCEPLATFORM",
+    "name": "Maintenance platform",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTransportElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/TransportElement.PLATFORMLIFT",
+    "code": "TransportElement.PLATFORMLIFT",
+    "name": "Platform lift",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcTransportElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/UnitaryControlElement.AUTOMATICRESCUEDEVICE",
+    "code": "UnitaryControlElement.AUTOMATICRESCUEDEVICE",
+    "name": "Automatic rescue device",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcUnitaryControlElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/UnitaryControlElement.LIFTSUPERVISORYPANEL",
+    "code": "UnitaryControlElement.LIFTSUPERVISORYPANEL",
+    "name": "Lift supervisory panel",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcUnitaryControlElement"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Valve.LANDINGVALVE",
+    "code": "Valve.LANDINGVALVE",
+    "name": "Landing valve",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcValve"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Valve.REFLUXVALVE",
+    "code": "Valve.REFLUXVALVE",
+    "name": "Reflux valve",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcValve"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Valve.SPRINKLERCONTROL",
+    "code": "Valve.SPRINKLERCONTROL",
+    "name": "Sprinkler control",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcValve"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/WasteTerminal.WASTESUMP",
+    "code": "WasteTerminal.WASTESUMP",
+    "name": "Waste sump",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcWasteTerminal"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Window.BAYWINDOW",
+    "code": "Window.BAYWINDOW",
+    "name": "Bay window",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcWindow"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0/class/Window.VENTILATIONSLEEVE",
+    "code": "Window.VENTILATIONSLEEVE",
+    "name": "Ventilation sleeve",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bsird/rir/1.0",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcWindow"
+    ],
+    "definition": null,
+    "description": null
   }
 ]
