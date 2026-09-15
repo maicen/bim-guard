@@ -343,28 +343,33 @@ FALLBACK_CLASSES: dict[str, dict[str, Any]] = {
     "Compression_Member": {
         "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/class/Compression_Member",
         "code": "Compression_Member",
-        "name": "Compression Member",
+        "name": "Compression_Member",
         "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
-        "related_ifc_entities": ["IfcColumn", "IfcMember"],
-        "description": "Structural member subject to axial compression according to Eurocode checks.",
+        # ACCORD carries no class definitions or property types/units in bSDD --
+        # verified live: DescriptionPart is "" for all 21 ACCORD classes, and
+        # Property/v4 returns no dataType/Units for its properties even for
+        # clearly numeric ones (Height, NEd). related_ifc_entities below is
+        # ACCORD's own (unexpected) relatedIfcEntityNames value, not ours.
+        "related_ifc_entities": ["IfcDoor"],
+        "description": None,
         "properties": [
             {
-                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/NEd",
+                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/4d1c980a-2c92-459a-948b-e37195568091",
                 "name": "NEd",
-                "property_set": "Pset_AccordStructuralCapacity",
-                "data_type": "IfcForceMeasure",
-                "units": "kN",
+                "property_set": None,
+                "data_type": None,
+                "units": None,
                 "allowed_values": [],
-                "description": "Design value of the axial compression force.",
+                "description": None,
             },
             {
-                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/NBRd",
+                "uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0/prop/e708de48-0a60-4085-8850-1f38bb2ffd9b",
                 "name": "NBRd",
-                "property_set": "Pset_AccordStructuralCapacity",
-                "data_type": "IfcForceMeasure",
-                "units": "kN",
+                "property_set": None,
+                "data_type": None,
+                "units": None,
                 "allowed_values": [],
-                "description": "Design buckling resistance of the compression member.",
+                "description": None,
             },
         ],
     },
@@ -700,7 +705,7 @@ class BSDDClient:
         lowered = query.lower()
         matched = []
         for code, raw in FALLBACK_CLASSES.items():
-            if lowered in code.lower() or lowered in raw.get("name", "").lower() or lowered in raw.get("description", "").lower():
+            if lowered in code.lower() or lowered in raw.get("name", "").lower() or lowered in (raw.get("description") or "").lower():
                 props = [BSDDPropertyItem(**p) for p in raw.get("properties", [])]
                 matched.append(
                     BSDDClassItem(
