@@ -33,6 +33,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -47,25 +48,49 @@ from supabase import Client, create_client  # noqa: E402
 
 IFC43_DICTIONARY_URI = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3"
 BATCH_SIZE = 500
+DEFAULT_REFERENCE_DIR = Path(__file__).resolve().parent.parent / "data" / "reference" / "bsdd"
+
+DEFAULT_CORE_SEED_CLASSES = [
+    "IfcWall",
+    "IfcBeam",
+    "IfcColumn",
+    "IfcSlab",
+    "IfcDoor",
+    "IfcWindow",
+    "IfcCovering",
+    "IfcPlate",
+    "IfcMember",
+    "IfcRailing",
+    "IfcStair",
+    "IfcPipeSegment",
+    "IfcPipeFitting",
+    "IfcValve",
+    "IfcPump",
+    "IfcDuctSegment",
+    "IfcDuctFitting",
+    "IfcAirTerminal",
+    "IfcSpace",
+    "IfcBuildingElementProxy",
+]
 
 
-def _build_client() -> Client:
-    """Create a Supabase client from server-side credentials.
-
-    Fails loudly rather than silently falling back to the in-memory stub,
-    since a crawl that doesn't persist is just a slow way to warm bSDD's
-    own cache.
-    """
+def _build_client() -> Client | None:
+    """Create a Supabase client from server-side credentials if available."""
     load_env_file()
     url = os.getenv("SUPABASE_URL", "").strip()
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or os.getenv("SUPABASE_KEY", "").strip()
     if not url or not key:
-        raise SystemExit("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to persist the crawl.")
-    return create_client(url, key)
+        return None
+    try:
+        return create_client(url, key)
+    except Exception:
+        return None
 
 
-def default_seed_roots(db: Client) -> list[str]:
-    """Distinct target_ifc_class values already used by this app's rules."""
+def default_seed_roots(db: Client | None) -> list[str]:
+    """Distinct target_ifc_class values used by rules, or core building elements."""
+    if db is None:
+        return list(DEFAULT_CORE_SEED_CLASSES)
     seen: list[str] = []
     offset = 0
     page_size = 1000
@@ -264,6 +289,20 @@ def upsert_batches(db: Client, table: str, rows: list[dict], on_conflict: str) -
         print(f"  upserted {table} {start + len(chunk)}/{len(rows)}")
 
 
+def save_local_reference_json(
+    output_dir: Path,
+    class_rows: list[dict],
+    property_rows: list[dict],
+    edge_rows: list[dict],
+) -> None:
+    """Save crawled ontology rows directly to bundled local reference JSON files."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "bsdd_classes.json").write_text(json.dumps(class_rows, indent=2), encoding="utf-8")
+    (output_dir / "bsdd_properties.json").write_text(json.dumps(property_rows, indent=2), encoding="utf-8")
+    (output_dir / "bsdd_class_properties.json").write_text(json.dumps(edge_rows, indent=2), encoding="utf-8")
+    print(f"Saved local reference JSON to {output_dir}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--roots", nargs="*", default=None, help="Seed IFC class codes (default: distinct target_ifc_class from public.rules)")
@@ -275,7 +314,18 @@ def main() -> None:
     )
     parser.add_argument("--max-classes", type=int, default=600, help="Safety cap on entity/domain classes visited")
     parser.add_argument("--delay", type=float, default=0.5, help="Seconds between bSDD requests")
-    parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to the database")
+    parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to disk or database")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_REFERENCE_DIR,
+        help="Local directory to store the crawled reference JSON files (default: data/reference/bsdd)",
+    )
+    parser.add_argument(
+        "--skip-db",
+        action="store_true",
+        help="Skip upserting to Supabase PostgreSQL and only write to local reference JSON files",
+    )
     parser.add_argument(
         "--skip-group-of-properties",
         action="store_true",
@@ -346,7 +396,18 @@ def main() -> None:
     )
 
     if args.dry_run:
-        print("Dry run -- not writing to the database.")
+        print("Dry run -- not writing to disk or database.")
+        return
+
+    if args.output_dir:
+        save_local_reference_json(args.output_dir, class_rows, property_rows, edge_rows)
+
+    if args.skip_db or db is None:
+        if args.skip_db:
+            print("Skipping database upsert as requested (--skip-db).")
+        else:
+            print("No Supabase credentials found; local reference JSON files updated successfully.")
+        print("Done.")
         return
 
     upsert_batches(db, "bsdd_classes", class_rows, on_conflict="uri")

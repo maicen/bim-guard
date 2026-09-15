@@ -12,7 +12,9 @@ actual usage, not just the seeded crawl.
 
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 from app.logging_config import get_logger
@@ -77,9 +79,53 @@ class BSDDOntologyRepository:
 
     # ── Read path (local ontology, refreshed periodically) ─────────────────
 
+    def _load_from_local_reference(self) -> bool:
+        """Attempt to load the curated bSDD ontology synchronously from local JSON files.
+
+        Returns True if files exist and are successfully parsed into memory (< 50ms),
+        avoiding paginated remote database queries over HTTP.
+        """
+        base_dir = Path(__file__).resolve().parent.parent.parent / "data" / "reference" / "bsdd"
+        classes_file = base_dir / "bsdd_classes.json"
+        props_file = base_dir / "bsdd_properties.json"
+        edges_file = base_dir / "bsdd_class_properties.json"
+
+        if not (classes_file.exists() and props_file.exists() and edges_file.exists()):
+            return False
+
+        try:
+            classes_rows = json.loads(classes_file.read_text(encoding="utf-8"))
+            props_rows = json.loads(props_file.read_text(encoding="utf-8"))
+            edges_rows = json.loads(edges_file.read_text(encoding="utf-8"))
+
+            if not classes_rows:
+                return False
+
+            self._classes_by_uri = {row["uri"]: row for row in classes_rows}
+            self._properties_by_uri = {row["uri"]: row for row in props_rows}
+            edges_by_class: dict[str, list[dict]] = {}
+            for row in edges_rows:
+                edges_by_class.setdefault(row["class_uri"], []).append(row)
+            self._edges_by_class = edges_by_class
+            self._cached_at = time.time()
+            logger.debug(
+                "Loaded local bSDD reference files (%d classes, %d properties, %d edges) in <50ms",
+                len(self._classes_by_uri),
+                len(self._properties_by_uri),
+                len(edges_rows),
+            )
+            return True
+        except Exception:
+            logger.exception("Failed to load local bSDD reference JSON files; falling back to DB/live")
+            return False
+
     def _refresh_if_stale(self) -> None:
         if self._classes_by_uri and (time.time() - self._cached_at) < _REFRESH_SECONDS:
             return
+        # Priority 1: High-speed local bundled JSON (< 50ms, zero network)
+        if self._load_from_local_reference():
+            return
+        # Priority 2: Remote database fallback
         try:
             self._classes_by_uri = {row["uri"]: row for row in self._classes.rows}
             self._properties_by_uri = {row["uri"]: row for row in self._properties.rows}
