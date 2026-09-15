@@ -83,6 +83,26 @@ export interface Timestamps {
 /** Mirrors OrgRole in app/modules/contracts.py. */
 export type OrgRole = "owner" | "admin" | "member";
 
+/** Mirrors app.modules.permissions.Action — a superadmin-configurable, role-gated action. */
+export type PermissionAction =
+  | "manage_org_members"
+  | "manage_llm_providers"
+  | "manage_project_bindings"
+  | "manage_parsing_engines";
+
+/** Mirrors PermissionActionResponse in app/modules/contracts.py. */
+export interface PermissionActionInfo {
+  action: PermissionAction;
+  description: string;
+}
+
+/** Mirrors RolePermissionResponse in app/modules/contracts.py. */
+export interface RolePermission {
+  action: PermissionAction;
+  min_role: OrgRole;
+  is_override: boolean;
+}
+
 /**
  * Canonical analysis domains. Mirrors the keys normalised by
  * `normalize_analysis_type` in app/constants.py; legacy stored values
@@ -403,7 +423,7 @@ export interface GoogleDriveImportPayload {
   originator?: string;
   suitability_code?: string;
   revision_code?: string;
-  parser?: "auto" | "unstructured" | "light";
+  parser?: "auto";
   engine_instance?: string;
 }
 
@@ -1060,10 +1080,12 @@ export interface ParsingEngineKind {
   requires_api_key: boolean;
   supports_strategy: boolean;
   url_placeholder: string;
+  docs_url: string;
 }
 
 export interface ParsingEngineInstance extends Timestamps {
   id: number;
+  organization_id: number | null;
   name: string;
   kind: ParsingEngineKindId;
   api_url: string;

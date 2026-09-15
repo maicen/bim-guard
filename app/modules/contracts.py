@@ -1773,6 +1773,7 @@ class ParsingEngineKindResponse(BaseModel):
     requires_api_key: bool = False
     supports_strategy: bool = False
     url_placeholder: str = ""
+    docs_url: str = ""
 
 
 # ==============================================================================

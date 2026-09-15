@@ -64,6 +64,8 @@ class ParsingEngineDriver(ABC):
     requires_api_key: ClassVar[bool] = False
     supports_strategy: ClassVar[bool] = False
     url_placeholder: ClassVar[str] = ""
+    docs_url: ClassVar[str] = ""
+    """Optional link to setup instructions (obtaining an API key, running the container), shown in the UI."""
 
     @abstractmethod
     def build(self, *, api_key: str, api_url: str, strategy: str, name: str) -> ParsingEngine:

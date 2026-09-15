@@ -14,6 +14,7 @@
     CheckCircle2,
     XCircle,
   } from "lucide-svelte";
+  import { router } from "svelte-spa-router";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import TabStrip from "../lib/components/TabStrip.svelte";
@@ -21,7 +22,7 @@
   import ProviderInstanceForm from "../lib/components/ProviderInstanceForm.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TaskAssignmentModal from "../lib/components/TaskAssignmentModal.svelte";
-  import { parsingEnginesApi, llmProvidersApi, settingsApi } from "../lib/api";
+  import { parsingEnginesApi, orgParsingEnginesApi, llmProvidersApi, settingsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import type {
@@ -40,6 +41,24 @@
 
   let activeOrg = $derived(authState.activeOrganization);
   let activeTab = $state<"parsing" | "llm" | "env">("parsing");
+
+  // Deep-link support: #/external-providers?tab=parsing lands on a specific
+  // tab (used by the "no parsing engine configured" upload guidance).
+  let queryParams = $derived(new URLSearchParams(router.querystring || ""));
+  $effect(() => {
+    const tabParam = queryParams.get("tab");
+    if (tabParam === "parsing" || tabParam === "llm" || tabParam === "env") {
+      activeTab = tabParam;
+    }
+  });
+
+  // Inline role check for now (matches DocumentUploadModal.svelte /
+  // TopHeader.svelte / UserMenu.svelte) -- swap for a proper
+  // Action.MANAGE_PARSING_ENGINES permission lookup once a frontend helper
+  // for the permission matrix exists.
+  let canManageOrgParsing = $derived(
+    authState.isSuperadmin || activeOrg?.role === "owner" || activeOrg?.role === "admin"
+  );
 
   const TABS = [
     { id: "parsing", label: "Document Parsing", icon: FileText },
@@ -184,6 +203,132 @@
       enginesError = err.message || "Could not delete parsing engine.";
     } finally {
       enginePendingDelete = null;
+    }
+  }
+
+  // ── Document Parsing (org-scoped, owner/admin-managed) ───────────────────
+  // Preferred over the platform-wide tier below when configured (see
+  // ParsingEngineInstancesService.get_effective_default on the backend).
+  let orgEngines = $state<ParsingEngineInstance[]>([]);
+  let orgEnginesLoading = $state(true);
+  let orgEnginesError = $state("");
+  let showAddOrgEngineForm = $state(false);
+  let isSavingOrgEngine = $state(false);
+  let newOrgEngineName = $state("");
+  let newOrgEngineKind = $state<ParsingEngineKindId>("");
+  let newOrgEngineUrl = $state("");
+  let newOrgEngineKey = $state("");
+  let newOrgEngineStrategy = $state("auto");
+  let newOrgEngineNotes = $state("");
+  let orgEnginePendingDelete = $state<ParsingEngineInstance | null>(null);
+  let testingOrgEngineId = $state<number | null>(null);
+  let orgEngineTestResults = $state<Record<number, { ok: boolean; detail: string }>>({});
+
+  async function loadOrgEngines(orgId: number) {
+    orgEnginesLoading = true;
+    orgEnginesError = "";
+    try {
+      orgEngines = await orgParsingEnginesApi.list(orgId);
+    } catch (err: any) {
+      orgEnginesError = err.message || "Failed to load parsing engines.";
+    } finally {
+      orgEnginesLoading = false;
+    }
+  }
+
+  function resetOrgEngineForm() {
+    newOrgEngineName = "";
+    newOrgEngineKind = engineKinds[0]?.kind ?? "";
+    newOrgEngineUrl = "";
+    newOrgEngineKey = "";
+    newOrgEngineStrategy = "auto";
+    newOrgEngineNotes = "";
+  }
+
+  async function handleAddOrgEngine() {
+    if (!activeOrg) return;
+    const selectedKindInfo = engineKindInfo(newOrgEngineKind);
+    if (!newOrgEngineName.trim() || !newOrgEngineUrl.trim() || !newOrgEngineKind) {
+      orgEnginesError = "Name, kind, and API URL are required.";
+      return;
+    }
+    if (selectedKindInfo?.requires_api_key && !newOrgEngineKey.trim()) {
+      orgEnginesError = `A ${selectedKindInfo.display_name} instance requires an API key.`;
+      return;
+    }
+    isSavingOrgEngine = true;
+    orgEnginesError = "";
+    try {
+      await orgParsingEnginesApi.create(activeOrg.organization_id, {
+        name: newOrgEngineName.trim(),
+        kind: newOrgEngineKind,
+        api_url: newOrgEngineUrl.trim(),
+        api_key: newOrgEngineKey.trim() || undefined,
+        strategy: newOrgEngineStrategy.trim() || "auto",
+        is_default: orgEngines.length === 0,
+        notes: newOrgEngineNotes.trim() || undefined,
+      });
+      resetOrgEngineForm();
+      showAddOrgEngineForm = false;
+      await loadOrgEngines(activeOrg.organization_id);
+    } catch (err: any) {
+      orgEnginesError = err.message || "Failed to register parsing engine.";
+    } finally {
+      isSavingOrgEngine = false;
+    }
+  }
+
+  async function handleSetDefaultOrgEngine(engine: ParsingEngineInstance) {
+    if (!activeOrg) return;
+    try {
+      await orgParsingEnginesApi.update(activeOrg.organization_id, engine.id, { is_default: true });
+      await loadOrgEngines(activeOrg.organization_id);
+    } catch (err: any) {
+      orgEnginesError = err.message || "Failed to set default parsing engine.";
+    }
+  }
+
+  async function handleToggleOrgEngineEnabled(engine: ParsingEngineInstance) {
+    if (!activeOrg) return;
+    try {
+      await orgParsingEnginesApi.update(activeOrg.organization_id, engine.id, {
+        is_enabled: !engine.is_enabled,
+      });
+      await loadOrgEngines(activeOrg.organization_id);
+    } catch (err: any) {
+      orgEnginesError = err.message || "Failed to update parsing engine.";
+    }
+  }
+
+  async function handleTestOrgEngine(engine: ParsingEngineInstance) {
+    if (!activeOrg) return;
+    testingOrgEngineId = engine.id;
+    try {
+      orgEngineTestResults = {
+        ...orgEngineTestResults,
+        [engine.id]: await orgParsingEnginesApi.test(activeOrg.organization_id, engine.id),
+      };
+    } catch (err: any) {
+      orgEngineTestResults = {
+        ...orgEngineTestResults,
+        [engine.id]: { ok: false, detail: err.message || "Test failed." },
+      };
+    } finally {
+      testingOrgEngineId = null;
+    }
+  }
+
+  async function handleDeleteOrgEngine() {
+    if (!activeOrg) return;
+    const engine = orgEnginePendingDelete;
+    if (!engine) return;
+    try {
+      await orgParsingEnginesApi.delete(activeOrg.organization_id, engine.id);
+      orgEngines = orgEngines.filter((e) => e.id !== engine.id);
+    } catch (err: any) {
+      orgEnginesError = err.message || "Could not delete parsing engine.";
+    } finally {
+      orgEnginePendingDelete = null;
     }
   }
 
@@ -478,6 +623,7 @@
 
   $effect(() => {
     if (activeOrg) {
+      loadOrgEngines(activeOrg.organization_id);
       loadLlmKinds(activeOrg.organization_id);
       loadLlmInstances(activeOrg.organization_id);
       loadTasksAndAssignments(activeOrg.organization_id);
@@ -605,9 +751,119 @@
           <div>
             <h2 class="text-base font-bold tracking-tight text-fg-primary">Document Parsing Engines</h2>
             <p class="text-xs text-fg-muted">
-              Platform-wide — shared by every organization, managed by a superadmin. Local self-hosted
-              containers, hosted accounts, or a mix. The default instance is used when an upload doesn't
-              name one explicitly.
+              Scoped to <span class="font-semibold text-fg-secondary">{activeOrg.name}</span> — used in
+              preference to the platform default below when configured. Local self-hosted containers,
+              hosted accounts, or a mix.
+            </p>
+          </div>
+          {#if canManageOrgParsing}
+            <button
+              type="button"
+              onclick={() => {
+                showAddOrgEngineForm = !showAddOrgEngineForm;
+                if (showAddOrgEngineForm) resetOrgEngineForm();
+              }}
+              class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
+            >
+              <Plus class="h-4 w-4" />
+              <span>Add Instance</span>
+            </button>
+          {/if}
+        </div>
+
+        {#if !canManageOrgParsing}
+          <div
+            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
+          >
+            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
+            <span>Read-only — ask an organization owner or admin to add, edit, or remove parsing engines.</span>
+          </div>
+        {/if}
+
+        {#if orgEnginesError}
+          <div
+            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
+          >
+            {orgEnginesError}
+          </div>
+        {/if}
+
+        {#if showAddOrgEngineForm}
+          <ProviderInstanceForm
+            kinds={engineKinds}
+            bind:name={newOrgEngineName}
+            bind:kind={newOrgEngineKind}
+            bind:url={newOrgEngineUrl}
+            bind:apiKey={newOrgEngineKey}
+            bind:notes={newOrgEngineNotes}
+            urlLabel="API URL"
+            submitting={isSavingOrgEngine}
+            onSubmit={handleAddOrgEngine}
+            onCancel={() => (showAddOrgEngineForm = false)}
+          >
+            {#snippet extraFields(kindInfo)}
+              {#if (kindInfo as ParsingEngineKind | null)?.supports_strategy}
+                <div>
+                  <label for="org-engine-strategy" class="mb-1 block text-caption font-semibold text-fg-muted"
+                    >Strategy</label
+                  >
+                  <select
+                    id="org-engine-strategy"
+                    bind:value={newOrgEngineStrategy}
+                    class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
+                  >
+                    <option value="auto">auto</option>
+                    <option value="fast">fast</option>
+                    <option value="hi_res">hi_res</option>
+                    <option value="ocr_only">ocr_only</option>
+                  </select>
+                </div>
+              {/if}
+            {/snippet}
+          </ProviderInstanceForm>
+        {/if}
+
+        {#if orgEnginesLoading}
+          <div class="p-8 text-center text-xs text-fg-muted">Loading parsing engines...</div>
+        {:else if orgEngines.length === 0}
+          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
+            No parsing engines configured for this organization — uploads use the platform default below,
+            if one is set, or fail with a clear error otherwise.
+          </div>
+        {:else}
+          <div class="space-y-2">
+            {#each orgEngines as engine (engine.id)}
+              {@const info = engineKindInfo(engine.kind)}
+              {@const accent = FAMILY_ACCENT[info?.family ?? ""] ?? FAMILY_ACCENT.default}
+              <ProviderInstanceCard
+                name={engine.name}
+                kindLabel={engine.kind}
+                icon={info?.requires_api_key ? Cloud : Server}
+                accentClass={accent}
+                isDefault={engine.is_default}
+                isEnabled={engine.is_enabled}
+                endpoint={engine.api_url}
+                detail={`strategy: ${engine.strategy} · ${engine.has_api_key ? "API key set" : "no API key"}${engine.notes ? ` · ${engine.notes}` : ""}`}
+                testResult={orgEngineTestResults[engine.id]}
+                testing={testingOrgEngineId === engine.id}
+                canManage={canManageOrgParsing}
+                onTest={() => handleTestOrgEngine(engine)}
+                onSetDefault={() => handleSetDefaultOrgEngine(engine)}
+                onToggleEnabled={() => handleToggleOrgEngineEnabled(engine)}
+                onDelete={() => (orgEnginePendingDelete = engine)}
+              />
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">Platform Default</h2>
+            <p class="text-xs text-fg-muted">
+              Shared by every organization that hasn't configured its own instance above, managed by a
+              superadmin.
             </p>
           </div>
           {#if authState.isSuperadmin}
@@ -627,7 +883,7 @@
             class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
           >
             <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
-            <span>Read-only — only a platform superadmin can add, edit, or remove parsing engines.</span>
+            <span>Read-only — only a platform superadmin can add, edit, or remove the platform default.</span>
           </div>
         {/if}
 
@@ -678,8 +934,8 @@
           <div class="p-8 text-center text-xs text-fg-muted">Loading parsing engines...</div>
         {:else if engines.length === 0}
           <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
-            No parsing engines configured — document upload falls back to the local, dependency-light
-            extractor.
+            No platform default configured — organizations with no org-scoped instance of their own will
+            fail to upload documents until one is added here, or they configure their own above.
           </div>
         {:else}
           <div class="space-y-2">
@@ -906,8 +1162,18 @@
 {/if}
 
 <ConfirmModal
-  isOpen={enginePendingDelete !== null}
+  isOpen={orgEnginePendingDelete !== null}
   title="Remove Parsing Engine"
+  message={`Remove parsing engine '${orgEnginePendingDelete?.name ?? ""}'? Documents already extracted with it are not affected.`}
+  confirmText="Remove Instance"
+  danger={true}
+  onConfirm={handleDeleteOrgEngine}
+  onCancel={() => (orgEnginePendingDelete = null)}
+/>
+
+<ConfirmModal
+  isOpen={enginePendingDelete !== null}
+  title="Remove Platform Default Parsing Engine"
   message={`Remove parsing engine '${enginePendingDelete?.name ?? ""}'? Documents already extracted with it are not affected.`}
   confirmText="Remove Instance"
   danger={true}

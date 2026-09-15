@@ -90,6 +90,7 @@ def list_kinds(
             requires_api_key=driver.requires_api_key,
             supports_strategy=driver.supports_strategy,
             url_placeholder=driver.url_placeholder,
+            docs_url=driver.docs_url,
         )
         for driver in sorted(ParsingEngineRegistry.all(), key=lambda d: d.kind)
     ]

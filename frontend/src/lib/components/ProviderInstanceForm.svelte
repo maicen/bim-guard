@@ -9,6 +9,7 @@
     description: string;
     requires_api_key: boolean;
     url_placeholder: string;
+    docs_url?: string;
   }
 
   interface Props {
@@ -100,6 +101,16 @@
       </select>
       {#if selectedKindInfo?.description}
         <p class="mt-1 text-caption text-fg-muted">{selectedKindInfo.description}</p>
+      {/if}
+      {#if selectedKindInfo?.docs_url}
+        <a
+          href={selectedKindInfo.docs_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-1 inline-block text-caption font-semibold text-accent hover:underline"
+        >
+          Setup docs →
+        </a>
       {/if}
     </div>
   </div>

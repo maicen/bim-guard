@@ -50,17 +50,28 @@ class _DoclingDriverBase(ParsingEngineDriver):
 class DoclingHostedDriver(_DoclingDriverBase):
     kind = "docling"
     display_name = "Docling (hosted Docling Serve instance)"
-    description = "Hosted Docling Serve account, e.g. IBM's managed offering."
+    description = (
+        "Hosted Docling Serve account, e.g. IBM's managed offering "
+        "(https://developer.dcls.saas.ibm.com) — sign up there and copy the "
+        "instance URL and API key it gives you into the fields below."
+    )
     requires_api_key = True
     url_placeholder = "https://api.aws-c1.dcls.saas.ibm.com/<instance-id>"
+    docs_url = "https://developer.dcls.saas.ibm.com"
 
 
 class DoclingLocalDriver(_DoclingDriverBase):
     kind = "docling-local"
     display_name = "Docling Local (self-hosted docling-serve container)"
-    description = "Self-hosted docling-serve Docker container — no API key by default."
+    description = (
+        "Self-hosted docling-serve Docker container — no API key by default. "
+        "Run `docker compose up -d docling-serve` (already part of this "
+        "project's docker-compose.yml) and point the URL below at it, e.g. "
+        "http://localhost:5001."
+    )
     requires_api_key = False
     url_placeholder = "http://localhost:5001"
+    docs_url = "https://github.com/docling-project/docling-serve"
 
 
 ParsingEngineRegistry.register(DoclingHostedDriver())

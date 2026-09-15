@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { FileText } from "lucide-svelte";
+  import { FileText, Settings2 } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import { Select, Switch } from "./ui";
   import { documentsApi } from "../api";
+  import type { ApiError } from "../api";
   import { authState } from "../auth.svelte";
   import { DOCUMENT_TYPES } from "../types";
   import type { DocumentItem, DocumentType, ParsingEngineInstance } from "../types";
@@ -23,11 +24,21 @@
 
   let uploadFile: File | null = $state(null);
   let uploadDocType = $state<string>("Specification");
-  let uploadParser = $state<"auto" | "unstructured" | "light">("auto");
   let uploadInstance = $state("");
   let generateDoclangOnUpload = $state(true);
   let isUploading = $state(false);
   let uploadError = $state("");
+  let noParsingEngineConfigured = $state(false);
+
+  // Inline role check for now (matches the pattern in TopHeader.svelte /
+  // UserMenu.svelte / DashboardView.svelte) -- swap for a proper
+  // Action.MANAGE_PARSING_ENGINES permission lookup once a frontend helper
+  // for the permission matrix exists.
+  let canManageParsing = $derived(
+    authState.isSuperadmin ||
+      authState.activeOrganization?.role === "owner" ||
+      authState.activeOrganization?.role === "admin"
+  );
 
   let isDoclangSelected = $derived(
     uploadFile ? /\.(doclang|dclg|dclx)$/i.test(uploadFile.name) : false
@@ -54,20 +65,6 @@
     label: type,
   }));
 
-  const parserSelectOptions = $derived([
-    { value: "auto", label: "Auto (configured engine, falls back to local)" },
-    {
-      value: "unstructured",
-      label: `Force configured engine only${
-        parsingEngines.length === 0
-          ? " (no engine configured)"
-          : " (best quality, slower, uploads file)"
-      }`,
-      disabled: parsingEngines.length === 0,
-    },
-    { value: "light", label: "Light local extraction only (instant, no upload)" },
-  ]);
-
   const instanceOptions = $derived([
     { value: "", label: "Default" },
     ...parsingEngines.map((engine) => ({
@@ -82,13 +79,13 @@
   function resetState() {
     uploadFile = null;
     uploadDocType = "Specification";
-    uploadParser = "auto";
     uploadInstance = "";
     generateDoclangOnUpload = true;
     uploadLimitPages = false;
     uploadStartPage = "1";
     uploadEndPage = "";
     uploadError = "";
+    noParsingEngineConfigured = false;
     isUploading = false;
   }
 
@@ -102,11 +99,11 @@
     if (isPdfSelected && uploadLimitPages && uploadPageRangeError) return;
     isUploading = true;
     uploadError = "";
+    noParsingEngineConfigured = false;
     try {
       const usePageRange = isPdfSelected && uploadLimitPages && !uploadPageRangeError;
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
-        parser: uploadParser,
-        engine_instance: uploadParser === "light" ? undefined : uploadInstance || undefined,
+        engine_instance: uploadInstance || undefined,
         generate_doclang: generateDoclangOnUpload,
         organization_id: authState.activeOrganizationId,
         start_page: usePageRange ? parseInt(uploadStartPage, 10) : undefined,
@@ -115,7 +112,9 @@
       resetState();
       onUploaded(created);
     } catch (err: any) {
-      uploadError = err.message || "Failed to upload document.";
+      const apiErr = err as ApiError;
+      uploadError = apiErr.message || "Failed to upload document.";
+      noParsingEngineConfigured = apiErr.status === 422;
     } finally {
       isUploading = false;
     }
@@ -130,8 +129,17 @@
 >
   <div class="space-y-4">
     {#if uploadError}
-      <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-        {uploadError}
+      <div class="space-y-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
+        <p>{uploadError}</p>
+        {#if noParsingEngineConfigured && canManageParsing}
+          <a
+            href={`#/external-providers?tab=parsing${authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : ""}`}
+            class="inline-flex items-center gap-1.5 font-semibold text-rose-200 underline hover:text-white"
+          >
+            <Settings2 class="h-3.5 w-3.5" />
+            Configure a parsing engine
+          </a>
+        {/if}
       </div>
     {/if}
 
@@ -151,19 +159,6 @@
     </div>
 
     {#if !isDoclangSelected}
-      <div class="space-y-1.5">
-        <label for="upload-parser" class="block text-xs font-semibold text-fg-secondary">
-          Parsing Engine
-        </label>
-        <Select
-          ariaLabel="Parsing Engine"
-          options={parserSelectOptions}
-          value={uploadParser}
-          onValueChange={(val) => (uploadParser = val as "auto" | "unstructured" | "light")}
-          triggerClass="w-full bg-surface-canvas"
-        />
-      </div>
-
       <div class="flex items-center justify-between rounded-xl border border-border-default bg-surface-canvas/60 px-3.5 py-2.5">
         <div>
           <label for="upload-generate-doclang" class="block text-xs font-semibold text-fg-secondary">
@@ -226,7 +221,7 @@
         </div>
       {/if}
 
-      {#if uploadParser !== "light" && parsingEngines.length > 0}
+      {#if parsingEngines.length > 0}
         <div class="space-y-1.5">
           <label for="upload-instance" class="block text-xs font-semibold text-fg-secondary">
             Instance

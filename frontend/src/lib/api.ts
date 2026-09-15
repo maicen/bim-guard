@@ -57,12 +57,16 @@ import type {
   OrganizationProjectGrantsResponse,
   OrganizationRulesetGrantsResponse,
   OrganizationSummary,
+  OrgRole,
   UserListResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
   ParsingEngineInstanceTestResult,
   ParsingEngineInstanceUpdatePayload,
   ParsingEngineKind,
+  PermissionAction,
+  PermissionActionInfo,
+  RolePermission,
   LLMProviderInstance,
   LLMProviderInstanceCreatePayload,
   LLMProviderInstanceTestResult,
@@ -1336,7 +1340,7 @@ export const documentsApi = {
       originator?: string;
       suitability_code?: string;
       revision_code?: string;
-      parser?: "auto" | "unstructured" | "light";
+      parser?: "auto";
       engine_instance?: string;
       generate_doclang?: boolean;
       organization_id?: number | null;
@@ -1406,7 +1410,7 @@ export const documentsApi = {
 
   async generateDoclang(
     id: number,
-    options?: { parser?: "auto" | "unstructured" | "light"; engine_instance?: string },
+    options?: { parser?: "auto"; engine_instance?: string },
   ): Promise<DocumentDetail> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/generate-doclang`, {
       method: "POST",
@@ -1803,6 +1807,105 @@ export const parsingEnginesApi = {
       method: "POST",
     });
     return handleResponse<ParsingEngineInstanceTestResult>(res);
+  },
+};
+
+// =============================================================================
+// Org-Scoped Parsing Engines API Client (see app/api/parsing_engine_instances.py)
+// =============================================================================
+// Mirrors parsingEnginesApi above but scoped to one organization — an org's
+// own owner/admin manages these; resolution prefers them over the
+// platform-wide instances parsingEnginesApi lists.
+
+export const orgParsingEnginesApi = {
+  async kinds(organizationId: number): Promise<ParsingEngineKind[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines/kinds`);
+    return handleResponse<ParsingEngineKind[]>(res);
+  },
+
+  async list(organizationId: number): Promise<ParsingEngineInstance[]> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines`);
+    return handleResponse<ParsingEngineInstance[]>(res);
+  },
+
+  async create(
+    organizationId: number,
+    payload: ParsingEngineInstanceCreatePayload,
+  ): Promise<ParsingEngineInstance> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ParsingEngineInstance>(res);
+  },
+
+  async update(
+    organizationId: number,
+    id: number,
+    payload: ParsingEngineInstanceUpdatePayload,
+  ): Promise<ParsingEngineInstance> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ParsingEngineInstance>(res);
+  },
+
+  async delete(organizationId: number, id: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines/${id}`, {
+      method: "DELETE",
+    });
+    await handleResponse<void>(res);
+  },
+
+  async test(organizationId: number, id: number): Promise<ParsingEngineInstanceTestResult> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/parsing-engines/${id}/test`, {
+      method: "POST",
+    });
+    return handleResponse<ParsingEngineInstanceTestResult>(res);
+  },
+};
+
+// =============================================================================
+// Permissions API Client (see app/api/permissions.py)
+// =============================================================================
+// Superadmin-only: the role-permission matrix (which org role each gated
+// action requires). Platform default when organizationId is omitted, else
+// that organization's effective matrix.
+
+export const permissionsApi = {
+  async actions(): Promise<PermissionActionInfo[]> {
+    const res = await apiFetch(`${API_BASE}/permissions/actions`);
+    return handleResponse<PermissionActionInfo[]>(res);
+  },
+
+  async matrix(organizationId?: number): Promise<RolePermission[]> {
+    const query = organizationId != null ? `?organization_id=${organizationId}` : "";
+    const res = await apiFetch(`${API_BASE}/permissions/matrix${query}`);
+    return handleResponse<RolePermission[]>(res);
+  },
+
+  async setMinRole(
+    action: PermissionAction,
+    minRole: OrgRole,
+    organizationId?: number | null,
+  ): Promise<RolePermission> {
+    const res = await apiFetch(`${API_BASE}/permissions/matrix/${action}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ organization_id: organizationId ?? null, min_role: minRole }),
+    });
+    return handleResponse<RolePermission>(res);
+  },
+
+  async resetToDefault(action: PermissionAction, organizationId: number): Promise<RolePermission> {
+    const res = await apiFetch(
+      `${API_BASE}/permissions/matrix/${action}?organization_id=${organizationId}`,
+      { method: "DELETE" },
+    );
+    return handleResponse<RolePermission>(res);
   },
 };
 

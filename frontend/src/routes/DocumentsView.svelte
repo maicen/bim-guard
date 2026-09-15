@@ -15,7 +15,7 @@
     FileCode,
   } from "lucide-svelte";
   import Icon from "@iconify/svelte";
-  import { documentsApi, parsingEnginesApi } from "../lib/api";
+  import { documentsApi, parsingEnginesApi, orgParsingEnginesApi } from "../lib/api";
   import { withAuthToken } from "../lib/authToken";
   import { authState } from "../lib/auth.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
@@ -114,7 +114,14 @@
 
   async function loadParsingEngines() {
     try {
-      parsingEngines = await parsingEnginesApi.list();
+      const orgId = authState.activeOrganizationId;
+      const [platform, org] = await Promise.all([
+        parsingEnginesApi.list(),
+        orgId ? orgParsingEnginesApi.list(orgId) : Promise.resolve([]),
+      ]);
+      // Org-scoped instances first -- they're the ones actually used
+      // (get_effective_default prefers them), so they should lead the list.
+      parsingEngines = [...org, ...platform];
     } catch {
       // Non-fatal — the instance selector just stays empty (uses the
       // server's default engine) when this can't be loaded.
