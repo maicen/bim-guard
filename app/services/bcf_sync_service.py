@@ -5,6 +5,13 @@ with BIMGuard Issue entities and ISO 19650 metadata.
 
 Reference: buildingSMART BCF-API REST Specification
 https://github.com/buildingSMART/BCF-API
+
+Persisted to Supabase (``public.bcf_topics`` / ``bcf_comments`` /
+``bcf_viewpoints``, migration ``20260915173941_create_bcf_tables``) rather than
+kept in a process-local dict: a REST API is expected to survive a restart and
+be shared across the multi-worker production uvicorn processes this repo's own
+``run_production_server`` scripts start, and an in-memory singleton could do
+neither.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from app.modules.contracts import (
     BCFViewpointResponse,
     CDEState,
 )
+from app.services.persistence import PersistenceService
 
 logger = get_logger(__name__)
 
@@ -34,14 +42,147 @@ def _utc_now_iso() -> str:
 
 
 class BCFSyncService:
-    """In-memory & persistent store bridging BCF REST API and BIMGuard compliance findings."""
+    """Supabase-backed store bridging the BCF REST API and BIMGuard compliance findings."""
 
-    def __init__(self) -> None:
-        # In-memory stores keyed by project_id -> list of entities
-        self._topics_by_project: dict[str, dict[str, dict[str, Any]]] = {}
-        self._comments_by_topic: dict[str, list[dict[str, Any]]] = {}
-        self._viewpoints_by_topic: dict[str, list[dict[str, Any]]] = {}
-        self._snapshots_by_viewpoint: dict[str, bytes] = {}
+    def __init__(self, *, topics_repo=None, comments_repo=None, viewpoints_repo=None) -> None:
+        """Wire the three BCF tables, defaulting to the shared Supabase connection."""
+        self._topics = (
+            topics_repo
+            if topics_repo is not None
+            else PersistenceService.get_table(
+                "bcf_topics",
+                {
+                    "guid": str,
+                    "project_id": str,
+                    "topic_type": str,
+                    "topic_status": str,
+                    "title": str,
+                    "priority": str,
+                    "topic_index": int,
+                    "creation_date": str,
+                    "creation_author": str,
+                    "modified_date": str,
+                    "modified_author": str,
+                    "assigned_to": str,
+                    "description": str,
+                    "due_date": str,
+                    "labels": str,
+                    "stage": str,
+                    "component_guids": str,
+                    "project_code": str,
+                    "originator": str,
+                    "suitability_code": str,
+                    "revision_code": str,
+                    "cde_state": str,
+                },
+                pk="guid",
+            )
+        )
+        self._comments = (
+            comments_repo
+            if comments_repo is not None
+            else PersistenceService.get_table(
+                "bcf_comments",
+                {
+                    "guid": str,
+                    "topic_guid": str,
+                    "comment_date": str,
+                    "author": str,
+                    "comment": str,
+                    "modified_date": str,
+                    "modified_author": str,
+                    "viewpoint_guid": str,
+                },
+                pk="guid",
+            )
+        )
+        self._viewpoints = (
+            viewpoints_repo
+            if viewpoints_repo is not None
+            else PersistenceService.get_table(
+                "bcf_viewpoints",
+                {
+                    "guid": str,
+                    "topic_guid": str,
+                    "viewpoint_index": int,
+                    "perspective_camera": str,
+                    "orthogonal_camera": str,
+                    "lines": str,
+                    "clipping_planes": str,
+                    "components": str,
+                    "snapshot_base64": str,
+                },
+                pk="guid",
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Row <-> contract mapping
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _topic_from_row(row: dict[str, Any], comments_count: int, viewpoints_count: int) -> BCFTopicResponse:
+        cde_state = row.get("cde_state") or None
+        return BCFTopicResponse(
+            guid=row["guid"],
+            topic_type=row.get("topic_type") or "Issue",
+            topic_status=row.get("topic_status") or "Open",
+            title=row.get("title") or "Untitled Topic",
+            priority=row.get("priority") or "Normal",
+            index=row.get("topic_index") or 1,
+            creation_date=row.get("creation_date") or _utc_now_iso(),
+            creation_author=row.get("creation_author") or "BIMGUARD-AI",
+            modified_date=row.get("modified_date") or None,
+            modified_author=row.get("modified_author") or None,
+            assigned_to=row.get("assigned_to") or None,
+            description=row.get("description") or None,
+            due_date=row.get("due_date") or None,
+            labels=row.get("labels") or [],
+            stage=row.get("stage") or None,
+            component_guids=row.get("component_guids") or [],
+            project_code=row.get("project_code") or None,
+            originator=row.get("originator") or None,
+            suitability_code=row.get("suitability_code") or None,
+            revision_code=row.get("revision_code") or None,
+            cde_state=CDEState(cde_state) if cde_state else None,
+            comments_count=comments_count,
+            viewpoints_count=viewpoints_count,
+        )
+
+    @staticmethod
+    def _comment_from_row(row: dict[str, Any]) -> BCFCommentResponse:
+        return BCFCommentResponse(
+            guid=row["guid"],
+            date=row.get("comment_date") or _utc_now_iso(),
+            author=row.get("author") or "",
+            comment=row.get("comment") or "",
+            topic_guid=row["topic_guid"],
+            modified_date=row.get("modified_date") or None,
+            modified_author=row.get("modified_author") or None,
+            viewpoint_guid=row.get("viewpoint_guid") or None,
+        )
+
+    @staticmethod
+    def _viewpoint_from_row(row: dict[str, Any]) -> BCFViewpointResponse:
+        return BCFViewpointResponse(
+            guid=row["guid"],
+            topic_guid=row["topic_guid"],
+            index=row.get("viewpoint_index") or 0,
+            perspective_camera=row.get("perspective_camera") or None,
+            orthogonal_camera=row.get("orthogonal_camera") or None,
+            lines=row.get("lines") or [],
+            clipping_planes=row.get("clipping_planes") or [],
+            components=row.get("components") or {},
+            snapshot_url=(
+                f"/api/bcf/v2.1/projects/0/topics/{row['topic_guid']}/viewpoints/{row['guid']}/snapshot"
+                if row.get("snapshot_base64")
+                else None
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Topics
+    # ------------------------------------------------------------------
 
     def get_topics(
         self,
@@ -53,88 +194,37 @@ class BCFSyncService:
         cde_state: str | None = None,
     ) -> list[BCFTopicResponse]:
         """List topics for a project with optional filters."""
-        project_store = self._topics_by_project.get(str(project_id), {})
-        topics = list(project_store.values())
+        rows = self._topics.rows_where("project_id = ?", [str(project_id)])
 
         if topic_status:
-            topics = [t for t in topics if t.get("topic_status", "").lower() == topic_status.lower()]
+            rows = [r for r in rows if (r.get("topic_status") or "").lower() == topic_status.lower()]
         if topic_type:
-            topics = [t for t in topics if t.get("topic_type", "").lower() == topic_type.lower()]
+            rows = [r for r in rows if (r.get("topic_type") or "").lower() == topic_type.lower()]
         if priority:
-            topics = [t for t in topics if t.get("priority", "").lower() == priority.lower()]
+            rows = [r for r in rows if (r.get("priority") or "").lower() == priority.lower()]
         if assigned_to:
-            topics = [t for t in topics if assigned_to.lower() in (t.get("assigned_to") or "").lower()]
+            rows = [r for r in rows if assigned_to.lower() in (r.get("assigned_to") or "").lower()]
         if cde_state:
-            topics = [t for t in topics if t.get("cde_state", "") == cde_state]
+            rows = [r for r in rows if (r.get("cde_state") or "") == cde_state]
 
-        results = []
-        for t in topics:
-            guid = t["guid"]
-            comments_count = len(self._comments_by_topic.get(guid, []))
-            viewpoints_count = len(self._viewpoints_by_topic.get(guid, []))
-            results.append(
-                BCFTopicResponse(
-                    guid=guid,
-                    topic_type=t.get("topic_type", "Issue"),
-                    topic_status=t.get("topic_status", "Open"),
-                    title=t.get("title", "Untitled Topic"),
-                    priority=t.get("priority", "Normal"),
-                    index=t.get("index", 1),
-                    creation_date=t.get("creation_date", _utc_now_iso()),
-                    creation_author=t.get("creation_author", "BIMGUARD-AI"),
-                    modified_date=t.get("modified_date"),
-                    modified_author=t.get("modified_author"),
-                    assigned_to=t.get("assigned_to"),
-                    description=t.get("description"),
-                    due_date=t.get("due_date"),
-                    labels=t.get("labels", []),
-                    stage=t.get("stage"),
-                    component_guids=t.get("component_guids", []),
-                    project_code=t.get("project_code"),
-                    originator=t.get("originator"),
-                    suitability_code=t.get("suitability_code"),
-                    revision_code=t.get("revision_code"),
-                    cde_state=t.get("cde_state"),
-                    comments_count=comments_count,
-                    viewpoints_count=viewpoints_count,
-                )
+        return [
+            self._topic_from_row(
+                row,
+                comments_count=len(self._comments.rows_where("topic_guid = ?", [row["guid"]])),
+                viewpoints_count=len(self._viewpoints.rows_where("topic_guid = ?", [row["guid"]])),
             )
-        return results
+            for row in rows
+        ]
 
     def get_topic(self, project_id: str, topic_guid: str) -> Optional[BCFTopicResponse]:
-        """Fetch single topic by GUID."""
-        project_store = self._topics_by_project.get(str(project_id), {})
-        t = project_store.get(str(topic_guid).upper()) or project_store.get(str(topic_guid))
-        if not t:
+        """Fetch single topic by GUID, scoped to its project."""
+        row = self._topics.get(str(topic_guid).upper()) or self._topics.get(str(topic_guid))
+        if not row or str(row.get("project_id")) != str(project_id):
             return None
-
-        guid = t["guid"]
-        comments_count = len(self._comments_by_topic.get(guid, []))
-        viewpoints_count = len(self._viewpoints_by_topic.get(guid, []))
-        return BCFTopicResponse(
-            guid=guid,
-            topic_type=t.get("topic_type", "Issue"),
-            topic_status=t.get("topic_status", "Open"),
-            title=t.get("title", "Untitled Topic"),
-            priority=t.get("priority", "Normal"),
-            index=t.get("index", 1),
-            creation_date=t.get("creation_date", _utc_now_iso()),
-            creation_author=t.get("creation_author", "BIMGUARD-AI"),
-            modified_date=t.get("modified_date"),
-            modified_author=t.get("modified_author"),
-            assigned_to=t.get("assigned_to"),
-            description=t.get("description"),
-            due_date=t.get("due_date"),
-            labels=t.get("labels", []),
-            stage=t.get("stage"),
-            component_guids=t.get("component_guids", []),
-            project_code=t.get("project_code"),
-            originator=t.get("originator"),
-            suitability_code=t.get("suitability_code"),
-            revision_code=t.get("revision_code"),
-            cde_state=t.get("cde_state"),
-            comments_count=comments_count,
-            viewpoints_count=viewpoints_count,
+        return self._topic_from_row(
+            row,
+            comments_count=len(self._comments.rows_where("topic_guid = ?", [row["guid"]])),
+            viewpoints_count=len(self._viewpoints.rows_where("topic_guid = ?", [row["guid"]])),
         )
 
     def create_topic(
@@ -146,21 +236,18 @@ class BCFSyncService:
         originator: str = "",
     ) -> BCFTopicResponse:
         """Create new BCF Topic under a project."""
-        proj_key = str(project_id)
-        if proj_key not in self._topics_by_project:
-            self._topics_by_project[proj_key] = {}
-
         guid = str(uuid.uuid4()).upper()
         now = _utc_now_iso()
-        index = len(self._topics_by_project[proj_key]) + 1
+        existing = self._topics.rows_where("project_id = ?", [str(project_id)])
 
-        topic_data = {
+        row = {
             "guid": guid,
+            "project_id": str(project_id),
             "topic_type": payload.topic_type,
             "topic_status": payload.topic_status,
             "title": payload.title,
             "priority": payload.priority,
-            "index": index,
+            "topic_index": len(existing) + 1,
             "creation_date": now,
             "creation_author": author,
             "modified_date": now,
@@ -168,20 +255,16 @@ class BCFSyncService:
             "assigned_to": payload.assigned_to,
             "description": payload.description,
             "due_date": payload.due_date,
-            "labels": payload.labels,
-            "component_guids": payload.component_guids,
+            "labels": payload.labels or [],
+            "component_guids": payload.component_guids or [],
             "project_code": project_code,
             "originator": originator,
             "suitability_code": payload.suitability_code or "S0",
             "revision_code": payload.revision_code or "P01.01",
-            "cde_state": payload.cde_state or CDEState.WIP,
+            "cde_state": (payload.cde_state or CDEState.WIP).value,
         }
+        self._topics.insert(row)
 
-        self._topics_by_project[proj_key][guid] = topic_data
-        self._comments_by_topic[guid] = []
-        self._viewpoints_by_topic[guid] = []
-
-        # If description is present, also add initial comment
         if payload.description:
             self.create_comment(
                 topic_guid=guid,
@@ -189,7 +272,7 @@ class BCFSyncService:
                 author=author,
             )
 
-        return self.get_topic(project_id, guid)  # type: ignore
+        return self.get_topic(project_id, guid)  # type: ignore[return-value]
 
     def update_topic(
         self,
@@ -199,155 +282,55 @@ class BCFSyncService:
         author: str = "BIMGUARD-AI",
     ) -> Optional[BCFTopicResponse]:
         """Update fields of an existing topic."""
-        proj_key = str(project_id)
-        project_store = self._topics_by_project.get(proj_key, {})
-        guid = str(topic_guid).upper()
-        if guid not in project_store and str(topic_guid) in project_store:
-            guid = str(topic_guid)
-
-        if guid not in project_store:
+        row = self._topics.get(str(topic_guid).upper()) or self._topics.get(str(topic_guid))
+        if not row or str(row.get("project_id")) != str(project_id):
             return None
+        guid = row["guid"]
 
-        t = project_store[guid]
-        now = _utc_now_iso()
-        t["modified_date"] = now
-        t["modified_author"] = author
-
+        updates: dict[str, Any] = {
+            "modified_date": _utc_now_iso(),
+            "modified_author": author,
+        }
         if payload.title is not None:
-            t["title"] = payload.title
+            updates["title"] = payload.title
         if payload.topic_type is not None:
-            t["topic_type"] = payload.topic_type
+            updates["topic_type"] = payload.topic_type
         if payload.topic_status is not None:
-            t["topic_status"] = payload.topic_status
+            updates["topic_status"] = payload.topic_status
         if payload.priority is not None:
-            t["priority"] = payload.priority
+            updates["priority"] = payload.priority
         if payload.description is not None:
-            t["description"] = payload.description
+            updates["description"] = payload.description
         if payload.assigned_to is not None:
-            t["assigned_to"] = payload.assigned_to
+            updates["assigned_to"] = payload.assigned_to
         if payload.due_date is not None:
-            t["due_date"] = payload.due_date
+            updates["due_date"] = payload.due_date
         if payload.labels is not None:
-            t["labels"] = payload.labels
+            updates["labels"] = payload.labels
         if payload.component_guids is not None:
-            t["component_guids"] = payload.component_guids
+            updates["component_guids"] = payload.component_guids
         if payload.suitability_code is not None:
-            t["suitability_code"] = payload.suitability_code
+            updates["suitability_code"] = payload.suitability_code
         if payload.revision_code is not None:
-            t["revision_code"] = payload.revision_code
+            updates["revision_code"] = payload.revision_code
         if payload.cde_state is not None:
-            t["cde_state"] = payload.cde_state
+            updates["cde_state"] = payload.cde_state.value
 
+        self._topics.update(updates=updates, pk_values=guid)
         return self.get_topic(project_id, guid)
-
-    def get_comments(self, topic_guid: str) -> list[BCFCommentResponse]:
-        """List comments for a topic."""
-        guid = str(topic_guid).upper()
-        items = self._comments_by_topic.get(guid, [])
-        return [BCFCommentResponse(**i) for i in items]
-
-    def create_comment(
-        self,
-        topic_guid: str,
-        payload: BCFCommentCreatePayload,
-        author: str = "BIMGUARD-AI",
-    ) -> BCFCommentResponse:
-        """Add a comment to a topic."""
-        guid = str(topic_guid).upper()
-        if guid not in self._comments_by_topic:
-            self._comments_by_topic[guid] = []
-
-        comment_guid = str(uuid.uuid4()).upper()
-        now = _utc_now_iso()
-        item = {
-            "guid": comment_guid,
-            "date": now,
-            "author": author,
-            "comment": payload.comment,
-            "topic_guid": guid,
-            "viewpoint_guid": payload.viewpoint_guid,
-        }
-        self._comments_by_topic[guid].append(item)
-        return BCFCommentResponse(**item)
-
-    def get_viewpoints(self, topic_guid: str) -> list[BCFViewpointResponse]:
-        """List viewpoints for a topic."""
-        guid = str(topic_guid).upper()
-        items = self._viewpoints_by_topic.get(guid, [])
-        return [BCFViewpointResponse(**i) for i in items]
-
-    def create_viewpoint(
-        self,
-        topic_guid: str,
-        payload: BCFViewpointCreatePayload,
-    ) -> BCFViewpointResponse:
-        """Create a 3D camera viewpoint with optional snapshot for a topic."""
-        guid = str(topic_guid).upper()
-        if guid not in self._viewpoints_by_topic:
-            self._viewpoints_by_topic[guid] = []
-
-        vp_guid = str(uuid.uuid4()).upper()
-        idx = len(self._viewpoints_by_topic[guid]) + 1
-
-        perspective_cam = payload.perspective_camera or {
-            "camera_view_point": {"x": 5.0, "y": 5.0, "z": 5.0},
-            "camera_direction": {"x": -0.577, "y": -0.577, "z": -0.577},
-            "camera_up_vector": {"x": 0.0, "y": 0.0, "z": 1.0},
-            "field_of_view": 60.0,
-        }
-
-        components_data = payload.components or {
-            "selection": [],
-            "coloring": [],
-            "visibility": {"default_visibility": True, "exceptions": []},
-        }
-
-        snapshot_url = None
-        if payload.snapshot_base64:
-            try:
-                raw_bytes = base64.b64decode(payload.snapshot_base64)
-                self._snapshots_by_viewpoint[vp_guid] = raw_bytes
-                snapshot_url = f"/api/bcf/v2.1/projects/0/topics/{guid}/viewpoints/{vp_guid}/snapshot"
-            except Exception as exc:
-                logger.debug("Failed decoding base64 snapshot: %s", exc)
-
-        item = {
-            "guid": vp_guid,
-            "topic_guid": guid,
-            "index": idx,
-            "perspective_camera": perspective_cam,
-            "orthogonal_camera": payload.orthogonal_camera,
-            "components": components_data,
-            "snapshot_url": snapshot_url,
-        }
-        self._viewpoints_by_topic[guid].append(item)
-        return BCFViewpointResponse(**item)
-
-    def get_snapshot(self, viewpoint_guid: str) -> Optional[bytes]:
-        """Fetch snapshot PNG bytes for a viewpoint."""
-        return self._snapshots_by_viewpoint.get(str(viewpoint_guid).upper())
 
     def delete_topic(self, project_id: str, topic_guid: str) -> bool:
         """Delete a BCF topic and its associated comments and viewpoints."""
-        proj_key = str(project_id)
-        project_store = self._topics_by_project.get(proj_key, {})
-        guid = str(topic_guid).upper()
-        if guid not in project_store and str(topic_guid) in project_store:
-            guid = str(topic_guid)
-
-        if guid not in project_store:
+        row = self._topics.get(str(topic_guid).upper()) or self._topics.get(str(topic_guid))
+        if not row or str(row.get("project_id")) != str(project_id):
             return False
+        guid = row["guid"]
 
-        del project_store[guid]
-
-        # Clean up comments and viewpoints
-        self._comments_by_topic.pop(guid, None)
-        viewpoints = self._viewpoints_by_topic.pop(guid, [])
-        for vp in viewpoints:
-            vp_guid = vp.get("guid")
-            if vp_guid:
-                self._snapshots_by_viewpoint.pop(vp_guid, None)
-
+        for comment in self._comments.rows_where("topic_guid = ?", [guid]):
+            self._comments.delete(comment["guid"])
+        for vp in self._viewpoints.rows_where("topic_guid = ?", [guid]):
+            self._viewpoints.delete(vp["guid"])
+        self._topics.delete(guid)
         return True
 
     def bulk_delete_topics(self, project_id: str, topic_guids: list[str]) -> int:
@@ -358,7 +341,95 @@ class BCFSyncService:
                 deleted_count += 1
         return deleted_count
 
+    # ------------------------------------------------------------------
+    # Comments
+    # ------------------------------------------------------------------
+
+    def get_comments(self, topic_guid: str) -> list[BCFCommentResponse]:
+        """List comments for a topic."""
+        guid = str(topic_guid).upper()
+        rows = self._comments.rows_where("topic_guid = ?", [guid])
+        return [self._comment_from_row(r) for r in rows]
+
+    def create_comment(
+        self,
+        topic_guid: str,
+        payload: BCFCommentCreatePayload,
+        author: str = "BIMGUARD-AI",
+    ) -> BCFCommentResponse:
+        """Add a comment to a topic."""
+        guid = str(topic_guid).upper()
+        comment_guid = str(uuid.uuid4()).upper()
+        row = {
+            "guid": comment_guid,
+            "topic_guid": guid,
+            "comment_date": _utc_now_iso(),
+            "author": author,
+            "comment": payload.comment,
+            "viewpoint_guid": payload.viewpoint_guid,
+        }
+        self._comments.insert(row)
+        return self._comment_from_row(row)
+
+    # ------------------------------------------------------------------
+    # Viewpoints
+    # ------------------------------------------------------------------
+
+    def get_viewpoints(self, topic_guid: str) -> list[BCFViewpointResponse]:
+        """List viewpoints for a topic."""
+        guid = str(topic_guid).upper()
+        rows = self._viewpoints.rows_where("topic_guid = ?", [guid])
+        return [self._viewpoint_from_row(r) for r in rows]
+
+    def create_viewpoint(
+        self,
+        topic_guid: str,
+        payload: BCFViewpointCreatePayload,
+    ) -> BCFViewpointResponse:
+        """Create a 3D camera viewpoint with optional snapshot for a topic."""
+        guid = str(topic_guid).upper()
+        vp_guid = str(uuid.uuid4()).upper()
+        existing = self._viewpoints.rows_where("topic_guid = ?", [guid])
+
+        perspective_cam = payload.perspective_camera or {
+            "camera_view_point": {"x": 5.0, "y": 5.0, "z": 5.0},
+            "camera_direction": {"x": -0.577, "y": -0.577, "z": -0.577},
+            "camera_up_vector": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "field_of_view": 60.0,
+        }
+        components_data = payload.components or {
+            "selection": [],
+            "coloring": [],
+            "visibility": {"default_visibility": True, "exceptions": []},
+        }
+
+        snapshot_base64 = None
+        if payload.snapshot_base64:
+            try:
+                base64.b64decode(payload.snapshot_base64)
+                snapshot_base64 = payload.snapshot_base64
+            except Exception as exc:
+                logger.debug("Failed decoding base64 snapshot: %s", exc)
+
+        row = {
+            "guid": vp_guid,
+            "topic_guid": guid,
+            "viewpoint_index": len(existing) + 1,
+            "perspective_camera": perspective_cam,
+            "orthogonal_camera": payload.orthogonal_camera,
+            "components": components_data,
+            "snapshot_base64": snapshot_base64,
+        }
+        self._viewpoints.insert(row)
+        return self._viewpoint_from_row(row)
+
+    def get_snapshot(self, viewpoint_guid: str) -> Optional[bytes]:
+        """Fetch snapshot PNG bytes for a viewpoint."""
+        row = self._viewpoints.get(str(viewpoint_guid).upper())
+        if not row or not row.get("snapshot_base64"):
+            return None
+        return base64.b64decode(row["snapshot_base64"])
+
 
 # Global Singleton BCF Sync Service
 DEFAULT_BCF_SYNC_SERVICE = BCFSyncService()
-

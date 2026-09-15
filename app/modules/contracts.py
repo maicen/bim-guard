@@ -2305,6 +2305,33 @@ class IDSExportRequest(BaseModel):
 # ------------------------------------------------------------------------------
 
 
+class BCFVersionResponse(BaseModel):
+    """One entry of the ``GET /bcf/versions`` discovery response."""
+
+    version_id: str
+    detailed_version: str
+
+
+class BCFExtensionsResponse(BaseModel):
+    """Per-project enumerations a BCF client uses to populate its UI.
+
+    Mirrors the ``GET /bcf/2.1/projects/{project_id}/extensions`` contract:
+    the fixed vocabularies this API actually accepts on topic create/update,
+    plus the actions a caller may take at project/topic/comment level.
+    """
+
+    topic_type: list[str] = Field(default_factory=lambda: ["Issue", "Request", "Clashes", "Remark"])
+    topic_status: list[str] = Field(default_factory=lambda: ["Open", "InProgress", "Resolved", "Closed"])
+    topic_label: list[str] = Field(default_factory=list)
+    priority: list[str] = Field(default_factory=lambda: ["Critical", "Major", "Normal", "Minor"])
+    user_id_type: list[str] = Field(default_factory=list)
+    stage: list[str] = Field(default_factory=list)
+    snippet_type: list[str] = Field(default_factory=list)
+    project_actions: list[str] = Field(default_factory=lambda: ["update"])
+    topic_actions: list[str] = Field(default_factory=lambda: ["createTopic", "updateTopic", "deleteTopic"])
+    comment_actions: list[str] = Field(default_factory=lambda: ["createComment", "updateComment", "deleteComment"])
+
+
 class BCFProjectResponse(BaseModel):
     """BCF Project information contract."""
 

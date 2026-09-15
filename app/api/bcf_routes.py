@@ -22,10 +22,12 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     BCFCommentCreatePayload,
     BCFCommentResponse,
+    BCFExtensionsResponse,
     BCFProjectResponse,
     BCFTopicCreatePayload,
     BCFTopicResponse,
     BCFTopicUpdatePayload,
+    BCFVersionResponse,
     BCFViewpointCreatePayload,
     BCFViewpointResponse,
 )
@@ -37,7 +39,30 @@ from app.services.projects_service import ProjectsService
 
 logger = get_logger(__name__)
 
+#: Discovery router, deliberately carrying no auth dependency: BCF-API requires
+#: ``GET /bcf/versions`` to be reachable before a client knows how to
+#: authenticate against the rest of the API. Mounted at the same "/api/bcf"
+#: prefix as ``router`` (app/main.py), so the path is "/api/bcf/versions"
+#: rather than the spec's root-level "/bcf/versions" -- this API lives under
+#: this app's own "/api" gateway namespace like every other router here.
+public_router = APIRouter()
+
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+@public_router.get(
+    "/versions",
+    response_model=list[BCFVersionResponse],
+    summary="BCF API Version Discovery",
+    tags=["BCF API"],
+)
+def get_bcf_versions() -> list[BCFVersionResponse]:
+    """Advertise the BCF API version(s) this server implements.
+
+    Unauthenticated per the BCF-API spec, so a client can discover which
+    version to speak before it has credentials.
+    """
+    return [BCFVersionResponse(version_id="2.1", detailed_version="2.1")]
 
 
 def get_bcf_sync_service() -> BCFSyncService:
@@ -142,6 +167,30 @@ def get_bcf_project(
 
     # Fallback for string/UUID projects
     return BCFProjectResponse(project_id=str(project_id), name=f"Project {project_id}")
+
+
+@router.get(
+    "/v2.1/projects/{project_id}/extensions",
+    response_model=BCFExtensionsResponse,
+    summary="Get BCF Project Extensions",
+    tags=["BCF API v2.1"],
+)
+def get_bcf_extensions(
+    project_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> BCFExtensionsResponse:
+    """Return the enumerations and actions this API accepts for the project.
+
+    Fixed vocabulary rather than DB-driven: every value returned here is what
+    ``BCFTopicCreatePayload``/``BCFTopicUpdatePayload`` actually validate, so a
+    client populating a dropdown from this response cannot submit a value the
+    create/update endpoints would reject.
+    """
+    _require_bcf_project_access(project_id, current_user, projects_service, memberships, profiles)
+    return BCFExtensionsResponse()
 
 
 # ------------------------------------------------------------------------------
