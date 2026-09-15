@@ -2,6 +2,8 @@
   import { AlertTriangle, Search } from "lucide-svelte";
   import SortHeader from "./SortHeader.svelte";
   import TablePagination from "./TablePagination.svelte";
+  import ConfidenceMeter from "./ConfidenceMeter.svelte";
+  import { UNKNOWN_PROPERTY_CONFIDENCE } from "../propertyConfidence";
   import type { RuleElementResult } from "../types";
 
   interface Props {
@@ -15,10 +17,17 @@
   let { elements, unit = "", requiredText, fmtVal, onViewIn3d }: Props = $props();
 
   let search = $state("");
-  let sortField = $state("status");
+  // Defaults to the most accurate property resolution first — a value read
+  // straight off the element's own Pset ranks above a geometry-bbox guess,
+  // regardless of whether the rule passed or failed.
+  let sortField = $state("confidence");
   let sortAsc = $state(true);
   let currentPage = $state(1);
   let pageSize = $state(25);
+
+  function confidenceRank(el: RuleElementResult): number {
+    return (el.property_confidence ?? UNKNOWN_PROPERTY_CONFIDENCE).rank;
+  }
 
   const STATUS_ORDER: Record<string, number> = { FAIL: 0, MISSING: 1, PASS: 2 };
 
@@ -64,7 +73,9 @@
   let sorted = $derived(
     [...filtered].sort((a, b) => {
       let cmp: number;
-      if (sortField === "status") {
+      if (sortField === "confidence") {
+        cmp = confidenceRank(a) - confidenceRank(b);
+      } else if (sortField === "status") {
         cmp = (STATUS_ORDER[a.status ?? ""] ?? 3) - (STATUS_ORDER[b.status ?? ""] ?? 3);
       } else if (sortField === "actual") {
         cmp = actualText(a).localeCompare(actualText(b));
@@ -124,6 +135,9 @@
           <SortHeader column="status" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Status</SortHeader
           >
+          <SortHeader column="confidence" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
+            >Confidence</SortHeader
+          >
         </tr>
       </thead>
       <tbody>
@@ -163,10 +177,13 @@
                 >
               {/if}
             </td>
+            <td class="px-3 py-2">
+              <ConfidenceMeter confidence={el.property_confidence} />
+            </td>
           </tr>
         {:else}
           <tr>
-            <td colspan="6" class="px-3 py-6 text-center text-xs italic text-fg-muted">
+            <td colspan="7" class="px-3 py-6 text-center text-xs italic text-fg-muted">
               No elements match "{search}".
             </td>
           </tr>

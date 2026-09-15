@@ -33,12 +33,30 @@ class ComplianceReporter:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _lowest_confidence_label(rule: dict) -> str:
+        """The least-authoritative confidence category among a rule's evaluated
+        elements — e.g. if even one element's value came from a geometry
+        estimate, that's what a reviewer needs to see on the rule's summary
+        row, not the best case among the rest.
+        """
+        elements = rule.get("all_elements") or []
+        worst: dict | None = None
+        for el in elements:
+            confidence = el.get("property_confidence")
+            if not confidence:
+                continue
+            if worst is None or confidence.get("rank", 0) > worst.get("rank", 0):
+                worst = confidence
+        return worst.get("label", "") if worst else ""
+
     def generate_csv_summary(self, compliance_results: list[dict]) -> str:
         """
         Return a CSV string — one row per rule — suitable for download.
 
         Columns: Rule Ref, Description, Target IFC, Property, Operator,
-                 Expected, Unit, Severity, Status, Pass, Fail, Missing, Total
+                 Expected, Unit, Severity, Status, Pass, Fail, Missing, Total,
+                 Lowest Confidence
         """
         output = io.StringIO()
         writer = csv.writer(output)
@@ -47,6 +65,7 @@ class ComplianceReporter:
             "Property Name", "Operator", "Expected Value", "Unit",
             "Severity", "Status",
             "Pass", "Fail", "Missing", "Total Elements",
+            "Lowest Confidence",
         ])
         for r in compliance_results:
             if r.get("operator") == "between":
@@ -67,6 +86,7 @@ class ComplianceReporter:
                 r.get("fail_count",    0),
                 r.get("missing_count", 0),
                 r.get("total_count",   0),
+                self._lowest_confidence_label(r),
             ])
         return output.getvalue()
 
@@ -91,6 +111,7 @@ class ComplianceReporter:
                 "Fail",
                 "Missing",
                 "Total Elements",
+                "Lowest Confidence",
             ]
         )
         yield row_buffer.getvalue()
@@ -118,6 +139,7 @@ class ComplianceReporter:
                     r.get("fail_count", 0),
                     r.get("missing_count", 0),
                     r.get("total_count", 0),
+                    self._lowest_confidence_label(r),
                 ]
             )
             yield row_buffer.getvalue()
@@ -135,13 +157,15 @@ class ComplianceReporter:
         Returns:
             dict with guid, title, description, type, status, element_guid
         """
+        confidence = failure.get("property_confidence") or {}
         return {
             "guid":         str(uuid.uuid4()),
             "title":        f"[{rule.get('rule_ref')}] {(rule.get('rule_desc') or '')[:80]}",
             "description":  (
-                f"Element : {failure.get('element_name')}\n"
-                f"Property: {rule.get('property_name')}\n"
-                f"Issue   : {failure.get('reason')}"
+                f"Element   : {failure.get('element_name')}\n"
+                f"Property  : {rule.get('property_name')}\n"
+                f"Issue     : {failure.get('reason')}\n"
+                f"Confidence: {confidence.get('label', 'Unresolved')} — {confidence.get('description', '')}"
             ),
             "type":         "Error" if rule.get("severity") == "mandatory" else "Warning",
             "status":       "Open",
