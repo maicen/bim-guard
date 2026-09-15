@@ -38,6 +38,7 @@ router = APIRouter()
 def _to_response(row: dict[str, Any]) -> ParsingEngineInstanceResponse:
     return ParsingEngineInstanceResponse(
         id=row["id"],
+        organization_id=row.get("organization_id"),
         name=row.get("name", ""),
         kind=row.get("kind", ""),
         api_url=row.get("api_url", ""),
@@ -82,8 +83,8 @@ def list_instances(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> list[ParsingEngineInstanceResponse]:
-    """Return all configured parsing-engine instances."""
-    return [_to_response(row) for row in service.list_instances()]
+    """Return all configured platform-wide parsing-engine instances."""
+    return [_to_response(row) for row in service.list_instances(None)]
 
 
 @router.post(
@@ -98,10 +99,11 @@ def create_instance(
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
-    """Register a new parsing-engine instance of any registered kind."""
+    """Register a new platform-wide parsing-engine instance of any registered kind."""
     _require_superadmin(current_user, profiles)
     try:
         created = service.create_instance(
+            None,
             name=payload.name,
             kind=payload.kind,
             api_url=payload.api_url,
@@ -122,8 +124,8 @@ def get_instance(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
-    """Retrieve a single configured parsing-engine instance by ID."""
-    row = service.get_instance(instance_id)
+    """Retrieve a single configured platform-wide parsing-engine instance by ID."""
+    row = service.get_instance(None, instance_id)
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -140,10 +142,11 @@ def update_instance(
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> ParsingEngineInstanceResponse:
-    """Update metadata for an existing configured parsing-engine instance."""
+    """Update metadata for an existing configured platform-wide parsing-engine instance."""
     _require_superadmin(current_user, profiles)
     try:
         updated = service.update_instance(
+            None,
             instance_id,
             name=payload.name,
             api_url=payload.api_url,
@@ -170,14 +173,14 @@ def delete_instance(
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
 ) -> None:
-    """Delete a configured parsing-engine instance by ID."""
+    """Delete a configured platform-wide parsing-engine instance by ID."""
     _require_superadmin(current_user, profiles)
-    if not service.get_instance(instance_id):
+    if not service.get_instance(None, instance_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parsing engine instance {instance_id} not found.",
         )
-    service.delete_instance(instance_id)
+    service.delete_instance(None, instance_id)
 
 
 @router.post(
@@ -197,7 +200,7 @@ def test_instance(
     .test_connection(...)) — this endpoint has no per-kind branching itself.
     """
     _require_superadmin(current_user, profiles)
-    row = service.get_instance(instance_id)
+    row = service.get_instance(None, instance_id)
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

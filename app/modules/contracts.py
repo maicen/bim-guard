@@ -701,7 +701,7 @@ class DocumentDetailResponse(IsoGovernanceFieldsRequired):
 class GenerateDoclangRequest(BaseModel):
     """Payload to (re)generate DocLang XML for an already-stored document."""
 
-    parser: Optional[str] = Field(default="auto", description="Extraction parser: auto | unstructured | light")
+    parser: Optional[str] = Field(default="auto", description="Extraction parser (currently only 'auto' is valid)")
     engine_instance: Optional[str] = Field(default="", description="Named parsing engine instance to use")
 
 
@@ -714,7 +714,7 @@ class GoogleDriveImportRequest(BaseModel):
     originator: Optional[str] = Field(default="", description="ISO 19650 Originator Code")
     suitability_code: Optional[str] = Field(default="S0", description="ISO 19650 Suitability Code")
     revision_code: Optional[str] = Field(default="P01.01", description="ISO 19650 Revision Code")
-    parser: Optional[str] = Field(default="auto", description="Extraction parser: auto | unstructured | light")
+    parser: Optional[str] = Field(default="auto", description="Extraction parser (currently only 'auto' is valid)")
     engine_instance: Optional[str] = Field(default="", description="Named parsing engine instance to use")
 
 
@@ -1736,9 +1736,12 @@ class ParsingEngineInstanceResponse(TimestampFields):
     """Response contract for a registered parsing-engine instance.
 
     The stored api_key is never echoed back — only whether one is set.
+    `organization_id` is null for the platform-wide tier (superadmin-managed)
+    and set for an org-scoped instance (owner/admin-managed).
     """
 
     id: int
+    organization_id: Optional[int] = None
     name: str
     kind: str
     api_url: str

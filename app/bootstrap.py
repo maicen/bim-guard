@@ -571,15 +571,15 @@ def build_default_container() -> ApplicationContainer:
         )
 
         has_default = any(
-            row.get("is_default") for row in parsing_engine_instances_service.list_instances()
+            row.get("is_default") for row in parsing_engine_instances_service.list_instances(None)
         )
 
         def _seed_if_missing(name: str, **kwargs) -> None:
             nonlocal has_default
-            if parsing_engine_instances_service.get_by_name(name):
+            if parsing_engine_instances_service.get_by_name(None, name):
                 return
             parsing_engine_instances_service.create_instance(
-                name=name, is_default=not has_default, **kwargs
+                None, name=name, is_default=not has_default, **kwargs
             )
             has_default = True
 

@@ -345,18 +345,34 @@ def _row_to_detail_response(row: dict, service: "DocumentService") -> DocumentDe
 
 def _resolve_parsing_instance(
     engine_instance: str,
+    organization_id: int | None,
     instances_service: ParsingEngineInstancesService,
 ) -> dict | None:
+    """Resolve which parsing engine instance an upload should use.
+
+    Named instance: org-scoped first, then platform-wide; 400 if named but
+    found in neither. Unnamed: the org's own default if it has one, else the
+    platform default. May return None when nothing is configured — the
+    caller (documents_service.ingest_uploaded_bytes) is where that turns
+    into a NoParsingEngineConfiguredError, so the failure is centralized in
+    one place.
+    """
     clean_instance_name = (engine_instance or "").strip()
     if clean_instance_name:
-        resolved = instances_service.get_by_name(clean_instance_name)
+        resolved = None
+        if organization_id is not None:
+            resolved = instances_service.get_by_name(organization_id, clean_instance_name)
+        if not resolved:
+            resolved = instances_service.get_by_name(None, clean_instance_name)
         if not resolved:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Parsing engine instance '{clean_instance_name}' is not configured.",
             )
         return resolved
-    return instances_service.get_default()
+    if organization_id is not None:
+        return instances_service.get_effective_default(organization_id)
+    return instances_service.get_default(None)
 
 
 @router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Upload document")
@@ -416,8 +432,6 @@ async def upload_document(
 
         profiles = get_container().profile_service
 
-    resolved_instance = _resolve_parsing_instance(engine_instance, instances_service)
-
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
@@ -459,6 +473,8 @@ async def upload_document(
                 )
         elif user_orgs:
             target_org_id = next(iter(user_orgs))
+
+    resolved_instance = _resolve_parsing_instance(engine_instance, target_org_id, instances_service)
 
     # ISO 19650 Originator: default to the target organization's own code
     # when the caller didn't specify one explicitly, same as project
@@ -524,7 +540,7 @@ async def import_from_google_drive(
     """
     from app.services.google_drive_service import GoogleDriveError, GoogleDriveService
 
-    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", instances_service)
+    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", None, instances_service)
     drive = GoogleDriveService()
 
     results: list[GoogleDriveImportResult] = []
@@ -588,7 +604,7 @@ async def generate_document_doclang(
             detail=f"Document with ID {document_id} not found.",
         )
 
-    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", instances_service)
+    resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", None, instances_service)
     clean_parser = (payload.parser or "auto").strip().lower()
     try:
         updated = await run_in_threadpool(
