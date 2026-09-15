@@ -20616,7 +20616,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20627,7 +20629,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20638,7 +20642,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20649,7 +20655,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20660,7 +20668,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20671,7 +20681,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20682,7 +20694,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20693,7 +20707,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20704,7 +20720,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20715,7 +20733,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20726,7 +20746,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20737,7 +20759,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20748,7 +20772,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20759,7 +20785,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20770,7 +20798,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20781,7 +20811,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20792,7 +20824,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20803,7 +20837,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20814,7 +20850,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20825,7 +20863,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   },
@@ -20836,7 +20876,9 @@
     "dictionary_uri": "https://identifier.buildingsmart.org/uri/accord/ACCORD/1.0",
     "class_type": "Class",
     "parent_class_uri": null,
-    "related_ifc_entities": [],
+    "related_ifc_entities": [
+      "IfcDoor"
+    ],
     "definition": null,
     "description": null
   }
