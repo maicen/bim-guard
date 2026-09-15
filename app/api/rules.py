@@ -584,6 +584,8 @@ def download_rule_snapshot_pdf(
 def create_rule_folder(
     payload: RuleFolderCreateRequest,
     service: Annotated[RuleService, Depends(get_rules_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> RuleFolderResponse:
     """Create a new ruleset folder category.
 
@@ -592,6 +594,13 @@ def create_rule_folder(
     ``organization_ruleset_grants`` row yet, so there is nothing to check a
     grant against without also blocking the ordinary "create a custom
     ruleset" flow for every non-superadmin.
+
+    That same missing grant row would otherwise make the new folder
+    invisible right after creation: ``list_rules``/``list_rule_folders``
+    both filter by organization grants whenever a caller passes one, and the
+    frontend always does. So the creating organization (from
+    ``X-Organization-Id``, attached to every authenticated request — see
+    ``authHeaders()``) is granted access to its own new ruleset immediately.
     """
     norm_cat = service.normalize_category(payload.category)
     created = service.create_folder(
@@ -606,6 +615,8 @@ def create_rule_folder(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Folder '{payload.ruleset_id}' already exists or has invalid ID.",
         )
+    if x_org_id and x_org_id.strip().isdigit():
+        ruleset_access.add_org_grant(int(x_org_id.strip()), payload.ruleset_id)
     folders = service.list_folders_with_rules()
     for f in folders:
         if service.normalize_ruleset_id(f.get("ruleset_id")) == service.normalize_ruleset_id(payload.ruleset_id):

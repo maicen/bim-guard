@@ -6,7 +6,6 @@
     FileText,
     Activity,
     CheckCircle2,
-    ArrowRight,
   } from "lucide-svelte";
   import { modelsApi } from "../lib/api";
   import type { Project, Model } from "../lib/types";
@@ -115,38 +114,21 @@
       "Everything scoped to this project — models, compliance, and reports."}
   />
 
-  <!-- Project summary card -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-    <div class="rounded-2xl border border-border-default bg-surface-card/60 p-5">
-      <div class="text-xs font-semibold uppercase tracking-wider text-fg-muted">Domain</div>
-      <div class="mt-2 text-xl font-bold text-fg-primary">
-        {selectedProject?.analysis_type ? formatAnalysisDomain(selectedProject.analysis_type) : "—"}
-      </div>
-    </div>
-    <div class="rounded-2xl border border-border-default bg-surface-card/60 p-5">
-      <div class="text-xs font-semibold uppercase tracking-wider text-fg-muted">Status</div>
-      <div class="mt-2 text-xl font-bold text-fg-primary">{selectedProject?.status || "—"}</div>
-    </div>
-    <button
-      type="button"
-      onclick={() => onNavigate("models")}
-      class="group rounded-2xl border border-border-default bg-surface-card/60 p-5 text-left transition-all hover:border-border-interactive"
-    >
-      <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-fg-muted">
-        <span>Models</span>
-        <ArrowRight class="h-3.5 w-3.5 text-blue-400 opacity-0 transition-all group-hover:opacity-100" />
-      </div>
-      <div class="mt-2 flex items-center gap-2 text-xl font-bold text-fg-primary">
-        {isLoadingFiles ? "…" : ifcFiles.length}
-        <span class="text-xs font-normal text-fg-muted">attached</span>
-      </div>
-      {#if primaryFile}
-        <div class="mt-1 flex items-center gap-1.5 truncate text-xs text-emerald-400">
-          <CheckCircle2 class="h-3 w-3 shrink-0" />
-          <span class="truncate">{primaryFile.file_name}</span>
-        </div>
-      {/if}
-    </button>
+  <!-- Project info (not interactive -- plain metadata, no card/border) -->
+  <div class="-mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+    <span>
+      <span class="font-semibold uppercase tracking-wider text-fg-muted">Domain</span>
+      <span class="ml-1.5 font-medium text-fg-secondary"
+        >{selectedProject?.analysis_type
+          ? formatAnalysisDomain(selectedProject.analysis_type)
+          : "—"}</span
+      >
+    </span>
+    <span class="text-border-default">·</span>
+    <span>
+      <span class="font-semibold uppercase tracking-wider text-fg-muted">Status</span>
+      <span class="ml-1.5 font-medium text-fg-secondary">{selectedProject?.status || "—"}</span>
+    </span>
   </div>
 
   <!-- Quick actions -->
@@ -155,7 +137,7 @@
       <button
         type="button"
         onclick={() => onNavigate(action.view)}
-        class="group rounded-2xl border border-border-default bg-surface-card/40 p-5 text-left transition-all hover:border-border-interactive"
+        class="group rounded-2xl border border-border-default bg-surface-card/40 p-5 text-left transition-colors hover:border-border-interactive hover:bg-surface-hover"
       >
         <div
           class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl transition-transform group-hover:scale-110 {COLOR_CLASSES[
@@ -164,8 +146,22 @@
         >
           <action.icon class="h-4 w-4" />
         </div>
-        <h3 class="text-sm font-semibold text-fg-primary">{action.label}</h3>
+        <h3 class="text-sm font-semibold text-fg-primary transition-colors group-hover:text-accent">
+          {action.label}
+        </h3>
         <p class="mt-1 text-xs text-fg-muted">{action.description}</p>
+        {#if action.view === "models"}
+          <div class="mt-2.5 flex items-center gap-1.5 text-xs">
+            <span class="font-semibold text-fg-primary">{isLoadingFiles ? "…" : ifcFiles.length}</span>
+            <span class="text-fg-muted">attached</span>
+          </div>
+          {#if primaryFile}
+            <div class="mt-1 flex items-center gap-1.5 truncate text-xs text-emerald-400">
+              <CheckCircle2 class="h-3 w-3 shrink-0" />
+              <span class="truncate">{primaryFile.file_name}</span>
+            </div>
+          {/if}
+        {/if}
       </button>
     {/each}
   </div>

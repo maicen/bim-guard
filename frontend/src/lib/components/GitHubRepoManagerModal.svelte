@@ -174,10 +174,18 @@
           <button
             type="button"
             onclick={() => (showAddForm = !showAddForm)}
-            class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-blue-500"
+            aria-expanded={showAddForm}
+            class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shadow-xs transition-all {showAddForm
+              ? 'border border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover'
+              : 'bg-blue-600 text-white hover:bg-blue-500'}"
           >
-            <Plus class="h-4 w-4" />
-            <span>Add GitHub Repository</span>
+            {#if showAddForm}
+              <X class="h-4 w-4" />
+              <span>Cancel</span>
+            {:else}
+              <Plus class="h-4 w-4" />
+              <span>Add GitHub Repository</span>
+            {/if}
           </button>
         </div>
 

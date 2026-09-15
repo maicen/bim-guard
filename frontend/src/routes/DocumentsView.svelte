@@ -13,6 +13,7 @@
     FolderSync,
     Sparkles,
     FileCode,
+    Plus,
   } from "lucide-svelte";
   import Icon from "@iconify/svelte";
   import { documentsApi, parsingEnginesApi, orgParsingEnginesApi } from "../lib/api";
@@ -306,50 +307,58 @@
     title="Document Specifications"
     subtitle="Upload and manage building code standards, specifications, and project manuals."
     icon={BookOpen}
-  >
-    {#snippet actions()}
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          onclick={() => (isOpenCdeModalOpen = true)}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-blue-800/50 bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-900/60"
-          title="Sync documents via buildingSMART OpenCDE API"
-        >
-          <FolderSync class="h-3.5 w-3.5" />
-          <span>OpenCDE Sync</span>
-        </button>
+  />
 
-        <button
-          type="button"
-          onclick={() => loadDocuments(true)}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-          title="Refresh document specifications"
-        >
-          <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
-          <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
-        </button>
+  <div class="flex flex-wrap items-center gap-2">
+    <button
+      type="button"
+      onclick={() => openUploadModal()}
+      class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+    >
+      <Upload class="h-3.5 w-3.5" />
+      <span>Upload Specification</span>
+    </button>
 
-        <button
-          type="button"
-          onclick={() => (isDriveImportModalOpen = true)}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-          title="Import documents from Google Drive share links"
-        >
-          <CloudDownload class="h-3.5 w-3.5" />
-          <span>Import from Drive</span>
-        </button>
+    <button
+      type="button"
+      onclick={() => push("/manual-rule-editor")}
+      class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+      title="Opens the Manual Rule Editor to hand-author a rule, organized by building element category"
+    >
+      <Plus class="h-3.5 w-3.5" />
+      <span>Add Manual Rules</span>
+    </button>
 
-        <button
-          type="button"
-          onclick={() => openUploadModal()}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
-        >
-          <Upload class="h-3.5 w-3.5" />
-          <span>Upload Specification</span>
-        </button>
-      </div>
-    {/snippet}
-  </PageHeader>
+    <button
+      type="button"
+      onclick={() => (isOpenCdeModalOpen = true)}
+      class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+      title="Sync documents via buildingSMART OpenCDE API"
+    >
+      <FolderSync class="h-3.5 w-3.5" />
+      <span>OpenCDE Sync</span>
+    </button>
+
+    <button
+      type="button"
+      onclick={() => loadDocuments(true)}
+      class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+      title="Refresh document specifications"
+    >
+      <RotateCw class="h-3.5 w-3.5 {isRefreshing ? 'animate-spin text-blue-400' : ''}" />
+      <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+    </button>
+
+    <button
+      type="button"
+      onclick={() => (isDriveImportModalOpen = true)}
+      class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+      title="Import documents from Google Drive share links"
+    >
+      <CloudDownload class="h-3.5 w-3.5" />
+      <span>Import from Drive</span>
+    </button>
+  </div>
 
   {#if error}
     <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">

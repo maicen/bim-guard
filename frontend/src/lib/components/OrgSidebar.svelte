@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     LayoutDashboard,
-    BookOpen,
     BookOpenCheck,
     Box,
     Sparkles,
@@ -56,7 +55,7 @@
     {
       title: "Rules & Standards",
       items: [
-        { id: "documents", label: "Rule Documents", icon: BookOpen },
+        { id: "documents", label: "New Rule Documents", icon: Plus },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
         { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
       ],

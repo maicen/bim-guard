@@ -40,6 +40,21 @@ class RulesetAccessService:
         rows = self._org_grants.rows_where("organization_id = ?", [organization_id])
         return [r["ruleset_id"] for r in rows]
 
+    def add_org_grant(self, organization_id: int, ruleset_id: str) -> None:
+        """Grant *organization_id* access to *ruleset_id* without touching its other grants.
+
+        Unlike :meth:`set_org_grants` (a full replace, used by the superadmin
+        grants screen), this only adds — used right after an organization
+        mints a brand-new ruleset folder via ``create_rule_folder``, whose own
+        grant row does not exist yet. Without it, the folder would exist but
+        be invisible in every org-scoped listing (``list_rules`` and
+        ``list_rule_folders`` both filter by this table), making "create a
+        custom ruleset" look broken for the very org that just created it.
+        """
+        if ruleset_id in self.list_org_grants(organization_id):
+            return
+        self._org_grants.insert({"organization_id": organization_id, "ruleset_id": ruleset_id})
+
     def set_org_grants(self, organization_id: int, ruleset_ids: list[str]) -> None:
         """Replace *organization_id*'s entire set of granted rulesets.
 
