@@ -1,0 +1,56 @@
+site_name: BIM-Guard User Manual
+site_description: Getting started, project setup, and operations guide for BIM-Guard
+docs_dir: docs/manual
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Projects:
+      - Creating a Project: projects/creating-a-project.md
+      - Project Settings: projects/project-settings.md
+  - Infrastructure Setup:
+      - Environment Setup: infrastructure/environment-setup.md
+      - Deployment: infrastructure/deployment.md
+  - Documents:
+      - Uploading Documents: documents/uploading-documents.md
+  - Rules:
+      - Rules Catalog: rules/rules-catalog.md
+  - Analysis:
+      - Running Analysis: analysis/running-analysis.md
+  - Administration:
+      - User & Organization Management: admin/user-management.md

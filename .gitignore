@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# MkDocs build output (built on-demand via `uv run mkdocs build`)
+site/
+
 # Environment variables (contains secrets — never commit)
 .env
 
