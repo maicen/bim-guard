@@ -3,8 +3,28 @@
   import { run, preventDefault } from "svelte/legacy";
 
   import { onMount } from "svelte";
-  import { X, Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
-  import { bsddApi, projectsApi, modelsApi, documentsApi, namingConfigApi } from "../api";
+  import {
+    X,
+    Check,
+    Upload,
+    ArrowRight,
+    ArrowLeft,
+    FileText,
+    CheckCircle2,
+    FolderGit2,
+    Box,
+    GitBranch,
+    ExternalLink,
+    Loader2,
+  } from "lucide-svelte";
+  import {
+    bsddApi,
+    projectsApi,
+    modelsApi,
+    documentsApi,
+    namingConfigApi,
+    githubReposApi,
+  } from "../api";
   import { authState } from "../auth.svelte";
   import {
     IFC_FILE_ROLES,
@@ -21,16 +41,23 @@
     DocumentItem,
     ProjectOptions,
     NamingConfigPayload,
+    GitHubRepoStructure,
   } from "../types";
   import NamingConfigStep from "./NamingConfigStep.svelte";
+  import TableCheckbox from "./TableCheckbox.svelte";
+  import { RadioGroupRoot, RadioGroupItem } from "./ui";
 
   interface Props {
     isOpen?: boolean;
+    // Set when the project should be created with its model(s) sourced from a
+    // connected GitHub repository (chosen in the Dashboard's Storage Source
+    // ribbon) instead of a local upload -- see Step 2 below.
+    sourceRepoId?: number | null;
     onClose: () => void;
     onProjectCreated: (project: Project) => void;
   }
 
-  let { isOpen = false, onClose, onProjectCreated }: Props = $props();
+  let { isOpen = false, sourceRepoId = null, onClose, onProjectCreated }: Props = $props();
 
   let currentStep = $state(1);
   let isSubmitting = $state(false);
@@ -70,6 +97,28 @@
   let createdProjectId: number | null = null;
 
   let primaryIfcFile = $derived(ifcFiles[primaryIndex] ?? null);
+
+  // Repository-sourced model selection (Step 2, when sourceRepoId is set) --
+  // mirrors ModelsView's GitHub repo browsing. Attaching happens after the
+  // project is created, since attachModelsToProject requires an existing
+  // project id.
+  let activeRepoStructure: GitHubRepoStructure | null = $state(null);
+  let isRepoLoading = $state(false);
+  let repoSearch = $state("");
+  let repoCategoryFilter = $state("all");
+  let selectedRepoPaths: Set<string> = $state(new Set());
+  let primaryRepoPath: string | null = $state(null);
+
+  let filteredRepoItems = $derived(
+    (activeRepoStructure?.items || []).filter((item) => {
+      const matchesSearch =
+        repoSearch === "" ||
+        item.name.toLowerCase().includes(repoSearch.toLowerCase()) ||
+        item.path.toLowerCase().includes(repoSearch.toLowerCase());
+      const matchesCategory = repoCategoryFilter === "all" || item.category === repoCategoryFilter;
+      return matchesSearch && matchesCategory;
+    }),
+  );
 
   // Step 1 building details. Held as strings because an empty number input
   // yields '', and sending '' is how the wizard says "not answered" — coercing
@@ -172,8 +221,56 @@
         .catch(() => {
           documents = [];
         });
+
+      if (sourceRepoId != null) {
+        loadRepoStructure(sourceRepoId);
+      } else {
+        activeRepoStructure = null;
+      }
     }
   });
+
+  async function loadRepoStructure(repoId: number, force = false) {
+    isRepoLoading = true;
+    try {
+      activeRepoStructure = await githubReposApi.getStructure(repoId, force);
+    } catch (err: any) {
+      activeRepoStructure = null;
+      errorMessage = err.message || "Failed to read the repository structure.";
+    } finally {
+      isRepoLoading = false;
+    }
+  }
+
+  function toggleRepoPath(path: string) {
+    const next = new Set(selectedRepoPaths);
+    if (next.has(path)) {
+      next.delete(path);
+      if (primaryRepoPath === path) primaryRepoPath = next.values().next().value ?? null;
+    } else {
+      next.add(path);
+      if (!primaryRepoPath) primaryRepoPath = path;
+    }
+    selectedRepoPaths = next;
+  }
+
+  function toggleAllRepoPaths() {
+    if (selectedRepoPaths.size === filteredRepoItems.length && filteredRepoItems.length > 0) {
+      selectedRepoPaths = new Set();
+      primaryRepoPath = null;
+    } else {
+      selectedRepoPaths = new Set(filteredRepoItems.map((item) => item.path));
+      primaryRepoPath = filteredRepoItems[0]?.path ?? null;
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
 
   onMount(async () => {
     try {
@@ -410,7 +507,30 @@
             });
       createdProjectId = createdProject.id;
 
-      if (ifcFiles.length) {
+      if (sourceRepoId != null && selectedRepoPaths.size > 0) {
+        try {
+          const filePaths = Array.from(selectedRepoPaths);
+          const primaryPathIndex = Math.max(0, filePaths.indexOf(primaryRepoPath || filePaths[0]));
+          await githubReposApi.attachModelsToProject(createdProject.id, {
+            repo_id: sourceRepoId,
+            file_paths: filePaths,
+            primary_index: primaryPathIndex,
+          });
+        } catch (attachErr: any) {
+          // The project row is already saved. Reporting that plainly and
+          // staying open is better than closing on an error the user would
+          // then try to fix by creating the project a second time.
+          errorMessage =
+            `Project "${name}" was saved, but attaching the repository model(s) failed: ` +
+            `${attachErr.message || "unknown error"}. Adjust the selection and press ` +
+            `Create again — the models will attach to the project that already exists.`;
+          currentStep = 2;
+          return;
+        }
+        // The primary is mirrored onto projects.ifc_file_path server-side, so
+        // the row fetched before the attach names no model yet.
+        createdProject = await projectsApi.get(createdProject.id, { forceRefresh: true });
+      } else if (ifcFiles.length) {
         try {
           await modelsApi.upload(createdProject.id, ifcFiles, primaryIndex, ifcRoles);
         } catch (uploadErr: any) {
@@ -468,6 +588,12 @@
     primaryIndex = 0;
     isDraggingIfc = false;
     ifcNotice = "";
+    activeRepoStructure = null;
+    isRepoLoading = false;
+    repoSearch = "";
+    repoCategoryFilter = "all";
+    selectedRepoPaths = new Set();
+    primaryRepoPath = null;
     namingConfig = { ...NAMING_DEFAULTS };
     createdProjectId = null;
     projectType = "";
@@ -768,110 +894,269 @@
             </div>
           </div>
         {:else if currentStep === 2}
-          <!-- Step 2: IFC Upload -->
+          <!-- Step 2: IFC Model -->
           <div class="space-y-4">
-            <div
-              role="region"
-              aria-label="IFC model drop zone"
-              ondragover={preventDefault(() => (isDraggingIfc = true))}
-              ondragleave={handleIfcDragLeave}
-              ondrop={preventDefault(handleIfcDrop)}
-              class="rounded-2xl border-2 border-dashed p-8 text-center transition-colors {isDraggingIfc
-                ? 'border-accent bg-accent/10'
-                : 'border-border-interactive bg-surface-canvas/40 hover:border-accent'}"
-            >
-              <Upload
-                class="h-10 w-10 {isDraggingIfc ? 'text-accent' : 'text-fg-muted'} mx-auto mb-3"
-              />
-              <h3 class="mb-1 text-sm font-semibold text-fg-primary">Upload OpenBIM IFC Models</h3>
-              <p class="mx-auto mb-4 max-w-sm text-xs text-fg-muted">
-                Drag and drop IFC 2x3 or IFC4 models here, or browse. Attach one model per
-                discipline — the primary is the one the compliance run analyses.
-              </p>
-              <label
-                class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-interactive bg-surface-overlay px-4 py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
-              >
-                <span>Browse Files (.ifc)</span>
-                <input
-                  type="file"
-                  accept=".ifc"
-                  multiple
-                  onchange={handleFileChange}
-                  class="hidden"
-                />
-              </label>
-            </div>
-
-            {#if ifcNotice}
-              <p class="text-caption text-amber-400">{ifcNotice}</p>
-            {/if}
-
-            {#if ifcFiles.length}
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-fg-muted">
-                  {ifcFiles.length} model{ifcFiles.length === 1 ? "" : "s"} selected
-                </span>
-                {#if ifcFiles.length > 1}
-                  <span class="text-caption text-fg-muted">Click a model to make it primary</span>
-                {/if}
-              </div>
-
-              <div class="max-h-64 space-y-2 overflow-y-auto">
-                {#each ifcFiles as file, idx (`${file.name}:${file.size}`)}
-                  <div
-                    class="flex items-center gap-2 rounded-xl border p-3 transition-all {idx ===
-                    primaryIndex
-                      ? 'border-accent bg-accent/15'
-                      : 'border-border-default bg-surface-canvas'}"
+            {#if sourceRepoId != null}
+              <!-- Repo-sourced model selection: mirrors ModelsView's GitHub
+                   repository browsing, scoped to the repo chosen in the
+                   Dashboard's Storage Source ribbon before this wizard opened. -->
+              {#if isRepoLoading}
+                <div
+                  class="flex items-center justify-center gap-2 rounded-2xl border border-border-default bg-surface-canvas/40 p-10 text-center text-xs text-fg-muted"
+                >
+                  <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
+                  <span>Reading GitHub repository structure & OpenBIM models tree...</span>
+                </div>
+              {:else if activeRepoStructure}
+                <div
+                  class="flex flex-col items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-canvas/60 p-3 sm:flex-row sm:items-center"
+                >
+                  <div class="flex items-center gap-2 text-xs">
+                    <FolderGit2 class="h-4 w-4 text-blue-400" />
+                    <span class="font-semibold text-fg-primary"
+                      >{activeRepoStructure.owner}/{activeRepoStructure.name}</span
+                    >
+                    <span
+                      class="inline-flex items-center gap-1 rounded border border-border-default bg-surface-canvas px-1.5 py-0.5 font-mono text-micro text-fg-muted"
+                    >
+                      <GitBranch class="h-3 w-3 text-blue-400" />
+                      {activeRepoStructure.branch}
+                    </span>
+                  </div>
+                  <a
+                    href={activeRepoStructure.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center gap-1.5 text-caption font-semibold text-blue-400 hover:underline"
                   >
-                    <button
-                      type="button"
-                      onclick={() => setPrimaryIfc(idx)}
-                      title="Make this the primary model"
-                      class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                    >
-                      <CheckCircle2
-                        class="h-4 w-4 shrink-0 {idx === primaryIndex
-                          ? 'text-accent'
-                          : 'text-emerald-400'}"
-                      />
-                      <span class="truncate text-xs font-medium text-fg-primary">{file.name}</span>
-                      <span class="shrink-0 text-caption text-fg-muted">
-                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
-                      {#if idx === primaryIndex}
-                        <span
-                          class="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-white"
-                        >
-                          Primary
-                        </span>
-                      {/if}
-                    </button>
+                    <span>GitHub Repo</span>
+                    <ExternalLink class="h-3.5 w-3.5" />
+                  </a>
+                </div>
 
+                <div class="flex flex-col items-center gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    bind:value={repoSearch}
+                    placeholder="Search repository IFC models by filename or path..."
+                    class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
+                  />
+                  {#if activeRepoStructure.categories.length > 0}
                     <select
-                      aria-label="Role for {file.name}"
-                      value={ifcRoles[idx]}
-                      onchange={(event) => {
-                        const select = event.currentTarget;
-                        if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
-                      }}
-                      class="shrink-0 rounded-lg border border-border-default bg-surface-card px-2 py-1 text-caption text-fg-primary focus:border-accent focus:outline-hidden"
+                      bind:value={repoCategoryFilter}
+                      class="w-full shrink-0 rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden sm:w-auto"
                     >
-                      {#each IFC_FILE_ROLES as roleOption (roleOption)}
-                        <option value={roleOption}>{roleOption}</option>
+                      <option value="all">All Category Folders</option>
+                      {#each activeRepoStructure.categories as cat (cat)}
+                        <option value={cat}>{cat}</option>
                       {/each}
                     </select>
+                  {/if}
+                </div>
 
-                    <button
-                      type="button"
-                      onclick={() => removeIfcFile(idx)}
-                      class="shrink-0 text-xs text-rose-400 hover:text-rose-300"
-                    >
-                      Remove
-                    </button>
+                {#if filteredRepoItems.length === 0}
+                  <div class="rounded-xl border border-border-default p-8 text-center text-xs text-fg-muted">
+                    No OpenBIM models found matching your search or category filter.
                   </div>
-                {/each}
+                {:else}
+                  <RadioGroupRoot value={primaryRepoPath} onValueChange={(val) => (primaryRepoPath = val)}>
+                    <div class="max-h-64 overflow-x-auto overflow-y-auto rounded-xl border border-border-default">
+                      <table class="w-full text-left text-xs text-fg-secondary">
+                        <thead
+                          class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                        >
+                          <tr>
+                            <th class="w-10 px-3 py-2">
+                              <TableCheckbox
+                                checked={selectedRepoPaths.size > 0 &&
+                                  selectedRepoPaths.size === filteredRepoItems.length}
+                                indeterminate={selectedRepoPaths.size > 0 &&
+                                  selectedRepoPaths.size < filteredRepoItems.length}
+                                onchange={toggleAllRepoPaths}
+                                title="Select or deselect all visible models"
+                              />
+                            </th>
+                            <th class="px-3 py-2">Model</th>
+                            <th class="px-3 py-2">Category</th>
+                            <th class="px-3 py-2">Size</th>
+                            <th class="px-3 py-2 text-center">Primary</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border-subtle">
+                          {#each filteredRepoItems as item (item.path)}
+                            {@const isSelected = selectedRepoPaths.has(item.path)}
+                            <tr
+                              class="transition-colors hover:bg-surface-hover {isSelected
+                                ? 'bg-surface-selected'
+                                : ''}"
+                            >
+                              <td class="w-10 px-3 py-2">
+                                <TableCheckbox
+                                  checked={isSelected}
+                                  onchange={() => toggleRepoPath(item.path)}
+                                  ariaLabel={`Select ${item.name}`}
+                                />
+                              </td>
+                              <td
+                                class="max-w-[180px] truncate px-3 py-2 font-semibold text-fg-primary"
+                                title={item.path}
+                              >
+                                <div class="flex items-center gap-1.5">
+                                  <Box class="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                                  <span class="truncate">{item.name}</span>
+                                </div>
+                              </td>
+                              <td class="px-3 py-2">
+                                <span
+                                  class="inline-block rounded border border-border-interactive bg-surface-overlay px-1.5 py-0.5 font-mono text-micro font-semibold uppercase text-fg-secondary"
+                                >
+                                  {item.category}
+                                </span>
+                              </td>
+                              <td class="whitespace-nowrap px-3 py-2 text-fg-muted">
+                                {formatBytes(item.size)}
+                              </td>
+                              <td class="px-3 py-2 text-center">
+                                {#if isSelected}
+                                  <div class="flex justify-center">
+                                    <RadioGroupItem
+                                      value={item.path}
+                                      aria-label="Set as this project's primary model"
+                                      class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-interactive bg-surface-canvas transition-colors focus-visible:outline-2 focus-visible:outline-accent data-[state=checked]:border-accent data-[state=checked]:bg-accent"
+                                    >
+                                      {#snippet children({ checked })}
+                                        {#if checked}
+                                          <span class="h-1.5 w-1.5 rounded-full bg-white"></span>
+                                        {/if}
+                                      {/snippet}
+                                    </RadioGroupItem>
+                                  </div>
+                                {/if}
+                              </td>
+                            </tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    </div>
+                  </RadioGroupRoot>
+                {/if}
+
+                {#if selectedRepoPaths.size > 0}
+                  <p class="text-caption text-fg-muted">
+                    {selectedRepoPaths.size} model{selectedRepoPaths.size === 1 ? "" : "s"} selected
+                    from this repository.
+                  </p>
+                {/if}
+              {:else}
+                <div class="rounded-xl border border-border-default p-8 text-center text-xs text-fg-muted">
+                  Could not read this repository's structure. Close the wizard, check the Storage
+                  Source ribbon on the Dashboard, and try again.
+                </div>
+              {/if}
+            {:else}
+              <div
+                role="region"
+                aria-label="IFC model drop zone"
+                ondragover={preventDefault(() => (isDraggingIfc = true))}
+                ondragleave={handleIfcDragLeave}
+                ondrop={preventDefault(handleIfcDrop)}
+                class="rounded-2xl border-2 border-dashed p-8 text-center transition-colors {isDraggingIfc
+                  ? 'border-accent bg-accent/10'
+                  : 'border-border-interactive bg-surface-canvas/40 hover:border-accent'}"
+              >
+                <Upload
+                  class="h-10 w-10 {isDraggingIfc ? 'text-accent' : 'text-fg-muted'} mx-auto mb-3"
+                />
+                <h3 class="mb-1 text-sm font-semibold text-fg-primary">Upload OpenBIM IFC Models</h3>
+                <p class="mx-auto mb-4 max-w-sm text-xs text-fg-muted">
+                  Drag and drop IFC 2x3 or IFC4 models here, or browse. Attach one model per
+                  discipline — the primary is the one the compliance run analyses.
+                </p>
+                <label
+                  class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-interactive bg-surface-overlay px-4 py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
+                >
+                  <span>Browse Files (.ifc)</span>
+                  <input
+                    type="file"
+                    accept=".ifc"
+                    multiple
+                    onchange={handleFileChange}
+                    class="hidden"
+                  />
+                </label>
               </div>
+
+              {#if ifcNotice}
+                <p class="text-caption text-amber-400">{ifcNotice}</p>
+              {/if}
+
+              {#if ifcFiles.length}
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-fg-muted">
+                    {ifcFiles.length} model{ifcFiles.length === 1 ? "" : "s"} selected
+                  </span>
+                  {#if ifcFiles.length > 1}
+                    <span class="text-caption text-fg-muted">Click a model to make it primary</span>
+                  {/if}
+                </div>
+
+                <div class="max-h-64 space-y-2 overflow-y-auto">
+                  {#each ifcFiles as file, idx (`${file.name}:${file.size}`)}
+                    <div
+                      class="flex items-center gap-2 rounded-xl border p-3 transition-all {idx ===
+                      primaryIndex
+                        ? 'border-accent bg-accent/15'
+                        : 'border-border-default bg-surface-canvas'}"
+                    >
+                      <button
+                        type="button"
+                        onclick={() => setPrimaryIfc(idx)}
+                        title="Make this the primary model"
+                        class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                      >
+                        <CheckCircle2
+                          class="h-4 w-4 shrink-0 {idx === primaryIndex
+                            ? 'text-accent'
+                            : 'text-emerald-400'}"
+                        />
+                        <span class="truncate text-xs font-medium text-fg-primary">{file.name}</span>
+                        <span class="shrink-0 text-caption text-fg-muted">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                        {#if idx === primaryIndex}
+                          <span
+                            class="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-white"
+                          >
+                            Primary
+                          </span>
+                        {/if}
+                      </button>
+
+                      <select
+                        aria-label="Role for {file.name}"
+                        value={ifcRoles[idx]}
+                        onchange={(event) => {
+                          const select = event.currentTarget;
+                          if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
+                        }}
+                        class="shrink-0 rounded-lg border border-border-default bg-surface-card px-2 py-1 text-caption text-fg-primary focus:border-accent focus:outline-hidden"
+                      >
+                        {#each IFC_FILE_ROLES as roleOption (roleOption)}
+                          <option value={roleOption}>{roleOption}</option>
+                        {/each}
+                      </select>
+
+                      <button
+                        type="button"
+                        onclick={() => removeIfcFile(idx)}
+                        class="shrink-0 text-xs text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
             {/if}
           </div>
         {:else if currentStep === 3}
@@ -1144,7 +1429,15 @@
               <div class="flex justify-between border-b border-border-default py-1">
                 <span class="font-medium text-fg-muted">Attached Models:</span>
                 <span class="font-semibold text-emerald-400">
-                  {#if primaryIfcFile}
+                  {#if sourceRepoId != null}
+                    {#if primaryRepoPath}
+                      {primaryRepoPath.split("/").pop()}{selectedRepoPaths.size > 1
+                        ? ` + ${selectedRepoPaths.size - 1} more`
+                        : ""} (from {activeRepoStructure?.owner}/{activeRepoStructure?.name})
+                    {:else}
+                      None (can attach later)
+                    {/if}
+                  {:else if primaryIfcFile}
                     {primaryIfcFile.name}{ifcFiles.length > 1
                       ? ` + ${ifcFiles.length - 1} more`
                       : ""}

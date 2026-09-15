@@ -13,16 +13,21 @@
     Trash2,
     Search,
     Building2,
+    Plus,
+    Database,
+    FolderGit2,
   } from "lucide-svelte";
-  import { dashboardApi, projectsApi } from "../lib/api";
+  import { dashboardApi, projectsApi, githubReposApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
-  import type { DashboardStats, Project } from "../lib/types";
+  import type { DashboardStats, Project, GitHubRepo } from "../lib/types";
   import ProjectEditModal from "../lib/components/ProjectEditModal.svelte";
   import ProjectDetailsModal from "../lib/components/ProjectDetailsModal.svelte";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import ProjectRulesetBindingsModal from "../lib/components/ProjectRulesetBindingsModal.svelte";
   import ProjectDocumentBindingsModal from "../lib/components/ProjectDocumentBindingsModal.svelte";
   import ProjectBulkEditModal from "../lib/components/ProjectBulkEditModal.svelte";
+  import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
+  import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
@@ -103,6 +108,30 @@
   // Bulk selection state
   let isBulkEditModalOpen = $state(false);
   let isBulkDeleteModalOpen = $state(false);
+
+  // New Project pop-out (mirrors ModelsView's Storage Source ribbon so a
+  // project can be created either with a locally-uploaded model or one
+  // sourced straight from a connected GitHub repository).
+  let isWizardOpen = $state(false);
+  let selectedSource = $state("supabase"); // 'supabase' or 'repo:<id>'
+  let repos: GitHubRepo[] = $state([]);
+  let isRepoManagerOpen = $state(false);
+  let sourceRepoId = $derived(
+    selectedSource.startsWith("repo:") ? parseInt(selectedSource.split(":")[1], 10) : null,
+  );
+
+  async function loadRepos() {
+    try {
+      repos = await githubReposApi.list();
+    } catch {
+      // Non-fatal -- the ribbon still supports Supabase-sourced project creation.
+    }
+  }
+
+  function handleProjectCreated(created: Project) {
+    isWizardOpen = false;
+    onSelectProjectForAudit(created.id, created.analysis_type);
+  }
 
   // An owner/admin of a project's own organization is the only one who may
   // change its rule assignments -- everyone else doesn't get the button, and
@@ -246,6 +275,7 @@
 
     // Proactively warm up and prefetch all other pages from the dashboard
     dashboardApi.prefetchAll();
+    loadRepos();
   });
 
   onDestroy(() => {
@@ -285,12 +315,64 @@
 
   <!-- Project Registry -->
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
       <div>
         <h2 class="text-base font-bold tracking-tight text-fg-primary">Project Registry</h2>
         <p class="text-xs text-fg-muted">
           Manage OpenBIM projects and jump directly to 3D visualization or compliance analysis.
         </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button
+          type="button"
+          onclick={() => (isWizardOpen = true)}
+          class="group flex items-center gap-3 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white shadow-xs shadow-blue-600/30 transition-all hover:bg-accent-hover"
+          title="New Project"
+        >
+          <Plus class="h-4 w-4 shrink-0 text-white" />
+          <span>New Project</span>
+        </button>
+
+        <div
+          class="flex flex-wrap items-center gap-2.5 rounded-2xl border border-border-default bg-surface-card/90 p-2"
+        >
+          <div class="flex items-center gap-2 px-2">
+            {#if selectedSource === "supabase"}
+              <Database class="h-4 w-4 text-emerald-400" />
+            {:else}
+              <FolderGit2 class="h-4 w-4 text-blue-400" />
+            {/if}
+            <span class="whitespace-nowrap text-xs font-semibold text-fg-secondary">Storage Source:</span
+            >
+          </div>
+
+          <select
+            bind:value={selectedSource}
+            class="max-w-[240px] truncate rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-primary focus:border-blue-500 focus:outline-hidden"
+          >
+            <option value="supabase">Supabase Database (Main Registry)</option>
+            {#if repos.length > 0}
+              <optgroup label="GitHub Repositories">
+                {#each repos as repo (repo.id)}
+                  <option value={`repo:${repo.id}`}>
+                    {repo.owner}/{repo.name} ({repo.branch})
+                  </option>
+                {/each}
+              </optgroup>
+            {/if}
+          </select>
+
+          <button
+            type="button"
+            onclick={() => (isRepoManagerOpen = true)}
+            class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
+            title="Manage GitHub Repositories (Add, Edit, Delete)"
+          >
+            <Plus class="h-3.5 w-3.5 text-blue-400" />
+            <span>Manage Repos</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -647,6 +729,19 @@
   selectedProjectIds={table.selectedIdList}
   onClose={() => (isBulkEditModalOpen = false)}
   onBulkUpdated={handleBulkUpdated}
+/>
+
+<ProjectWizardModal
+  isOpen={isWizardOpen}
+  {sourceRepoId}
+  onClose={() => (isWizardOpen = false)}
+  onProjectCreated={handleProjectCreated}
+/>
+
+<GitHubRepoManagerModal
+  isOpen={isRepoManagerOpen}
+  onClose={() => (isRepoManagerOpen = false)}
+  onReposUpdated={loadRepos}
 />
 
 <ConfirmModal
