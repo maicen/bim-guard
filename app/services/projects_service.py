@@ -61,6 +61,11 @@ class ProjectsService:
 
             models_service = ModelsService(storage=self._storage, project_mirror=self)
         self._models = models_service
+        # Bound after construction via bind_graph_services: bootstrap builds
+        # GraphService/GraphTriplestoreService well after ProjectsService, so
+        # neither can be a constructor argument here.
+        self._graph_service = None
+        self._graph_triplestore_service = None
         self._projects = (
             projects_repo
             if projects_repo is not None
@@ -137,6 +142,11 @@ class ProjectsService:
                 },
             )
         )
+
+    def bind_graph_services(self, graph_service=None, graph_triplestore_service=None) -> None:
+        """Attach the graph/triplestore services after construction, for project-scoped cleanup on delete."""
+        self._graph_service = graph_service
+        self._graph_triplestore_service = graph_triplestore_service
 
     @cache_db_query(key_prefix="bimguard:projects:list")
     def list_projects(self):
@@ -484,7 +494,16 @@ class ProjectsService:
         logger.info("Project IFC attached project_id=%d ref=%s", project_id, storage_ref)
 
     def delete_project(self, project_id: int):
-        """Delete a project row by primary key."""
+        """Delete a project row by primary key.
+
+        Also cascades into the graph database (Neo4j/Kùzu) and RDF
+        triplestore, if configured: IFC element nodes/triples are ingested
+        with a project_id tag (see app.modules.ifc_reader.ifc_graph and
+        app.services.graph_triplestore_service), and were previously left
+        behind after the owning project row was gone -- a GDPR erasure gap.
+        Best-effort: a graph/triplestore failure must not block deleting the
+        project itself.
+        """
         project = self.get_project(project_id)
         if project is not None:
             self._models.delete_all_for_project(project_id)
@@ -494,6 +513,16 @@ class ProjectsService:
                     self._client_documents.delete(cd["id"])
         except Exception:
             pass
+        if self._graph_service is not None:
+            try:
+                self._graph_service.delete_project_data(str(project_id))
+            except Exception:
+                logger.warning("Graph cleanup failed for project_id=%d", project_id, exc_info=True)
+        if self._graph_triplestore_service is not None:
+            try:
+                self._graph_triplestore_service.delete_project_graph(project_id)
+            except Exception:
+                logger.warning("Triplestore cleanup failed for project_id=%d", project_id, exc_info=True)
         self._projects.delete(project_id)
         invalidate_cache(f"bimguard:projects:item:project_id={project_id}")
         invalidate_cache("bimguard:projects:list")

@@ -367,6 +367,29 @@ class KuzuDatabaseProvider:
         self._rel_columns.clear()
         self._node_label_by_id.clear()
 
+    def delete_by_project(self, project_id: Any) -> None:
+        """Delete every node tagged with this project_id, across every node table.
+
+        Kùzu's node tables are strictly typed (unlike Neo4j's property
+        graph), so this can't MATCH across labels in one query -- only
+        tables that actually carry a project_id column (checked via the
+        same catalog introspection ``_ensure_node_table`` uses) are queried;
+        tables without one (e.g. global reference data like Rule/IfcClass,
+        which are never tagged with a project) are skipped.
+        """
+        for label in list(self._node_tables):
+            if label not in self._node_columns:
+                self._node_columns[label] = self._fetch_existing_columns(label)
+            if "project_id" not in self._node_columns[label]:
+                continue
+            try:
+                self.execute_query(
+                    f"MATCH (n:{label}) WHERE n.project_id = $project_id DETACH DELETE n",
+                    {"project_id": project_id},
+                )
+            except Exception as e:
+                logger.warning(f"Failed to delete project-scoped nodes from table {label}: {e}")
+
     def close(self) -> None:
         """Release the connection/database handles (and the on-disk lock file).
 

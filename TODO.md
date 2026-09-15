@@ -839,3 +839,40 @@ themselves are deleted:
 
 Decide per branch: reimplement the feature against `app/api/` +
 `frontend/src/routes/` (if still wanted) or delete outright.
+
+---
+
+20260915
+
+## Compliance roadmap (SOC 2 / ISO 27001) — Phase 2/3 remaining
+
+Phase 1 technical controls (audit log, CI security scanning,
+`docs/architecture/security-controls.md`) and the GDPR privacy policy/DPA drafts
+(`docs/compliance/`) plus the graph/triplestore project-deletion cascade are done. What's
+left is mostly organizational, not code — see the full roadmap context in
+`docs/architecture/security-controls.md` and the compliance drafts in
+`docs/compliance/` for what these depend on:
+
+- [ ] Fill in the bracketed placeholders in `docs/compliance/gdpr-privacy-policy.md` and
+      `docs/compliance/data-processing-agreement.md` (legal entity name, address,
+      contact, sub-processor hosting regions/transfer mechanisms) and get both reviewed
+      by qualified legal counsel before publishing or sending to any customer.
+- [ ] Stand up an ISMS skeleton for ISO 27001: asset inventory, risk register, access
+      review cadence — typically via a compliance automation platform (Vanta, Drata,
+      etc.) rather than hand-built.
+- [ ] Select a SOC 2 auditor and compliance automation tool; begin the Type II
+      observation window (3–12 months, calendar-gated) once Phase 1 controls have been
+      live long enough to produce evidence.
+- [ ] Decide whether to pursue CSA STAR (builds on ISO 27001; only worth it once that's
+      done, and only if a specific cloud-focused enterprise deal calls for it).
+- [ ] Revisit PCI-DSS scope only if/when BIM-Guard adds direct payment handling beyond a
+      hosted third-party checkout (Stripe Elements/Checkout keeps scope at SAQ-A).
+- [ ] Extend `AuditLogService` coverage beyond the current representative set (org role
+      changes, permission-matrix edits, project/document deletion) to other
+      sensitive mutations as they're identified — e.g. document/ruleset access-grant
+      changes, LLM/parsing engine credential edits. Call
+      `AuditLogService.record(...)` from the relevant route after the mutation
+      succeeds, per the existing call sites in `app/api/organizations.py`,
+      `app/api/permissions.py`, `app/api/documents.py`, `app/api/projects.py`.
+- [ ] Set a concrete audit-log retention/purge policy (`public.audit_log` is currently
+      unbounded) if a fixed retention period is required for compliance purposes.

@@ -73,19 +73,35 @@ No BIM-Guard-specific encryption-at-rest configuration exists beyond what Supaba
 by default — this is documented here as a control the team relies on, not one implemented
 in this codebase.
 
-## Data deletion (GDPR "right to be forgotten") — current gaps
+## Data deletion (GDPR "right to be forgotten")
 
 `ProjectsService.delete_project` (`app/services/projects_service.py`) cascades deletion of
-a project's IFC models and client documents. `DocumentService.delete_document_with_file`
-(`app/services/documents_service.py`) best-effort removes stored files alongside the
-document row. Neither currently reaches:
+a project's IFC models, client documents, graph-database nodes, and RDF triplestore data.
+`DocumentService.delete_document_with_file` (`app/services/documents_service.py`)
+best-effort removes stored files alongside the document row.
 
-- Graph data in Neo4j/Kuzu (`app/services/neo4j_provider.py`, `kuzu_provider.py`) tied to a
-  deleted project.
-- The RDF triplestore (`app/services/graph_triplestore_service.py`).
+Project deletion now reaches:
 
-A full GDPR erasure path needs these covered before "delete my data" is a complete
-guarantee. Tracked as Phase 1 follow-up work, not yet implemented.
+- **Graph data** (Neo4j/Kuzu): IFC element nodes are ingested with a `project_id` property
+  (`app/modules/ifc_reader/ifc_graph.py`). `GraphService.delete_project_data(project_id)`
+  removes them — `Neo4jDatabaseProvider.delete_by_project` runs a single label-agnostic
+  `MATCH (n {project_id: ...}) DETACH DELETE n`; `KuzuDatabaseProvider.delete_by_project`
+  iterates the strictly-typed node-table catalog and deletes from only the tables that
+  actually carry a `project_id` column, leaving global reference data (`Rule`, `IfcClass`)
+  untouched.
+- **RDF triplestore**: each project's triples live in their own named graph
+  (`https://bimguard.io/graphs/{project_id}`) in `GraphTriplestoreService`.
+  `delete_project_graph(project_id)` clears that graph without touching any other
+  project's.
+
+Both are wired into `ProjectsService` via `bind_graph_services(...)`, called from
+`app/bootstrap.py` after the graph/triplestore services are constructed (the same
+late-binding pattern `ModelsService.bind_project_mirror` already uses). Both are
+best-effort: a graph/triplestore failure is logged, not raised, so it never blocks
+deleting the project row itself.
+
+Document deletion does not need the same treatment — documents are never ingested into
+the graph or triplestore, only projects' IFC models are.
 
 ## SSRF hardening
 

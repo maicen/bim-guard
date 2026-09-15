@@ -88,6 +88,17 @@ class GraphTriplestoreService:
                 
         logger.info("Loaded %d triples into graph %s", count, graph_name.value)
 
+    def delete_project_graph(self, project_id: int) -> None:
+        """Permanently remove a project's named graph and all its triples.
+
+        Used by project deletion to close the GDPR erasure gap: without
+        this, a deleted project's RDF triples (loaded via load_graph) stayed
+        in the shared store indefinitely.
+        """
+        if project_id in self._lru:
+            self._lru.remove(project_id)
+        self.store.clear_graph(self._graph_name_for(project_id))
+
     def query(self, project_id: int, sparql_query: str) -> dict[str, Any]:
         """Execute a SPARQL query against a project's named graph.
 

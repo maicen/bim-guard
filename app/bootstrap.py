@@ -712,6 +712,10 @@ def build_default_container() -> ApplicationContainer:
             logger.warning("Could not initialize in-memory GraphTriplestoreService: %s", e_mem)
             graph_triplestore_service = None
 
+    projects_service.bind_graph_services(
+        graph_service=graph_service, graph_triplestore_service=graph_triplestore_service
+    )
+
     bimguard_app = BIMGuard_App(
         projects_service=projects_service,
         models_service=models_service,

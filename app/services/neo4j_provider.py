@@ -293,6 +293,18 @@ class Neo4jDatabaseProvider:
         self._node_label_by_id.clear()
         self._node_pk_by_label.clear()
 
+    def delete_by_project(self, project_id: Any) -> None:
+        """Delete every node tagged with this project_id, across every label.
+
+        Neo4j's property graph lets a single MATCH span every label at once
+        -- unlike Kùzu's strictly-typed tables, this doesn't need to know
+        which labels actually carry a project_id property.
+        """
+        self.execute_query(
+            "MATCH (n {project_id: $project_id}) DETACH DELETE n",
+            {"project_id": project_id},
+        )
+
     def close(self) -> None:
         """Close the underlying driver connection."""
         if self.driver is not None and hasattr(self.driver, "close"):

@@ -61,6 +61,10 @@ class GraphDatabaseProvider(Protocol):
         """Clear all data from the graph."""
         ...
 
+    def delete_by_project(self, project_id: Any) -> None:
+        """Delete every node (and its relationships) tagged with this project_id."""
+        ...
+
 
 class GraphService:
     """Domain service wrapping the configured Graph Database provider."""
@@ -164,5 +168,19 @@ class GraphService:
         self.provider.add_node("Rule", {"rule_id": rule_id})
         self.provider.add_node("IfcClass", {"id": ifc_class, "class_name": ifc_class})
         self.provider.add_edge(rule_id, ifc_class, "APPLIES_TO", from_label="Rule", to_label="IfcClass")
+
+    def delete_project_data(self, project_id: Any) -> None:
+        """Delete every graph node (and edges) tagged with this project_id.
+
+        Used by project deletion to close the GDPR erasure gap: IFC element
+        nodes are ingested with a ``project_id`` property
+        (see ``app.modules.ifc_reader.ifc_graph.ingest_ifc_to_graph``), but
+        deleting the project row alone left them behind. No-ops if no
+        provider is configured, or if the configured provider doesn't
+        implement project-scoped deletion.
+        """
+        if not self.provider or not hasattr(self.provider, "delete_by_project"):
+            return
+        self.provider.delete_by_project(project_id)
 
 
