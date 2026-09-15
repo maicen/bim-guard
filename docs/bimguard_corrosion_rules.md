@@ -3,10 +3,10 @@
 Corrosion slice of the BIMGUARD AI OpenBIM compliance application: the GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media and XM-001 cross-material rule logic, their catalogs and rule packs, plus the shared platform architecture. Compiled for analysis against corrosion standards (ISO 9223, ISO 12944, ASTM G82).
 
 - **NotebookLM workspace:** FMP: BIMGUARD AI - Corrosion
-- **Generated:** 2026-09-14 21:05 UTC
+- **Generated:** 2026-09-15 05:49 UTC
 - **Source repository:** `bim-guard-merge`
 - **File types included:** `.csv`, `.json`, `.md`, `.py`, `.txt`, `.xml`
-- **Files included:** 351 (105 corrosion-specific, 246 shared architecture files also present in the companion notebook)
+- **Files included:** 352 (105 corrosion-specific, 247 shared architecture files also present in the companion notebook)
 
 ---
 
@@ -6724,6 +6724,7 @@ class GitHubRepoResponse(TimestampFields):
     branch: str = "main"
     description: str = ""
     is_active: bool = True
+    organization_id: int
 
 
 class GitHubRepoItem(BaseModel):
@@ -14691,8 +14692,13 @@ class DoclingExtractor:
             resolved_key = api_key if api_key is not None else DOCLING_API_KEY
             resolved_url = api_url if api_url is not None else DOCLING_SERVICE_URL
         else:
+            from app.modules.config import DOCLING_LOCAL_URL
+
             resolved_key = api_key or ""
-            resolved_url = api_url or ""
+            if DOCLING_LOCAL_URL and (not api_url or "localhost" in api_url or "127.0.0.1" in api_url):
+                resolved_url = DOCLING_LOCAL_URL
+            else:
+                resolved_url = api_url or DOCLING_LOCAL_URL or "http://localhost:5001"
 
         if not resolved_url:
             raise RuntimeError(
@@ -14900,27 +14906,28 @@ class DoclingExtractor:
         """
         if not xml_content or not xml_content.strip():
             return False
-        import tempfile
         import sys
+        import tempfile
         from pathlib import Path
         try:
-            import doclang
             import os
+
+            import doclang
             if sys.platform == "win32":
                 try:
                     import doclang.backends.saxonche as sc
                     if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
                         def _patched_saxon_validate(self, xml_path, *, schema_path, allow_empty_namespace=False, verbose=False):
+                            from doclang.backends.saxonche import (
+                                _ensure_namespace,
+                                _parse_doclang_document,
+                                _require_saxonche_backend,
+                                _svrl_failed_asserts_to_violations,
+                                _transpile_schematron_to_xslt,
+                                _write_xml_without_dtd,
+                            )
                             from lxml import etree
                             from saxonche import PySaxonProcessor
-                            from doclang.backends.saxonche import (
-                                _require_saxonche_backend,
-                                _parse_doclang_document,
-                                _ensure_namespace,
-                                _write_xml_without_dtd,
-                                _transpile_schematron_to_xslt,
-                                _svrl_failed_asserts_to_violations,
-                            )
                             _require_saxonche_backend()
                             with open(xml_path, "rb") as f:
                                 xml_doc = _parse_doclang_document(f)
@@ -16810,8 +16817,14 @@ class _DoclingDriverBase(ParsingEngineDriver):
     def test_connection(self, *, api_key: str, api_url: str) -> EngineConnectionResult:
         from docling.service_client import DoclingServiceClient
 
+        from app.modules.config import DOCLING_LOCAL_URL
+
+        target_url = api_url
+        if self.kind == "docling-local" and DOCLING_LOCAL_URL and (not target_url or "localhost" in target_url or "127.0.0.1" in target_url):
+            target_url = DOCLING_LOCAL_URL
+
         try:
-            with DoclingServiceClient(url=api_url, api_key=api_key or "") as client:
+            with DoclingServiceClient(url=target_url, api_key=api_key or "") as client:
                 health = client.health()
             return EngineConnectionResult(ok=True, detail=str(health))
         except Exception as exc:
@@ -49718,9 +49731,18 @@ class GitHubRepoService:
         self._models_service = models_service
         self._tree_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
-    def list_repos(self) -> list[dict[str, Any]]:
-        """Retrieve all registered GitHub repositories ordered newest first."""
+    def list_repos(self, organization_ids: Optional[set[int]] = None) -> list[dict[str, Any]]:
+        """Retrieve registered GitHub repositories ordered newest first.
+
+        Args:
+            organization_ids: When given, restrict results to repositories
+                owned by one of these organizations. ``None`` returns every
+                repository (callers must apply their own authorization,
+                e.g. a superadmin bypass).
+        """
         rows = list(self._repos.rows)
+        if organization_ids is not None:
+            rows = [r for r in rows if r.get("organization_id") in organization_ids]
         return sorted(rows, key=lambda r: int(r.get("id") or 0), reverse=True)
 
     def get_repo(self, repo_id: int) -> dict[str, Any] | None:
@@ -49738,6 +49760,7 @@ class GitHubRepoService:
     def create_repo(
         self,
         url: str,
+        organization_id: int,
         name: Optional[str] = None,
         branch: str = "main",
         description: str = "",
@@ -49760,6 +49783,7 @@ class GitHubRepoService:
             "branch": branch.strip() or "main",
             "description": description.strip(),
             "is_active": True,
+            "organization_id": organization_id,
             "created_at": now,
             "updated_at": now,
         }
@@ -52017,6 +52041,12 @@ class LLMProviderInstancesService:
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         if self.get_by_name(organization_id, clean_name):
             raise ValueError(f"An instance named '{clean_name}' already exists in this organization.")
+        clean_base = (api_base or "").strip().rstrip("/")
+        if clean_base:
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
+                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
 
         clean_is_default = bool(is_default)
         if clean_is_default:
@@ -52028,7 +52058,7 @@ class LLMProviderInstancesService:
             "name": clean_name,
             "kind": clean_kind,
             "api_key": (api_key or "").strip(),
-            "api_base": (api_base or "").strip().rstrip("/"),
+            "api_base": clean_base,
             "is_default": clean_is_default,
             "is_enabled": bool(is_enabled),
             "notes": (notes or "").strip(),
@@ -52070,7 +52100,13 @@ class LLMProviderInstancesService:
         if api_key is not None:
             updates["api_key"] = api_key.strip()
         if api_base is not None:
-            updates["api_base"] = api_base.strip().rstrip("/")
+            clean_base = api_base.strip().rstrip("/")
+            if clean_base:
+                from app.services.ssrf_protection import is_safe_url
+
+                if not is_safe_url(clean_base, allow_localhost=(existing.get("kind") == "ollama")):
+                    raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
+            updates["api_base"] = clean_base
         if is_enabled is not None:
             updates["is_enabled"] = bool(is_enabled)
         if notes is not None:
@@ -52119,6 +52155,11 @@ class LLMProviderInstancesService:
         if driver.requires_api_key and not clean_key:
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         clean_base = (api_base or "").strip().rstrip("/")
+        if clean_base:
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
+                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
         return await driver.test_connection(api_key=clean_key, api_base=clean_base or None)
 
     @staticmethod
@@ -54596,6 +54637,12 @@ class ObjectStorage:
 
         # 2. HTTP/HTTPS URL (e.g. GitHub raw model URLs)
         if reference.startswith("http://") or reference.startswith("https://"):
+            from app.services.ssrf_protection import is_safe_url
+
+            if not is_safe_url(reference, allow_localhost=False):
+                logger.warning("Blocked unsafe remote model URL ref=%s (SSRF protection)", reference)
+                return None
+
             import hashlib
 
             import httpx
@@ -54612,12 +54659,33 @@ class ObjectStorage:
 
             try:
                 logger.info("Downloading remote model from URL ref=%s", reference)
-                with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-                    resp = client.get(reference)
-                    resp.raise_for_status()
-                    cache_file.write_bytes(resp.content)
-                    logger.info("Downloaded remote model ref=%s bytes=%d", reference, len(resp.content))
-                    return cache_file
+                # follow_redirects is deliberately off: a validated public URL
+                # could otherwise 302 to an internal/metadata address that
+                # is_safe_url never re-checks. Each hop is re-validated here.
+                with httpx.Client(timeout=60.0, follow_redirects=False) as client:
+                    current_url = reference
+                    for _ in range(5):
+                        resp = client.get(current_url)
+                        if resp.is_redirect:
+                            next_url = resp.headers.get("location")
+                            if not next_url:
+                                resp.raise_for_status()
+                            next_url = str(httpx.URL(current_url).join(next_url))
+                            if not is_safe_url(next_url, allow_localhost=False):
+                                logger.warning(
+                                    "Blocked unsafe redirect target ref=%s -> %s (SSRF protection)",
+                                    reference,
+                                    next_url,
+                                )
+                                return None
+                            current_url = next_url
+                            continue
+                        resp.raise_for_status()
+                        cache_file.write_bytes(resp.content)
+                        logger.info("Downloaded remote model ref=%s bytes=%d", reference, len(resp.content))
+                        return cache_file
+                logger.warning("Too many redirects downloading remote model ref=%s", reference)
+                return None
             except Exception as exc:
                 logger.exception("Failed to download remote model ref=%s: %s", reference, exc)
                 return None
@@ -61944,6 +62012,121 @@ class SettingsService:
             description=str(existing.get("description") or ""),
         )
         self._cache()[key] = value
+```
+
+---
+
+### app/services/ssrf_protection.py
+
+```python
+"""SSRF protection utility for outbound HTTP requests and provider URLs."""
+
+from __future__ import annotations
+
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+def is_ip_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, *, allow_localhost: bool = False) -> bool:
+    """Return True if an IP address is considered an internal/private/reserved target."""
+    if allow_localhost and ip.is_loopback:
+        return False
+
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    ):
+        return True
+
+    # Explicit check for 169.254.169.254 and cloud metadata ranges
+    if isinstance(ip, ipaddress.IPv4Address):
+        # 169.254.0.0/16 is link-local, but explicit safety check
+        if ip in ipaddress.ip_network("169.254.0.0/16"):
+            return True
+        # 100.64.0.0/10 (Carrier-grade NAT)
+        if ip in ipaddress.ip_network("100.64.0.0/10"):
+            return True
+
+    return False
+
+
+def is_safe_url(url: str, *, allow_localhost: bool = False) -> bool:
+    """Validate that a URL uses safe HTTP/HTTPS schemes and does not target internal IPs.
+
+    Args:
+        url: The candidate URL string to test.
+        allow_localhost: When True, loopback addresses (127.0.0.1, localhost)
+            are allowed (e.g. for self-hosted local Ollama servers).
+
+    Returns:
+        True if the URL is safe to query; False otherwise.
+
+    Note:
+        This is a check-then-use validation: the hostname is resolved here,
+        but the caller's own HTTP client resolves it again independently when
+        it actually connects. A hostname with a short-TTL DNS record could in
+        principle resolve safely here and to an internal address moments
+        later (DNS rebinding). Full protection would require pinning the
+        connection to the IP validated here (e.g. a custom transport), which
+        is not implemented. Callers that need stronger guarantees should
+        additionally restrict egress at the network layer.
+    """
+    if not url or not isinstance(url, str):
+        return False
+
+    clean = url.strip()
+    try:
+        parsed = urlparse(clean)
+    except Exception:
+        return False
+
+    if parsed.scheme not in ("http", "https"):
+        return False
+
+    host = parsed.hostname
+    if not host:
+        return False
+
+    host = host.strip("[]")
+
+    # Check literal IP address
+    try:
+        ip = ipaddress.ip_address(host)
+        return not is_ip_blocked(ip, allow_localhost=allow_localhost)
+    except ValueError:
+        pass
+
+    if host.lower() == "localhost":
+        return allow_localhost
+
+    # Resolve hostname to all associated IPs and verify each one
+    try:
+        addr_info = socket.getaddrinfo(host, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if not addr_info:
+            return False
+        for family, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+                if is_ip_blocked(ip, allow_localhost=allow_localhost):
+                    logger.warning("SSRF blocked host=%s resolved_ip=%s", host, ip_str)
+                    return False
+            except ValueError:
+                return False
+    except Exception as exc:
+        logger.warning("SSRF DNS resolution failed for host %s: %s", host, exc)
+        return False
+
+    return True
 ```
 
 ---
