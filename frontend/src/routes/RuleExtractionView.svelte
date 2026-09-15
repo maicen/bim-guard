@@ -608,10 +608,10 @@
           <p class="text-caption text-fg-muted">Loading available models…</p>
         {:else if llmModels.length === 0}
           <div
-            class="rounded-xl border border-dashed border-border-default bg-surface-canvas/60 px-3.5 py-2.5 text-xs text-fg-muted"
+            class="rounded-xl border border-critical-border bg-critical-bg px-3.5 py-2.5 text-xs text-critical"
           >
             {llmModelsError || "No LLM provider configured for this organization."} Add one under
-            <a href="#/external-providers" class="font-semibold text-accent hover:underline"
+            <a href="#/external-providers" class="font-semibold underline hover:no-underline"
               >Admin → External providers</a
             >.
           </div>
