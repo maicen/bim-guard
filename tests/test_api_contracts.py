@@ -12,8 +12,13 @@ from fastapi.routing import APIRoute
 
 from app.auth import get_current_user, get_current_user_flexible
 from app.main import TAGS_METADATA, app
+from app.scim_auth import get_scim_organization
 
-_AUTH_DEPENDENCY_CALLABLES = {get_current_user, get_current_user_flexible}
+# get_scim_organization is a deliberately different auth scheme (a
+# per-organization SCIM bearer token, not a Supabase JWT -- see
+# app/scim_auth.py) but satisfies the same "every route is authenticated or
+# explicitly Public" contract this test enforces.
+_AUTH_DEPENDENCY_CALLABLES = {get_current_user, get_current_user_flexible, get_scim_organization}
 
 _REGISTERED_TAGS = {tag["name"] for tag in TAGS_METADATA}
 
@@ -40,6 +45,10 @@ RESPONSE_MODEL_EXEMPT: set[tuple[str, str]] = {
     ("GET", "/api/events/{project_id}"),
     ("GET", "/api/workflow/{project_id}/events"),
     ("GET", "/download/{fmt}/{project_id}"),
+    # SCIM DELETE returns a bare 204 No Content per RFC 7644 §3.6 -- a JSON
+    # body on a 204 response is itself a spec violation some IdPs reject.
+    ("DELETE", "/api/scim/v2/Users/{user_id}"),
+    ("DELETE", "/api/scim/v2/Groups/{group_id}"),
 }
 
 # Routes whose auth is enforced but not via a direct get_current_user*

@@ -80,6 +80,9 @@ from app.api import (
     rules as api_rules,
 )
 from app.api import (
+    scim as api_scim,
+)
+from app.api import (
     settings as api_settings,
 )
 from app.api import (
@@ -220,6 +223,11 @@ TAGS_METADATA = [
     {"name": "LLM Providers", "description": "Per-organization configured LLM provider instances and their models."},
     {"name": "Events", "description": "Server-Sent Events streaming of pipeline/engine progress."},
     {"name": "Audit Log", "description": "Superadmin-only read access to the sensitive-mutation audit trail."},
+    {
+        "name": "SCIM",
+        "description": "SCIM 2.0 (RFC 7644) user/group provisioning for external IdPs (Okta, Azure AD, ...), "
+        "authenticated by a per-organization bearer token rather than Supabase JWT.",
+    },
     {
         "name": "Public",
         "description": "Routes that intentionally require no authentication -- public reference "
@@ -398,6 +406,7 @@ app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
 app.include_router(api_graph.router, prefix="/api", tags=["Graph & Spatial Intelligence"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 app.include_router(api_audit_log.router, prefix="/api/audit-log", tags=["Audit Log"])
+app.include_router(api_scim.router, prefix="/api/scim/v2", tags=["SCIM"])
 
 
 

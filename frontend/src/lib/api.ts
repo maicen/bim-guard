@@ -58,6 +58,8 @@ import type {
   OrganizationRulesetGrantsResponse,
   OrganizationSummary,
   OrgRole,
+  ScimTokenMintResult,
+  ScimTokenStatus,
   UserListResponse,
   ParsingEngineInstance,
   ParsingEngineInstanceCreatePayload,
@@ -302,6 +304,28 @@ export const organizationsApi = {
       method: "DELETE",
     });
     await handleResponse<void>(res);
+  },
+
+  /** SCIM provisioning token status -- never the raw value. Owner/admin only. */
+  async getScimTokenStatus(organizationId: number): Promise<ScimTokenStatus> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/scim-token`);
+    return handleResponse<ScimTokenStatus>(res);
+  },
+
+  /** Mint (or rotate) the organization's SCIM token. The raw token is returned exactly once. */
+  async mintScimToken(organizationId: number): Promise<ScimTokenMintResult> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/scim-token`, {
+      method: "POST",
+    });
+    return handleResponse<ScimTokenMintResult>(res);
+  },
+
+  /** Revoke the organization's SCIM token. */
+  async revokeScimToken(organizationId: number): Promise<ScimTokenStatus> {
+    const res = await apiFetch(`${API_BASE}/organizations/${organizationId}/scim-token`, {
+      method: "DELETE",
+    });
+    return handleResponse<ScimTokenStatus>(res);
   },
 
   async listGroups(organizationId: number): Promise<GroupListResponse> {

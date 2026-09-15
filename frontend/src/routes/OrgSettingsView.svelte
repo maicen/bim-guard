@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Building2, Mail, Plus, Shield, Trash2, UserPlus, Users, FolderOpen } from "lucide-svelte";
+  import { Building2, KeyRound, Mail, Plus, Shield, Trash2, UserPlus, Users, FolderOpen } from "lucide-svelte";
   import { SvelteSet } from "svelte/reactivity";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
@@ -14,7 +14,7 @@
   import { organizationsApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
-  import type { Group, OrganizationInvite, OrganizationMember, Project } from "../lib/types";
+  import type { Group, OrganizationInvite, OrganizationMember, Project, ScimTokenStatus } from "../lib/types";
 
   let activeOrg = $derived(authState.activeOrganization);
 
@@ -283,6 +283,55 @@
       projectsSaving = false;
     }
   }
+
+  // SCIM provisioning token
+  let scimStatus = $state<ScimTokenStatus | null>(null);
+  let scimLoading = $state(false);
+  let scimMinting = $state(false);
+  let scimRevokeConfirmOpen = $state(false);
+  let mintedToken = $state<{ token: string; base_url: string } | null>(null);
+
+  async function loadScimStatus() {
+    if (!activeOrg) return;
+    scimLoading = true;
+    try {
+      scimStatus = await organizationsApi.getScimTokenStatus(activeOrg.organization_id);
+    } catch (err) {
+      toasts.fromError(err, "Could not load SCIM provisioning status.");
+    } finally {
+      scimLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (activeOrg) loadScimStatus();
+  });
+
+  async function mintScimToken() {
+    if (!activeOrg) return;
+    scimMinting = true;
+    try {
+      const result = await organizationsApi.mintScimToken(activeOrg.organization_id);
+      mintedToken = result;
+      await loadScimStatus();
+      toasts.success("SCIM token generated.");
+    } catch (err) {
+      toasts.fromError(err, "Could not generate a SCIM token.");
+    } finally {
+      scimMinting = false;
+    }
+  }
+
+  async function revokeScimToken() {
+    if (!activeOrg) return;
+    scimRevokeConfirmOpen = false;
+    try {
+      scimStatus = await organizationsApi.revokeScimToken(activeOrg.organization_id);
+      toasts.success("SCIM token revoked.");
+    } catch (err) {
+      toasts.fromError(err, "Could not revoke the SCIM token.");
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -503,6 +552,60 @@
             </li>
           {/each}
         </ul>
+      {/if}
+    </div>
+
+    <!-- SCIM provisioning -->
+    <div class="rounded-2xl border border-border-default bg-surface-card/40">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border-default p-4">
+        <div>
+          <h2 class="flex items-center gap-2 text-sm font-bold text-fg-primary">
+            <KeyRound class="h-4 w-4 text-fg-muted" />
+            SCIM Provisioning
+          </h2>
+          <p class="mt-0.5 text-caption text-fg-muted">
+            Let an identity provider (Okta, Azure AD, ...) automatically create, update, and
+            deactivate members of this organization via SCIM 2.0.
+          </p>
+        </div>
+        {#if scimStatus?.configured && !scimStatus.revoked}
+          <Button variant="outline" size="sm" onclick={() => (scimRevokeConfirmOpen = true)}>
+            <Trash2 class="h-3.5 w-3.5" />
+            Revoke
+          </Button>
+        {/if}
+      </div>
+
+      {#if scimLoading}
+        <LoadingState message="Loading SCIM status…" />
+      {:else}
+        <div class="space-y-3 p-4 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-fg-muted">Base URL</span>
+            <code class="rounded-md border border-border-subtle bg-surface-canvas px-2 py-1 text-fg-secondary"
+              >{window.location.origin}{scimStatus?.base_url ?? "/api/scim/v2"}</code
+            >
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-fg-muted">Status</span>
+            {#if scimStatus?.configured && !scimStatus.revoked}
+              <span class="rounded-md border border-success-border bg-success-bg px-2 py-0.5 text-success"
+                >Active{scimStatus.last_used_at ? ` · last used ${new Date(scimStatus.last_used_at).toLocaleString()}` : " · never used"}</span
+              >
+            {:else if scimStatus?.configured && scimStatus.revoked}
+              <span class="rounded-md border border-warning-border bg-warning-bg px-2 py-0.5 text-warning"
+                >Revoked</span
+              >
+            {:else}
+              <span class="rounded-md border border-border-interactive px-2 py-0.5 text-fg-muted">Not configured</span
+              >
+            {/if}
+          </div>
+          <Button variant="outline" size="sm" disabled={scimMinting} onclick={mintScimToken}>
+            <KeyRound class="h-3.5 w-3.5" />
+            {scimMinting ? "Generating…" : scimStatus?.configured ? "Rotate token" : "Generate token"}
+          </Button>
+        </div>
       {/if}
     </div>
 
@@ -730,4 +833,59 @@
   confirmText="Delete"
   onConfirm={() => groupPendingDelete && deleteGroup(groupPendingDelete)}
   onCancel={() => (groupPendingDelete = null)}
+/>
+
+<!-- One-time SCIM token reveal -->
+<Modal
+  isOpen={mintedToken !== null}
+  title="SCIM token generated"
+  subtitle="Shown once — copy it now"
+  icon={KeyRound}
+  onClose={() => (mintedToken = null)}
+>
+  {#if mintedToken}
+    <div class="space-y-3">
+      <p class="text-xs text-fg-secondary">
+        Paste this token as the bearer token in your identity provider's SCIM connector settings,
+        alongside the base URL below. It will not be shown again — generating a new token replaces
+        this one.
+      </p>
+      <div>
+        <div class="mb-1 text-caption font-semibold uppercase tracking-wider text-fg-muted">Base URL</div>
+        <input
+          readonly
+          value={`${window.location.origin}${mintedToken.base_url}`}
+          onclick={(e) => (e.target as HTMLInputElement).select()}
+          class="w-full rounded-lg border border-border-interactive bg-surface-canvas px-3 py-2 font-mono text-xs text-fg-primary"
+        />
+      </div>
+      <div>
+        <div class="mb-1 text-caption font-semibold uppercase tracking-wider text-fg-muted">Bearer token</div>
+        <input
+          readonly
+          value={mintedToken.token}
+          onclick={(e) => (e.target as HTMLInputElement).select()}
+          class="w-full rounded-lg border border-border-interactive bg-surface-canvas px-3 py-2 font-mono text-xs text-fg-primary"
+        />
+      </div>
+    </div>
+    <div class="flex justify-end pt-4">
+      <button
+        type="button"
+        onclick={() => (mintedToken = null)}
+        class="h-9 rounded-xl bg-accent px-4 text-xs font-semibold text-white hover:bg-accent-hover"
+      >
+        Done
+      </button>
+    </div>
+  {/if}
+</Modal>
+
+<ConfirmModal
+  isOpen={scimRevokeConfirmOpen}
+  title="Revoke SCIM token"
+  message="Revoke this organization's SCIM token? Your identity provider will no longer be able to provision or deprovision members until a new token is generated and reconfigured there."
+  confirmText="Revoke"
+  onConfirm={revokeScimToken}
+  onCancel={() => (scimRevokeConfirmOpen = false)}
 />

@@ -1812,6 +1812,36 @@ class RolePermissionSetRequest(BaseModel):
 
 
 # ==============================================================================
+# SCIM Token Contracts (see app/services/scim_token_service.py)
+# ==============================================================================
+#
+# These are the human-facing REST contracts for managing a SCIM token
+# (mint/status/revoke) -- the SCIM protocol's own wire format (Users,
+# Groups, PATCH ops) lives separately in app/modules/scim_contracts.py.
+
+
+class ScimTokenStatusResponse(BaseModel):
+    """Metadata about an organization's SCIM provisioning token -- never the raw value."""
+
+    configured: bool
+    base_url: str
+    created_at: Optional[str] = None
+    last_used_at: Optional[str] = None
+    revoked: bool = False
+
+
+class ScimTokenMintResponse(BaseModel):
+    """The one-time response to minting or rotating a SCIM token.
+
+    `token` is shown exactly once; only its hash is ever persisted (see
+    app.services.scim_token_service.ScimTokenService).
+    """
+
+    token: str
+    base_url: str
+
+
+# ==============================================================================
 # Audit Log Contracts (see app/services/audit_log_service.py)
 # ==============================================================================
 

@@ -68,6 +68,7 @@ endpoint:
 - **Styling**: Use Tailwind CSS utility classes following the design tokens in `DESIGN.md`.
 - **3D Viewport**: Reuse or extend `src/lib/components/IfcViewer.svelte` for IFC 3D visualization and BCF camera viewpoints.
 - **New Feature Development**: All new UI views (projects, dashboards, analysis, rule editors) MUST be added to `frontend/src/routes/` or `frontend/src/lib/components/`.
+- **Usability Standards**: See [`docs/usability-standards.md`](usability-standards.md) for how these conventions map onto ISO 9241 and Nielsen's 10 usability heuristics.
 
 ---
 

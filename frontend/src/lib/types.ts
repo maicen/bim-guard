@@ -88,7 +88,8 @@ export type PermissionAction =
   | "manage_org_members"
   | "manage_llm_providers"
   | "manage_project_bindings"
-  | "manage_parsing_engines";
+  | "manage_parsing_engines"
+  | "manage_scim";
 
 /** Mirrors PermissionActionResponse in app/modules/contracts.py. */
 export interface PermissionActionInfo {
@@ -101,6 +102,21 @@ export interface RolePermission {
   action: PermissionAction;
   min_role: OrgRole;
   is_override: boolean;
+}
+
+/** Mirrors ScimTokenStatusResponse in app/modules/contracts.py -- never the raw token. */
+export interface ScimTokenStatus {
+  configured: boolean;
+  base_url: string;
+  created_at: string | null;
+  last_used_at: string | null;
+  revoked: boolean;
+}
+
+/** Mirrors ScimTokenMintResponse in app/modules/contracts.py -- the raw token, shown exactly once. */
+export interface ScimTokenMintResult {
+  token: string;
+  base_url: string;
 }
 
 /**

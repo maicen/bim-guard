@@ -59,6 +59,8 @@ from app.services.rules_service import (
     RuleService,
 )
 from app.services.ruleset_access_service import RulesetAccessService
+from app.services.scim_service import ScimService
+from app.services.scim_token_service import ScimTokenService
 from app.services.settings_service import SettingsService
 from app.services.static_data_service import (
     _SETTINGS_SCHEMA,
@@ -103,6 +105,7 @@ class ApplicationContainer:
     project_document_bindings_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
     audit_log_repo: DatabaseAdapter
+    scim_tokens_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -120,6 +123,8 @@ class ApplicationContainer:
     permission_service: PermissionService
     user_admin_service: UserAdminService
     audit_log_service: AuditLogService
+    scim_token_service: ScimTokenService
+    scim_service: ScimService
     ruleset_access_service: RulesetAccessService
     document_access_service: DocumentAccessService
     analysis_service: AnalysisService
@@ -438,6 +443,18 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    scim_tokens_repo = PersistenceService.get_table(
+        "scim_tokens",
+        {
+            "id": int,
+            "organization_id": int,
+            "token_hash": str,
+            "created_at": str,
+            "last_used_at": str,
+            "revoked_at": str,
+        },
+    )
+
     parsing_engine_instances_repo = PersistenceService.get_table(
         "parsing_engine_instances",
         {
@@ -561,6 +578,14 @@ def build_default_container() -> ApplicationContainer:
     user_admin_service = UserAdminService(PersistenceService.get_db())
 
     audit_log_service = AuditLogService(audit_log_repo=audit_log_repo)
+
+    scim_token_service = ScimTokenService(scim_tokens_repo=scim_tokens_repo)
+
+    scim_service = ScimService(
+        membership_service=membership_service,
+        profile_service=profile_service,
+        db_client=PersistenceService.get_db(),
+    )
 
     # Seed default repo if database is empty
     try:
@@ -769,6 +794,7 @@ def build_default_container() -> ApplicationContainer:
         project_document_bindings_repo=project_document_bindings_repo,
         profiles_repo=profiles_repo,
         audit_log_repo=audit_log_repo,
+        scim_tokens_repo=scim_tokens_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -786,6 +812,8 @@ def build_default_container() -> ApplicationContainer:
         permission_service=permission_service,
         user_admin_service=user_admin_service,
         audit_log_service=audit_log_service,
+        scim_token_service=scim_token_service,
+        scim_service=scim_service,
         ruleset_access_service=ruleset_access_service,
         document_access_service=document_access_service,
         analysis_service=analysis_service,

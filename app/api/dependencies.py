@@ -30,6 +30,8 @@ from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
+from app.services.scim_service import ScimService
+from app.services.scim_token_service import ScimTokenService
 from app.services.settings_service import SettingsService
 from app.services.user_admin_service import UserAdminService
 
@@ -163,3 +165,13 @@ def get_user_admin_service() -> UserAdminService:
 def get_graph_triplestore_service() -> GraphTriplestoreService:
     """Return the configured GraphTriplestoreService instance."""
     return get_container().graph_triplestore_service
+
+
+def get_scim_token_service() -> ScimTokenService:
+    """Return the configured ScimTokenService instance."""
+    return get_container().scim_token_service
+
+
+def get_scim_service() -> ScimService:
+    """Return the configured ScimService instance."""
+    return get_container().scim_service

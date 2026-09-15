@@ -304,6 +304,8 @@ Every data table across the application (Projects, Documents, Reports & BCF, Rul
 
 To maintain cohesive design patterns, rock-solid accessibility (WAI-ARIA compliance), and consistent styling, all UI views must compose with established component building blocks from `frontend/src/lib/components/` and headless primitives from `frontend/src/lib/components/ui/`.
 
+> §§1, 11–13 of this document are the basis for [`docs/usability-standards.md`](docs/usability-standards.md)'s formal ISO 9241 / Nielsen's-heuristics mapping — see that document for which standard each convention here satisfies.
+
 ### Strict Rule Against Raw HTML Controls (MANDATORY)
 
 **NEVER use raw, unstyled HTML interactive controls or browser defaults in UI views.** Browser defaults lack design-token integration, break dark-mode contrast, and offer poor accessibility:

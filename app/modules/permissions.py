@@ -35,12 +35,16 @@ class Action(str, Enum):
     MANAGE_PARSING_ENGINES = "manage_parsing_engines"
     """Create/update/delete/test an organization's document-parsing engine instances."""
 
+    MANAGE_SCIM = "manage_scim"
+    """Mint/rotate/revoke an organization's SCIM 2.0 provisioning token."""
+
 
 ACTION_DESCRIPTIONS: dict[Action, str] = {
     Action.MANAGE_ORG_MEMBERS: "Manage organization members, invites, and groups",
     Action.MANAGE_LLM_PROVIDERS: "Manage LLM provider instances and task model shortlists",
     Action.MANAGE_PROJECT_BINDINGS: "Change a project's bound rulesets and documents",
     Action.MANAGE_PARSING_ENGINES: "Manage document-parsing engine instances",
+    Action.MANAGE_SCIM: "Mint/rotate/revoke the organization's SCIM provisioning token",
 }
 
 ROLE_RANK: dict[str, int] = {"member": 0, "admin": 1, "owner": 2}

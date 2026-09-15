@@ -15,6 +15,7 @@ from app.api.dependencies import (
     get_profile_service,
     get_projects_service,
     get_ruleset_access_service,
+    get_scim_token_service,
     get_user_admin_service,
 )
 from app.auth import CurrentUser, get_current_user
@@ -41,6 +42,8 @@ from app.modules.contracts import (
     OrganizationRulesetGrantsResponse,
     OrganizationRulesetGrantsUpdateRequest,
     OrganizationSummary,
+    ScimTokenMintResponse,
+    ScimTokenStatusResponse,
     UserListResponse,
     UserOrganizationSummary,
     UserSummary,
@@ -53,6 +56,7 @@ from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.ruleset_access_service import RulesetAccessService
+from app.services.scim_token_service import ScimTokenService
 from app.services.user_admin_service import UserAdminService
 
 router = APIRouter()
@@ -593,6 +597,99 @@ def set_group_project_grants(
         )
     memberships.set_group_project_grants(group_id, payload.project_ids)
     return get_group_project_grants(organization_id, group_id, current_user, memberships, profiles)
+
+
+# ---------------------------------------------------------------------------
+# SCIM 2.0 provisioning token (see app/scim_auth.py, app/api/scim.py)
+# ---------------------------------------------------------------------------
+
+
+_SCIM_BASE_PATH = "/api/scim/v2"
+"""Client-facing hint only -- the SCIM router itself derives its full base URL from the request host."""
+
+
+def _scim_token_response(row: dict | None) -> ScimTokenStatusResponse:
+    if row is None:
+        return ScimTokenStatusResponse(configured=False, base_url=_SCIM_BASE_PATH)
+    return ScimTokenStatusResponse(
+        configured=True,
+        base_url=_SCIM_BASE_PATH,
+        created_at=row.get("created_at"),
+        last_used_at=row.get("last_used_at"),
+        revoked=bool(row.get("revoked_at")),
+    )
+
+
+@router.get(
+    "/{organization_id}/scim-token",
+    response_model=ScimTokenStatusResponse,
+    summary="Get an organization's SCIM provisioning token status",
+)
+def get_scim_token_status(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    scim_tokens: Annotated[ScimTokenService, Depends(get_scim_token_service)],
+) -> ScimTokenStatusResponse:
+    """Return whether a SCIM token is configured, and its last-used metadata -- never the raw value."""
+    permissions.require(organization_id, current_user, Action.MANAGE_SCIM)
+    return _scim_token_response(scim_tokens.status(organization_id))
+
+
+@router.post(
+    "/{organization_id}/scim-token",
+    response_model=ScimTokenMintResponse,
+    summary="Mint or rotate an organization's SCIM provisioning token",
+)
+def mint_scim_token(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    scim_tokens: Annotated[ScimTokenService, Depends(get_scim_token_service)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
+) -> ScimTokenMintResponse:
+    """Issue a fresh SCIM bearer token, invalidating any existing one.
+
+    The raw token is returned exactly once here -- only its hash is ever
+    persisted, so a lost token can only be replaced, never recovered.
+    """
+    permissions.require(organization_id, current_user, Action.MANAGE_SCIM)
+    token = scim_tokens.mint(organization_id)
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        organization_id=organization_id,
+        action="organization.scim_token.minted",
+        resource_type="scim_token",
+        resource_id=str(organization_id),
+    )
+    return ScimTokenMintResponse(token=token, base_url=_SCIM_BASE_PATH)
+
+
+@router.delete(
+    "/{organization_id}/scim-token",
+    response_model=ScimTokenStatusResponse,
+    summary="Revoke an organization's SCIM provisioning token",
+)
+def revoke_scim_token(
+    organization_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    scim_tokens: Annotated[ScimTokenService, Depends(get_scim_token_service)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
+) -> ScimTokenStatusResponse:
+    """Revoke the organization's SCIM token; the IdP's next request will 401."""
+    permissions.require(organization_id, current_user, Action.MANAGE_SCIM)
+    scim_tokens.revoke(organization_id)
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        organization_id=organization_id,
+        action="organization.scim_token.revoked",
+        resource_type="scim_token",
+        resource_id=str(organization_id),
+    )
+    return _scim_token_response(scim_tokens.status(organization_id))
 
 
 # ---------------------------------------------------------------------------
