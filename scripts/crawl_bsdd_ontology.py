@@ -1,53 +1,34 @@
-"""Crawl a curated branch of the bSDD IFC 4.3 hierarchy into local tables.
+"""Crawl a curated branch of the bSDD IFC 4.3 hierarchy into local reference JSON.
 
-Populates public.bsdd_classes / bsdd_properties / bsdd_class_properties (see
-supabase/migrations/20260903213309_create_bsdd_ontology.sql) from the live
-buildingSMART Data Dictionary API, so the app can look up class/property
-definitions, hierarchy, and relationships without a live bSDD round trip.
+Outputs bundled JSON files under data/reference/bsdd/ (bsdd_classes.json,
+bsdd_properties.json, bsdd_class_properties.json) directly from the live
+buildingSMART Data Dictionary API, completely eliminating database dependencies.
 
 The IFC *entity* hierarchy (classType=Class) is deliberately curated, not a
-full-dictionary crawl: starting from a set of seed classes (by default,
-every distinct target_ifc_class already used in public.rules), it walks
-each seed's full DESCENDANT subtree (children, recursively) plus its
-ANCESTOR chain up to IfcRoot -- but does NOT expand an ancestor's other
-children, which is what would otherwise explode this into most of the IFC
-entity hierarchy. A door's cousins (other built elements) stay out unless
-they're a seed or a descendant of one.
-
-GroupOfProperties classes (every Pset_/Qto_ property and quantity set
-definition in the dictionary) have no parent-child relation for that walk
-to follow, so they're crawled separately and exhaustively instead: paged
-straight from GET /api/Dictionary/v1/Classes?classtype=groupofproperties
-(see BSDDClient.list_classes_by_type), then each one's full detail (and
-member properties) fetched the same way as an IFC entity class. This is the
-whole bucket, not a curated subset -- there's no cousin-explosion risk to
-curate away, since Psets/Qtos don't reference each other.
+full-dictionary crawl: starting from a set of seed classes, it walks each seed's
+full DESCENDANT subtree (children, recursively) plus its ANCESTOR chain up to
+IfcRoot -- but does NOT expand an ancestor's other children.
 
 Usage:
-    uv run python scripts/crawl_bsdd_ontology.py
+    uv run python scripts/crawl_bsdd_ontology.py --curated
     uv run python scripts/crawl_bsdd_ontology.py --roots IfcDoor IfcWindow
     uv run python scripts/crawl_bsdd_ontology.py --max-classes 50 --dry-run
-    uv run python scripts/crawl_bsdd_ontology.py --skip-group-of-properties
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.environment import load_env_file  # noqa: E402
 from app.modules.contracts import BSDDClassItem  # noqa: E402
 from app.services.bsdd_client import CURATED_DICTIONARY_METADATA, BSDDClient  # noqa: E402
-from supabase import Client, create_client  # noqa: E402
 
 IFC43_DICTIONARY_URI = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3"
-BATCH_SIZE = 500
 DEFAULT_REFERENCE_DIR = Path(__file__).resolve().parent.parent / "data" / "reference" / "bsdd"
 
 DEFAULT_CORE_SEED_CLASSES = [
@@ -74,42 +55,9 @@ DEFAULT_CORE_SEED_CLASSES = [
 ]
 
 
-def _build_client() -> Client | None:
-    """Create a Supabase client from server-side credentials if available."""
-    load_env_file()
-    url = os.getenv("SUPABASE_URL", "").strip()
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or os.getenv("SUPABASE_KEY", "").strip()
-    if not url or not key:
-        return None
-    try:
-        return create_client(url, key)
-    except Exception:
-        return None
-
-
-def default_seed_roots(db: Client | None) -> list[str]:
-    """Distinct target_ifc_class values used by rules, or core building elements."""
-    if db is None:
-        return list(DEFAULT_CORE_SEED_CLASSES)
-    seen: list[str] = []
-    offset = 0
-    page_size = 1000
-    while True:
-        resp = (
-            db.table("rules")
-            .select("target_ifc_class")
-            .range(offset, offset + page_size - 1)
-            .execute()
-        )
-        rows = resp.data or []
-        for row in rows:
-            cls = (row.get("target_ifc_class") or "").strip()
-            if cls and cls not in seen:
-                seen.append(cls)
-        if len(rows) < page_size:
-            break
-        offset += page_size
-    return seen
+def default_seed_roots() -> list[str]:
+    """Return default seed classes covering all major building and MEP elements."""
+    return list(DEFAULT_CORE_SEED_CLASSES)
 
 
 class Crawler:
@@ -282,13 +230,6 @@ def build_rows(visited: dict[str, BSDDClassItem]) -> tuple[list[dict], list[dict
     return class_rows, list(property_rows.values()), edge_rows
 
 
-def upsert_batches(db: Client, table: str, rows: list[dict], on_conflict: str) -> None:
-    for start in range(0, len(rows), BATCH_SIZE):
-        chunk = rows[start : start + BATCH_SIZE]
-        db.table(table).upsert(chunk, on_conflict=on_conflict).execute()
-        print(f"  upserted {table} {start + len(chunk)}/{len(rows)}")
-
-
 def save_local_reference_json(
     output_dir: Path,
     class_rows: list[dict],
@@ -305,7 +246,7 @@ def save_local_reference_json(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--roots", nargs="*", default=None, help="Seed IFC class codes (default: distinct target_ifc_class from public.rules)")
+    parser.add_argument("--roots", nargs="*", default=None, help="Seed IFC class codes (default: core building elements)")
     parser.add_argument("--dictionary-uri", default=IFC43_DICTIONARY_URI)
     parser.add_argument(
         "--curated",
@@ -314,17 +255,12 @@ def main() -> None:
     )
     parser.add_argument("--max-classes", type=int, default=600, help="Safety cap on entity/domain classes visited")
     parser.add_argument("--delay", type=float, default=0.5, help="Seconds between bSDD requests")
-    parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to disk or database")
+    parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to disk")
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=DEFAULT_REFERENCE_DIR,
         help="Local directory to store the crawled reference JSON files (default: data/reference/bsdd)",
-    )
-    parser.add_argument(
-        "--skip-db",
-        action="store_true",
-        help="Skip upserting to Supabase PostgreSQL and only write to local reference JSON files",
     )
     parser.add_argument(
         "--skip-group-of-properties",
@@ -339,7 +275,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    db = _build_client()
     bsdd_client = BSDDClient(timeout_seconds=20.0)
     all_visited: dict[str, BSDDClassItem] = {}
 
@@ -364,7 +299,7 @@ def main() -> None:
         print("=======================================================")
 
         if "ifc" in dict_uri.lower():
-            roots = args.roots or default_seed_roots(db)
+            roots = args.roots or default_seed_roots()
             if not roots:
                 print("! No seed roots found -- skipping entity tree crawl for IFC.")
             else:
@@ -396,23 +331,11 @@ def main() -> None:
     )
 
     if args.dry_run:
-        print("Dry run -- not writing to disk or database.")
+        print("Dry run -- not writing to disk.")
         return
 
     if args.output_dir:
         save_local_reference_json(args.output_dir, class_rows, property_rows, edge_rows)
-
-    if args.skip_db or db is None:
-        if args.skip_db:
-            print("Skipping database upsert as requested (--skip-db).")
-        else:
-            print("No Supabase credentials found; local reference JSON files updated successfully.")
-        print("Done.")
-        return
-
-    upsert_batches(db, "bsdd_classes", class_rows, on_conflict="uri")
-    upsert_batches(db, "bsdd_properties", property_rows, on_conflict="uri")
-    upsert_batches(db, "bsdd_class_properties", edge_rows, on_conflict="class_uri,property_uri,property_set")
     print("Done.")
 
 

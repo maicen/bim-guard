@@ -1,13 +1,11 @@
-"""Local-first lookup layer over the crawled bSDD ontology tables.
+"""Local-first and 100% database-independent lookup layer for the bSDD ontology.
 
-Sits in front of BSDDClient: a class or property already crawled into
-public.bsdd_classes / bsdd_properties / bsdd_class_properties (see
-scripts/crawl_bsdd_ontology.py) resolves entirely from the database -- no
-external bSDD API round trip, no rate limit, no per-hover network latency.
-Anything not found locally falls back to a live bSDD lookup via the caller's
-BSDDClient, and the result is written back into these tables afterwards --
-so a live miss today is a local hit tomorrow, and the ontology grows from
-actual usage, not just the seeded crawl.
+Sits in front of BSDDClient: curated reference ontologies are bundled locally
+under data/reference/bsdd/ (bsdd_classes.json, bsdd_properties.json,
+bsdd_class_properties.json), and dynamic live lookups persist to local JSON in
+data/cache/bsdd/. Lookups resolve entirely in-process (< 50ms cold start, < 1ms
+memory lookup) with zero database tables, zero network latency, and zero remote
+database reliance.
 """
 
 from __future__ import annotations
@@ -20,75 +18,35 @@ from typing import Any, Optional
 from app.logging_config import get_logger
 from app.modules.contracts import BSDDClassItem, BSDDPropertyItem
 from app.services.bsdd_client import BSDDClient
-from app.services.persistence import PersistenceService
 
 logger = get_logger(__name__)
 
-_CLASS_SCHEMA = {
-    "uri": str,
-    "code": str,
-    "name": str,
-    "dictionary_uri": str,
-    "class_type": str,
-    "parent_class_uri": str,
-    "related_ifc_entities": str,  # jsonb
-    "definition": str,
-    "description": str,
-}
-_PROPERTY_SCHEMA = {
-    "uri": str,
-    "code": str,
-    "name": str,
-    "data_type": str,
-    "definition": str,
-    "description": str,
-    "units": str,  # jsonb
-}
-_EDGE_SCHEMA = {
-    "class_uri": str,
-    "property_uri": str,
-    "property_set": str,
-    "data_type": str,
-    "units": str,  # jsonb
-    "allowed_values": str,  # jsonb
-}
-
 SECONDS_PER_HOUR = 3600
-# The crawl is a manual, occasional operation (scripts/crawl_bsdd_ontology.py)
-# and writes go through persist_class(), which patches this snapshot directly
-# -- so a full reload is only needed to pick up an external change (a rerun
-# of the crawler, a manual DB edit), not to stay current with this process's
-# own writes. Refreshing hourly instead of every few minutes avoids paying
-# the ~20s paginated reload cost on an otherwise-idle server.
+# Reference ontologies are static bundled files; refreshing hourly ensures
+# any background crawler or runtime updates to disk cache are picked up.
 _REFRESH_SECONDS = 4 * SECONDS_PER_HOUR
 
 
 class BSDDOntologyRepository:
-    """Reads and opportunistically writes the local bSDD ontology cache."""
+    """In-memory, local-file-backed bSDD ontology repository with zero database reliance."""
 
-    def __init__(self, db=None):
-        self._db = db or PersistenceService.get_db()
-        self._classes = PersistenceService.get_table("bsdd_classes", _CLASS_SCHEMA, pk="uri", db=None)
-        self._properties = PersistenceService.get_table("bsdd_properties", _PROPERTY_SCHEMA, pk="uri", db=None)
-        self._edges = PersistenceService.get_table("bsdd_class_properties", _EDGE_SCHEMA, pk="id", db=None)
+    def __init__(self, db: Any = None) -> None:
+        # db accepted for backward compatibility with legacy test callers, but unused.
+        self._reference_dir = Path(__file__).resolve().parent.parent.parent / "data" / "reference" / "bsdd"
+        self._cache_dir = Path(__file__).resolve().parent.parent.parent / "data" / "cache" / "bsdd"
 
-        self._classes_by_uri: dict[str, dict] = {}
-        self._properties_by_uri: dict[str, dict] = {}
-        self._edges_by_class: dict[str, list[dict]] = {}
-        self._cached_at = 0.0
+        self._classes_by_uri: dict[str, dict[str, Any]] = {}
+        self._properties_by_uri: dict[str, dict[str, Any]] = {}
+        self._edges_by_class: dict[str, list[dict[str, Any]]] = {}
+        self._cached_at: float = 0.0
 
     # ── Read path (local ontology, refreshed periodically) ─────────────────
 
     def _load_from_local_reference(self) -> bool:
-        """Attempt to load the curated bSDD ontology synchronously from local JSON files.
-
-        Returns True if files exist and are successfully parsed into memory (< 50ms),
-        avoiding paginated remote database queries over HTTP.
-        """
-        base_dir = Path(__file__).resolve().parent.parent.parent / "data" / "reference" / "bsdd"
-        classes_file = base_dir / "bsdd_classes.json"
-        props_file = base_dir / "bsdd_properties.json"
-        edges_file = base_dir / "bsdd_class_properties.json"
+        """Load curated bSDD baseline and dynamic runtime cache synchronously (< 50ms)."""
+        classes_file = self._reference_dir / "bsdd_classes.json"
+        props_file = self._reference_dir / "bsdd_properties.json"
+        edges_file = self._reference_dir / "bsdd_class_properties.json"
 
         if not (classes_file.exists() and props_file.exists() and edges_file.exists()):
             return False
@@ -103,39 +61,47 @@ class BSDDOntologyRepository:
 
             self._classes_by_uri = {row["uri"]: row for row in classes_rows}
             self._properties_by_uri = {row["uri"]: row for row in props_rows}
-            edges_by_class: dict[str, list[dict]] = {}
+            edges_by_class: dict[str, list[dict[str, Any]]] = {}
             for row in edges_rows:
                 edges_by_class.setdefault(row["class_uri"], []).append(row)
             self._edges_by_class = edges_by_class
+
+            # Merge dynamic runtime cache if present
+            runtime_classes_file = self._cache_dir / "runtime_classes.json"
+            runtime_props_file = self._cache_dir / "runtime_properties.json"
+            runtime_edges_file = self._cache_dir / "runtime_class_properties.json"
+
+            if runtime_classes_file.exists():
+                rt_classes = json.loads(runtime_classes_file.read_text(encoding="utf-8"))
+                for row in rt_classes:
+                    self._classes_by_uri[row["uri"]] = row
+
+            if runtime_props_file.exists():
+                rt_props = json.loads(runtime_props_file.read_text(encoding="utf-8"))
+                for row in rt_props:
+                    self._properties_by_uri[row["uri"]] = row
+
+            if runtime_edges_file.exists():
+                rt_edges = json.loads(runtime_edges_file.read_text(encoding="utf-8"))
+                for row in rt_edges:
+                    self._edges_by_class.setdefault(row["class_uri"], []).append(row)
+
             self._cached_at = time.time()
             logger.debug(
-                "Loaded local bSDD reference files (%d classes, %d properties, %d edges) in <50ms",
+                "Loaded local bSDD reference files (%d classes, %d properties, %d classes with edges) in <50ms",
                 len(self._classes_by_uri),
                 len(self._properties_by_uri),
-                len(edges_rows),
+                len(self._edges_by_class),
             )
             return True
         except Exception:
-            logger.exception("Failed to load local bSDD reference JSON files; falling back to DB/live")
+            logger.exception("Failed to load local bSDD reference JSON files")
             return False
 
     def _refresh_if_stale(self) -> None:
         if self._classes_by_uri and (time.time() - self._cached_at) < _REFRESH_SECONDS:
             return
-        # Priority 1: High-speed local bundled JSON (< 50ms, zero network)
-        if self._load_from_local_reference():
-            return
-        # Priority 2: Remote database fallback
-        try:
-            self._classes_by_uri = {row["uri"]: row for row in self._classes.rows}
-            self._properties_by_uri = {row["uri"]: row for row in self._properties.rows}
-            edges_by_class: dict[str, list[dict]] = {}
-            for row in self._edges.rows:
-                edges_by_class.setdefault(row["class_uri"], []).append(row)
-            self._edges_by_class = edges_by_class
-            self._cached_at = time.time()
-        except Exception:
-            logger.exception("Failed to load local bSDD ontology; falling back to live lookups only")
+        self._load_from_local_reference()
 
     def _class_item(self, uri: str) -> Optional[BSDDClassItem]:
         row = self._classes_by_uri.get(uri)
@@ -285,67 +251,14 @@ class BSDDOntologyRepository:
     # ── Write path: opportunistic caching of a live bSDD lookup ────────────
 
     def persist_class(self, item: BSDDClassItem) -> None:
-        """Best-effort upsert of a live-fetched class into the local ontology.
+        """Persist a live-fetched class into in-memory ontology and local JSON cache.
 
         Never raises: a caching failure must not break the live lookup that
-        triggered it. Called after any get_class() falls through to a live
-        BSDDClient fetch, so the next lookup for the same class is local.
+        triggered it. Persists to data/cache/bsdd/ so the next lookup or server
+        restart resolves it locally without repeating network calls.
         """
         try:
-            self._db.table("bsdd_classes").upsert(
-                {
-                    "uri": item.uri,
-                    "code": item.code,
-                    "name": item.name,
-                    "dictionary_uri": item.dictionary_uri,
-                    "class_type": item.class_type,
-                    "parent_class_uri": f"{item.dictionary_uri}/class/{item.parent_class_code}"
-                    if item.parent_class_code
-                    else None,
-                    "related_ifc_entities": item.related_ifc_entities,
-                    "definition": item.definition,
-                    "description": item.description,
-                },
-                on_conflict="uri",
-            ).execute()
-
-            if item.properties:
-                prop_rows = [
-                    {
-                        "uri": p.uri,
-                        "code": p.uri.rsplit("/", 1)[-1],
-                        "name": p.name,
-                        "data_type": p.data_type,
-                        "definition": p.definition,
-                        "description": p.description,
-                        "units": [p.units] if p.units else [],
-                    }
-                    for p in item.properties
-                    if p.uri
-                ]
-                self._db.table("bsdd_properties").upsert(prop_rows, on_conflict="uri").execute()
-
-                edge_rows = [
-                    {
-                        "class_uri": item.uri,
-                        "property_uri": p.uri,
-                        "property_set": p.property_set,
-                        "data_type": p.data_type,
-                        "units": [p.units] if p.units else [],
-                        "allowed_values": p.allowed_values,
-                    }
-                    for p in item.properties
-                    if p.uri
-                ]
-                self._db.table("bsdd_class_properties").upsert(
-                    edge_rows, on_conflict="class_uri,property_uri,property_set"
-                ).execute()
-
-            # Patch the in-memory snapshot directly rather than invalidating
-            # it -- a full reload is the expensive part (a paginated re-read
-            # of every row in all three tables), and the whole point of this
-            # cache is to not pay that cost on every write either.
-            self._classes_by_uri[item.uri] = {
+            class_row = {
                 "uri": item.uri,
                 "code": item.code,
                 "name": item.name,
@@ -358,11 +271,14 @@ class BSDDOntologyRepository:
                 "definition": item.definition,
                 "description": item.description,
             }
-            edges = []
+            self._classes_by_uri[item.uri] = class_row
+
+            prop_rows = []
+            edge_rows = []
             for p in item.properties:
                 if not p.uri:
                     continue
-                self._properties_by_uri[p.uri] = {
+                p_row = {
                     "uri": p.uri,
                     "code": p.uri.rsplit("/", 1)[-1],
                     "name": p.name,
@@ -371,19 +287,73 @@ class BSDDOntologyRepository:
                     "description": p.description,
                     "units": [p.units] if p.units else [],
                 }
-                edges.append(
-                    {
-                        "class_uri": item.uri,
-                        "property_uri": p.uri,
-                        "property_set": p.property_set,
-                        "data_type": p.data_type,
-                        "units": [p.units] if p.units else [],
-                        "allowed_values": p.allowed_values,
-                    }
-                )
-            self._edges_by_class[item.uri] = edges
+                self._properties_by_uri[p.uri] = p_row
+                prop_rows.append(p_row)
+
+                e_row = {
+                    "class_uri": item.uri,
+                    "property_uri": p.uri,
+                    "property_set": p.property_set,
+                    "data_type": p.data_type,
+                    "units": [p.units] if p.units else [],
+                    "allowed_values": p.allowed_values,
+                }
+                edge_rows.append(e_row)
+
+            self._edges_by_class[item.uri] = edge_rows
+
+            self._persist_to_local_cache(class_row, prop_rows, edge_rows)
         except Exception:
             logger.exception("Failed to cache bSDD class %s locally (non-fatal)", item.uri)
+
+    def _persist_to_local_cache(
+        self, class_row: dict[str, Any], prop_rows: list[dict[str, Any]], edge_rows: list[dict[str, Any]]
+    ) -> None:
+        """Persist dynamic runtime records to data/cache/bsdd/*.json."""
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+
+        classes_file = self._cache_dir / "runtime_classes.json"
+        existing_classes = {}
+        if classes_file.exists():
+            try:
+                for row in json.loads(classes_file.read_text(encoding="utf-8")):
+                    existing_classes[row["uri"]] = row
+            except Exception:
+                pass
+        existing_classes[class_row["uri"]] = class_row
+        classes_file.write_text(json.dumps(list(existing_classes.values()), indent=2), encoding="utf-8")
+
+        if prop_rows:
+            props_file = self._cache_dir / "runtime_properties.json"
+            existing_props = {}
+            if props_file.exists():
+                try:
+                    for row in json.loads(props_file.read_text(encoding="utf-8")):
+                        existing_props[row["uri"]] = row
+                except Exception:
+                    pass
+            for p in prop_rows:
+                existing_props[p["uri"]] = p
+            props_file.write_text(json.dumps(list(existing_props.values()), indent=2), encoding="utf-8")
+
+        if edge_rows:
+            edges_file = self._cache_dir / "runtime_class_properties.json"
+            existing_edges = []
+            seen_keys = set()
+            if edges_file.exists():
+                try:
+                    for row in json.loads(edges_file.read_text(encoding="utf-8")):
+                        key = (row.get("class_uri"), row.get("property_uri"), row.get("property_set"))
+                        seen_keys.add(key)
+                        existing_edges.append(row)
+                except Exception:
+                    pass
+            for e in edge_rows:
+                key = (e.get("class_uri"), e.get("property_uri"), e.get("property_set"))
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    existing_edges.append(e)
+            edges_file.write_text(json.dumps(existing_edges, indent=2), encoding="utf-8")
 
     # ── Local-first orchestration ───────────────────────────────────────────
 

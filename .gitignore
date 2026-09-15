@@ -33,6 +33,7 @@ data/BIMGuard_IFC4_Export.json
 
 # Runtime artifacts are durable in Supabase Storage; local copies are disposable.
 data/cache/supabase-storage/
+data/cache/bsdd/
 data/agent-sessions/
 
 # Source PDFs cached by fetch_standards.py --local-pdf. Tens of megabytes each
