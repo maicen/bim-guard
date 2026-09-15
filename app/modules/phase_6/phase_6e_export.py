@@ -101,6 +101,11 @@ CSV_COLUMNS: tuple[str, ...] = (
     "overlap_volume_mm3",
     "clearance_mm",
     "standards",
+    # Where the engine's thresholds came from: database_rows, stored_payload or
+    # in_memory_fallback (app.services.corrosion_rule_catalog). Blank for
+    # mechanisms without a threshold catalog. Last, so every existing column
+    # keeps its position.
+    "catalog_source",
 )
 
 
@@ -174,6 +179,7 @@ def to_csv(result: dict) -> str:
                 "overlap_volume_mm3": issue.metadata.get("overlap_volume_mm3", ""),
                 "clearance_mm": issue.metadata.get("clearance_mm", ""),
                 "standards": _standards(issue),
+                "catalog_source": issue.metadata.get("catalog_source", ""),
             }
         )
     return buffer.getvalue()
@@ -546,6 +552,7 @@ def _description(issue: Issue) -> str:
         _line("Band", issue.band.value),
         _line("Score", round(float(issue.score or 0.0), 4)),
         _line("Ruleset", meta.get("ruleset_version")),
+        _line("Catalog source", meta.get("catalog_source")),
         _line("Check", meta.get("check")),
     ]
     assessment = [line for line in assessment if line]

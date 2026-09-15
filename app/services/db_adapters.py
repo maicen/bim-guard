@@ -11,7 +11,10 @@ from typing import Any, Callable
 from httpx import TransportError
 from postgrest.exceptions import APIError
 
+from app.logging_config import get_logger
 from app.services.cache import adapter_cache_service
+
+logger = get_logger(__name__)
 
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY_S = 0.2
@@ -248,6 +251,28 @@ class SupabaseTableAdapter(DatabaseAdapter):
         else:
             _USE_MEMORY_FALLBACK_TABLES.discard(self._table_name)
 
+    def _degrade_to_memory(self, operation: str, exc: Exception) -> None:
+        """Switch this table to the in-process memory copy, and say so.
+
+        The switch is module-level and nothing clears it, so from here until the
+        process exits every read of the table returns the memory rows (usually
+        none) and every write lands only in this process. It used to happen
+        silently; a run scored from a table in this state could not be told
+        apart from one scored from the database. Logged once per table, on the
+        transition, because the condition is permanent rather than per call.
+        """
+        if not self._use_memory_fallback:
+            logger.warning(
+                "Table degraded to in-process memory table=%s operation=%s "
+                "error_code=%s error=%s; results from this table are no longer "
+                "authoritative for the rest of this process",
+                self._table_name,
+                operation,
+                getattr(exc, "code", None),
+                exc,
+            )
+        self._use_memory_fallback = True
+
     @property
     def columns_dict(self) -> dict[str, Any]:
         """Return known columns from declared schema."""
@@ -291,7 +316,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows[0] if rows else None
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("get", exc)
                 return self.get(pk_value)
             raise
 
@@ -313,7 +338,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows[0] if rows else payload
         except APIError as exc:
             if self._is_missing_table_error(exc) or getattr(exc, "code", None) == "23503":
-                self._use_memory_fallback = True
+                self._degrade_to_memory("insert", exc)
                 return self.insert(payload)
             if self._should_retry_insert_with_pk(exc, payload):
                 retry_payload = dict(payload)
@@ -350,7 +375,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return inserted
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("insert_many", exc)
                 return [self.insert(payload) for payload in payloads]
             raise
 
@@ -369,7 +394,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("update", exc)
                 self.update(updates=updates, pk_values=pk_values)
                 return
             raise
@@ -390,7 +415,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("delete", exc)
                 self.delete(pk_value)
                 return
             raise
@@ -418,7 +443,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("delete_many", exc)
                 pk_set = set(pk_values)
                 pk_str_set = {str(pk) for pk in pk_values}
                 self._memory_rows[:] = [
@@ -459,7 +484,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return result
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("rows_where", exc)
                 return self.rows_where(where_sql, params, limit)
             raise
 
@@ -479,7 +504,7 @@ class SupabaseTableAdapter(DatabaseAdapter):
             return rows
         except APIError as exc:
             if self._is_missing_table_error(exc):
-                self._use_memory_fallback = True
+                self._degrade_to_memory("select_all", exc)
                 return list(self._memory_rows)
             raise
 

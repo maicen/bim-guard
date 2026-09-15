@@ -95,8 +95,9 @@
         </p>
         <p class="text-xs text-fg-secondary sm:text-sm">
           Every result also shows its working: which rule was applied, which published engineering
-          standard the rule came from, and where each piece of data came from. Anyone can trace a result
-          back to the page in the standard that justifies it.
+          standard governs that kind of corrosion, and where each piece of data came from. The numbers
+          behind the rules are BIMGUARD's own calibration written against those standards, not figures
+          copied from them, so a corrosion engineer should check them before a result is relied on.
         </p>
       </section>
 

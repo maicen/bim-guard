@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy - BIM Guard</title>
+  <meta name="description" content="Privacy Policy for BIM Guard OpenBIM automated compliance and coordination platform." />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <style>
+    :root {
+      --bg-canvas: #090d16;
+      --bg-card: #0f172a;
+      --border: #1e293b;
+      --border-focus: #3b82f6;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --badge-bg: rgba(59, 130, 246, 0.1);
+      --badge-border: rgba(59, 130, 246, 0.25);
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 1rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2.5rem 0 5rem;
+    }
+    header.site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    }
+    .brand-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .back-link {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      background-color: var(--bg-card);
+      transition: all 0.2s ease;
+    }
+    .back-link:hover {
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background-color: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: var(--accent);
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+    .last-updated {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+    .content-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 0.85rem;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+    h2:first-of-type {
+      margin-top: 0;
+    }
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      font-size: 0.975rem;
+    }
+    ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+      margin-bottom: 1.25rem;
+      color: var(--text-secondary);
+    }
+    li {
+      margin-bottom: 0.45rem;
+      font-size: 0.95rem;
+    }
+    strong {
+      color: var(--text-primary);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    a:hover {
+      color: var(--accent-hover);
+    }
+    .highlight-box {
+      background: rgba(59, 130, 246, 0.08);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      color: var(--text-primary);
+      font-size: 0.925rem;
+    }
+    footer.site-footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .footer-links a:hover {
+      color: var(--text-primary);
+    }
+    @media (max-width: 640px) {
+      .container {
+        padding: 1.5rem 0 3rem;
+      }
+      .content-card {
+        padding: 1.25rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <a href="/" class="brand">
+        <div class="brand-icon">BG</div>
+        <span class="brand-name">BIM Guard</span>
+      </a>
+      <a href="/" class="back-link">&larr; Return to Application</a>
+    </header>
+
+    <main>
+      <div class="badge">Legal &amp; Privacy</div>
+      <h1>Privacy Policy</h1>
+      <div class="last-updated">Effective Date: September 15, 2026 &bull; Last Updated: September 15, 2026</div>
+
+      <div class="content-card">
+        <h2>1. Introduction</h2>
+        <p>
+          Welcome to <strong>BIM Guard</strong> (accessible at <a href="https://bim-guard.xyz">https://bim-guard.xyz</a>). BIM Guard is an OpenBIM compliance verification and coordination platform that performs automated building code checks, corrosion physics analysis (galvanic, crevice, and microbiological), and ISO 19650 Common Data Environment (CDE) workflow tracking for architectural, structural, and MEP models.
+        </p>
+        <p>
+          We are committed to protecting your privacy and being transparent about how we collect, use, store, and safeguard your personal information and project data. This Privacy Policy explains our practices regarding data collected when you visit our website, create an account, authenticate via Google Sign-In, or use our services.
+        </p>
+
+        <h2>2. Information We Collect</h2>
+        <p>We collect information in the following categories:</p>
+        <ul>
+          <li>
+            <strong>Google OAuth Account Information:</strong> When you sign in to BIM Guard using Google OAuth 2.0, we receive your basic profile information as permitted by Google's consent screen. This includes your <strong>email address</strong>, <strong>full name</strong>, and <strong>avatar image URL</strong>. We do not receive or store your Google account password.
+          </li>
+          <li>
+            <strong>User-Provided Account Details:</strong> If you sign up via standard email and password, we collect your email address and store a cryptographically hashed representation of your password managed by Supabase Auth.
+          </li>
+          <li>
+            <strong>BIM Project &amp; Engineering Data:</strong> When you use our platform, you or your team members may upload Industry Foundation Classes (IFC) models, BIM Collaboration Format (BCF) coordination topics, architectural rulesets, technical documentation, and project metadata (e.g., project codes, originator tags, suitability classifications, and revision codes).
+          </li>
+          <li>
+            <strong>Audit &amp; System Logs:</strong> We log system interactions for compliance audit trails, security, and debugging, including timestamps, ISO 19650 workflow state transitions (WIP &rarr; SHARED &rarr; PUBLISHED &rarr; ARCHIVED), rule evaluation results, and API access logs.
+          </li>
+        </ul>
+
+        <h2>3. How We Use Your Information</h2>
+        <p>We use the collected information strictly for the following purposes:</p>
+        <ul>
+          <li>To authenticate your identity, maintain your secure session, and protect your account from unauthorized access.</li>
+          <li>To display your name, email, and avatar in collaborative project contexts (such as BCF topic assignment, comment authorship, and ISO 19650 approval logs).</li>
+          <li>To execute compliance audits, corrosion risk assessments, and clearance checks on the IFC models you submit.</li>
+          <li>To provide real-time Server-Sent Events (SSE) updates on background pipeline progress.</li>
+          <li>To diagnose technical errors, improve system performance, and maintain platform security.</li>
+        </ul>
+
+        <div class="highlight-box">
+          <strong>Google API Limited Use Disclosure:</strong><br />
+          BIM Guard's use and transfer to any other app of information received from Google APIs adheres to the 
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
+            Google API Services User Data Policy
+          </a>, including the Limited Use requirements. We never use Google user data for advertising, marketing, or to train artificial intelligence or machine learning models without explicit consent.
+        </div>
+
+        <h2>4. Data Sharing &amp; Third-Party Services</h2>
+        <p>
+          <strong>We do not sell, rent, monetize, or trade your personal information or Google account data to third parties.</strong>
+        </p>
+        <p>We only share data with trusted infrastructure providers required to operate BIM Guard:</p>
+        <ul>
+          <li><strong>Supabase:</strong> Provides managed PostgreSQL database services, Row-Level Security (RLS), and secure authentication.</li>
+          <li><strong>Cloudflare:</strong> Provides DNS routing, SSL/TLS certificate termination, DDoS mitigation, and edge delivery.</li>
+          <li><strong>Google Identity Services:</strong> Facilitates secure single sign-on authentication via OAuth 2.0.</li>
+        </ul>
+
+        <h2>5. Data Security &amp; Storage</h2>
+        <p>
+          We implement rigorous technical and organizational measures to safeguard your personal data and proprietary BIM files:
+        </p>
+        <ul>
+          <li><strong>Encryption in Transit:</strong> All web traffic and API communications are encrypted using Transport Layer Security (TLS 1.3 / HTTPS).</li>
+          <li><strong>Database Row-Level Security (RLS):</strong> Multi-tenant isolation is enforced at the database kernel layer via Supabase RLS policies, ensuring users only access projects within their authorized organization.</li>
+          <li><strong>Access Control:</strong> Administrative access to underlying infrastructure is restricted, monitored, and protected by multi-factor authentication (MFA).</li>
+        </ul>
+
+        <h2>6. Data Retention &amp; User Rights</h2>
+        <p>
+          You retain control over your data. Under applicable privacy laws (including GDPR and CCPA), you have the right to:
+        </p>
+        <ul>
+          <li>Access the personal information we hold about you.</li>
+          <li>Request correction of inaccurate or incomplete information.</li>
+          <li>Request permanent deletion of your account, personal data, and associated BIM files.</li>
+          <li>Export your project deliverables, BCF coordination packages, and compliance reports.</li>
+        </ul>
+        <p>
+          To exercise any of these rights, or to request account deletion, please email us at 
+          <a href="mailto:privacy@bim-guard.xyz">privacy@bim-guard.xyz</a>. We process verified requests within 30 days.
+        </p>
+
+        <h2>7. Cookies and Local Storage</h2>
+        <p>
+          BIM Guard uses strictly necessary browser cookies and LocalStorage items exclusively for session authentication tokens (JWTs) and user interface preferences (such as dark theme preference and active project selection). We do not deploy third-party advertising trackers or behavioral analytics pixels.
+        </p>
+
+        <h2>8. Changes to this Privacy Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time to reflect modifications in our services, technological enhancements, or regulatory requirements. Any updates will be posted on this page with an updated "Last Updated" date.
+        </p>
+
+        <h2>9. Contact Us</h2>
+        <p>
+          If you have questions, concerns, or inquiries regarding this Privacy Policy or our data handling practices, please contact us at:
+        </p>
+        <ul>
+          <li><strong>Email:</strong> <a href="mailto:privacy@bim-guard.xyz">privacy@bim-guard.xyz</a></li>
+          <li><strong>Website:</strong> <a href="https://bim-guard.xyz">https://bim-guard.xyz</a></li>
+          <li><strong>Support:</strong> <a href="mailto:support@bim-guard.xyz">support@bim-guard.xyz</a></li>
+        </ul>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div>&copy; 2026 BIM Guard. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="https://bim-guard.xyz">Home</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
+

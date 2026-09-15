@@ -354,6 +354,17 @@ def _seed_risk_bands(
         )
 
 
+# ── GC-001, CC-001, MC-001 — provenance of what is seeded below ───────────────
+# Every GC-001, CC-001 and MC-001 row below is written with
+# source_text="Source: <citation>". That citation names the standard or body of
+# practice governing the mechanism; it is NOT the document the number was read
+# from. The numbers are a calibration authored for these rulesets with AI
+# assistance (NotebookLM prompts, April 2026; docs/RESOURCES.md:97-104), none of
+# the cited documents is held, and no value has been verified against one. The
+# "Source:" prefix is left as it is because it is stored rule data; the corrected
+# reading, and proposed wording, are in
+# docs/planning/corrosion_provenance_2026-09-13.md.
+
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
 
@@ -584,6 +595,46 @@ def _seed_cc001(svc: RuleService) -> int:
 # ── MC-001 — Microbially Influenced Corrosion ─────────────────────────────────
 
 
+#: The corrected citation for the MC-001 materials whose payload ``reference``
+#: names ASTM G-187 (a soil-resistivity practice) or NACCE TPC 11 (an
+#: unverified, misspelt NACE document). Wording from
+#: docs/planning/corrosion_provenance_2026-09-13.md §12.2, identical to what
+#: migration 20260914195107 writes.
+_MC001_MATERIAL_SOURCE_TEXT = (
+    "Source: AMPP (formerly NACE) industry practice, MIC mechanism only; "
+    "score is MC-001 authored calibration"
+)
+
+#: Payload ``reference`` -> seeded ``source_text`` for the seven
+#: ``material_susceptibility`` entries carrying a suspect citation (carbon_steel,
+#: cast_iron, galv_steel, ss304, ss316, duplex2205, titanium; five distinct
+#: strings). Keyed by the exact payload string; every other reference is seeded
+#: as ``Source: <reference>`` unchanged.
+_MC001_SUPERSEDED_MATERIAL_REFERENCES = {
+    "ASTM G-187 / NACCE TPC 11": _MC001_MATERIAL_SOURCE_TEXT,
+    "NACCE TPC 11": _MC001_MATERIAL_SOURCE_TEXT,
+    "ASTM G-187": _MC001_MATERIAL_SOURCE_TEXT,
+    "NACE / ASTM G-187": _MC001_MATERIAL_SOURCE_TEXT,
+    "ASTM G-187 — exceptional MIC resistance": _MC001_MATERIAL_SOURCE_TEXT,
+}
+
+
+def _mc001_material_source_text(mat: dict) -> str:
+    """Return the ``source_text`` seeded for one MC-001 material.
+
+    A payload reference in :data:`_MC001_SUPERSEDED_MATERIAL_REFERENCES` is
+    replaced by :data:`_MC001_MATERIAL_SOURCE_TEXT`; any other reference, and the
+    no-reference default, is emitted as before. The seeder inserts only, so
+    existing rows are corrected by migration 20260914195107; this change prevents
+    a fresh seed from reintroducing the old text.
+    """
+    reference = mat.get(
+        "reference",
+        "AMPP (formerly NACE) industry practice, MIC mechanism only; score is MC-001 authored calibration",
+    )
+    return _MC001_SUPERSEDED_MATERIAL_REFERENCES.get(reference, f"Source: {reference}")
+
+
 def _seed_mc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-MC-001"
     if svc.has_ruleset(RULESET_ID):
@@ -667,7 +718,7 @@ def _seed_mc001(svc: RuleService) -> int:
             description=f"{mat['label']}: MIC susceptibility score {mat['score']}",
             check_value=mat["score"],
             keyword=mat_key,
-            source_text=f"Source: {mat.get('reference', 'NACCE TPC 11')}",
+            source_text=_mc001_material_source_text(mat),
             parameters=json.dumps({**mat, "material_key": mat_key}),
         )
 

@@ -40,9 +40,12 @@ connectivity graph looking for dissimilar-metal couples that GC-001 cannot see,
 because they are two separate elements joined by a fitting rather than one
 element with a declared material pairing.
 
-Each engine produces a normalised 0.0–1.0 composite score from published
+Each engine produces a normalised 0.0–1.0 composite score from its ruleset's
 weightings, bands it Critical / High / Medium / Low, and attaches the standard
-and clause the threshold came from. Elements the engines cannot score do not
+that governs the mechanism. The weightings and thresholds are a calibration
+authored for each ruleset, not values quoted from those standards; none of the
+cited documents is held and no value has been verified against one (see
+`docs/planning/corrosion_provenance_2026-09-13.md`). Elements the engines cannot score do not
 disappear — they raise a `data_quality` finding instead, because "we have not
 assessed this" and "this is compliant" are different claims and the report keeps
 them apart. On a hospital that distinction matters: an unassessed run in a
@@ -76,7 +79,7 @@ nothing downstream needs to know about mechanisms:
 | `band` | `critical` / `high` / `medium` / `low` |
 | `score` | Normalised composite, 0.0–1.0 |
 | `mechanism` | Engine label, or `data_quality` for an unassessed element |
-| `citations` | Standard + clause + the reason that clause applies |
+| `citations` | The standard governing the mechanism, and why it applies — not the source of the number |
 | `mitigation` | The engineering action, not a restatement of the problem |
 
 Risk bands are aligned so that Critical means the same thing whichever engine
@@ -91,6 +94,10 @@ classes T0–T5), EN 1993-1-4 (structural stainless), BS 8539 (bi-metallic
 assemblies and dielectric separation), CIBSE TM13 and HSE HSG274 (Legionella
 control), BS 8552 (water sampling and monitoring), EN ISO 9308-1 (microbiological
 water quality), EN 12952-12 (feedwater quality) and ASTM B117 (salt spray).
+These name the governing mechanism for each engine. Across all five engines the
+numbers are authored calibration: MM-001 and XM-001 have always said so in their
+rule packs, and GC-001, CC-001 and MC-001 now say so too. A corrosion engineer
+must check a value against its cited source before relying on it.
 
 Mitigations are catalogued rather than generated per finding. A galvanic couple
 returns `MIT-GC-001` — install dielectric isolation at every contact point

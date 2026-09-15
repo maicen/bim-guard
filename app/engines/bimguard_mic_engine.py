@@ -6,11 +6,30 @@ Standards referenced:
   - CIBSE TM13:2013 (Minimising the Risk of Legionella)
   - HSE HSG274 Parts 1–3 (Legionella Control)
   - BS 8552:2012 (Sampling and Monitoring of Water)
-  - ASTM G-187 (MIC Assessment)
+  - ASTM G-187 (MIC Assessment) -- suspect citation: the seeded ruleset itself
+    declares ASTM G-187 a soil-resistivity practice, yet cites it for material
+    susceptibility to MIC
   - EN ISO 9308-1 (Microbiological Water Quality)
   - CIBSE Guide G (Public Health Engineering)
   - WHO Guidelines for Drinking Water Quality (4th Ed.)
-  - NACCE TPC 11 (MIC in Industrial Water Systems)
+  - NACCE TPC 11 (MIC in Industrial Water Systems) -- suspect citation, recorded
+    as written: the body is NACE (now AMPP), and the document is unverified
+
+  Neither suspect citation is emitted. BCF issues and findings name AMPP
+  (formerly NACE) industry practice for the MIC mechanism only, and state that
+  the thresholds are authored calibration. The seeded payload still carries both.
+
+PROVENANCE:
+  The numbers in this ruleset -- thresholds, weights, band cut-offs, scores and
+  class boundaries -- are a calibration authored for BIMGUARD-MC-001. They are
+  NOT quoted from the standards listed above. Each citation names the standard
+  or body of practice that GOVERNS THE MECHANISM, not a document from which the
+  digit was read. None of the cited source documents is held by this project,
+  and no value has been verified against one. The ruleset was generated with AI
+  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  A corrosion engineer must verify every value against the cited source before
+  any value is relied on. Per-value status and counts, and the two suspect
+  citations: docs/planning/corrosion_provenance_2026-09-13.md.
 
 Weighted composite score:
   Score_MC = (0.35 × flow_velocity_risk)
@@ -82,8 +101,11 @@ DEAD_LEG_CLASSES = _MC_CATALOG["dead_leg_classes"]
 
 def classify_dead_leg(length_m: Optional[float], diameter_m: Optional[float]) -> tuple[str, dict]:
     """
-    Classify dead-leg by length-to-diameter ratio per HSE HSG274.
-    Returns risk class key and metadata dict from DB.
+    Classify dead-leg by length-to-diameter ratio.
+
+    The dead-leg concern is HSE HSG274's; the ratio bands and risk scores are
+    authored calibration, not quoted from it. Returns risk class key and
+    metadata dict from DB.
     """
     if length_m is None or diameter_m is None or diameter_m <= 0:
         return "DL5_UNKNOWN", DEAD_LEG_CLASSES.get("DL5_UNKNOWN", {"risk": 0.5})
@@ -187,6 +209,20 @@ MITIGATIONS = {
 }
 if _MC_CATALOG.get("mitigations"):
     MITIGATIONS.update(_MC_CATALOG["mitigations"])
+
+
+def catalog_source() -> dict[str, str]:
+    """Return where the MC-001 tables this process holds were built from.
+
+    Read at call time rather than import time, so it follows
+    :func:`reload_rules`. The values are those recorded by
+    ``corrosion_rule_catalog._catalog_source``: ``catalog_source`` is one of
+    ``database_rows``, ``stored_payload`` or ``in_memory_fallback``.
+    """
+    return {
+        "catalog_source": str(_MC_CATALOG.get("catalog_source", "")),
+        "catalog_payload_source": str(_MC_CATALOG.get("catalog_payload_source", "")),
+    }
 
 
 def reload_rules() -> None:
@@ -517,7 +553,8 @@ Relevant standards:
   CIBSE TM13:2013 — Minimising Risk from Legionella
   HSE HSG274 Parts 1–3 — Legionella Control
   BS 8552:2012 — Sampling and Monitoring of Water Systems
-  ASTM G-187 — MIC Assessment Standard Practice"""
+  AMPP (formerly NACE) industry practice — MIC mechanism only
+  MC-001 thresholds are authored calibration, not values quoted from any standard above"""
     return BCFIssue(
         guid=str(uuid.uuid4()).upper(),
         title=f"MC-001 MIC Risk — {result.risk_band} — {result.element_type} [{result.global_id[:8]}]",

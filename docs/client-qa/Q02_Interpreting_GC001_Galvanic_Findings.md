@@ -60,7 +60,7 @@ A representative Critical finding, and what each part is telling you:
 | voltage gap | ~0.50 V | Large driving force — a specification problem |
 | area ratio | small anode / large cathode | Concentrated attack — accelerates it |
 | environment | `T3_chloride` or worse | Conductive, persistently wet |
-| `citations` | NASA-STD-6012 + clause | The threshold's source, auditable |
+| `citations` | NASA-STD-6012 + clause | The standard governing the mechanism — the threshold itself is authored calibration, not quoted from it |
 | `mitigation` | `MIT-GC-001` | Dielectric isolation at every contact point |
 
 A `GC-001.DATA` finding is a different animal. It is not a verdict — it means an
@@ -98,8 +98,8 @@ practically every refurbishment that ties new work into an existing system.
 
 Per finding: the composite score and band, the three contributing terms in the
 finding metadata, the resolved material names on both sides of the couple, the
-environment class applied, the standard and clause behind the threshold, and the
-catalogued mitigation. Aggregate `issue_stats` give totals per band plus a
+environment class applied, the standard governing the mechanism (the threshold
+itself is authored calibration, not quoted from it), and the catalogued mitigation. Aggregate `issue_stats` give totals per band plus a
 separate `data_quality` count, which is deliberately kept out of the band totals
 so an unassessed element is never mistaken for a Low-risk one.
 

@@ -160,6 +160,30 @@ try:
 except ImportError:
     pass
 
+# Same idea for app.api.documents's document-grant checks (get, update, delete,
+# file download, asset streaming, extraction, doclang export).
+try:
+    from app.api.documents import (  # noqa: E402
+        DocumentAccessChecker,
+        get_document_access_checker,
+        get_document_access_checker_flexible,
+    )
+
+    class _PermissiveDocumentAccessChecker(DocumentAccessChecker):
+        def __init__(self) -> None:  # noqa: D107
+            pass
+
+        def __call__(self, document_id, *, for_mutation: bool = False) -> None:  # noqa: ANN001
+            return None
+
+    def _override_get_document_access_checker() -> DocumentAccessChecker:
+        return _PermissiveDocumentAccessChecker()
+
+    app.dependency_overrides[get_document_access_checker] = _override_get_document_access_checker
+    app.dependency_overrides[get_document_access_checker_flexible] = _override_get_document_access_checker
+except ImportError:
+    pass
+
 # Membership auto-provisioning lands a first-time signer as a plain 'member',
 # which the group-based RBAC layer (MembershipService.member_can_access_project)
 # now restricts to nothing without a group grant. Tests need TEST_USER to act

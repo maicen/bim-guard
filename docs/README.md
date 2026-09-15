@@ -29,6 +29,7 @@ domain (Piping, Seismic, Architecture, Workflow).
 ## Operational Guides
 
 - `../frontend/README.md`
+- `deployment_orbstack_cloudflare.md` — OrbStack Docker + Cloudflare Tunnel deployment guide
 - `NotebookLM/README.md`
 - `NotebookLM/setup_guide.md`
 - `NotebookLM/sources.md`

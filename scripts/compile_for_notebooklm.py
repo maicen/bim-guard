@@ -97,6 +97,10 @@ EXCLUDED_PATH_PATTERNS: list[str] = [
     "docs/validation/final-godmode-audit-*",
     "docs/validation/final-verification-*",
     "docs/validation/seismic-and-coverage-*",
+    # A dated submission that lists ASTM G-187 among the corrosion engines'
+    # standards, recorded before that citation was found suspect. Kept as
+    # submitted; not fed to a notebook for the same reason as the records above.
+    "docs/submissions/BIMGuard_3rd_Submission_REVISED.md",
 ]
 
 #: Maps a file suffix onto the language hint used for the Markdown fence.

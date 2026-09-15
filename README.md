@@ -27,8 +27,8 @@ OpenBIM standards (IFC, BCF, IDS) with large language models. Its compliance
 engines and data ingestion pipeline evaluate structural and material integrity
 against international building codes through two primary modules:
 
-*   **GC-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing standards (e.g., FEMA E-74, ASCE 7-22).
-*   **CC-001 (Piping & Corrosion):** Evaluates material degradation, galvanic mismatch, and environmental exposure against atmospheric standards (e.g., ISO 9223, MBIE B2).
+*   **SB-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing guidance (FEMA E-74, and ASCE/SEI 7-10 §13.6 as cited by it). Its dimensional thresholds are BIMGUARD screening calibration except where marked sourced, not code values (`data/rulesets/sb001_seismic_clearance.json`).
+*   **GC-001, CC-001, MC-001, MM-001, XM-001 (Piping & Corrosion):** Evaluate galvanic, crevice, microbiological, material-media and cross-material corrosion risk, citing the standards that govern each mechanism (e.g., NASA-STD-6012, EN ISO 15329, HSE HSG274). The thresholds are a calibration authored for each ruleset, not values quoted from those standards (`docs/planning/corrosion_provenance_2026-09-13.md`).
 
 ## The Agentic RAG Methodology
 

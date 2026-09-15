@@ -169,7 +169,7 @@ def build():
         [["rule_id", "AR-001 … AR-006", "Identifies the rule that fired"],
          ["element_id", "IFC GlobalId of the failing element", "Anchors the finding to the model"],
          ["band", "Critical / High / Medium / Low", "Triage order for the reviewer"],
-         ["citations", "Standard and clause that set the threshold", "Makes the finding arguable on evidence"],
+         ["citations", "Standard and clause governing the requirement", "Makes the finding arguable on evidence"],
          ["metadata", "Measured value against required value", "Shows the margin, not just the verdict"],
          ["mechanism", "fire_rating, egress, accessibility …", "Keeps distinct failures separately actionable"]],
         widths=[1.7, 4.0, 3.8], row_h=0.30)

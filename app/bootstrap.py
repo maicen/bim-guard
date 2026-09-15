@@ -529,12 +529,18 @@ def build_default_container() -> ApplicationContainer:
     # Seed default repo if database is empty
     try:
         if not github_repo_service.list_repos():
-            github_repo_service.create_repo(
-                url="https://github.com/maicen/bimguard-test-models",
-                name="bimguard-test-models",
-                branch="main",
-                description="Official BIM-Guard test models repository containing architectural, structural, HVAC, electrical, and plumbing IFC models.",
+            default_org = next(
+                iter(organizations_repo.rows_where("slug = ?", ["default"], limit=1)),
+                None,
             )
+            if default_org is not None:
+                github_repo_service.create_repo(
+                    url="https://github.com/maicen/bimguard-test-models",
+                    organization_id=default_org["id"],
+                    name="bimguard-test-models",
+                    branch="main",
+                    description="Official BIM-Guard test models repository containing architectural, structural, HVAC, electrical, and plumbing IFC models.",
+                )
     except Exception:
         logger.warning("Could not seed default GitHub repository; continuing startup", exc_info=True)
 
@@ -636,6 +642,7 @@ def build_default_container() -> ApplicationContainer:
         rules_service=rules_service,
         documents_service=documents_service,
         engine_registry=registry,
+        ruleset_access_service=ruleset_access_service,
     )
 
     digital_inspector_service = DigitalInspectorService()

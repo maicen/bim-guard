@@ -997,6 +997,7 @@ export interface GitHubRepo extends Timestamps {
   branch: string;
   description: string;
   is_active: boolean;
+  organization_id: number;
 }
 
 export interface GitHubRepoItem {
