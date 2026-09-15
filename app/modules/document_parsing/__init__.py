@@ -5,27 +5,15 @@ Public interface for Module 1 — PDF → structured text pipeline.
 Exports
 -------
 DocumentReader
-    Thin wrapper around LightExtractor's pypdf reader. Used as a fallback
-    in the web pipeline and for plain text / markdown uploads.
+    Normalizes and chunks already-extracted document text into
+    size-bounded sections for downstream rule extraction.
 """
 
 import re
 
 
 class DocumentReader:
-    """
-    Basic PDF reader (pypdf, via LightExtractor).
-    Used as the light fallback when the Unstructured hosted API is
-    unavailable, unconfigured, or fails.
-    """
-
-    def parse_pdf(self, file_content: bytes) -> str:
-        """Parse PDF document bytes and return extracted text."""
-        if not file_content:
-            return ""
-        from app.modules.document_parsing.light_extractor import LightExtractor
-
-        return LightExtractor().extract("document.pdf", file_content)
+    """Normalizes raw extracted text into size-bounded chunks."""
 
     def extract_text_sections(self, raw_text: str) -> list[str]:
         """Extract normalized, size-bounded text chunks from parsed document text."""

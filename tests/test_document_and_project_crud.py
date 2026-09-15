@@ -144,15 +144,50 @@ def _one_page_pdf_bytes(text: str) -> bytes:
     return buffer.getvalue()
 
 
+class _StubParsingEngine:
+    """Deterministic stand-in for a real ParsingEngine, so this test never talks to Docling."""
+
+    def __init__(self, text: str):
+        self._text = text
+
+    def extract_bytes(self, content: bytes, filename: str, return_doclang: bool = False):
+        pages = [{"page_number": 1, "text": self._text}]
+        if return_doclang:
+            return self._text, [], pages, f"<doclang><p>{self._text}</p></doclang>", []
+        return self._text, [], pages
+
+
+class _StubParsingEngineDriver:
+    """Minimal ParsingEngineDriver registered only for this test's duration."""
+
+    kind = "test-stub"
+    family = "test-stub"
+    display_name = "Test Stub"
+
+    def __init__(self, text: str):
+        self._text = text
+
+    def build(self, *, api_key: str, api_url: str, strategy: str, name: str):
+        return _StubParsingEngine(self._text)
+
+    def test_connection(self, *, api_key: str, api_url: str):
+        from app.modules.document_parsing.engines.base import EngineConnectionResult
+
+        return EngineConnectionResult(ok=True, detail="stub")
+
+
 def test_upload_stores_pages_and_serves_original_file(client: TestClient) -> None:
     """Uploading a PDF persists page-tagged text and GET /api/documents/{id}/file streams the original bytes."""
+    from app.modules.document_parsing.engines import ParsingEngineRegistry
+
     doc_service = DocumentService()
     pages_service = DocumentPagesService()
     snippet = "Rule test snippet for page lookup"
     pdf_bytes = _one_page_pdf_bytes(snippet)
 
+    ParsingEngineRegistry.register(_StubParsingEngineDriver(snippet))
     row, created = doc_service.ingest_uploaded_bytes(
-        "test_pages.pdf", pdf_bytes, parser="light"
+        "test_pages.pdf", pdf_bytes, instance={"kind": "test-stub", "name": "stub"}
     )
     assert created is True
     doc_id = row["id"]

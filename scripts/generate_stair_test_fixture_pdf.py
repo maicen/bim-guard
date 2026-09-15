@@ -1,9 +1,8 @@
 """Generate the Module 1 stair-code test fixture PDF.
 
-app/modules/tests/test_document_parsing.py (TestUnstructuredExtractor) and the
-Module 1 setup docs (app/modules/tests/TEST_README.md) expect a real,
+The Module 1 setup docs (app/modules/tests/TEST_README.md) expect a real,
 structured code-style PDF at app/modules/tests/fixtures/sample_obc_stairs.pdf
-so the PDF-extraction tests can exercise SectionChunker's dotted-decimal
+so PDF-extraction tests can exercise SectionChunker's dotted-decimal
 heading detection, table extraction, and the keyword_master term list against
 real stair/landing/guard/handrail clauses instead of being skipped.
 

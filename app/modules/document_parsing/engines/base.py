@@ -3,12 +3,12 @@
 Adding a new document-parsing engine — a new backend, or a new deployment
 mode of an existing backend (local vs. hosted) — means writing one
 `ParsingEngineDriver` subclass and registering it with `ParsingEngineRegistry`
-(see engines/unstructured_driver.py and engines/docling_driver.py for the
-pattern). Nothing else needs editing: document_extractor.py, the parsing
-engines API router, and ParsingEngineInstancesService all depend on this
-module's `ParsingEngine` protocol and `ParsingEngineRegistry`, never on a
-concrete extractor class or a hardcoded kind string — Dependency Inversion
-and Open/Closed in the same move.
+(see engines/docling_driver.py for the pattern). Nothing else needs editing:
+document_extractor.py, the parsing engines API router, and
+ParsingEngineInstancesService all depend on this module's `ParsingEngine`
+protocol and `ParsingEngineRegistry`, never on a concrete extractor class or
+a hardcoded kind string — Dependency Inversion and Open/Closed in the same
+move.
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ class ParsingEngine(Protocol):
     """What document_extractor.py needs from any structured-extraction engine.
 
     Deliberately minimal (Interface Segregation) — an engine's own richer
-    API (e.g. UnstructuredExtractor.extract for on-disk files) lives on the
-    concrete class; callers that only extract from in-memory bytes never
-    need to know it exists.
+    API (e.g. DoclingExtractor's on-disk helpers) lives on the concrete
+    class; callers that only extract from in-memory bytes never need to
+    know it exists.
     """
 
     def extract_bytes(self, content: bytes, filename: str) -> tuple[str, list[dict], list[dict]]: ...

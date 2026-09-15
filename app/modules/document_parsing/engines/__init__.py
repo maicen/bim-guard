@@ -9,10 +9,7 @@ module here. No other file needs to change.
 
 # Imported for their registration side effect (ParsingEngineRegistry.register
 # at module scope) — the imports themselves are otherwise unused here.
-from app.modules.document_parsing.engines import (  # noqa: F401
-    docling_driver,
-    unstructured_driver,
-)
+from app.modules.document_parsing.engines import docling_driver  # noqa: F401
 from app.modules.document_parsing.engines.base import (
     EngineConnectionResult,
     ParsingEngine,

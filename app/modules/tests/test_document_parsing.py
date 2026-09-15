@@ -1,14 +1,9 @@
 """
 tests/test_document_parsing.py
 ----------------------
-Unit tests for Module 1 — SectionChunker, UnstructuredExtractor (PDF parsing),
-and regression snapshots.
+Unit tests for Module 1 — SectionChunker and regression snapshots.
 
 Run with: pytest tests/test_document_parsing.py -v
-
-SETUP:
-  Place 1-3 real building-code PDF pages in tests/fixtures/
-  e.g.  tests/fixtures/sample_code_stairs.pdf
 """
 
 import json
@@ -19,7 +14,6 @@ from document_parsing.keywords.keyword_master import ALL_KEYWORDS, BIGRAM_PHRASE
 from document_parsing.section_chunker import SectionChunker
 
 TEST_DB = "tests/test_rules_m1.db"
-FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), "snapshots")
 
 
@@ -149,79 +143,6 @@ def test_chunker_char_count_field(chunker):
     for c in chunks:
         if "char_count" in c:
             assert c["char_count"] == len(c["text"]), "char_count doesn't match actual text length"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# UnstructuredExtractor tests (PDF parsing — the critical gap)
-# ═══════════════════════════════════════════════════════════════════════════════
-#
-# These require real PDFs in tests/fixtures/ AND a configured
-# UNSTRUCTURED_API_KEY.  Mark them so they only run when both are present
-# (won't break CI if PDFs aren't committed or no key is configured).
-
-
-def _skip_if_missing_pdf(name):
-    path = os.path.join(FIXTURES_DIR, name)
-    return pytest.mark.skipif(not os.path.exists(path), reason=f"Fixture not found: {name}")
-
-
-# ── Adjust the PDF name below to match your actual fixture file ──
-SAMPLE_PDF = "sample_obc_stairs.pdf"
-SAMPLE_PDF_PATH = os.path.join(FIXTURES_DIR, SAMPLE_PDF)
-
-
-@pytest.fixture
-def unstructured_extractor():
-    """Import lazily — requires unstructured-client and UNSTRUCTURED_API_KEY."""
-    try:
-        from document_parsing.unstructured_extractor import UnstructuredExtractor
-
-        return UnstructuredExtractor()
-    except (ImportError, RuntimeError) as exc:
-        pytest.skip(f"UnstructuredExtractor not available: {exc}")
-
-
-@pytest.mark.slow
-class TestUnstructuredExtractor:
-    """
-    Tests that run against real PDFs via the Unstructured hosted API.
-    Run with:  pytest tests/test_document_parsing.py -m slow -v
-    Skip with: pytest tests/test_document_parsing.py -m "not slow"
-    """
-
-    @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_returns_text(self, unstructured_extractor):
-        """PDF extraction must return non-empty text."""
-        text, _tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
-        assert len(text) > 100, "Extracted text is suspiciously short"
-
-    @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_contains_expected_terms(self, unstructured_extractor):
-        """
-        Extracted text should contain known terms from the fixture PDF.
-        ── CUSTOMIZE these expected terms for your actual fixture PDF ──
-        """
-        text, _tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
-        text_lower = text.lower()
-
-        expected_terms = ["stair", "shall", "mm"]  # adjust to your PDF
-        for term in expected_terms:
-            assert term in text_lower, f"Expected term '{term}' not found in extracted text"
-
-    @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_finds_tables(self, unstructured_extractor):
-        """If the PDF has tables, extraction should return table data."""
-        _text, tables = unstructured_extractor.extract(SAMPLE_PDF_PATH)
-        # This is a soft check — skip if your fixture has no tables
-        if tables:
-            assert len(tables) >= 1
-            assert tables[0].get("row_count", 0) > 0
-
-    @_skip_if_missing_pdf(SAMPLE_PDF)
-    def test_extraction_handles_corrupt_pdf(self, unstructured_extractor):
-        """Corrupt or missing files should raise cleanly, not crash."""
-        with pytest.raises(Exception):
-            unstructured_extractor.extract("/tmp/does_not_exist.pdf")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

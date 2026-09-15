@@ -408,7 +408,7 @@ Owner: unassigned.
 
 - [x] Integrate LlamaIndex as the primary ingestion engine for BEP PDFs, ISO 19650
       guidelines, and regulatory codes (e.g., DIN 4149, NZ Seismic). Layered on top
-      of the existing `UnstructuredExtractor`/`LightExtractor`, gated behind
+      of the existing Docling-based extraction pipeline, gated behind
       `BIM_GUARD_USE_LLAMAINDEX_INGESTION`.
 - [x] Implement table- and layout-aware document chunking to prevent fragmentation
       of complex engineering tables, schedules, and nested matrices

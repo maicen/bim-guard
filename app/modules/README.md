@@ -16,15 +16,13 @@ app/modules/
 ├── document_parsing/           # Document → structured text/nodes (Module 1)
 │   ├── docling_extractor.py       — Docling-backed PDF/table extraction
 │   ├── document_extractor.py      — generic document text extraction
-│   ├── unstructured_extractor.py  — Unstructured.io-backed extraction
-│   ├── light_extractor.py         — lightweight pypdf-only fallback
 │   ├── section_chunker.py         — splits extracted text into clause-scoped sections
 │   ├── iso_validator.py           — ISO 19650 document/container validation helpers
 │   ├── llamaindex_ingestor.py      — LlamaIndex ingestion (table/layout-aware chunking,
 │   │                                 clause metadata), gated by
 │   │                                 BIM_GUARD_USE_LLAMAINDEX_INGESTION
 │   ├── llamaindex_program.py      — deontic statement extraction (shall/must/should)
-│   ├── engines/                   — Docling/Unstructured driver adapters
+│   ├── engines/                   — parsing-engine driver adapters (Docling today)
 │   └── keywords/                  — keyword reference data used by extraction heuristics
 ├── rule_builder/                # Structured text → compliance rules (Module 3)
 │   ├── llamaindex_rule_generator.py — the live LLM rule-extraction engine: a typed

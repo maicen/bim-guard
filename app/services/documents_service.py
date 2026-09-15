@@ -508,7 +508,7 @@ class DocumentService:
         """Return this document's per-element bbox records, keyed by DocLang-injected ids.
 
         Filters out any record missing `element_id` -- documents parsed by a
-        non-Docling engine (Unstructured, light extractor) never got ids
+        a pre-Docling engine never got ids
         injected into their DocLang XML, so their raw bbox records (if any)
         can't be matched to a rendered element client-side and are dropped
         rather than surfaced with a dangling/absent id.

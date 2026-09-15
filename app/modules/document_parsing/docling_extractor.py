@@ -1,4 +1,4 @@
-"""Document extraction via a Docling service, an alternative to Unstructured.
+"""Document extraction via a Docling service.
 
 Two kinds, both speaking the same protocol:
 
@@ -78,13 +78,13 @@ class DoclingExtractor:
         if not resolved_url:
             raise RuntimeError(
                 "No Docling service URL configured. Configure a Docling "
-                "instance in Settings, or use LightExtractor."
+                "instance in Settings."
             )
         if self.kind == KIND_DOCLING_HOSTED and not resolved_key:
             raise RuntimeError(
                 "DOCLING_API_KEY is not set. Get a key from your Docling "
                 "Serve deployment (https://developer.dcls.saas.ibm.com) and "
-                "configure it in Settings, or use LightExtractor."
+                "configure it in Settings."
             )
 
         try:
@@ -108,7 +108,7 @@ class DoclingExtractor:
             file_path (str | Path): path to the document
             filename  (str | None): unused for on-disk paths (Docling reads
                                      the file's own name); kept for parity
-                                     with UnstructuredExtractor's signature
+                                     with the ParsingEngine protocol's shape
             return_doclang (bool):  when True, returns (text, tables, pages, doclang_xml, bboxes)
 
         Returns:

@@ -3,8 +3,8 @@
 Also does typed deontic ("shall"/"must"/"should"/"may") entity extraction.
 
 This module does NOT reimplement PDF/table parsing. It layers on top of
-the existing ``document_extractor.extract_document_text()`` (Unstructured
-Workflow/Jobs API, falling back to LightExtractor) and the existing
+the existing ``document_extractor.extract_document_text()`` (the configured
+Docling parsing engine) and the existing
 ``SectionChunker`` heading detector, then wraps each detected section as a
 LlamaIndex node carrying clause metadata (clause id, page number, parent
 section, section path).

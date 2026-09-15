@@ -470,9 +470,9 @@ async def upload_document(
 
     clean_parser = (parser or "auto").strip().lower()
     try:
-        # The Unstructured path runs an async job under the hood (several to
-        # tens of seconds) — offload to a worker thread so it doesn't block
-        # the event loop for every other in-flight request.
+        # Docling extraction can take a few seconds — offload to a worker
+        # thread so it doesn't block the event loop for every other
+        # in-flight request.
         row, _created = await run_in_threadpool(
             service.ingest_uploaded_bytes,
             clean_filename,

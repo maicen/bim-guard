@@ -1,9 +1,9 @@
 """Slice a PDF down to a page range before it reaches any extraction engine.
 
 Trimming happens once, up front, on the raw upload bytes -- the resulting
-(smaller) PDF is what gets stored, viewed, and handed to whichever parser
-(Docling, Unstructured, or the light pypdf-only path) the caller selected, so
-none of those extraction paths need their own page-range support.
+(smaller) PDF is what gets stored, viewed, and handed to whichever parsing
+engine instance the caller selected, so extraction paths never need their
+own page-range support.
 """
 
 from __future__ import annotations

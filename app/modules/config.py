@@ -52,36 +52,22 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SECONDS = 1.0
 RETRY_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff: 1s, 2s, 4s
 
-# ── Document parsing (Unstructured Workflow/Jobs API) ─────────────────────────
-# Primary document-text extraction engine (async job per document, several to
-# tens of seconds). When UNSTRUCTURED_API_KEY is unset, the pipeline falls
-# back to LightExtractor (pypdf/python-docx/openpyxl/csv — no upload, no ML
-# models, effectively instant). See document_parsing/document_extractor.py.
-UNSTRUCTURED_API_KEY = os.environ.get("UNSTRUCTURED_API_KEY", "")
-UNSTRUCTURED_API_URL = os.environ.get("UNSTRUCTURED_API_URL", "")
-UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
-# Base URL of a self-hosted / local open-source unstructured-api container
-# (see docker-compose.yml's `unstructured-api` service, profile "unstructured").
-# Used only to seed the `parsing_engine_instances` registry on first boot —
-# once instances exist in the database, they are the source of truth and
-# these env vars are no longer read. e.g. http://localhost:8001 for a host
-# process talking to the container's published port, or
-# http://unstructured-api:8000 for the bim-guard app container talking to it
-# over the compose network.
-UNSTRUCTURED_LOCAL_URL = os.environ.get("UNSTRUCTURED_LOCAL_URL", "")
-
-# Hosted Docling Serve instance (https://developer.dcls.saas.ibm.com). A
-# second parsing-engine option alongside Unstructured — used only to seed
-# the `parsing_engine_instances` registry's "docling-hosted" row on first
-# boot; the registry is the source of truth afterwards.
+# ── Document parsing (Docling) ─────────────────────────────────────────────
+# Docling is the only document-text extraction engine. There is no
+# dependency-light fallback: uploads fail loudly when no parsing engine
+# instance is configured. See document_parsing/document_extractor.py.
+#
+# Hosted Docling Serve instance (https://developer.dcls.saas.ibm.com) — used
+# only to seed the `parsing_engine_instances` registry's "docling-hosted" row
+# on first boot; the registry is the source of truth afterwards.
 DOCLING_SERVICE_URL = os.environ.get("DOCLING_SERVICE_URL", "")
 DOCLING_API_KEY = os.environ.get("DOCLING_API_KEY", "")
 
 # Base URL of a self-hosted docling-serve container (see docker-compose.yml's
-# `docling-serve` service, profile "docling"). Same seed-only role as
-# UNSTRUCTURED_LOCAL_URL — e.g. http://localhost:5001 for a host process
-# talking to the container's published port, or http://docling-serve:5001
-# for the bim-guard app container talking to it over the compose network.
+# `docling-serve` service). Same seed-only role as the vars above — e.g.
+# http://localhost:5001 for a host process talking to the container's
+# published port, or http://docling-serve:5001 for the bim-guard app
+# container talking to it over the compose network.
 DOCLING_LOCAL_URL = os.environ.get("DOCLING_LOCAL_URL", "")
 
 # ── Google Drive import ────────────────────────────────────────────────────

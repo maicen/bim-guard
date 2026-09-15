@@ -50,10 +50,6 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     # ── Document parsing ─────────────────────────────────────────────────────
     # Seed-only: parsing_engine_instances DB rows are the source of truth once
     # they exist -- see app/modules/config.py's own comments on these.
-    EnvVarSpec("UNSTRUCTURED_API_KEY", "Document Parsing", "Seeds the hosted Unstructured parsing_engine_instances row on first boot."),
-    EnvVarSpec("UNSTRUCTURED_API_URL", "Document Parsing", "Seeds the hosted Unstructured parsing_engine_instances row on first boot."),
-    EnvVarSpec("UNSTRUCTURED_STRATEGY", "Document Parsing", "Default Unstructured parsing strategy."),
-    EnvVarSpec("UNSTRUCTURED_LOCAL_URL", "Document Parsing", "Seeds a self-hosted Unstructured parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_SERVICE_URL", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_API_KEY", "Document Parsing", "Seeds the hosted Docling parsing_engine_instances row on first boot."),
     EnvVarSpec("DOCLING_LOCAL_URL", "Document Parsing", "Seeds a self-hosted Docling parsing_engine_instances row on first boot."),

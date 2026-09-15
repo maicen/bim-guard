@@ -21,10 +21,6 @@ from app.modules.document_parsing.engines.docling_driver import (
     DoclingHostedDriver,
     DoclingLocalDriver,
 )
-from app.modules.document_parsing.engines.unstructured_driver import (
-    UnstructuredHostedDriver,
-    UnstructuredLocalDriver,
-)
 from app.modules.orchestrator import BIMGuard_App
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.db_adapters import DatabaseAdapter
@@ -562,11 +558,9 @@ def build_default_container() -> ApplicationContainer:
     )
 
     # Seed the registry from legacy env vars on first boot, so existing
-    # UNSTRUCTURED_API_KEY / UNSTRUCTURED_LOCAL_URL / DOCLING_* deployments
-    # keep working without manual setup. Each named instance is seeded
-    # independently (checked by name, not "table is empty") so a later env
-    # var — e.g. DOCLING_API_KEY added after the Unstructured instances were
-    # already seeded on a prior boot — still gets picked up. Once seeded, an
+    # DOCLING_* deployments keep working without manual setup. Each named
+    # instance is seeded independently (checked by name, not "table is
+    # empty") so a later env var still gets picked up. Once seeded, an
     # instance's fields are the database's to own; these env vars are only
     # ever consulted to create a missing row, never to update an existing one.
     try:
@@ -574,10 +568,6 @@ def build_default_container() -> ApplicationContainer:
             DOCLING_API_KEY,
             DOCLING_LOCAL_URL,
             DOCLING_SERVICE_URL,
-            UNSTRUCTURED_API_KEY,
-            UNSTRUCTURED_API_URL,
-            UNSTRUCTURED_LOCAL_URL,
-            UNSTRUCTURED_STRATEGY,
         )
 
         has_default = any(
@@ -593,23 +583,6 @@ def build_default_container() -> ApplicationContainer:
             )
             has_default = True
 
-        if UNSTRUCTURED_LOCAL_URL:
-            _seed_if_missing(
-                "local",
-                kind=UnstructuredLocalDriver.kind,
-                api_url=UNSTRUCTURED_LOCAL_URL,
-                strategy=UNSTRUCTURED_STRATEGY,
-                notes="Self-hosted Unstructured Docker container (seeded from UNSTRUCTURED_LOCAL_URL).",
-            )
-        if UNSTRUCTURED_API_KEY:
-            _seed_if_missing(
-                "hosted-default",
-                kind=UnstructuredHostedDriver.kind,
-                api_url=UNSTRUCTURED_API_URL or "https://api.unstructuredapp.io",
-                api_key=UNSTRUCTURED_API_KEY,
-                strategy=UNSTRUCTURED_STRATEGY,
-                notes="Unstructured Platform API (seeded from UNSTRUCTURED_API_KEY).",
-            )
         if DOCLING_SERVICE_URL and DOCLING_API_KEY:
             _seed_if_missing(
                 "docling-hosted",
