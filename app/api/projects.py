@@ -23,6 +23,7 @@ from app.api.dependencies import (
     get_document_access_service,
     get_membership_service,
     get_models_service,
+    get_permission_service,
     get_profile_service,
     get_projects_service,
     get_ruleset_access_service,
@@ -63,9 +64,11 @@ from app.modules.contracts import (
     ProjectUpdateRequest,
     StandardOption,
 )
+from app.modules.permissions import Action
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
+from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
@@ -913,23 +916,6 @@ def validate_project_iso_naming(
 # ---------------------------------------------------------------------------
 
 
-def _require_project_admin(
-    project: dict,
-    current_user: CurrentUser,
-    memberships: MembershipService,
-    profiles: ProfileService,
-) -> None:
-    """Raise 403 unless the caller is an owner/admin of the project's organization."""
-    if profiles.is_superadmin(current_user.id):
-        return
-    role = memberships.role_for_user(project["organization_id"], current_user.id)
-    if role not in ("owner", "admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an organization owner or admin can change a project's rule assignments.",
-        )
-
-
 @router.get(
     "/{project_id}/ruleset-bindings",
     response_model=ProjectRulesetBindingsResponse,
@@ -964,8 +950,7 @@ def set_project_ruleset_bindings(
     payload: ProjectRulesetBindingsUpdateRequest,
     project: Annotated[dict, Depends(get_authorized_project)],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
 ) -> ProjectRulesetBindingsResponse:
     """Replace the project's bound rulesets.
@@ -974,7 +959,7 @@ def set_project_ruleset_bindings(
     ruleset must already be granted to the project's organization -- a
     project can only bind what its organization was itself granted.
     """
-    _require_project_admin(project, current_user, memberships, profiles)
+    permissions.require(project["organization_id"], current_user, Action.MANAGE_PROJECT_BINDINGS)
     try:
         ruleset_access.set_project_bindings(
             project_id, payload.ruleset_ids, organization_id=project["organization_id"]
@@ -1021,8 +1006,7 @@ def set_project_document_bindings(
     payload: ProjectDocumentBindingsUpdateRequest,
     project: Annotated[dict, Depends(get_authorized_project)],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
 ) -> ProjectDocumentBindingsResponse:
     """Replace the project's bound documents.
@@ -1030,7 +1014,7 @@ def set_project_document_bindings(
     Only an org owner/admin (or superadmin) may do this. Every requested
     document must already be granted to the project's organization.
     """
-    _require_project_admin(project, current_user, memberships, profiles)
+    permissions.require(project["organization_id"], current_user, Action.MANAGE_PROJECT_BINDINGS)
     try:
         document_access.set_project_bindings(
             project_id, payload.document_ids, organization_id=project["organization_id"]

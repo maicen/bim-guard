@@ -62,6 +62,9 @@ from app.api import (
     parsing_engines as api_parsing_engines,
 )
 from app.api import (
+    permissions as api_permissions,
+)
+from app.api import (
     projects as api_projects,
 )
 from app.api import (
@@ -368,6 +371,11 @@ app.include_router(
     api_parsing_engines.router,
     prefix="/api/parsing-engines",
     tags=["Parsing Engines"],
+)
+app.include_router(
+    api_permissions.router,
+    prefix="/api/permissions",
+    tags=["Permissions"],
 )
 app.include_router(
     api_llm_provider_instances.router,

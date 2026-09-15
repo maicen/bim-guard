@@ -1776,6 +1776,41 @@ class ParsingEngineKindResponse(BaseModel):
 
 
 # ==============================================================================
+# Role Permission Matrix Contracts (see app/modules/permissions, app/services/permission_service.py)
+# ==============================================================================
+
+
+class PermissionActionResponse(BaseModel):
+    """One role-gated action from app.modules.permissions.Action."""
+
+    action: str
+    description: str = ""
+
+
+class RolePermissionResponse(BaseModel):
+    """The effective minimum role for one action in one scope.
+
+    `is_override` is True when this reflects an org-specific row rather than
+    the platform default falling through unmodified.
+    """
+
+    action: str
+    min_role: str
+    is_override: bool = False
+
+
+class RolePermissionSetRequest(BaseModel):
+    """Payload for setting an action's minimum role in a scope.
+
+    `organization_id` omitted (or null) targets the platform default;
+    otherwise it targets that organization's override.
+    """
+
+    organization_id: Optional[int] = Field(None, description="Target organization, or null for the platform default")
+    min_role: str = Field(..., description="'owner', 'admin', or 'member'")
+
+
+# ==============================================================================
 # LLM Provider Instance Contracts (org-scoped — see app/modules/llm_providers)
 # ==============================================================================
 

@@ -18,9 +18,10 @@ from app.api.dependencies import (
     get_llm_provider_instances_service,
     get_llm_task_assignment_service,
     get_membership_service,
+    get_permission_service,
     get_profile_service,
 )
-from app.api.organizations import _require_membership, _require_org_admin
+from app.api.organizations import _require_membership
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -36,9 +37,11 @@ from app.modules.contracts import (
     LLMTaskResponse,
 )
 from app.modules.llm_providers import LLMProviderRegistry
+from app.modules.permissions import Action
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
+from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 
 logger = get_logger(__name__)
@@ -128,12 +131,11 @@ def create_instance(
     organization_id: int,
     payload: LLMProviderInstanceCreateRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
 ) -> LLMProviderInstanceResponse:
     """Register a new LLM provider instance of any registered kind for this organization."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     try:
         created = service.create_instance(
             organization_id,
@@ -159,12 +161,11 @@ async def test_candidate_connection(
     organization_id: int,
     payload: LLMProviderTestConnectionRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
 ) -> LLMProviderInstanceTestResponse:
     """Check connectivity and credentials before registering an LLM provider instance."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     try:
         result = await service.test_connection(
             kind=payload.kind,
@@ -259,13 +260,12 @@ def set_task_assignments(
     task_key: str,
     payload: LLMTaskAssignmentSetRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     instances_service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
     assignments_service: Annotated[LLMTaskAssignmentService, Depends(get_llm_task_assignment_service)],
 ) -> list[LLMTaskModelAssignmentResponse]:
     """Replace the whole shortlist for (organization_id, task_key) in one call."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     try:
         created = assignments_service.set_assignments(
             organization_id,
@@ -313,12 +313,11 @@ def update_instance(
     instance_id: int,
     payload: LLMProviderInstanceUpdateRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
 ) -> LLMProviderInstanceResponse:
     """Update metadata for an existing configured LLM provider instance."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     try:
         updated = service.update_instance(
             organization_id,
@@ -349,12 +348,11 @@ def delete_instance(
     organization_id: int,
     instance_id: int,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
 ) -> None:
     """Delete a configured LLM provider instance by ID."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     if not service.get_instance(organization_id, instance_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -372,8 +370,7 @@ async def test_instance(
     organization_id: int,
     instance_id: int,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    memberships: Annotated[MembershipService, Depends(get_membership_service)],
-    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
     service: Annotated[LLMProviderInstancesService, Depends(get_llm_provider_instances_service)],
 ) -> LLMProviderInstanceTestResponse:
     """Ping a configured instance to confirm it is reachable and authorized.
@@ -381,7 +378,7 @@ async def test_instance(
     Delegates to the instance's driver (LLMProviderRegistry.get(kind)
     .test_connection(...)) — this endpoint has no per-kind branching itself.
     """
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_LLM_PROVIDERS)
     try:
         result = await service.test_instance(organization_id, instance_id)
         return LLMProviderInstanceTestResponse(ok=result.ok, detail=result.detail)

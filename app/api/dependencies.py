@@ -22,6 +22,7 @@ from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
+from app.services.permission_service import PermissionService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
@@ -121,6 +122,11 @@ def get_membership_service() -> MembershipService:
 def get_profile_service() -> ProfileService:
     """Return the configured ProfileService instance."""
     return get_container().profile_service
+
+
+def get_permission_service() -> PermissionService:
+    """Return the configured PermissionService instance."""
+    return get_container().permission_service
 
 
 def get_llm_provider_instances_service() -> LLMProviderInstancesService:

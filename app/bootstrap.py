@@ -45,6 +45,7 @@ from app.services.naming_config_service import (
 from app.services.neo4j_provider import Neo4jDatabaseProvider
 from app.services.object_storage import ObjectStorage
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
+from app.services.permission_service import PermissionService
 from app.services.persistence import PersistenceService
 from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
@@ -91,6 +92,7 @@ class ApplicationContainer:
     organizations_repo: DatabaseAdapter
     memberships_repo: DatabaseAdapter
     organization_invites_repo: DatabaseAdapter
+    role_permissions_repo: DatabaseAdapter
     groups_repo: DatabaseAdapter
     group_project_grants_repo: DatabaseAdapter
     organization_ruleset_grants_repo: DatabaseAdapter
@@ -113,6 +115,7 @@ class ApplicationContainer:
     llm_task_assignment_service: LLMTaskAssignmentService
     membership_service: MembershipService
     profile_service: ProfileService
+    permission_service: PermissionService
     user_admin_service: UserAdminService
     ruleset_access_service: RulesetAccessService
     document_access_service: DocumentAccessService
@@ -321,6 +324,17 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    role_permissions_repo = PersistenceService.get_table(
+        "role_permissions",
+        {
+            "id": int,
+            "organization_id": int,
+            "action": str,
+            "min_role": str,
+            "updated_at": str,
+        },
+    )
+
     groups_repo = PersistenceService.get_table(
         "groups",
         {
@@ -520,6 +534,12 @@ def build_default_container() -> ApplicationContainer:
 
     profile_service = ProfileService(profiles_repo=profiles_repo)
 
+    permission_service = PermissionService(
+        role_permissions_repo=role_permissions_repo,
+        membership_service=membership_service,
+        profile_service=profile_service,
+    )
+
     user_admin_service = UserAdminService(PersistenceService.get_db())
 
     # Seed default repo if database is empty
@@ -715,6 +735,7 @@ def build_default_container() -> ApplicationContainer:
         organizations_repo=organizations_repo,
         memberships_repo=memberships_repo,
         organization_invites_repo=organization_invites_repo,
+        role_permissions_repo=role_permissions_repo,
         groups_repo=groups_repo,
         group_project_grants_repo=group_project_grants_repo,
         organization_ruleset_grants_repo=organization_ruleset_grants_repo,
@@ -737,6 +758,7 @@ def build_default_container() -> ApplicationContainer:
         llm_task_assignment_service=llm_task_assignment_service,
         membership_service=membership_service,
         profile_service=profile_service,
+        permission_service=permission_service,
         user_admin_service=user_admin_service,
         ruleset_access_service=ruleset_access_service,
         document_access_service=document_access_service,

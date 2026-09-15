@@ -10,6 +10,7 @@ from postgrest.exceptions import APIError
 from app.api.dependencies import (
     get_document_access_service,
     get_membership_service,
+    get_permission_service,
     get_profile_service,
     get_projects_service,
     get_ruleset_access_service,
@@ -43,8 +44,10 @@ from app.modules.contracts import (
     UserOrganizationSummary,
     UserSummary,
 )
+from app.modules.permissions import Action
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
+from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.ruleset_access_service import RulesetAccessService
@@ -223,24 +226,6 @@ def _require_membership(
         )
 
 
-def _require_org_admin(
-    organization_id: int,
-    current_user: CurrentUser,
-    memberships: MembershipService,
-    profiles: ProfileService,
-) -> None:
-    """Raise unless the caller is an owner/admin of *organization_id* (or superadmin)."""
-    _require_membership(organization_id, current_user, memberships, profiles)
-    if profiles.is_superadmin(current_user.id):
-        return
-    role = memberships.role_for_user(organization_id, current_user.id)
-    if role not in ("owner", "admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an organization owner or admin can do this.",
-        )
-
-
 def _member_response(
     row: dict, profiles_by_id: dict[str, dict], groups_by_id: dict[int, dict]
 ) -> OrganizationMemberResponse:
@@ -306,9 +291,10 @@ def update_member_role(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationMemberListResponse:
     """Update a member's role, refusing to leave the organization without an owner."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     rows = memberships.list_members_raw(organization_id)
     if payload.role != "owner" and _owner_count_after(rows, demoted_user_id=user_id) == 0:
         raise HTTPException(
@@ -333,9 +319,10 @@ def remove_member(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationMemberListResponse:
     """Remove a member, refusing to leave the organization without an owner."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     rows = memberships.list_members_raw(organization_id)
     if _owner_count_after(rows, excluding_user_id=user_id) == 0:
         raise HTTPException(
@@ -380,9 +367,10 @@ def list_invites(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationInviteListResponse:
     """Return every invite (pending and accepted) sent for the organization."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     rows = memberships.list_invites(organization_id)
     return OrganizationInviteListResponse(
         organization_id=organization_id,
@@ -402,14 +390,15 @@ def create_invite(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationInviteListResponse:
     """Create a pending invite; it becomes a membership the first time that email signs in."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     try:
         memberships.create_invite(organization_id, payload.email, payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    return list_invites(organization_id, current_user, memberships, profiles)
+    return list_invites(organization_id, current_user, memberships, profiles, permissions)
 
 
 @router.delete(
@@ -423,14 +412,15 @@ def revoke_invite(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationInviteListResponse:
     """Delete a pending invite so that email can no longer redeem it."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     try:
         memberships.revoke_invite(organization_id, invite_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    return list_invites(organization_id, current_user, memberships, profiles)
+    return list_invites(organization_id, current_user, memberships, profiles, permissions)
 
 
 # ---------------------------------------------------------------------------
@@ -469,9 +459,10 @@ def create_group(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> GroupListResponse:
     """Create a new group within the organization. Owner/admin only."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     try:
         memberships.create_group(organization_id, payload.name)
     except ValueError as exc:
@@ -490,9 +481,10 @@ def delete_group(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> GroupListResponse:
     """Delete a group. Its members become ungrouped, not removed from the organization."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     try:
         memberships.delete_group(organization_id, group_id)
     except ValueError as exc:
@@ -512,9 +504,10 @@ def update_member_group(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> OrganizationMemberListResponse:
     """Change which group a member belongs to. A member belongs to at most one group."""
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     try:
         memberships.set_member_group(organization_id, user_id, payload.group_id)
     except ValueError as exc:
@@ -560,6 +553,7 @@ def set_group_project_grants(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
 ) -> GroupProjectGrantsResponse:
     """Replace the set of projects this group can access. Owner/admin only.
 
@@ -568,7 +562,7 @@ def set_group_project_grants(
     (``organization_project_grants``). A group can never be granted a project
     its own organization has no claim to.
     """
-    _require_org_admin(organization_id, current_user, memberships, profiles)
+    permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
     group = memberships.get_group(group_id)
     if group is None or group.get("organization_id") != organization_id:
         raise HTTPException(
