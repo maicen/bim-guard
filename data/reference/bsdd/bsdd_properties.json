@@ -24475,5 +24475,1976 @@
     "definition": null,
     "description": null,
     "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IsSpare",
+    "code": "IsSpare",
+    "name": "IsSpare",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SerialNumber",
+    "code": "SerialNumber",
+    "name": "SerialNumber",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PipeMountPosition",
+    "code": "PipeMountPosition",
+    "name": "PipeMountPosition",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SafeWorkingLoad",
+    "code": "SafeWorkingLoad",
+    "name": "SafeWorkingLoad",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DrawingDimsTb_DimDescr",
+    "code": "DrawingDimsTb_DimDescr",
+    "name": "DrawingDimensionsTable_DimensionDescription",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DrawingDimsTb_DimName",
+    "code": "DrawingDimsTb_DimName",
+    "name": "DrawingDimensionsTable_DimensionName",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DrawingDimsTb_DimUnit",
+    "code": "DrawingDimsTb_DimUnit",
+    "name": "DrawingDimensionsTable_DimensionUnit",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DrawingDimsTb_DimValue",
+    "code": "DrawingDimsTb_DimValue",
+    "name": "DrawingDimensionsTable_DimensionValue",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DisplacedVolume",
+    "code": "DisplacedVolume",
+    "name": "DisplacedVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IdInUnifilarDiagram",
+    "code": "IdInUnifilarDiagram",
+    "name": "IdInUnifilarDiagram",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntVolume",
+    "code": "IntVolume",
+    "name": "InternalVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/Mass",
+    "code": "Mass",
+    "name": "Mass",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PartNumber",
+    "code": "PartNumber",
+    "name": "PartNumber",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ProjectDrawingCode",
+    "code": "ProjectDrawingCode",
+    "name": "ProjectDrawingCode",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ProjectDrawingRevision",
+    "code": "ProjectDrawingRevision",
+    "name": "ProjectDrawingRevision",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ManufDefinedMaterialName",
+    "code": "ManufDefinedMaterialName",
+    "name": "ManufacturerDefinedMaterialName",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaterialSupplierName",
+    "code": "MaterialSupplierName",
+    "name": "MaterialSupplierName",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SupplierProvidedMaterialName",
+    "code": "SupplierProvidedMaterialName",
+    "name": "SupplierProvidedMaterialName",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AnodeCollarsAxialSpacing",
+    "code": "AnodeCollarsAxialSpacing",
+    "name": "AnodeCollarsAxialSpacing",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AnodeCollarsQuantity",
+    "code": "AnodeCollarsQuantity",
+    "name": "AnodeCollarsQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ClampIntDiameter",
+    "code": "ClampIntDiameter",
+    "name": "ClampInternalDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ExtDiameter",
+    "code": "ExtDiameter",
+    "name": "ExternalDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GalvanicMaterial",
+    "code": "GalvanicMaterial",
+    "name": "GalvanicMaterial",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IndividualAnodeMass",
+    "code": "IndividualAnodeMass",
+    "name": "IndividualAnodeMass",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MetallicStrandLength",
+    "code": "MetallicStrandLength",
+    "name": "MetallicStrandLength",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MetallicStrandSpareQuantity",
+    "code": "MetallicStrandSpareQuantity",
+    "name": "MetallicStrandSpareQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntDiameter",
+    "code": "IntDiameter",
+    "name": "InternalDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerAnnular",
+    "code": "LayerAnnular",
+    "name": "LayerAnnular",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerAnnularType",
+    "code": "LayerAnnularType",
+    "name": "LayerAnnularType",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerContinuity",
+    "code": "LayerContinuity",
+    "name": "LayerContinuity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerThick",
+    "code": "LayerThick",
+    "name": "LayerThickness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerWatertight",
+    "code": "LayerWatertight",
+    "name": "LayerWatertight",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerWatertightLowerLayerIntFreeVolume",
+    "code": "LayerWatertightLowerLayerIntFreeVolume",
+    "name": "LayerWatertightLowerLayerInternalFreeVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LinearMass",
+    "code": "LinearMass",
+    "name": "LinearMass",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomCrossSec",
+    "code": "LayerGeomCrossSec",
+    "name": "LayerGeometryCrossSection",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomInertiaX",
+    "code": "LayerGeomInertiaX",
+    "name": "LayerGeometryInertiaX",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomInertiaY",
+    "code": "LayerGeomInertiaY",
+    "name": "LayerGeometryInertiaY",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomManuf",
+    "code": "LayerGeomManuf",
+    "name": "LayerGeometryManufacturer",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomName",
+    "code": "LayerGeomName",
+    "name": "LayerGeometryName",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomProfileThick",
+    "code": "LayerGeomProfileThick",
+    "name": "LayerGeometryProfileThickness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomProfileWidth",
+    "code": "LayerGeomProfileWidth",
+    "name": "LayerGeometryProfileWidth",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayerGeomThick",
+    "code": "LayerGeomThick",
+    "name": "LayerGeometryThickness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TapesQuantity",
+    "code": "TapesQuantity",
+    "name": "TapesQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BendMomentVsShearForceTb_BendingMoment",
+    "code": "BendMomentVsShearForceTb_BendingMoment",
+    "name": "BendMomentVsShearForceTable_BendingMoment",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BendMomentVsShearForceTb_Condition",
+    "code": "BendMomentVsShearForceTb_Condition",
+    "name": "BendMomentVsShearForceTable_Condition",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BendMomentVsShearForceTb_ShearForce",
+    "code": "BendMomentVsShearForceTb_ShearForce",
+    "name": "BendMomentVsShearForceTable_ShearForce",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AssemblyTorque",
+    "code": "AssemblyTorque",
+    "name": "AssemblyTorque",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FullyThreaded",
+    "code": "FullyThreaded",
+    "name": "FullyThreaded",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/Lubricant",
+    "code": "Lubricant",
+    "name": "Lubricant",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LubricantFrictionFactor",
+    "code": "LubricantFrictionFactor",
+    "name": "LubricantFrictionFactor",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/NominalLength",
+    "code": "NominalLength",
+    "name": "NominalLength",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/Quantity",
+    "code": "Quantity",
+    "name": "Quantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SpareQuantity",
+    "code": "SpareQuantity",
+    "name": "SpareQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LongTermFloatDensity",
+    "code": "LongTermFloatDensity",
+    "name": "LongTermFloatDensity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LongTermFloatVolume",
+    "code": "LongTermFloatVolume",
+    "name": "LongTermFloatVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/NominalFloatDensity",
+    "code": "NominalFloatDensity",
+    "name": "NominalFloatDensity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/NominalFloatVolume",
+    "code": "NominalFloatVolume",
+    "name": "NominalFloatVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShortTermFloatDensity",
+    "code": "ShortTermFloatDensity",
+    "name": "ShortTermFloatDensity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShortTermFloatVolume",
+    "code": "ShortTermFloatVolume",
+    "name": "ShortTermFloatVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MetallicLayerPitch",
+    "code": "MetallicLayerPitch",
+    "name": "MetallicLayerPitch",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StressAtDesignPressure",
+    "code": "StressAtDesignPressure",
+    "name": "StressAtDesignPressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BoreDiameter",
+    "code": "BoreDiameter",
+    "name": "BoreDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FlangeFaceType",
+    "code": "FlangeFaceType",
+    "name": "FlangeFaceType",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FlangeType",
+    "code": "FlangeType",
+    "name": "FlangeType",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketInnerDIameter",
+    "code": "RingGasketInnerDIameter",
+    "name": "RingGasketInnerDIameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketOuterDiameter",
+    "code": "RingGasketOuterDiameter",
+    "name": "RingGasketOuterDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketPressureRating",
+    "code": "RingGasketPressureRating",
+    "name": "RingGasketPressureRating",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketSpecification",
+    "code": "RingGasketSpecification",
+    "name": "RingGasketSpecification",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketStandard",
+    "code": "RingGasketStandard",
+    "name": "RingGasketStandard",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketType",
+    "code": "RingGasketType",
+    "name": "RingGasketType",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/HasFaceORing",
+    "code": "HasFaceORing",
+    "name": "HasFaceORing",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/HasModaSensor",
+    "code": "HasModaSensor",
+    "name": "HasModaSensor",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/HasN2InjectionPort",
+    "code": "HasN2InjectionPort",
+    "name": "HasN2InjectionPort",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_Press",
+    "code": "EarlyLeakMaxPressTb_Press",
+    "name": "EarlyLeakMaxPressTable_Press",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_PressIntValStrat",
+    "code": "EarlyLeakMaxPressTb_PressIntValStrat",
+    "name": "EarlyLeakMaxPressTable_PressIntValStrat",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_PressValRef",
+    "code": "EarlyLeakMaxPressTb_PressValRef",
+    "name": "EarlyLeakMaxPressTable_PressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_PressValRefMult",
+    "code": "EarlyLeakMaxPressTb_PressValRefMult",
+    "name": "EarlyLeakMaxPressTable_PressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_TensLimit",
+    "code": "EarlyLeakMaxPressTb_TensLimit",
+    "name": "EarlyLeakMaxPressTable_TensLimit",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakMaxPressTb_TensLimitValRef",
+    "code": "EarlyLeakMaxPressTb_TensLimitValRef",
+    "name": "EarlyLeakMaxPressTable_TensLimitValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_Press",
+    "code": "EarlyLeakNomPressTb_Press",
+    "name": "EarlyLeakNomPressTable_Press",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_PressIntValStrat",
+    "code": "EarlyLeakNomPressTb_PressIntValStrat",
+    "name": "EarlyLeakNomPressTable_PressIntValStrat",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_PressValRef",
+    "code": "EarlyLeakNomPressTb_PressValRef",
+    "name": "EarlyLeakNomPressTable_PressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_PressValRefMult",
+    "code": "EarlyLeakNomPressTb_PressValRefMult",
+    "name": "EarlyLeakNomPressTable_PressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_TensLimit",
+    "code": "EarlyLeakNomPressTb_TensLimit",
+    "name": "EarlyLeakNomPressTable_TensLimit",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/EarlyLeakNomPressTb_TensLimitValRef",
+    "code": "EarlyLeakNomPressTb_TensLimitValRef",
+    "name": "EarlyLeakNomPressTable_TensLimitValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatMaxPress",
+    "code": "FatMaxPress",
+    "name": "FatMaxPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatMaxPressValRef",
+    "code": "FatMaxPressValRef",
+    "name": "FatMaxPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatMaxPressValRefMult",
+    "code": "FatMaxPressValRefMult",
+    "name": "FatMaxPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatNomPress",
+    "code": "FatNomPress",
+    "name": "FatNomPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatNomPressValRef",
+    "code": "FatNomPressValRef",
+    "name": "FatNomPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FatNomPressValRefMult",
+    "code": "FatNomPressValRefMult",
+    "name": "FatNomPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevMaxPress",
+    "code": "OffLeakPLevMaxPress",
+    "name": "OffLeakPLevMaxPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevMaxPressValRef",
+    "code": "OffLeakPLevMaxPressValRef",
+    "name": "OffLeakPLevMaxPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevMaxPressValRefMult",
+    "code": "OffLeakPLevMaxPressValRefMult",
+    "name": "OffLeakPLevMaxPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevNomPress",
+    "code": "OffLeakPLevNomPress",
+    "name": "OffLeakPLevNomPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevNomPressValRef",
+    "code": "OffLeakPLevNomPressValRef",
+    "name": "OffLeakPLevNomPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OffLeakPLevNomPressValRefMult",
+    "code": "OffLeakPLevNomPressValRefMult",
+    "name": "OffLeakPLevNomPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevMaxPress",
+    "code": "StrIntOffPLevMaxPress",
+    "name": "StrIntOffPLevMaxPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevMaxPressValRef",
+    "code": "StrIntOffPLevMaxPressValRef",
+    "name": "StrIntOffPLevMaxPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevMaxPressValRefMult",
+    "code": "StrIntOffPLevMaxPressValRefMult",
+    "name": "StrIntOffPLevMaxPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevNomPress",
+    "code": "StrIntOffPLevNomPress",
+    "name": "StrIntOffPLevNomPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevNomPressValRef",
+    "code": "StrIntOffPLevNomPressValRef",
+    "name": "StrIntOffPLevNomPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOffPLevNomPressValRefMult",
+    "code": "StrIntOffPLevNomPressValRefMult",
+    "name": "StrIntOffPLevNomPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensMaxPress",
+    "code": "StrIntOnNoTensMaxPress",
+    "name": "StrIntOnNoTensMaxPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensMaxPressValRef",
+    "code": "StrIntOnNoTensMaxPressValRef",
+    "name": "StrIntOnNoTensMaxPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensMaxPressValRefMult",
+    "code": "StrIntOnNoTensMaxPressValRefMult",
+    "name": "StrIntOnNoTensMaxPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensNomPress",
+    "code": "StrIntOnNoTensNomPress",
+    "name": "StrIntOnNoTensNomPress",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensNomPressValRef",
+    "code": "StrIntOnNoTensNomPressValRef",
+    "name": "StrIntOnNoTensNomPressValRef",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrIntOnNoTensNomPressValRefMult",
+    "code": "StrIntOnNoTensNomPressValRefMult",
+    "name": "StrIntOnNoTensNomPressValRefMult",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AssemblyShouldObeyModelPolarity",
+    "code": "AssemblyShouldObeyModelPolarity",
+    "name": "AssemblyShouldObeyModelPolarity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ManufacturingDate",
+    "code": "ManufacturingDate",
+    "name": "ManufacturingDate",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ManufacturingNonConformities",
+    "code": "ManufacturingNonConformities",
+    "name": "ManufacturingNonConformities",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxLengthTolerance",
+    "code": "MaxLengthTolerance",
+    "name": "MaxLengthTolerance",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PipeSecApplication",
+    "code": "PipeSecApplication",
+    "name": "PipeSectionApplication",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SpecialRequirements",
+    "code": "SpecialRequirements",
+    "name": "SpecialRequirements",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AbsoluteInsidePressure",
+    "code": "AbsoluteInsidePressure",
+    "name": "AbsoluteInsidePressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AbsoluteOutsidePressure",
+    "code": "AbsoluteOutsidePressure",
+    "name": "AbsoluteOutsidePressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BendingMomentTb_BendingMoment",
+    "code": "BendingMomentTb_BendingMoment",
+    "name": "BendingMomentTable_BendingMoment",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BendingMomentTb_Curvature",
+    "code": "BendingMomentTb_Curvature",
+    "name": "BendingMomentTable_Curvature",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/CriticalCurvatureOfSlipping",
+    "code": "CriticalCurvatureOfSlipping",
+    "name": "CriticalCurvatureOfSlipping",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/InsideTemperature",
+    "code": "InsideTemperature",
+    "name": "InsideTemperature",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntermediateValuesStrategy",
+    "code": "IntermediateValuesStrategy",
+    "name": "IntermediateValuesStrategy",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OutsideTemperature",
+    "code": "OutsideTemperature",
+    "name": "OutsideTemperature",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PostSlippingBendingStiffness",
+    "code": "PostSlippingBendingStiffness",
+    "name": "PostSlippingBendingStiffness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PreSlippingBendingStiffness",
+    "code": "PreSlippingBendingStiffness",
+    "name": "PreSlippingBendingStiffness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensileArmourAnnulusCondition",
+    "code": "TensileArmourAnnulusCondition",
+    "name": "TensileArmourAnnulusCondition",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TestConditions",
+    "code": "TestConditions",
+    "name": "TestConditions",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FrictionCoefTighteningTb_CoefOfFriction",
+    "code": "FrictionCoefTighteningTb_CoefOfFriction",
+    "name": "FrictionCoefficientTighteningTable_CoefficientOfFriction",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FrictionCoefTighteningTb_TighteningPerTrack",
+    "code": "FrictionCoefTighteningTb_TighteningPerTrack",
+    "name": "FrictionCoefficientTighteningTable_TighteningPerTrack",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAmbientTemperature",
+    "code": "MaxAmbientTemperature",
+    "name": "MaximumAmbientTemperature",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensionerPadsMaterial",
+    "code": "TensionerPadsMaterial",
+    "name": "TensionerPadsMaterial",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensionerPadsOpeningAngle",
+    "code": "TensionerPadsOpeningAngle",
+    "name": "TensionerPadsOpeningAngle",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensionerPadsShape",
+    "code": "TensionerPadsShape",
+    "name": "TensionerPadsShape",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensionerTracksQuantity",
+    "code": "TensionerTracksQuantity",
+    "name": "TensionerTracksQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/UtilizationFactor",
+    "code": "UtilizationFactor",
+    "name": "UtilizationFactor",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTensionTb_MaxAllowableTensile",
+    "code": "MaxAllowableTensionTb_MaxAllowableTensile",
+    "name": "MaximumAllowableTensionTable_MaximumAllowableTensile",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTensionTb_PulleyRad",
+    "code": "MaxAllowableTensionTb_PulleyRad",
+    "name": "MaximumAllowableTensionTable_PulleyRadius",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTensionTb_PulleyVAngle",
+    "code": "MaxAllowableTensionTb_PulleyVAngle",
+    "name": "MaximumAllowableTensionTable_PulleyVAngle",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTighteningTb_AxialLoad",
+    "code": "MaxAllowableTighteningTb_AxialLoad",
+    "name": "MaximumAllowableTighteningTable_AxialLoad",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTighteningTb_TighteningPerTrack",
+    "code": "MaxAllowableTighteningTb_TighteningPerTrack",
+    "name": "MaximumAllowableTighteningTable_TighteningPerTrack",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AxialStiffnessUnderCompressionAtSeaLevel",
+    "code": "AxialStiffnessUnderCompressionAtSeaLevel",
+    "name": "AxialStiffnessUnderCompressionAtSeaLevel",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/AxialStiffnessUnderTensionAtSeaLevel",
+    "code": "AxialStiffnessUnderTensionAtSeaLevel",
+    "name": "AxialStiffnessUnderTensionAtSeaLevel",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/CalculatedAbsoluteBurstPressure",
+    "code": "CalculatedAbsoluteBurstPressure",
+    "name": "CalculatedAbsoluteBurstPressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DamagingPullInStraightLine",
+    "code": "DamagingPullInStraightLine",
+    "name": "DamagingPullInStraightLine",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ErosionalVelocity",
+    "code": "ErosionalVelocity",
+    "name": "ErosionalVelocity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FlexibleStructureServicesList",
+    "code": "FlexibleStructureServicesList",
+    "name": "FlexibleStructureServicesList",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/FrictionCoefBetweenPipeAndTensioner",
+    "code": "FrictionCoefBetweenPipeAndTensioner",
+    "name": "FrictionCoefBetweenPipeAndTensioner",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/HydrostaticCollapseAbsPressDry",
+    "code": "HydrostaticCollapseAbsPressDry",
+    "name": "HydrostaticCollapseAbsPressDry",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LimpTorsionalStiffnessAtSeaLevel",
+    "code": "LimpTorsionalStiffnessAtSeaLevel",
+    "name": "LimpTorsionalStiffnessAtSeaLevel",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxAllowableTensileForStraightLine",
+    "code": "MaxAllowableTensileForStraightLine",
+    "name": "MaximumAllowableTensileForStraightLine",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxDesignPressure",
+    "code": "MaxDesignPressure",
+    "name": "MaxDesignPressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MinBendingRadForStorage",
+    "code": "MinBendingRadForStorage",
+    "name": "MinimumBendingRadiusForStorage",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/OuterDiameter",
+    "code": "OuterDiameter",
+    "name": "OuterDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SpoolingTension",
+    "code": "SpoolingTension",
+    "name": "SpoolingTension",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StiffTorsionalStiffnessAtSeaLevel",
+    "code": "StiffTorsionalStiffnessAtSeaLevel",
+    "name": "StiffTorsionalStiffnessAtSeaLevel",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StructureApplicationsList",
+    "code": "StructureApplicationsList",
+    "name": "StructureApplicationsList",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StructureCode",
+    "code": "StructureCode",
+    "name": "StructureCode",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensileArmourFreeAnnulusVolume",
+    "code": "TensileArmourFreeAnnulusVolume",
+    "name": "TensileArmourFreeAnnulusVolume",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ThermalExchangeCoefFlooded",
+    "code": "ThermalExchangeCoefFlooded",
+    "name": "ThermalExchangeCoefficientFlooded",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/DimingCriteria",
+    "code": "DimingCriteria",
+    "name": "DimensioningCriteria",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_AbsoluteExtPressure",
+    "code": "LayingMinRadTb_AbsoluteExtPressure",
+    "name": "LayingMinimumRadiusTable_AbsoluteExternalPressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_AbsoluteIntPressure",
+    "code": "LayingMinRadTb_AbsoluteIntPressure",
+    "name": "LayingMinimumRadiusTable_AbsoluteInternalPressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_Compression",
+    "code": "LayingMinRadTb_Compression",
+    "name": "LayingMinimumRadiusTable_Compression",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_MinAllowableBendingRad",
+    "code": "LayingMinRadTb_MinAllowableBendingRad",
+    "name": "LayingMinimumRadiusTable_MinimumAllowableBendingRadius",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_SecSuppedByRigidSupp",
+    "code": "LayingMinRadTb_SecSuppedByRigidSupp",
+    "name": "LayingMinimumRadiusTable_SectionSupportedByRigidSupport",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/LayingMinRadTb_TensileArmourAnnulusCondition",
+    "code": "LayingMinRadTb_TensileArmourAnnulusCondition",
+    "name": "LayingMinimumRadiusTable_TensileArmourAnnulusCondition",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrooveDiameter",
+    "code": "GrooveDiameter",
+    "name": "GrooveDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrooveHeight",
+    "code": "GrooveHeight",
+    "name": "GrooveHeight",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrooveMinSuppArea",
+    "code": "GrooveMinSuppArea",
+    "name": "GrooveMinimumSupportArea",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrooveSuppSurfaceDiameter",
+    "code": "GrooveSuppSurfaceDiameter",
+    "name": "GrooveSupportSurfaceDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrooveSuppSurfaceFilletRad",
+    "code": "GrooveSuppSurfaceFilletRad",
+    "name": "GrooveSupportSurfaceFilletRadius",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/GrvCntrPntDstnceFrmTermFlange",
+    "code": "GrvCntrPntDstnceFrmTermFlange",
+    "name": "GrvCntrPntDstnceFrmTermFlange",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TechnicalNotes",
+    "code": "TechnicalNotes",
+    "name": "TechnicalNotes",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/CollarIntDiameter",
+    "code": "CollarIntDiameter",
+    "name": "CollarInternalDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxDynamicLoad",
+    "code": "MaxDynamicLoad",
+    "name": "MaxDynamicLoad",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/UpperItubeDiameter",
+    "code": "UpperItubeDiameter",
+    "name": "UpperItubeDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ModulusOfElasticity",
+    "code": "ModulusOfElasticity",
+    "name": "ModulusOfElasticity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrandsTb_SpareQuantity",
+    "code": "StrandsTb_SpareQuantity",
+    "name": "StrandsTable_SpareQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrandsTb_StrandsLength",
+    "code": "StrandsTb_StrandsLength",
+    "name": "StrandsTable_StrandsLength",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/StrandsTb_StrandsQuantity",
+    "code": "StrandsTb_StrandsQuantity",
+    "name": "StrandsTable_StrandsQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/NominalDiameter",
+    "code": "NominalDiameter",
+    "name": "NominalDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PitchToleranceClass",
+    "code": "PitchToleranceClass",
+    "name": "PitchToleranceClass",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ThreadPitch",
+    "code": "ThreadPitch",
+    "name": "ThreadPitch",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ThreadStandard",
+    "code": "ThreadStandard",
+    "name": "ThreadStandard",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RingGasketMaterial",
+    "code": "RingGasketMaterial",
+    "name": "RingGasketMaterial",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/PullingHeadType",
+    "code": "PullingHeadType",
+    "name": "PullingHeadType",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/WireRopeQuantity",
+    "code": "WireRopeQuantity",
+    "name": "WireRopeQuantity",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/WireRopeSlingDiameter",
+    "code": "WireRopeSlingDiameter",
+    "name": "WireRopeSlingDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/WireRopeSlingLength",
+    "code": "WireRopeSlingLength",
+    "name": "WireRopeSlingLength",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShackleInnerDiameter",
+    "code": "ShackleInnerDiameter",
+    "name": "ShackleInnerDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShackleOpeningWidth",
+    "code": "ShackleOpeningWidth",
+    "name": "ShackleOpeningWidth",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShackleOuterDiameter",
+    "code": "ShackleOuterDiameter",
+    "name": "ShackleOuterDiameter",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ShackleThick",
+    "code": "ShackleThick",
+    "name": "ShackleThickness",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/WorkingLoadLimit",
+    "code": "WorkingLoadLimit",
+    "name": "WorkingLoadLimit",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/BasicProjectRevision",
+    "code": "BasicProjectRevision",
+    "name": "BasicProjectRevision",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/CO2VolumePercentage",
+    "code": "CO2VolumePercentage",
+    "name": "CO2VolumePercentage",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/H2SVolumeConcentration",
+    "code": "H2SVolumeConcentration",
+    "name": "H2SVolumeConcentration",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntIncidentalPressureTb_PositionReference",
+    "code": "IntIncidentalPressureTb_PositionReference",
+    "name": "InternalIncidentalPressureTable_PositionReference",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntIncidentalPressureTb_Pressure",
+    "code": "IntIncidentalPressureTb_Pressure",
+    "name": "InternalIncidentalPressureTable_Pressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/IntIncidentalPressureTb_VPosWRTWaterline",
+    "code": "IntIncidentalPressureTb_VPosWRTWaterline",
+    "name": "InternalIncidentalPressureTable_VPosWRTWaterline",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaterialRequest",
+    "code": "MaterialRequest",
+    "name": "MaterialRequest",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaterialRequestRev",
+    "code": "MaterialRequestRev",
+    "name": "MaterialRequestRev",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxDesignAbsIntPresTb_PositionReference",
+    "code": "MaxDesignAbsIntPresTb_PositionReference",
+    "name": "MaxDesignAbsIntPresTable_PositionReference",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxDesignAbsIntPresTb_Pressure",
+    "code": "MaxDesignAbsIntPresTb_Pressure",
+    "name": "MaxDesignAbsIntPresTable_Pressure",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxDesignAbsIntPresTb_VPosWRTWaterline",
+    "code": "MaxDesignAbsIntPresTb_VPosWRTWaterline",
+    "name": "MaxDesignAbsIntPresTable_VPosWRTWaterline",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxTemperature",
+    "code": "MaxTemperature",
+    "name": "MaximumTemperature",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MaxThermalExchangeCoef",
+    "code": "MaxThermalExchangeCoef",
+    "name": "MaximumThermalExchangeCoefficient",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/MinThermalExchangeCoef",
+    "code": "MinThermalExchangeCoef",
+    "name": "MinimumThermalExchangeCoefficient",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ProjectAcronym",
+    "code": "ProjectAcronym",
+    "name": "ProjectAcronym",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ProjectCode",
+    "code": "ProjectCode",
+    "name": "ProjectCode",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/RiserConfiguration",
+    "code": "RiserConfiguration",
+    "name": "RiserConfiguration",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/Service",
+    "code": "Service",
+    "name": "Service",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/SubProjectId",
+    "code": "SubProjectId",
+    "name": "SubProjectId",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ExecutiveProjectRevision",
+    "code": "ExecutiveProjectRevision",
+    "name": "ExecutiveProjectRevision",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/UnifilarDiagram",
+    "code": "UnifilarDiagram",
+    "name": "UnifilarDiagram",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/UnifilarDiagramRev",
+    "code": "UnifilarDiagramRev",
+    "name": "UnifilarDiagramRev",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensileWireLayAngle",
+    "code": "TensileWireLayAngle",
+    "name": "TensileWireLayAngle",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/TensileWiresCount",
+    "code": "TensileWiresCount",
+    "name": "TensileWiresCount",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/prop/ThreadsPerInch",
+    "code": "ThreadsPerInch",
+    "name": "ThreadsPerInch",
+    "data_type": null,
+    "definition": null,
+    "description": null,
+    "units": []
   }
 ]

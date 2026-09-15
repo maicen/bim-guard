@@ -180491,5 +180491,1293 @@
     ],
     "definition": null,
     "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AnchoringCollar",
+    "code": "AnchoringCollar",
+    "name": "AnchoringCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AnchoringCollarType",
+    "code": "AnchoringCollarType",
+    "name": "AnchoringCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AnodeCollarSet",
+    "code": "AnodeCollarSet",
+    "name": "AnodeCollarSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AnodeCollarSetType",
+    "code": "AnodeCollarSetType",
+    "name": "AnodeCollarSetType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AntiCollapseSheath",
+    "code": "AntiCollapseSheath",
+    "name": "AntiCollapseSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AntiWearSheath",
+    "code": "AntiWearSheath",
+    "name": "AntiWearSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/ArmourLayer",
+    "code": "ArmourLayer",
+    "name": "ArmourLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Asset",
+    "code": "Asset",
+    "name": "Asset",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/AssetType",
+    "code": "AssetType",
+    "name": "AssetType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BendRestrictor",
+    "code": "BendRestrictor",
+    "name": "BendRestrictor",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BendRestrictorType",
+    "code": "BendRestrictorType",
+    "name": "BendRestrictorType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BendStiffener",
+    "code": "BendStiffener",
+    "name": "BendStiffener",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BendStiffenerType",
+    "code": "BendStiffenerType",
+    "name": "BendStiffenerType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BoltSet",
+    "code": "BoltSet",
+    "name": "BoltSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BuoyancyModule",
+    "code": "BuoyancyModule",
+    "name": "BuoyancyModule",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/BuoyancyModuleType",
+    "code": "BuoyancyModuleType",
+    "name": "BuoyancyModuleType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/CarcassLayer",
+    "code": "CarcassLayer",
+    "name": "CarcassLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/CompactObject",
+    "code": "CompactObject",
+    "name": "CompactObject",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/CompactObjectType",
+    "code": "CompactObjectType",
+    "name": "CompactObjectType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Component",
+    "code": "Component",
+    "name": "Component",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/ComponentType",
+    "code": "ComponentType",
+    "name": "ComponentType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Connection",
+    "code": "Connection",
+    "name": "Connection",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/DeadweightCollar",
+    "code": "DeadweightCollar",
+    "name": "DeadweightCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/DeadweightCollarType",
+    "code": "DeadweightCollarType",
+    "name": "DeadweightCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/DimsDrawing",
+    "code": "DimsDrawing",
+    "name": "DimensionsDrawing",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDocumentInformation"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/DistributionConnectionPoint",
+    "code": "DistributionConnectionPoint",
+    "name": "DistributionConnectionPoint",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionPort"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/EndFitting",
+    "code": "EndFitting",
+    "name": "EndFitting",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/EndFittingType",
+    "code": "EndFittingType",
+    "name": "EndFittingType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/EquipmentLocation",
+    "code": "EquipmentLocation",
+    "name": "EquipmentLocation",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/FabricTape",
+    "code": "FabricTape",
+    "name": "FabricTape",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/FlexiblePipeSegment",
+    "code": "FlexiblePipeSegment",
+    "name": "FlexiblePipeSegment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/FlexiblePipeStructure",
+    "code": "FlexiblePipeStructure",
+    "name": "FlexiblePipeStructure",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegmentType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/FlexibleStructureLayer",
+    "code": "FlexibleStructureLayer",
+    "name": "FlexibleStructureLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/FloatingProductionUnit",
+    "code": "FloatingProductionUnit",
+    "name": "FloatingProductionUnit",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuilding"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/GroovePoint",
+    "code": "GroovePoint",
+    "name": "GroovePoint",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcDistributionPort"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HandlingCollar",
+    "code": "HandlingCollar",
+    "name": "HandlingCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HandlingCollarType",
+    "code": "HandlingCollarType",
+    "name": "HandlingCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HangOffCollar",
+    "code": "HangOffCollar",
+    "name": "HangOffCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HangOffCollarType",
+    "code": "HangOffCollarType",
+    "name": "HangOffCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HardwareItem",
+    "code": "HardwareItem",
+    "name": "HardwareItem",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HighStrengthTape",
+    "code": "HighStrengthTape",
+    "name": "HighStrengthTape",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/HoldingBandage",
+    "code": "HoldingBandage",
+    "name": "HoldingBandage",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/InnerTube",
+    "code": "InnerTube",
+    "name": "InnerTube",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/InsulationTape",
+    "code": "InsulationTape",
+    "name": "InsulationTape",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Interconnection",
+    "code": "Interconnection",
+    "name": "Interconnection",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/InterlockedCarcass",
+    "code": "InterlockedCarcass",
+    "name": "InterlockedCarcass",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/IntermediateBendStiffener",
+    "code": "IntermediateBendStiffener",
+    "name": "IntermediateBendStiffener",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/IntermediateBendStiffenerType",
+    "code": "IntermediateBendStiffenerType",
+    "name": "IntermediateBendStiffenerType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/IntermediateSheath",
+    "code": "IntermediateSheath",
+    "name": "IntermediateSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/IntPressureSheath",
+    "code": "IntPressureSheath",
+    "name": "InternalPressureSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineAncillary",
+    "code": "LineAncillary",
+    "name": "LineAncillary",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineAncillaryType",
+    "code": "LineAncillaryType",
+    "name": "LineAncillaryType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LinearLocation",
+    "code": "LinearLocation",
+    "name": "LinearLocation",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LinearObject",
+    "code": "LinearObject",
+    "name": "LinearObject",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineComponent",
+    "code": "LineComponent",
+    "name": "LineComponent",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineComponentType",
+    "code": "LineComponentType",
+    "name": "LineComponentType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineTermination",
+    "code": "LineTermination",
+    "name": "LineTermination",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LineTerminationType",
+    "code": "LineTerminationType",
+    "name": "LineTerminationType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Location",
+    "code": "Location",
+    "name": "Location",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LogicalConnection",
+    "code": "LogicalConnection",
+    "name": "LogicalConnection",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/LowResistanceTape",
+    "code": "LowResistanceTape",
+    "name": "LowResistanceTape",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/MetallicStrandSet",
+    "code": "MetallicStrandSet",
+    "name": "MetallicStrandSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcCableSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/MetricBoltSet",
+    "code": "MetricBoltSet",
+    "name": "MetricBoltSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/MetricStudSet",
+    "code": "MetricStudSet",
+    "name": "MetricStudSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/ModelLocationPoint",
+    "code": "ModelLocationPoint",
+    "name": "ModelLocationPoint",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/MooringAccessory",
+    "code": "MooringAccessory",
+    "name": "MooringAccessory",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PhysicalConnection",
+    "code": "PhysicalConnection",
+    "name": "PhysicalConnection",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PipePullingHead",
+    "code": "PipePullingHead",
+    "name": "PipePullingHead",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PipePullingHeadType",
+    "code": "PipePullingHeadType",
+    "name": "PipePullingHeadType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PipeSegment",
+    "code": "PipeSegment",
+    "name": "PipeSegment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PipeTermination",
+    "code": "PipeTermination",
+    "name": "PipeTermination",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PipeTerminationType",
+    "code": "PipeTerminationType",
+    "name": "PipeTerminationType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PointLocation",
+    "code": "PointLocation",
+    "name": "PointLocation",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PressureArmour",
+    "code": "PressureArmour",
+    "name": "PressureArmour",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/ProtectiveSheath",
+    "code": "ProtectiveSheath",
+    "name": "ProtectiveSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PullInCollar",
+    "code": "PullInCollar",
+    "name": "PullInCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PullInCollarType",
+    "code": "PullInCollarType",
+    "name": "PullInCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PullingHead",
+    "code": "PullingHead",
+    "name": "PullingHead",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/PullingHeadType",
+    "code": "PullingHeadType",
+    "name": "PullingHeadType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/ReferenceDrawing",
+    "code": "ReferenceDrawing",
+    "name": "ReferenceDrawing",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/RingGasket",
+    "code": "RingGasket",
+    "name": "RingGasket",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/RiserBalcony",
+    "code": "RiserBalcony",
+    "name": "RiserBalcony",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SacrificialSheath",
+    "code": "SacrificialSheath",
+    "name": "SacrificialSheath",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/Shackle",
+    "code": "Shackle",
+    "name": "Shackle",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SolidLayer",
+    "code": "SolidLayer",
+    "name": "SolidLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SplitCollar",
+    "code": "SplitCollar",
+    "name": "SplitCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SplitCollarType",
+    "code": "SplitCollarType",
+    "name": "SplitCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/StopperCollar",
+    "code": "StopperCollar",
+    "name": "StopperCollar",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/StopperCollarType",
+    "code": "StopperCollarType",
+    "name": "StopperCollarType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/StudSet",
+    "code": "StudSet",
+    "name": "StudSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaConnectionPoint",
+    "code": "SubseaConnectionPoint",
+    "name": "SubseaConnectionPoint",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaFlexiblePipesBsddDictionary",
+    "code": "SubseaFlexiblePipesBsddDictionary",
+    "name": "SubseaFlexiblePipesBsddDictionary",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcClassification"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaLayout",
+    "code": "SubseaLayout",
+    "name": "SubseaLayout",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaOilField",
+    "code": "SubseaOilField",
+    "name": "SubseaOilField",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcSite"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaPipeline",
+    "code": "SubseaPipeline",
+    "name": "SubseaPipeline",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuilding"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/SubseaWell",
+    "code": "SubseaWell",
+    "name": "SubseaWell",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcBuilding"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TapeLayer",
+    "code": "TapeLayer",
+    "name": "TapeLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TensileArmour",
+    "code": "TensileArmour",
+    "name": "TensileArmour",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeSegment"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TopBendStiffener",
+    "code": "TopBendStiffener",
+    "name": "TopBendStiffener",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TopBendStiffenerType",
+    "code": "TopBendStiffenerType",
+    "name": "TopBendStiffenerType",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFittingType"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TopsideConnectionPoint",
+    "code": "TopsideConnectionPoint",
+    "name": "TopsideConnectionPoint",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcPipeFitting"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/TransportLineSegment",
+    "code": "TransportLineSegment",
+    "name": "TransportLineSegment",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/UNSBoltSet",
+    "code": "UNSBoltSet",
+    "name": "UNSBoltSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/UNSStudSet",
+    "code": "UNSStudSet",
+    "name": "UNSStudSet",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [
+      "IfcMechanicalFastener"
+    ],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/WireLayer",
+    "code": "WireLayer",
+    "name": "WireLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
+  },
+  {
+    "uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1/class/WoundLayer",
+    "code": "WoundLayer",
+    "name": "WoundLayer",
+    "dictionary_uri": "https://identifier.buildingsmart.org/uri/bs-energy/subsea-flexible-pipes/2.1",
+    "class_type": "Class",
+    "parent_class_uri": null,
+    "related_ifc_entities": [],
+    "definition": null,
+    "description": null
   }
 ]
