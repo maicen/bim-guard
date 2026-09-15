@@ -8,16 +8,15 @@ Test API: https://test.bsdd.buildingsmart.org
 
 from __future__ import annotations
 
-import json
 import os
 import re
+import threading
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
+import httpx
 from cachetools import TTLCache
 
 from app.logging_config import get_logger
@@ -34,6 +33,45 @@ logger = get_logger(__name__)
 
 DEFAULT_BSDD_BASE_URL = os.getenv("BSDD_API_BASE_URL", "https://api.bsdd.buildingsmart.org")
 FALLBACK_BSDD_BASE_URL = "https://test.bsdd.buildingsmart.org"
+
+# bSDD publishes no documented rate limit (technical.buildingsmart.org/services/
+# bsdd/using-the-bsdd-api/ covers auth and headers only). Verified live against
+# api.bsdd.buildingsmart.org on 2026-09-15: bursts of 10 concurrent GETs all
+# succeeded; 12-20 concurrent GETs returned HTTP 429 with `Retry-After: 2` for
+# roughly a third to half of them. This cap stays a conservative margin below
+# that observed threshold and is shared by every BSDDClient instance in the
+# process (and one pooled/keep-alive httpx.Client), since the throttle is very
+# likely per source IP rather than per Python object.
+BSDD_MAX_CONCURRENT_REQUESTS = 8
+_bsdd_request_semaphore = threading.Semaphore(BSDD_MAX_CONCURRENT_REQUESTS)
+_bsdd_http_client: httpx.Client | None = None
+_bsdd_http_client_lock = threading.Lock()
+
+
+def _get_bsdd_http_client() -> httpx.Client:
+    """Lazily build one process-wide, connection-pooled/keep-alive httpx.Client.
+
+    Avoids a fresh TCP+TLS handshake per request (api.bsdd.buildingsmart.org is
+    EU-hosted, so that overhead alone was ~200-600ms/request) and is safe to
+    share across threads and BSDDClient instances -- httpx.Client is thread-safe
+    for concurrent requests.
+    """
+    global _bsdd_http_client
+    if _bsdd_http_client is None:
+        with _bsdd_http_client_lock:
+            if _bsdd_http_client is None:
+                _bsdd_http_client = httpx.Client(
+                    limits=httpx.Limits(
+                        max_connections=BSDD_MAX_CONCURRENT_REQUESTS,
+                        max_keepalive_connections=BSDD_MAX_CONCURRENT_REQUESTS,
+                    ),
+                    headers={
+                        "Accept": "application/json",
+                        "User-Agent": "BIMGuard-AI/1.0 (buildingSMART-Integration)",
+                    },
+                )
+    return _bsdd_http_client
+
 
 # GroupOfProperties classes (Pset_/Qto_ definitions) carry no structured
 # relatedIfcEntities field -- the only hint of which IFC entities they apply
@@ -407,28 +445,29 @@ class BSDDClient:
         if not self.enable_network:
             return None
 
+        client = _get_bsdd_http_client()
         for attempt in range(3):
             try:
-                req = urllib.request.Request(
-                    url,
-                    headers={
-                        "Accept": "application/json",
-                        "User-Agent": "BIMGuard-AI/1.0 (buildingSMART-Integration)",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode("utf-8"))
-                        self._cache[cache_key] = data
-                        return data
-            except urllib.error.HTTPError as exc:
-                if exc.code == 429 and attempt < 2:
-                    backoff = 1.5 * (attempt + 1)
-                    time.sleep(backoff)
-                    continue
-                logger.debug("bSDD HTTP request failed for %s: %s", url, exc)
+                # Bound global concurrency to the API's real (undocumented)
+                # throttle -- see BSDD_MAX_CONCURRENT_REQUESTS -- regardless of
+                # how many threads/callers are racing to fetch.
+                with _bsdd_request_semaphore:
+                    response = client.get(url, timeout=self.timeout_seconds)
+                if response.status_code == 200:
+                    data = response.json()
+                    self._cache[cache_key] = data
+                    return data
+                if response.status_code == 429:
+                    if attempt < 2:
+                        retry_after = response.headers.get("Retry-After")
+                        backoff = float(retry_after) if retry_after and retry_after.strip().isdigit() else 1.5 * (attempt + 1)
+                        time.sleep(backoff)
+                        continue
+                    logger.debug("bSDD HTTP request failed for %s: 429 Too Many Requests (retries exhausted)", url)
+                    break
+                logger.debug("bSDD HTTP request failed for %s: HTTP %s", url, response.status_code)
                 break
-            except Exception as exc:
+            except httpx.HTTPError as exc:
                 logger.debug("bSDD HTTP request failed for %s: %s", url, exc)
                 break
 

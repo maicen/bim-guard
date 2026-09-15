@@ -13,6 +13,14 @@ Usage:
     uv run python scripts/crawl_bsdd_ontology.py --curated
     uv run python scripts/crawl_bsdd_ontology.py --roots IfcDoor IfcWindow
     uv run python scripts/crawl_bsdd_ontology.py --max-classes 50 --dry-run
+
+Per-class fetches (the GroupOfProperties/domain-class N+1 fan-out, and each
+BFS level of the IFC entity walk) run concurrently via a thread pool, bounded
+by --workers (default: BSDD_MAX_CONCURRENT_REQUESTS in app/services/
+bsdd_client.py -- see that constant's comment for how the safe concurrency
+ceiling was measured against the live, undocumented bSDD throttle). The
+shared httpx.Client there also reuses connections (keep-alive) instead of
+opening a fresh TLS handshake per request.
 """
 
 from __future__ import annotations
@@ -20,13 +28,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.modules.contracts import BSDDClassItem  # noqa: E402
-from app.services.bsdd_client import CURATED_DICTIONARY_METADATA, BSDDClient  # noqa: E402
+from app.services.bsdd_client import (  # noqa: E402
+    BSDD_MAX_CONCURRENT_REQUESTS,
+    CURATED_DICTIONARY_METADATA,
+    BSDDClient,
+)
 
 IFC43_DICTIONARY_URI = "https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3"
 DEFAULT_REFERENCE_DIR = Path(__file__).resolve().parent.parent / "data" / "reference" / "bsdd"
@@ -90,75 +102,100 @@ class Crawler:
         client: BSDDClient,
         dictionary_uri: str,
         max_classes: int | None,
-        delay: float,
         existing_classes: set[str] | None = None,
+        workers: int = BSDD_MAX_CONCURRENT_REQUESTS,
     ):
         self.client = client
         self.dictionary_uri = dictionary_uri
         self.max_classes = max_classes
-        self.delay = delay
         self.existing_classes = existing_classes or set()
+        self.workers = workers
         self.visited: dict[str, BSDDClassItem] = {}
 
     def _class_uri(self, code: str) -> str:
         return f"{self.dictionary_uri}/class/{code}"
 
-    def _fetch(self, code: str) -> BSDDClassItem | None:
-        uri = self._class_uri(code)
-        if uri in self.visited:
-            return self.visited[uri]
-        if uri in self.existing_classes:
-            return None
-        if self.max_classes is not None and len(self.visited) >= self.max_classes:
-            return None
+    def _fetch_one(self, code: str) -> BSDDClassItem | None:
+        """Fetch a single class.
 
-        item = None
-        for attempt in range(4):
-            item = self.client.get_class(self.dictionary_uri, code)
-            if item is not None:
-                break
-            time.sleep(self.delay * (3**attempt) + 1.0)
-        time.sleep(self.delay)
-
-        if item is not None:
-            self.visited[uri] = item
-            print(f"  [{len(self.visited)}] {code}" + ("" if item.definition else "  (no definition)"))
-        else:
-            print(f"  ! {code} -- not found after retries")
-        return item
+        Safe to call from any thread -- the client itself caps real network
+        concurrency against bSDD and already retries 429s (honoring
+        `Retry-After`) inside get_class()/_http_get(). Retrying again here on
+        top of that would multiply requests during exactly the situation
+        (sustained throttling) where the API most needs fewer, not more.
+        """
+        return self.client.get_class(self.dictionary_uri, code)
 
     def _walk_ancestors(self, item: BSDDClassItem) -> None:
         """Fetch (but never expand) a class's parent chain up to IfcRoot."""
         code = item.parent_class_code
         while code:
-            parent = self._fetch(code)
-            if parent is None:
+            uri = self._class_uri(code)
+            if uri in self.visited:
+                code = self.visited[uri].parent_class_code
+                continue
+            if uri in self.existing_classes:
                 break
+            parent = self._fetch_one(code)
+            if parent is None:
+                print(f"  ! {code} -- not found after retries")
+                break
+            self.visited[uri] = parent
+            print(f"  [{len(self.visited)}] {code}  (ancestor)")
             code = parent.parent_class_code
 
     def crawl(self, roots: list[str]) -> None:
-        queue = list(roots)
+        """Level-order BFS over the descendant tree.
+
+        Each round's queued codes are fetched concurrently (bounded by
+        self.workers) before their children are enqueued for the next round.
+        Ancestor walks stay sequential per item -- chains are short and
+        heavily cache-deduped across siblings that share ancestors.
+        """
+        queue: list[str] = list(dict.fromkeys(roots))
+        enqueued: set[str] = {self._class_uri(c) for c in queue}
+
         while queue:
-            code = queue.pop(0)
-            if self._class_uri(code) in self.visited:
+            if self.max_classes is not None:
+                remaining = self.max_classes - len(self.visited)
+                if remaining <= 0:
+                    break
+                queue = queue[:remaining]
+
+            batch = [c for c in queue if self._class_uri(c) not in self.visited and self._class_uri(c) not in self.existing_classes]
+            queue = []
+            if not batch:
                 continue
-            item = self._fetch(code)
-            if item is None:
-                continue
-            self._walk_ancestors(item)
-            for child_code in item.child_class_codes:
-                if self._class_uri(child_code) not in self.visited:
-                    queue.append(child_code)
+
+            with ThreadPoolExecutor(max_workers=min(self.workers, len(batch))) as pool:
+                fetched = list(pool.map(self._fetch_one, batch))
+
+            next_round: list[str] = []
+            for code, item in zip(batch, fetched):
+                uri = self._class_uri(code)
+                if item is None:
+                    print(f"  ! {code} -- not found after retries")
+                    continue
+                self.visited[uri] = item
+                print(f"  [{len(self.visited)}] {code}" + ("" if item.definition else "  (no definition)"))
+                self._walk_ancestors(item)
+                for child_code in item.child_class_codes:
+                    child_uri = self._class_uri(child_code)
+                    if child_uri not in self.visited and child_uri not in enqueued:
+                        next_round.append(child_code)
+                        enqueued.add(child_uri)
+
+            queue = next_round
 
 
 def crawl_classes_by_type(
     client: BSDDClient,
     dictionary_uri: str,
     class_type: str = "class",
-    delay: float = 0.5,
     max_items: int | None = None,
     fetch_properties: bool = True,
     existing_classes: set[str] | None = None,
+    workers: int = BSDD_MAX_CONCURRENT_REQUESTS,
 ) -> dict[str, BSDDClassItem]:
     """Fetch classes of a given classType directly from a dictionary listing.
 
@@ -167,16 +204,27 @@ def crawl_classes_by_type(
     an IfcRoot ancestor inheritance tree. For classification systems without
     properties (such as Uniclass), fetch_properties=False enables fast batch paging.
     Skips any entity already stored in existing_classes.
+
+    Each page's per-class get_class() calls (the N+1 fan-out for Psets/Qtos
+    and domain classes) run concurrently, bounded by `workers` -- the client's
+    own semaphore additionally caps real network concurrency against bSDD.
+    get_class()/_http_get() already retries 429s internally (honoring
+    `Retry-After`), so this doesn't retry again on top of that -- stacking
+    retries here would multiply outbound requests during exactly the moment
+    (sustained throttling) where fewer requests, not more, are needed.
     """
     visited: dict[str, BSDDClassItem] = {}
     offset = 0
     limit = 1000 if not fetch_properties else 100
     total: int | None = None
     skipped_count = 0
+
     while total is None or offset < total:
         summaries, total = client.list_classes_by_type(dictionary_uri, class_type, offset, limit)
         if not summaries:
             break
+
+        pending: list[tuple[str, str]] = []  # (code, uri)
         for summary in summaries:
             code = summary.get("code")
             if not code:
@@ -186,8 +234,8 @@ def crawl_classes_by_type(
                 skipped_count += 1
                 continue
 
-            if max_items is not None and len(visited) >= max_items:
-                return visited
+            if max_items is not None and len(visited) + len(pending) >= max_items:
+                break
 
             if not fetch_properties:
                 item = BSDDClassItem(
@@ -201,15 +249,13 @@ def crawl_classes_by_type(
                 )
                 visited[item.uri] = item
             else:
-                item = None
-                for attempt in range(5):
-                    item = client.get_class(dictionary_uri, code)
-                    if item is not None:
-                        break
-                    backoff = delay * (2**attempt) + 1.5
-                    time.sleep(backoff)
-                time.sleep(delay)
+                pending.append((code, uri))
 
+        if pending:
+            codes = [code for code, _ in pending]
+            with ThreadPoolExecutor(max_workers=min(workers, len(codes))) as pool:
+                fetched = list(pool.map(lambda c: client.get_class(dictionary_uri, c), codes))
+            for (code, _uri), item in zip(pending, fetched):
                 if item is not None:
                     visited[item.uri] = item
                     print(f"  [{class_type} {len(visited)}/{total}] {code}")
@@ -218,7 +264,9 @@ def crawl_classes_by_type(
 
         if not fetch_properties:
             print(f"  [{class_type} {len(visited)}/{total or '?'}] (paged {len(summaries)}, skipped {skipped_count} existing)")
-            time.sleep(delay)
+
+        if max_items is not None and len(visited) >= max_items:
+            break
 
         offset += limit
     if skipped_count:
@@ -229,18 +277,18 @@ def crawl_classes_by_type(
 def crawl_group_of_properties(
     client: BSDDClient,
     dictionary_uri: str,
-    delay: float,
     max_items: int | None,
     existing_classes: set[str] | None = None,
+    workers: int = BSDD_MAX_CONCURRENT_REQUESTS,
 ) -> dict[str, BSDDClassItem]:
     """Fetch every GroupOfProperties class (Pset_/Qto_ definition) in a dictionary."""
     return crawl_classes_by_type(
         client,
         dictionary_uri,
         "groupofproperties",
-        delay,
         max_items,
         existing_classes=existing_classes,
+        workers=workers,
     )
 
 
@@ -319,7 +367,13 @@ def main() -> None:
     )
     parser.add_argument("--rebuild-ifc", action="store_true", help="Re-crawl IFC 4.3 entity hierarchy even if reference JSON exists on disk")
     parser.add_argument("--max-classes", type=int, default=None, help="Safety cap on entity/domain classes visited")
-    parser.add_argument("--delay", type=float, default=0.5, help="Seconds between bSDD requests")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=BSDD_MAX_CONCURRENT_REQUESTS,
+        help=f"Max concurrent bSDD requests (default: {BSDD_MAX_CONCURRENT_REQUESTS}, the empirically "
+        "safe margin below bSDD's undocumented throttle -- see app/services/bsdd_client.py)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Crawl and print counts without writing to disk")
     parser.add_argument(
         "--output-dir",
@@ -371,7 +425,9 @@ def main() -> None:
                 print("! No seed roots found -- skipping entity tree crawl for IFC.")
             else:
                 print(f"Seed roots ({len(roots)}): {', '.join(roots)}")
-                crawler = Crawler(bsdd_client, dict_uri, args.max_classes, args.delay, existing_classes=existing_class_uris)
+                crawler = Crawler(
+                    bsdd_client, dict_uri, args.max_classes, existing_classes=existing_class_uris, workers=args.workers
+                )
                 crawler.crawl(roots)
                 print(f"Crawled {len(crawler.visited)} IFC entity classes.")
                 all_visited.update(crawler.visited)
@@ -381,9 +437,9 @@ def main() -> None:
                 gop_visited = crawl_group_of_properties(
                     bsdd_client,
                     dict_uri,
-                    args.delay,
                     args.max_group_of_properties,
                     existing_classes=existing_class_uris,
+                    workers=args.workers,
                 )
                 print(f"Crawled {len(gop_visited)} GroupOfProperties classes.")
                 all_visited.update(gop_visited)
@@ -393,10 +449,10 @@ def main() -> None:
                 bsdd_client,
                 dict_uri,
                 "class",
-                args.delay,
                 args.max_classes,
                 fetch_properties=False,
                 existing_classes=existing_class_uris,
+                workers=args.workers,
             )
             print(f"Crawled {len(uniclass_visited)} Uniclass classes.")
             all_visited.update(uniclass_visited)
@@ -406,10 +462,10 @@ def main() -> None:
                 bsdd_client,
                 dict_uri,
                 "class",
-                args.delay,
                 args.max_classes,
                 fetch_properties=True,
                 existing_classes=existing_class_uris,
+                workers=args.workers,
             )
             print(f"Crawled {len(domain_visited)} domain classes.")
             all_visited.update(domain_visited)
