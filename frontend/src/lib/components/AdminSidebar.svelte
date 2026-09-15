@@ -10,6 +10,7 @@
     ChevronRight,
     Shield,
     Plug,
+    Lock,
   } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -38,6 +39,13 @@
       icon: Plug,
       path: "/external-providers",
       description: "Document parsing & LLM provider credentials",
+    },
+    {
+      id: "permissions",
+      label: "Role permissions",
+      icon: Lock,
+      path: "/permissions",
+      description: "Which role each gated action requires",
     },
     {
       id: "superadmin-users",

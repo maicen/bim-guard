@@ -40,6 +40,7 @@
   import SettingsView from "./routes/SettingsView.svelte";
   import OrgSettingsView from "./routes/OrgSettingsView.svelte";
   import ExternalProvidersView from "./routes/ExternalProvidersView.svelte";
+  import PermissionsView from "./routes/PermissionsView.svelte";
   import SuperadminRulesetsView from "./routes/SuperadminRulesetsView.svelte";
   import SuperadminProjectGrantsView from "./routes/SuperadminProjectGrantsView.svelte";
   import SuperadminDocumentGrantsView from "./routes/SuperadminDocumentGrantsView.svelte";
@@ -399,6 +400,7 @@
     "admin",
     "org-settings",
     "external-providers",
+    "permissions",
     "superadmin-rulesets",
     "superadmin-project-grants",
     "superadmin-document-grants",
@@ -640,6 +642,8 @@
           <OrgSettingsView />
         {:else if activeView === "external-providers"}
           <ExternalProvidersView />
+        {:else if activeView === "permissions"}
+          <PermissionsView />
         {:else if activeView === "superadmin-rulesets"}
           <SuperadminRulesetsView />
         {:else if activeView === "superadmin-project-grants"}
