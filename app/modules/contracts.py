@@ -1812,6 +1812,31 @@ class RolePermissionSetRequest(BaseModel):
 
 
 # ==============================================================================
+# Audit Log Contracts (see app/services/audit_log_service.py)
+# ==============================================================================
+
+
+class AuditLogEntryResponse(BaseModel):
+    """One recorded sensitive mutation."""
+
+    id: int
+    occurred_at: str
+    actor_id: str
+    actor_email: Optional[str] = None
+    organization_id: Optional[int] = None
+    action: str
+    resource_type: str
+    resource_id: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class AuditLogListResponse(BaseModel):
+    """A page of audit log entries, newest first."""
+
+    entries: list[AuditLogEntryResponse]
+
+
+# ==============================================================================
 # LLM Provider Instance Contracts (org-scoped — see app/modules/llm_providers)
 # ==============================================================================
 

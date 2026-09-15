@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    get_audit_log_service,
     get_document_access_service,
     get_membership_service,
     get_models_service,
@@ -65,6 +66,7 @@ from app.modules.contracts import (
     StandardOption,
 )
 from app.modules.permissions import Action
+from app.services.audit_log_service import AuditLogService
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
@@ -712,11 +714,22 @@ def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete project")
 def delete_project(
     project_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     existing: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
 ) -> None:
     """Delete a project and its associated metadata."""
     service.delete_project(project_id)
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        organization_id=existing.get("organization_id"),
+        action="project.deleted",
+        resource_type="project",
+        resource_id=project_id,
+        metadata={"name": existing.get("name")},
+    )
 
 
 @router.get("/{project_id}/ifc", summary="Download project IFC model")

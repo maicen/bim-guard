@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.bootstrap import get_container
 from app.modules.orchestrator import BIMGuard_App
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.audit_log_service import AuditLogService
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
 from app.services.bsdd_ontology_repository import (
     BSDDOntologyRepository,
@@ -127,6 +128,11 @@ def get_profile_service() -> ProfileService:
 def get_permission_service() -> PermissionService:
     """Return the configured PermissionService instance."""
     return get_container().permission_service
+
+
+def get_audit_log_service() -> AuditLogService:
+    """Return the configured AuditLogService instance."""
+    return get_container().audit_log_service
 
 
 def get_llm_provider_instances_service() -> LLMProviderInstancesService:

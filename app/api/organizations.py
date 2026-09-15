@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from postgrest.exceptions import APIError
 
 from app.api.dependencies import (
+    get_audit_log_service,
     get_document_access_service,
     get_membership_service,
     get_permission_service,
@@ -45,6 +46,7 @@ from app.modules.contracts import (
     UserSummary,
 )
 from app.modules.permissions import Action
+from app.services.audit_log_service import AuditLogService
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
 from app.services.permission_service import PermissionService
@@ -292,6 +294,7 @@ def update_member_role(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
 ) -> OrganizationMemberListResponse:
     """Update a member's role, refusing to leave the organization without an owner."""
     permissions.require(organization_id, current_user, Action.MANAGE_ORG_MEMBERS)
@@ -305,6 +308,15 @@ def update_member_role(
         memberships.update_role(organization_id, user_id, payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        organization_id=organization_id,
+        action="organization.member.role_updated",
+        resource_type="membership",
+        resource_id=user_id,
+        metadata={"new_role": payload.role},
+    )
     return list_members(organization_id, current_user, memberships, profiles)
 
 

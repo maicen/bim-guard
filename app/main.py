@@ -20,6 +20,9 @@ from app.api import (
     analyze as api_analyze,
 )
 from app.api import (
+    audit_log as api_audit_log,
+)
+from app.api import (
     auth as api_auth,
 )
 from app.api import (
@@ -216,6 +219,7 @@ TAGS_METADATA = [
     {"name": "Parsing Engines", "description": "Configured external IFC parsing engine instances."},
     {"name": "LLM Providers", "description": "Per-organization configured LLM provider instances and their models."},
     {"name": "Events", "description": "Server-Sent Events streaming of pipeline/engine progress."},
+    {"name": "Audit Log", "description": "Superadmin-only read access to the sensitive-mutation audit trail."},
     {
         "name": "Public",
         "description": "Routes that intentionally require no authentication -- public reference "
@@ -393,6 +397,7 @@ app.include_router(
 app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
 app.include_router(api_graph.router, prefix="/api", tags=["Graph & Spatial Intelligence"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
+app.include_router(api_audit_log.router, prefix="/api/audit-log", tags=["Audit Log"])
 
 
 

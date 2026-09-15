@@ -23,6 +23,7 @@ from app.modules.document_parsing.engines.docling_driver import (
 )
 from app.modules.orchestrator import BIMGuard_App
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.audit_log_service import AuditLogService
 from app.services.db_adapters import DatabaseAdapter
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
@@ -101,6 +102,7 @@ class ApplicationContainer:
     organization_document_grants_repo: DatabaseAdapter
     project_document_bindings_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
+    audit_log_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -117,6 +119,7 @@ class ApplicationContainer:
     profile_service: ProfileService
     permission_service: PermissionService
     user_admin_service: UserAdminService
+    audit_log_service: AuditLogService
     ruleset_access_service: RulesetAccessService
     document_access_service: DocumentAccessService
     analysis_service: AnalysisService
@@ -420,6 +423,21 @@ def build_default_container() -> ApplicationContainer:
         pk="id",
     )
 
+    audit_log_repo = PersistenceService.get_table(
+        "audit_log",
+        {
+            "id": int,
+            "occurred_at": str,
+            "actor_id": str,
+            "actor_email": str,
+            "organization_id": int,
+            "action": str,
+            "resource_type": str,
+            "resource_id": str,
+            "metadata": dict,
+        },
+    )
+
     parsing_engine_instances_repo = PersistenceService.get_table(
         "parsing_engine_instances",
         {
@@ -541,6 +559,8 @@ def build_default_container() -> ApplicationContainer:
     )
 
     user_admin_service = UserAdminService(PersistenceService.get_db())
+
+    audit_log_service = AuditLogService(audit_log_repo=audit_log_repo)
 
     # Seed default repo if database is empty
     try:
@@ -744,6 +764,7 @@ def build_default_container() -> ApplicationContainer:
         organization_document_grants_repo=organization_document_grants_repo,
         project_document_bindings_repo=project_document_bindings_repo,
         profiles_repo=profiles_repo,
+        audit_log_repo=audit_log_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -760,6 +781,7 @@ def build_default_container() -> ApplicationContainer:
         profile_service=profile_service,
         permission_service=permission_service,
         user_admin_service=user_admin_service,
+        audit_log_service=audit_log_service,
         ruleset_access_service=ruleset_access_service,
         document_access_service=document_access_service,
         analysis_service=analysis_service,

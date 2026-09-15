@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_permission_service, get_profile_service
+from app.api.dependencies import get_audit_log_service, get_permission_service, get_profile_service
 from app.api.organizations import _require_superadmin
 from app.auth import CurrentUser, get_current_user
 from app.modules.contracts import (
@@ -22,6 +22,7 @@ from app.modules.contracts import (
     RolePermissionSetRequest,
 )
 from app.modules.permissions import ACTION_DESCRIPTIONS, ROLE_RANK, Action
+from app.services.audit_log_service import AuditLogService
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 
@@ -76,6 +77,7 @@ def set_matrix_entry(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
     permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
 ) -> RolePermissionResponse:
     """Set the minimum role for *action*, in the scope named by the payload."""
     _require_superadmin(current_user, profiles)
@@ -91,6 +93,15 @@ def set_matrix_entry(
             detail=f"min_role must be one of {sorted(ROLE_RANK)}.",
         )
     permissions.set_min_role(payload.organization_id, resolved_action, payload.min_role)
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        organization_id=payload.organization_id,
+        action="permissions.matrix.entry_set",
+        resource_type="role_permission",
+        resource_id=resolved_action.value,
+        metadata={"min_role": payload.min_role},
+    )
     effective = permissions.get_effective_matrix(payload.organization_id)
     platform_matrix = permissions.get_effective_matrix(None)
     return RolePermissionResponse(

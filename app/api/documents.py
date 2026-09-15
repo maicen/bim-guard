@@ -20,6 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from app.api.dependencies import (
+    get_audit_log_service,
     get_document_access_service,
     get_documents_service,
     get_membership_service,
@@ -53,6 +54,7 @@ from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
 from app.modules.document_parsing.section_tree import build_section_tree
 from app.modules.permissions import Action
+from app.services.audit_log_service import AuditLogService
 from app.services.cache import cache_service
 from app.services.cde_state_machine import CDEStateMachine
 from app.services.document_access_service import DocumentAccessService
@@ -1171,8 +1173,10 @@ def preview_rule_drafts_ids(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete document")
 def delete_document(
     document_id: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     service: Annotated[DocumentService, Depends(get_documents_service)],
     access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    audit_log: Annotated[AuditLogService, Depends(get_audit_log_service)],
 ) -> None:
     """Delete a document record and its stored file."""
     access_checker(document_id, for_mutation=True)
@@ -1183,4 +1187,12 @@ def delete_document(
             detail=f"Document with ID {document_id} not found.",
         )
     service.delete_document_with_file(document_id)
+    audit_log.record(
+        actor_id=current_user.id,
+        actor_email=current_user.email,
+        action="document.deleted",
+        resource_type="document",
+        resource_id=document_id,
+        metadata={"filename": doc.get("filename")},
+    )
 
