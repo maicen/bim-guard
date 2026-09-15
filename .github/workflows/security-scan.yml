@@ -55,4 +55,4 @@ jobs:
       - name: Run gitleaks
         run: |
           docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.28.0 \
-            detect --source /repo --verbose --redact
+            detect --source /repo --config /repo/.gitleaks.toml --verbose --redact

@@ -1,0 +1,17 @@
+title = "gitleaks config for bim-guard"
+
+[extend]
+useDefault = true
+
+[allowlist]
+  # Reference/seed data: high-entropy-looking material codes (e.g. "brass_yellow_268")
+  # in the MIL-STD-889B galvanic table, not secrets.
+  paths = [
+    '''data/reference/mil_std_889b_table_ii\.json''',
+  ]
+
+  # Historical Gemini API key committed in example.env (commit f74f892), already
+  # rotated/dead and long since replaced with a placeholder in the current file.
+  regexes = [
+    '''AIzaSyA_nYcNlJjwiJypAOBaZE0cRcdSweav7vU''',
+  ]
