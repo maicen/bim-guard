@@ -731,15 +731,9 @@ class DocumentService:
                 raise ValueError(f"Invalid DocLang archive '{filename}': {exc}") from exc
             self._warn_if_invalid_doclang(doclang_xml, filename)
         elif generate_doclang:
-            try:
-                _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
-                    filename, content, parser=parser, instance=instance, return_doclang=True
-                )
-            except (ValueError, RuntimeError):
-                raise
-            except Exception as exc:
-                logger.warning("Document extraction failed filename=%s parser=%s error=%s", filename, parser, exc)
-                pages, doclang_xml, element_bboxes = [], "", []
+            _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
+                filename, content, parser=parser, instance=instance, return_doclang=True
+            )
 
         file_path = self.store_document_file(filename, content)
         created = self.create_document(

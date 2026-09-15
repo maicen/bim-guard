@@ -13,6 +13,7 @@ from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
 from app.services.rule_draft_service import RuleDraftService
 from app.services.rules_service import RuleService
+from app.utils import md5_hex
 
 
 @pytest.fixture(scope="module")
@@ -204,6 +205,19 @@ def test_upload_stores_pages_and_serves_original_file(client: TestClient) -> Non
         assert response.content == pdf_bytes
     finally:
         doc_service.delete_document_with_file(doc_id)
+
+
+def test_upload_raises_instead_of_storing_empty_document_when_no_engine_configured() -> None:
+    """No silent fallback: ingest_uploaded_bytes must raise, not store a document with empty text."""
+    from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
+
+    doc_service = DocumentService()
+    pdf_bytes = _one_page_pdf_bytes("Nothing should extract this without a configured engine")
+
+    with pytest.raises(NoParsingEngineConfiguredError):
+        doc_service.ingest_uploaded_bytes("no_engine.pdf", pdf_bytes, instance=None)
+
+    assert doc_service.find_by_md5(md5_hex(pdf_bytes)) is None
 
 
 def test_promote_draft_carries_source_document_and_snippet() -> None:

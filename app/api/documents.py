@@ -24,6 +24,7 @@ from app.api.dependencies import (
     get_documents_service,
     get_membership_service,
     get_parsing_engine_instances_service,
+    get_permission_service,
     get_profile_service,
 )
 from app.auth import CurrentUser, get_current_user, get_current_user_flexible
@@ -49,7 +50,9 @@ from app.modules.contracts import (
     RuleExtractionProgressResponse,
 )
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
+from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
 from app.modules.document_parsing.section_tree import build_section_tree
+from app.modules.permissions import Action
 from app.services.cache import cache_service
 from app.services.cde_state_machine import CDEStateMachine
 from app.services.document_access_service import DocumentAccessService
@@ -57,6 +60,7 @@ from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
 from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
+from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.utils import safe_upload_name, validate_document_upload
@@ -375,6 +379,31 @@ def _resolve_parsing_instance(
     return instances_service.get_default(None)
 
 
+def _no_parsing_engine_detail(
+    organization_id: int | None,
+    current_user: CurrentUser,
+    permissions: PermissionService,
+) -> str:
+    """Build a permission-aware error message for a failed upload with no parsing engine.
+
+    A caller who can self-serve (per the permission matrix) gets pointed at
+    where to fix it; anyone else is told to ask someone who can.
+    """
+    can_self_serve = (
+        organization_id is not None
+        and permissions.can(organization_id, current_user.id, Action.MANAGE_PARSING_ENGINES)
+    )
+    if can_self_serve:
+        return (
+            "No document parsing engine is configured. Add a Docling instance under "
+            "Admin → External Providers → Document Parsing."
+        )
+    return (
+        "No document parsing engine is configured for this organization. "
+        "Ask an organization owner or admin to configure one."
+    )
+
+
 @router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Upload document")
 async def upload_document(
     file: UploadFile = File(...),
@@ -397,6 +426,7 @@ async def upload_document(
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
     memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
     profiles: Annotated[ProfileService, Depends(get_profile_service)] = None,
+    permissions: Annotated[PermissionService, Depends(get_permission_service)] = None,
     current_user: Annotated[CurrentUser, Depends(get_current_user)] = None,
 ) -> DocumentDetailResponse:
     """Upload a specification document and generate its DocLang XML.
@@ -431,6 +461,10 @@ async def upload_document(
         from app.bootstrap import get_container
 
         profiles = get_container().profile_service
+    if permissions is None:
+        from app.bootstrap import get_container
+
+        permissions = get_container().permission_service
 
     content = await file.read()
     if not content:
@@ -504,6 +538,9 @@ async def upload_document(
             start_page=start_page,
             end_page=end_page,
         )
+    except NoParsingEngineConfiguredError as exc:
+        detail = _no_parsing_engine_detail(target_org_id, current_user, permissions)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail) from exc
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
