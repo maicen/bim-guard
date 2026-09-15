@@ -2362,6 +2362,26 @@ class BCFCommentCreatePayload(BaseModel):
     viewpoint_guid: Optional[str] = Field(None, description="Optional associated viewpoint GUID")
 
 
+class BCFCommentUpdatePayload(BaseModel):
+    """Payload for updating an existing comment's text."""
+
+    comment: str = Field(..., min_length=1, description="Replacement comment text content")
+
+
+class BCFCurrentUserResponse(BaseModel):
+    """``GET /bcf/2.1/current-user`` contract.
+
+    Present regardless of which authentication scheme fronts the API — this
+    server authenticates callers via a Supabase JWT bearer token rather than
+    the spec's OAuth2 authorization-code flow, but a BCF client still needs a
+    way to ask "who am I" once authenticated.
+    """
+
+    id: str
+    name: str
+    email: Optional[str] = None
+
+
 class BCFViewpointResponse(BaseModel):
     """BCF Topic viewpoint contract."""
 

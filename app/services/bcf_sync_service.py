@@ -17,6 +17,7 @@ neither.
 from __future__ import annotations
 
 import base64
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -25,6 +26,7 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     BCFCommentCreatePayload,
     BCFCommentResponse,
+    BCFCommentUpdatePayload,
     BCFTopicCreatePayload,
     BCFTopicResponse,
     BCFTopicUpdatePayload,
@@ -39,6 +41,19 @@ logger = get_logger(__name__)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def topic_etag(topic: BCFTopicResponse) -> str:
+    """Return an opaque, quoted ETag for a topic's current state.
+
+    Derived from the guid plus ``modified_date`` (falling back to
+    ``creation_date`` for a never-updated topic) rather than a full content
+    hash: those two already change on every write this service makes, so they
+    are sufficient to detect "this topic changed since you last read it" for
+    ``If-Match`` on ``PUT``.
+    """
+    basis = f"{topic.guid}:{topic.modified_date or topic.creation_date}"
+    return f'"{hashlib.sha256(basis.encode("utf-8")).hexdigest()[:32]}"'
 
 
 class BCFSyncService:
@@ -371,6 +386,36 @@ class BCFSyncService:
         self._comments.insert(row)
         return self._comment_from_row(row)
 
+    def update_comment(
+        self,
+        topic_guid: str,
+        comment_guid: str,
+        payload: BCFCommentUpdatePayload,
+        author: str = "BIMGUARD-AI",
+    ) -> Optional[BCFCommentResponse]:
+        """Update an existing comment's text, scoped to its topic."""
+        guid = str(comment_guid).upper()
+        row = self._comments.get(guid)
+        if not row or str(row.get("topic_guid")) != str(topic_guid).upper():
+            return None
+        updates = {
+            "comment": payload.comment,
+            "modified_date": _utc_now_iso(),
+            "modified_author": author,
+        }
+        self._comments.update(updates=updates, pk_values=guid)
+        row.update(updates)
+        return self._comment_from_row(row)
+
+    def delete_comment(self, topic_guid: str, comment_guid: str) -> bool:
+        """Delete a comment, scoped to its topic."""
+        guid = str(comment_guid).upper()
+        row = self._comments.get(guid)
+        if not row or str(row.get("topic_guid")) != str(topic_guid).upper():
+            return False
+        self._comments.delete(guid)
+        return True
+
     # ------------------------------------------------------------------
     # Viewpoints
     # ------------------------------------------------------------------
@@ -429,6 +474,98 @@ class BCFSyncService:
         if not row or not row.get("snapshot_base64"):
             return None
         return base64.b64decode(row["snapshot_base64"])
+
+    def delete_viewpoint(self, topic_guid: str, viewpoint_guid: str) -> bool:
+        """Delete a viewpoint, scoped to its topic."""
+        guid = str(viewpoint_guid).upper()
+        row = self._viewpoints.get(guid)
+        if not row or str(row.get("topic_guid")) != str(topic_guid).upper():
+            return False
+        self._viewpoints.delete(guid)
+        return True
+
+    # ------------------------------------------------------------------
+    # BCF-XML import
+    # ------------------------------------------------------------------
+
+    def import_topic(self, project_id: str, parsed_topic: dict[str, Any]) -> BCFTopicResponse:
+        """Create or replace one topic (and its comments/viewpoints) from a parsed ``.bcfzip``.
+
+        Upserts by the topic GUID the archive itself carries -- re-importing
+        the same archive updates the existing topic in place rather than
+        duplicating it, which is what a coordinator re-syncing a `.bcfzip`
+        after editing it in Revit/Solibri expects.
+
+        Args:
+            project_id: Project the imported topic is filed under.
+            parsed_topic: One entry from :func:`app.services.bcf_importer.parse_bcfzip`.
+        """
+        guid = str(parsed_topic["guid"]).upper()
+        existing = self._topics.get(guid)
+        now = _utc_now_iso()
+
+        row = {
+            "guid": guid,
+            "project_id": str(project_id),
+            "topic_type": parsed_topic.get("topic_type") or "Issue",
+            "topic_status": parsed_topic.get("topic_status") or "Open",
+            "title": parsed_topic.get("title") or "Untitled Topic",
+            "priority": parsed_topic.get("priority") or "Normal",
+            "topic_index": existing["topic_index"] if existing else len(self._topics.rows_where("project_id = ?", [str(project_id)])) + 1,
+            "creation_date": parsed_topic.get("creation_date") or (existing or {}).get("creation_date") or now,
+            "creation_author": parsed_topic.get("creation_author") or (existing or {}).get("creation_author") or "",
+            "modified_date": now,
+            "modified_author": parsed_topic.get("modified_author") or "",
+            "assigned_to": parsed_topic.get("assigned_to"),
+            "description": parsed_topic.get("description"),
+            "due_date": parsed_topic.get("due_date"),
+            "labels": parsed_topic.get("labels") or [],
+            "component_guids": parsed_topic.get("component_guids") or [],
+            "project_code": (existing or {}).get("project_code", ""),
+            "originator": (existing or {}).get("originator", ""),
+            "suitability_code": (existing or {}).get("suitability_code") or "S0",
+            "revision_code": (existing or {}).get("revision_code") or "P01.01",
+            "cde_state": (existing or {}).get("cde_state") or CDEState.WIP.value,
+        }
+        if existing:
+            self._topics.update(updates=row, pk_values=guid)
+        else:
+            self._topics.insert(row)
+
+        for comment in parsed_topic.get("comments", []):
+            comment_guid = str(comment.get("guid") or uuid.uuid4()).upper()
+            comment_row = {
+                "guid": comment_guid,
+                "topic_guid": guid,
+                "comment_date": comment.get("date") or now,
+                "author": comment.get("author") or "",
+                "comment": comment.get("comment") or "",
+                "viewpoint_guid": comment.get("viewpoint_guid"),
+            }
+            if self._comments.get(comment_guid):
+                self._comments.update(updates=comment_row, pk_values=comment_guid)
+            else:
+                self._comments.insert(comment_row)
+
+        for viewpoint in parsed_topic.get("viewpoints", []):
+            vp_guid = str(viewpoint.get("guid") or uuid.uuid4()).upper()
+            vp_row = {
+                "guid": vp_guid,
+                "topic_guid": guid,
+                "viewpoint_index": 1,
+                "perspective_camera": viewpoint.get("perspective_camera"),
+                "orthogonal_camera": viewpoint.get("orthogonal_camera"),
+                "components": viewpoint.get("components") or {},
+                "snapshot_base64": viewpoint.get("snapshot_base64"),
+            }
+            if self._viewpoints.get(vp_guid):
+                self._viewpoints.update(updates=vp_row, pk_values=vp_guid)
+            else:
+                existing_vps = self._viewpoints.rows_where("topic_guid = ?", [guid])
+                vp_row["viewpoint_index"] = len(existing_vps) + 1
+                self._viewpoints.insert(vp_row)
+
+        return self.get_topic(project_id, guid)  # type: ignore[return-value]
 
 
 # Global Singleton BCF Sync Service
