@@ -37,7 +37,7 @@ def test_bsdd_outage_fallback_performance():
 
 
 def test_bsdd_local_runtime_cache(tmp_path):
-    """Verify that BSDDOntologyRepository persists runtime classes directly to local JSON without any database."""
+    """Verify that BSDDOntologyRepository persists runtime classes directly to a local DuckDB file without any database server."""
     from app.modules.contracts import BSDDClassItem, BSDDPropertyItem
 
     repo = BSDDOntologyRepository()
@@ -63,21 +63,16 @@ def test_bsdd_local_runtime_cache(tmp_path):
     # Persist the item locally
     repo.persist_class(test_item)
 
-    # Verify JSON files exist on disk
-    runtime_classes_file = repo._cache_dir / "runtime_classes.json"
-    runtime_props_file = repo._cache_dir / "runtime_properties.json"
-    runtime_edges_file = repo._cache_dir / "runtime_class_properties.json"
-
-    assert runtime_classes_file.exists()
-    assert runtime_props_file.exists()
-    assert runtime_edges_file.exists()
+    # Verify the local DuckDB runtime cache file exists on disk
+    runtime_db = repo._cache_dir / "bsdd_runtime.duckdb"
+    assert runtime_db.exists()
 
     # Create a fresh repository pointing to the same cache directory
     fresh_repo = BSDDOntologyRepository()
     fresh_repo._cache_dir = repo._cache_dir
     fresh_repo._refresh_if_stale()
 
-    # Assert class was reloaded into memory from local JSON cache
+    # Assert class was reloaded into memory from the local DuckDB cache
     cached_class = fresh_repo.get_class_by_uri(test_item.uri)
     assert cached_class is not None
     assert cached_class.code == "CustomSensor"

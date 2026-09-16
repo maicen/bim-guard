@@ -1,8 +1,9 @@
-"""Crawl a curated branch of the bSDD IFC 4.3 hierarchy into local reference JSON.
+"""Crawl a curated branch of the bSDD IFC 4.3 hierarchy into the local reference DuckDB.
 
-Outputs bundled JSON files under data/reference/bsdd/ (bsdd_classes.json,
-bsdd_properties.json, bsdd_class_properties.json) directly from the live
-buildingSMART Data Dictionary API, completely eliminating database dependencies.
+Outputs a single bundled DuckDB file at data/reference/bsdd/bsdd_ontology.duckdb
+(see app.services.bsdd_duckdb_store) directly from the live buildingSMART Data
+Dictionary API -- an embedded, zero-server database file, not a database to run
+or connect to.
 
 The IFC *entity* hierarchy (classType=Class) is deliberately curated, not a
 full-dictionary crawl: starting from a set of seed classes, it walks each seed's
@@ -26,7 +27,6 @@ opening a fresh TLS handshake per request.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -34,6 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.modules.contracts import BSDDClassItem  # noqa: E402
+from app.services import bsdd_duckdb_store  # noqa: E402
 from app.services.bsdd_client import (  # noqa: E402
     BSDD_MAX_CONCURRENT_REQUESTS,
     CURATED_DICTIONARY_METADATA,
@@ -80,18 +81,10 @@ def default_seed_roots() -> list[str]:
     return list(DEFAULT_CORE_SEED_CLASSES)
 
 
-def load_existing_reference_json(output_dir: Path) -> tuple[dict[str, dict], dict[str, dict], list[dict]]:
-    """Load existing bundled reference JSON rows from disk if present."""
-    classes_file = output_dir / "bsdd_classes.json"
-    props_file = output_dir / "bsdd_properties.json"
-    edges_file = output_dir / "bsdd_class_properties.json"
-    if not (classes_file.exists() and props_file.exists() and edges_file.exists()):
-        return {}, {}, []
+def load_existing_reference_data(output_dir: Path) -> tuple[dict[str, dict], dict[str, dict], list[dict]]:
+    """Load existing bundled reference rows from the local DuckDB file if present."""
     try:
-        classes = {row["uri"]: row for row in json.loads(classes_file.read_text(encoding="utf-8"))}
-        props = {row["uri"]: row for row in json.loads(props_file.read_text(encoding="utf-8"))}
-        edges = json.loads(edges_file.read_text(encoding="utf-8"))
-        return classes, props, edges
+        return bsdd_duckdb_store.read_ontology_tables(output_dir / "bsdd_ontology.duckdb")
     except Exception:
         return {}, {}, []
 
@@ -270,7 +263,7 @@ def crawl_classes_by_type(
 
         offset += limit
     if skipped_count:
-        print(f"  Skipped {skipped_count} classes already stored in local reference JSON.")
+        print(f"  Skipped {skipped_count} classes already stored in the local reference DuckDB.")
     return visited
 
 
@@ -342,18 +335,16 @@ def build_rows(visited: dict[str, BSDDClassItem]) -> tuple[list[dict], list[dict
     return class_rows, list(property_rows.values()), edge_rows
 
 
-def save_local_reference_json(
+def save_local_reference_data(
     output_dir: Path,
     class_rows: list[dict],
     property_rows: list[dict],
     edge_rows: list[dict],
 ) -> None:
-    """Save crawled ontology rows directly to bundled local reference JSON files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "bsdd_classes.json").write_text(json.dumps(class_rows, indent=2), encoding="utf-8")
-    (output_dir / "bsdd_properties.json").write_text(json.dumps(property_rows, indent=2), encoding="utf-8")
-    (output_dir / "bsdd_class_properties.json").write_text(json.dumps(edge_rows, indent=2), encoding="utf-8")
-    print(f"Saved local reference JSON to {output_dir}")
+    """Save crawled ontology rows to the bundled local reference DuckDB file."""
+    db_path = output_dir / "bsdd_ontology.duckdb"
+    bsdd_duckdb_store.write_ontology_tables(db_path, class_rows, property_rows, edge_rows)
+    print(f"Saved local reference DuckDB to {db_path}")
 
 
 def main() -> None:
@@ -365,7 +356,7 @@ def main() -> None:
         action="store_true",
         help="Crawl all curated BIM-Guard compliance, regulatory, and corrosion dictionaries (IFC 4.3, ACCORD, RIR, Subsea, Uniclass 2015)",
     )
-    parser.add_argument("--rebuild-ifc", action="store_true", help="Re-crawl IFC 4.3 entity hierarchy even if reference JSON exists on disk")
+    parser.add_argument("--rebuild-ifc", action="store_true", help="Re-crawl IFC 4.3 entity hierarchy even if the reference DuckDB already has it")
     parser.add_argument("--max-classes", type=int, default=None, help="Safety cap on entity/domain classes visited")
     parser.add_argument(
         "--workers",
@@ -379,7 +370,7 @@ def main() -> None:
         "--output-dir",
         type=Path,
         default=DEFAULT_REFERENCE_DIR,
-        help="Local directory to store the crawled reference JSON files (default: data/reference/bsdd)",
+        help="Local directory to store the crawled reference DuckDB file (default: data/reference/bsdd)",
     )
     parser.add_argument(
         "--skip-group-of-properties",
@@ -398,7 +389,7 @@ def main() -> None:
     all_visited: dict[str, BSDDClassItem] = {}
 
     # Load existing reference data to merge against and skip already crawled classes
-    existing_classes, existing_props, existing_edges = load_existing_reference_json(args.output_dir)
+    existing_classes, existing_props, existing_edges = load_existing_reference_data(args.output_dir)
     existing_class_uris = set(existing_classes.keys())
 
     target_dictionaries: list[str] = []
@@ -499,7 +490,7 @@ def main() -> None:
         return
 
     if args.output_dir:
-        save_local_reference_json(
+        save_local_reference_data(
             args.output_dir,
             list(merged_classes.values()),
             list(merged_props.values()),

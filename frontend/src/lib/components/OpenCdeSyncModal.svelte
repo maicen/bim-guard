@@ -37,11 +37,14 @@
   let cdeUser: any = $state(null);
 
   // Sync Form
-  let externalCdeType = $state("Autodesk Construction Cloud (ACC)");
+  let externalCdeType = $state("BIM-Guard OpenCDE (self-hosted)");
 
   // The sync contract needs the CDE's base URL, while the picker shows the
   // platform's product name; keep the two associated here.
   const CDE_PLATFORM_URLS: Record<string, string> = {
+    // Default docker-compose `opencde` service (osama-ata/OpenCDE), authenticated
+    // via the same Supabase project as this app -- see docker-compose.yml.
+    "BIM-Guard OpenCDE (self-hosted)": "http://localhost:8081",
     "Autodesk Construction Cloud (ACC)": "https://developer.api.autodesk.com/bim360/docs/v1",
     "Autodesk BIM 360": "https://developer.api.autodesk.com/bim360/docs/v1",
     "Dalux Box": "https://api.dalux.com/opencde/v1",
@@ -223,6 +226,9 @@
                 bind:value={externalCdeType}
                 class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
               >
+                <option value="BIM-Guard OpenCDE (self-hosted)"
+                  >BIM-Guard OpenCDE (self-hosted)</option
+                >
                 <option value="Autodesk Construction Cloud (ACC)"
                   >Autodesk Construction Cloud (ACC)</option
                 >

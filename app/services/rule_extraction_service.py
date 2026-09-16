@@ -11,6 +11,10 @@ from app.modules.document_parsing.section_chunker import SectionChunker
 from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
 from app.services import extraction_progress
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
+from app.services.bsdd_ontology_repository import (
+    BSDDOntologyRepository,
+    get_bsdd_ontology_repository,
+)
 from app.services.document_pages_service import DocumentPagesService
 
 #: Node-level LLM calls to run concurrently during draft extraction. Bounded
@@ -99,6 +103,7 @@ class RuleExtractionService:
         provider: RuleExtractionProvider | None = None,
         ingestor: LlamaIndexIngestor | None = None,
         bsdd_client: BSDDClient | None = None,
+        ontology: BSDDOntologyRepository | None = None,
         generator: RuleDraftGenerator | None = None,
         draft_service: Any | None = None,
         pages_service: DocumentPagesService | None = None,
@@ -116,14 +121,42 @@ class RuleExtractionService:
                 ingested clause node's page_number), for tests that inject
                 fakes for the ingestor/generator too and shouldn't otherwise
                 hit the real `document_pages` table.
+            ontology: Injectable BSDDOntologyRepository -- bSDD grounding
+                (_ground_draft_with_bsdd) checks this local, in-process
+                ontology first and only falls back to the live `bsdd_client`
+                on a local miss, the same local-first-then-live pattern
+                BSDDOntologyRepository.get_class_cached already uses.
         """
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
         self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
+        self._ontology = ontology or get_bsdd_ontology_repository()
         self._generator = generator or LlamaIndexRuleGenerator()
         self._draft_service = draft_service
         self._pages_service = pages_service or DocumentPagesService()
         self._max_concurrent_nodes = max_concurrent_nodes
+
+    def _search_properties_grounded(self, prop_name: str) -> list[contracts.BSDDPropertyItem]:
+        """Local ontology first (in-process DuckDB, <1ms, offline), live bSDD only on a local miss.
+
+        Mirrors BSDDOntologyRepository.get_class_cached's local-first-then-live
+        pattern: the curated/previously-cached ontology answers the common
+        case instantly and without a network round trip, and only a name bSDD
+        knows about but this app hasn't crawled falls through to the live API.
+        """
+        try:
+            local_matches = self._ontology.search_properties(prop_name, limit=5)
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning("Local bSDD ontology lookup failed property_name=%s error=%s", prop_name, exc)
+            local_matches = []
+        if local_matches:
+            return local_matches
+
+        try:
+            return self._bsdd_client.search_properties(prop_name, limit=5)
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning("bSDD grounding lookup failed property_name=%s error=%s", prop_name, exc)
+            return []
 
     def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
         """Correct an extracted rule's property_set/property_name against bSDD.
@@ -143,12 +176,7 @@ class RuleExtractionService:
         if not prop_name:
             return draft
 
-        try:
-            matches = self._bsdd_client.search_properties(prop_name, limit=5)
-        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
-            logger.warning("bSDD grounding lookup failed property_name=%s error=%s", prop_name, exc)
-            return draft
-
+        matches = self._search_properties_grounded(prop_name)
         match = next((m for m in matches if m.name.strip().lower() == prop_name.lower()), None)
         if match is None or not match.property_set:
             return draft

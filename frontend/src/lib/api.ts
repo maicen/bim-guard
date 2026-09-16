@@ -2274,6 +2274,9 @@ export const namingConfigApi = {
 // enough that a bSDD revision eventually reaches the client anyway.
 const BSDD_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+// In-memory only (see listOntologyClasses) -- cleared on reload, never in localStorage.
+let ontologyClassesMemoryCache: BSDDOntologyClassSummary[] | null = null;
+
 export const bsddApi = {
   /** Classification standards a project can be coded against (Uniclass, OmniClass, IFC, ...). */
   async listDictionaries(curatedOnly: boolean = false): Promise<BSDDDictionaryItem[]> {
@@ -2320,14 +2323,21 @@ export const bsddApi = {
     return result;
   },
 
-  /** Every class in the local ontology cache -- backs the bSDD Wiki's browsable tree. */
+  /**
+   * Every class in the local ontology cache -- backs the bSDD Wiki's browsable tree.
+   *
+   * Not persisted to localStorage: the response is the full ~16k-row ontology
+   * (a multi-MB payload), and the backend already serves it from an in-memory,
+   * file-backed cache in well under 50ms (see BSDDOntologyRepository), so a
+   * 30-day localStorage copy just burns quota for no real latency win. Kept
+   * in-memory for the tab's lifetime instead, so navigating away from and
+   * back to the bSDD Wiki within one session doesn't re-fetch it.
+   */
   async listOntologyClasses(): Promise<BSDDOntologyClassSummary[]> {
-    const cacheKey = "bsdd:ontology:classes";
-    const cached = getPersistentCache<BSDDOntologyClassSummary[]>(cacheKey, BSDD_CACHE_TTL_MS);
-    if (cached) return cached;
+    if (ontologyClassesMemoryCache) return ontologyClassesMemoryCache;
     const res = await apiFetch(`${API_BASE}/bsdd/ontology/classes`);
     const result = await handleResponse<BSDDOntologyClassSummary[]>(res);
-    setPersistentCache(cacheKey, result);
+    ontologyClassesMemoryCache = result;
     return result;
   },
 

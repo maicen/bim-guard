@@ -41,6 +41,7 @@ dependencies = [
     "rdflib>=7.1.0",
     "pyshacl>=0.30.0",
     "doclang[schematron-saxon]>=0.7.3",
+    "duckdb>=1.5.5",
 ]
 
 [project.scripts]

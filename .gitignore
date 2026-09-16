@@ -49,6 +49,11 @@ data/cache/ifc-release/
 # in that script.
 data/cache/ifc2x3-release/
 
+# Dynamic runtime cache of live bSDD lookups (app/services/bsdd_ontology_repository.py),
+# opportunistic and fully regenerable from the live API -- the curated baseline
+# lives in the tracked data/reference/bsdd/bsdd_ontology.duckdb instead.
+data/cache/bsdd/
+
 # Validation sweep inputs/outputs: ~1.8 GB, fully regenerable.
 # Models re-download from the URLs in the validation dataset doc; BCF
 # archives re-export from the cached per-model results. The evidentiary
