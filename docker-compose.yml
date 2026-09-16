@@ -145,6 +145,39 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # ── Default: self-hosted OpenCDE server (buildingSMART OpenCDE Documents API) ─
+  # osama-ata/OpenCDE (a modernized fork of Dangl.OpenCDE) -- verifies bearer
+  # tokens against BIM-Guard's own Supabase JWKS, so BIM-Guard users authenticate
+  # to it with their existing session token. Built via docker/opencde/Dockerfile,
+  # which clones the fork's `develop` branch and additionally compiles the
+  # Angular admin UI (dangl-opencde-ui) that the fork's own Dockerfile skips --
+  # ASPNETCORE_ENVIRONMENT is Production here specifically so the compiled UI is
+  # served as static files instead of proxied to a (nonexistent) `ng serve` on
+  # :4200. OPENCDE_* below are only needed if you point the sync modal's "CDE
+  # server URL" somewhere other than this container's default http://localhost:8081.
+  opencde:
+    build:
+      context: ./docker/opencde
+    image: bim-guard-opencde:latest
+    container_name: bim-guard-opencde
+    ports:
+      - "${OPENCDE_PORT:-8081}:80"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${OPENCDE_ASPNETCORE_ENVIRONMENT:-Production}
+      AppBaseUrl: ${OPENCDE_APP_BASE_URL:-http://localhost:8081}
+      # Same Supabase project BIM-Guard's own users sign in against, so the
+      # caller's BIM-Guard access token authenticates here unchanged.
+      Supabase__Url: ${SUPABASE_URL}
+      # Publishable/anon key -- safe to expose to the browser. Lets the
+      # server's own UI (http://localhost:8081) sign users in directly via
+      # Supabase Auth; leave unset and its login screen just stays disabled.
+      Supabase__AnonKey: ${SUPABASE_PUBLISHABLE_KEY:-}
+      ConnectionStrings__Sqlite: "Data Source=/data/opencde.db"
+      StorageSettings__LocalDiskBasePath: /data/files
+    volumes:
+      - bim-guard-opencde-data:/data
+    restart: unless-stopped
+
   # ── Optional: Cloudflare Tunnel for secure public domain routing ───────────
   # Official cloudflared client container (https://hub.docker.com/r/cloudflare/cloudflared).
   # Establishes an outbound encrypted tunnel to Cloudflare's edge without opening
@@ -178,4 +211,6 @@ volumes:
     name: bim-guard-logs
   bim-guard-neo4j-data:
     name: bim-guard-neo4j-data
+  bim-guard-opencde-data:
+    name: bim-guard-opencde-data
 
