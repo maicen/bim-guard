@@ -9,6 +9,19 @@ import * as THREE from "https://esm.sh/three@0.182.0";
 import JSZip from "https://esm.sh/jszip@3.10.1";
 import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-5";
 import { colorGroupsFromComponentColors, styleNameForColor } from "./bcf-colors.js?v=viewer-band-colors-1";
+import { normalizeMounts, VIEWER_MOUNTS_API } from "./viewer-mounts.js?v=viewer-band-colors-2";
+
+/**
+ * What the Svelte host checks before it trusts this module.
+ *
+ * A bundle that exports nothing here predates the mounts contract, which means
+ * /static is being served from an older checkout than the app. Re-exported
+ * rather than redefined so there is one source of truth.
+ */
+export { VIEWER_MOUNTS_API };
+
+/** Cache-busting token this file is published under; kept beside the API version. */
+export const VIEWER_ASSET_VERSION = "viewer-band-colors-2";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -1059,11 +1072,27 @@ function createDrawingsModule(components, world, viewsModule, layersModule, topi
 }
 
 export async function initViewer(mounts) {
-    const viewportHost = mounts?.viewport;
-    const detailsHost = mounts?.details;
-    const drawingsHost = mounts?.drawings;
-    if (!viewportHost) {
-        console.error("initViewer: a viewport mount element is required", mounts);
+    // Both the current { viewport, details, drawings } form and the older
+    // single-container one are accepted; see viewer-mounts.js for why, and for
+    // the error text when neither resolves.
+    let viewportHost;
+    let detailsHost;
+    let drawingsHost;
+    try {
+        const resolved = normalizeMounts(mounts, {
+            getElementById: (id) => document.getElementById(id),
+        });
+        viewportHost = resolved.viewport;
+        detailsHost = resolved.details;
+        drawingsHost = resolved.drawings;
+        if (resolved.form !== "mounts") {
+            console.warn(
+                `${LOG} initViewer received the legacy ${resolved.form} form; ` +
+                "the details dock and drawings board will not be mounted.",
+            );
+        }
+    } catch (err) {
+        console.error(`${LOG} ${err.message}`, mounts);
         return null;
     }
 
