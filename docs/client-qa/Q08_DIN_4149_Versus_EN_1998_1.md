@@ -39,7 +39,11 @@ and a DIN 4149 edition dated 2022, with per-standard values. That was wrong: nei
 per-standard values attributed to them were not taken from either standard. The
 file was corrected on 2026-09-13 (schema 1.1.0); the full account is in
 `docs/planning/sb001_provenance_2026-09-13.md`. The brace angle was re-sourced to
-the Hilti Seismic Manual on 2026-09-16 (schema 1.2.0).
+the Hilti Seismic Manual on 2026-09-16 (schema 1.2.0), and the brace spacing was
+re-sourced to the same manual later the same day (schema 1.3.0). The pipe
+diameter threshold was checked against the same fabrication pattern at that
+point too: it carries it, but no sourced replacement exists, so it is now
+labelled unsourced rather than authored.
 
 Every threshold in the file now carries a provenance block with a `status`:
 
@@ -48,15 +52,16 @@ Every threshold in the file now carries a provenance block with a `status`:
 | Importance factor, hospital / standard | 1.5 / 1.0 | sourced | FEMA E-74 §5.3.1; ASCE/SEI 7-10 §13.1.3 |
 | Duct area bracing threshold | 0.557 m² (6 sq ft) | sourced | FEMA E-74 §6.4.6.1 |
 | Clearance from structure | 200 mm | authored | No source gives a braced-service clearance |
-| Restraint spacing, transverse / longitudinal | 1.0 m / 1.5 m | authored | Screening values far tighter than FEMA E-74's sample-spec maxima (40/80 ft ductile pipe) |
-| Pipe diameter threshold | 63 mm | authored | Inside the ~1–3 in exemption band FEMA E-74 reports for ASCE 7-10 |
+| Restraint spacing, transverse / longitudinal | 12 m / 24 m | sourced | Hilti Seismic Manual (05/2022), citing NFPA 13 / EN 12845 Annex E |
+| Pipe diameter threshold | 63 mm | unsourced | Same fabrication pattern as the former angle and spacing values; no sourced replacement found |
 | Brace angle | 30°–60° from horizontal | sourced | Hilti Seismic Manual (05/2022), Annex A: nominal 45° ± 15° on the horizontal level (vendor manual applying EN 1998-1, not a code) |
 | Ideal angle / tolerance | 45° / 15° | sourced | The same manual's stated nominal angle and tolerance |
 | Seismic-zone, hospital and adjacent-system additions | 0 mm | authored | No source gives a clearance addition |
 
-**Authored** means BIMGUARD screening calibration, not a code value. SB-001 is a
-screening tool; it is not a substitute for design to ASCE/SEI 7-10 §13.6 or
-EN 1998-1.
+**Authored** means BIMGUARD screening calibration, not a code value. **Unsourced**
+means neither a code value nor a BIMGUARD calibration — an unverified figure kept
+only because no sourced replacement is available. SB-001 is a screening tool; it
+is not a substitute for design to ASCE/SEI 7-10 §13.6 or EN 1998-1.
 
 ## When Each Applies
 
@@ -109,8 +114,9 @@ to the structural engineer of record and the building control authority.
 
 1. Get the structural engineer of record to confirm the governing framework in
    writing — for Cologne, EN 1998-1 with DIN EN 1998-1/NA.
-2. Treat SB-001 findings as screening. The 200 mm clearance and 1.0/1.5 m spacing
-   are authored calibration; your bracing designer's calculations govern.
+2. Treat SB-001 findings as screening. The 200 mm clearance is authored
+   calibration and the 12/24 m spacing is sourced to a vendor manual, not a
+   code; either way, your bracing designer's calculations govern.
 3. If a contract cites DIN 4149, raise it: the standard is withdrawn.
 4. Attach the configuration file to any submission, and quote its
    `provenance_summary` statement alongside the findings.

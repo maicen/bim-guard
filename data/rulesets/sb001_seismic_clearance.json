@@ -1,14 +1,16 @@
 {
   "metadata": {
     "ruleset_id": "BIMGUARD-SB-001",
-    "schema_version": "1.2.0",
+    "schema_version": "1.3.0",
     "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds except where marked sourced, not code values)",
     "region": "EU / Germany",
-    "created_by": "hermes_config_expanded.py (v1.0.0); provenance re-labelled by hand 2026-09-13 (v1.1.0); brace angle re-sourced by hand 2026-09-16 (v1.2.0)",
+    "created_by": "hermes_config_expanded.py (v1.0.0); provenance re-labelled by hand 2026-09-13 (v1.1.0); brace angle re-sourced by hand 2026-09-16 (v1.2.0); brace spacing re-sourced by hand 2026-09-16 (v1.3.0)",
     "standards_cited": [
       "FEMA E-74 (4th ed., December 2012)",
       "ASCE/SEI 7-10 \u00a713.6",
-      "Hilti Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System (05/2022)"
+      "Hilti Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System (05/2022)",
+      "NFPA 13 (via Hilti Seismic Manual)",
+      "EN 12845 Annex E (via Hilti Seismic Manual)"
     ],
     "governing_codes": [
       {
@@ -35,8 +37,8 @@
       {
         "code": "Hilti Seismic Manual (05/2022)",
         "title": "Earthquake-resistant design of MEP supports, MT System \u2013 Hilti Corporation, document W4571 EN, 05/2022",
-        "relevant_clause": "Annex A, \"Tilt angle \u2013 for all bracings\" (45\u00b0 \u00b1 15\u00b0); worked example \u00a72.4.3",
-        "note": "A vendor design manual applying EN 1998-1 to MEP supports, not a code. It is the source of angle_constraints. It states the brace tilt angle on the horizontal level, the same datum this config uses. NFPA 13-based product literature (Eaton, nVent, Hilti US anchor load tables) measures brace angle from vertical instead and tabulates 30-90 degrees from vertical; that convention is not used here."
+        "relevant_clause": "Annex A, \"Tilt angle \u2013 for all bracings\" (45\u00b0 \u00b1 15\u00b0); worked example \u00a72.4.3; sprinkler pipe restraint spacing, citing NFPA 13 / EN 12845 Annex E (transverse 12 m / longitudinal 24 m)",
+        "note": "A vendor design manual applying EN 1998-1 to MEP supports, not a code. It is the source of angle_constraints and, via its NFPA 13 / EN 12845 Annex E citation, of brace_types[*].spacing_transverse_m and spacing_longitudinal_m. It states the brace tilt angle on the horizontal level, the same datum this config uses. NFPA 13-based product literature (Eaton, nVent, Hilti US anchor load tables) measures brace angle from vertical instead and tabulates 30-90 degrees from vertical; that convention is not used here."
       }
     ],
     "data_gaps": [
@@ -53,6 +55,18 @@
       "ASCE/SEI 7-10"
     ],
     "changelog": [
+      {
+        "version": "1.3.0",
+        "date": "2026-09-16",
+        "changes": [
+          "Replaced the brace spacing constants with values stated by a held source. brace_types.*.spacing_transverse_m 1.0 -> 12.0, spacing_longitudinal_m 1.5 -> 24.0 (metres).",
+          "Source: Hilti Seismic Manual, Earthquake-resistant design of MEP supports, MT System (05/2022), citing NFPA 13 / EN 12845 Annex E, sprinkler pipe restraint spacing 12 m transverse / 24 m longitudinal.",
+          "Both spacing thresholds are now status=sourced (were status=authored). The prior 1.0 m / 1.5 m values and their 'BIMGUARD authored calibration' label were inaccurate: per docs/planning/sb001_spacing_investigation.md (D:/claude-workspace/hilti-seismic), the values are the same unverified Hermes research pass that produced the fabricated brace angle, compounded by a feet-written-as-inches unit error. The Hermes summary's invented \"NFPA 13-2021\" entry read \"40 in (transverse), 60 in (longitudinal)\" and its invented \"EN 1998-1:2020\" entry read \"1.0 m (transverse), 1.5 m (longitudinal)\" -- the same two figures, one in each unit system, with the longitudinal value also carrying a digit change (80 -> 60) before being written in inches. hermes_config_expanded.py's min() merge then kept the smaller (EN) pair as-is. The real NFPA 13 figure the corrupted \"40\" belongs to is 40 ft transverse / 80 ft longitudinal (12.19 m / 24.38 m), which the Hilti Seismic Manual reports directly as 12 m / 24 m.",
+          "Cross-checked thresholds.pipe_diameter_mm (63.0, introduced in the same commit as the fabricated angle and spacing) against the same unit-mirroring signature: EN 63 mm = 2.48 in approx-equals NFPA's reported \"2.5 in\", the same pattern as the spacing values. No source held in the hilti-seismic corpus states a pipe-diameter seismic-bracing exemption threshold (NFPA 13, UFGS 23 05 48.19 and the Hilti Seismic Manual were searched; none give one), so the value is left unchanged at 63.0 but its status is corrected from authored to unsourced: it was never a BIMGUARD screening choice, it is the unverified Hermes figure with no available sourced replacement.",
+          "No SB-001 code path evaluates spacing_transverse_m, spacing_longitudinal_m or pipe_diameter_mm for a modelled brace at this commit beyond the SB-001.01/.03/.04 seeded numeric-comparison rules; halo_volume_generator.load_clearance_config reads all three into ClearanceRule. No current finding's severity or band changes as a result of this correction; only the values and their provenance change.",
+          "provenance_summary updated: 9 sourced, 0 derived, 4 authored, 1 unsourced (was 7 / 0 / 7)."
+        ]
+      },
       {
         "version": "1.2.0",
         "date": "2026-09-16",
@@ -86,10 +100,11 @@
     ]
   },
   "provenance_summary": {
-    "sourced": 7,
+    "sourced": 9,
     "derived": 0,
-    "authored": 7,
-    "statement": "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 \u00a713.6 or EN 1998-1. Sourced: the two component importance factors and the duct area threshold (FEMA E-74), and the four brace angle constraints (Hilti Seismic Manual 05/2022). Spacing, clearance and the pipe diameter threshold remain authored screening calibration."
+    "authored": 4,
+    "unsourced": 1,
+    "statement": "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 \u00a713.6 or EN 1998-1. Sourced: the two component importance factors and the duct area threshold (FEMA E-74), the four brace angle constraints (Hilti Seismic Manual 05/2022), and the two brace spacing values (Hilti Seismic Manual 05/2022, citing NFPA 13 / EN 12845 Annex E). Clearance additions and the base clearance remain authored screening calibration. The pipe diameter threshold is marked unsourced: it is an unverified figure from the same fabricated research pass as the former angle and spacing values, with no sourced replacement found in the sources held."
   },
   "provenance": {
     "importance_factors.hospital": {
@@ -126,22 +141,24 @@
       "note": "E-74 exempts HVAC ducts with cross-sectional area under 6 sq ft (or weighing under 17 lb/ft) where impact is avoided or protected against; bracing is required above that or for ducts carrying hazardous materials. 6 sq ft = 0.557 m\u00b2: the metric conversion is BIMGUARD's, as E-74 is US customary throughout and gives no metric equivalent for this value. At schema 1.1.0 no SB-001 code path reads this value."
     },
     "brace_types.*.spacing_transverse_m": {
-      "value": 1.0,
-      "status": "authored",
+      "value": 12.0,
+      "status": "sourced",
       "source": {
-        "document": "BIMGUARD SB-001 authored calibration",
-        "upstream_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a73.9.D.6-7, pp. A-12 to A-13 (PDF pp. 750-751)"
+        "document": "Hilti Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Sprinkler pipe restraint spacing, citing NFPA 13 / EN 12845 Annex E",
+        "detail": "Transverse restraint spacing 12 m."
       },
-      "note": "Authored conservative calibration. Upstream reference: FEMA E-74 App. A \u00a73.9.D.6-7 gives maxima of 40 ft (12.19 m) for ductile and 20 ft (6.10 m) for nonductile pipe, from a sample specification intended to be customised. BIMGUARD's value is approximately 6-12\u00d7 tighter and is a screening threshold, not a code requirement. Not applicable to ducts: E-74 gives no duct brace spacing."
+      "note": "Sourced. Replaces the former 1.0, which was not BIMGUARD calibration: it was the same unverified Hermes research pass that produced the fabricated brace angle, with an additional feet-written-as-inches unit corruption -- the same figure, stated once in metres and once (corrupted) in inches by that pass's two invented per-standard entries, survived a min() merge across them. The real value the corrupted figure belongs to is 40 ft (12.19 m), which this source states directly as 12 m. See changelog 1.3.0 and D:/claude-workspace/hilti-seismic/sb001_spacing_investigation.md."
     },
     "brace_types.*.spacing_longitudinal_m": {
-      "value": 1.5,
-      "status": "authored",
+      "value": 24.0,
+      "status": "sourced",
       "source": {
-        "document": "BIMGUARD SB-001 authored calibration",
-        "upstream_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, Appendix A \u00a73.9.D.6, p. A-13 (PDF p.751)"
+        "document": "Hilti Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Sprinkler pipe restraint spacing, citing NFPA 13 / EN 12845 Annex E",
+        "detail": "Longitudinal restraint spacing 24 m."
       },
-      "note": "Authored conservative calibration. Upstream: FEMA E-74 App. A \u00a73.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft (12.19 m) nonductile. Same screening rationale as the transverse value. Not applicable to ducts."
+      "note": "Sourced. Replaces the former 1.5, from the same fabricated Hermes pass as the transverse value, with an extra digit change (the real 80 ft became 60 in before conversion to 1.5 m). The real NFPA 13 value is 80 ft (24.38 m), which this source states directly as 24 m. See changelog 1.3.0 and D:/claude-workspace/hilti-seismic/sb001_spacing_investigation.md."
     },
     "clearance_rules.base_from_structure_mm": {
       "value": 200.0,
@@ -154,13 +171,13 @@
     },
     "thresholds.pipe_diameter_mm": {
       "value": 63.0,
-      "status": "authored",
+      "status": "unsourced",
       "source": {
-        "document": "BIMGUARD SB-001 authored calibration",
+        "document": "Unverified Hermes research pass (docs/validation/data/hermes_standards_research_summary.json), same origin as the pre-2026-09-16 brace angle and pre-2026-09-16 brace spacing values",
         "related_reference": "FEMA E-74, Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, 4th ed., December 2012, \u00a76.4.3.1, p.6-238 (PDF p.331)",
         "upstream": "ASCE/SEI 7-10 \u00a713.6 (not held)"
       },
-      "note": "Within the ASCE 7-10 exemption band as reported by FEMA E-74 \u00a76.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) depending on seismic design category and occupancy. 63 mm \u2248 2.48 in falls inside that band. Not a stated standard value."
+      "note": "Not a BIMGUARD authored calibration and not a stated standard value: this is an unverified figure carried over from the same fabricated Hermes research pass that produced the brace angle and brace spacing values (see changelog 1.2.0 and 1.3.0), flagged by the same unit-mirroring signature (EN 63 mm \u2248 2.48 in, close to NFPA's reported \u22482.5 in). Falls within the ASCE 7-10 exemption band FEMA E-74 \u00a76.4.3.1 reports (roughly 1 to 3 in / 25.4-76.2 mm depending on seismic design category and occupancy), but that band does not fix a single threshold, so it does not confirm the value. No document in D:/claude-workspace/hilti-seismic/sources (NFPA 13, UFGS 23 05 48.19, Hilti Seismic Manual) states a pipe-diameter seismic-bracing exemption threshold, so no sourced replacement is available; the value is left at 63.0 pending one and is marked unsourced/placeholder rather than authored."
     },
     "angle_constraints.min_degrees": {
       "value": 30.0,
@@ -245,8 +262,8 @@
   "brace_types": {
     "angle_fire": {
       "standard_sizes": [],
-      "spacing_transverse_m": 1.0,
-      "spacing_longitudinal_m": 1.5,
+      "spacing_transverse_m": 12.0,
+      "spacing_longitudinal_m": 24.0,
       "clearance_mm": 200.0,
       "base_footprint_mm": [
         120,
@@ -255,8 +272,8 @@
     },
     "angle_mechanical": {
       "standard_sizes": [],
-      "spacing_transverse_m": 1.0,
-      "spacing_longitudinal_m": 1.5,
+      "spacing_transverse_m": 12.0,
+      "spacing_longitudinal_m": 24.0,
       "clearance_mm": 200.0,
       "base_footprint_mm": [
         120,
@@ -265,8 +282,8 @@
     },
     "cable": {
       "standard_sizes": [],
-      "spacing_transverse_m": 1.0,
-      "spacing_longitudinal_m": 1.5,
+      "spacing_transverse_m": 12.0,
+      "spacing_longitudinal_m": 24.0,
       "clearance_mm": 200.0,
       "base_footprint_mm": [
         50,
@@ -275,8 +292,8 @@
     },
     "rod": {
       "standard_sizes": [],
-      "spacing_transverse_m": 1.0,
-      "spacing_longitudinal_m": 1.5,
+      "spacing_transverse_m": 12.0,
+      "spacing_longitudinal_m": 24.0,
       "clearance_mm": 200.0,
       "base_footprint_mm": [
         100,
@@ -301,6 +318,9 @@
     "FEMA (2012). Reducing the Risks of Nonstructural Earthquake Damage \u2013 A Practical Guide, FEMA E-74, 4th ed. Federal Emergency Management Agency. December 2012.",
     "ASCE (2010). Minimum Design Loads for Buildings and Other Structures, ASCE/SEI 7-10. American Society of Civil Engineers, Reston, Virginia. \u00a713.6 (not held; cited via FEMA E-74).",
     "CEN. EN 1998-1:2004+A1:2013, Eurocode 8: Design of structures for earthquake resistance \u2013 Part 1: General rules, seismic actions and rules for buildings. \u00a74.3.5. Gives no MEP dimensional rules.",
-    "DIN. DIN EN 1998-1/NA:2018-10, National Annex \u2013 Nationally determined parameters for EN 1998-1. Gives no MEP dimensional rules."
+    "DIN. DIN EN 1998-1/NA:2018-10, National Annex \u2013 Nationally determined parameters for EN 1998-1. Gives no MEP dimensional rules.",
+    "Hilti Corporation (2022). Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System. Document W4571 EN, 05/2022. Source of angle_constraints (Annex A) and of brace_types[*].spacing_transverse_m / spacing_longitudinal_m (sprinkler pipe restraint spacing, citing NFPA 13 / EN 12845 Annex E).",
+    "NFPA 13, Standard for the Installation of Sprinkler Systems. Not held directly; cited via the Hilti Seismic Manual for the 12 m / 24 m restraint spacing.",
+    "CEN. EN 12845, Fixed firefighting systems \u2013 Automatic sprinkler systems \u2013 Design, installation and maintenance, Annex E. Not held directly; cited via the Hilti Seismic Manual for the 12 m / 24 m restraint spacing."
   ]
 }
