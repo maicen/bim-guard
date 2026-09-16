@@ -1,4 +1,4 @@
-"""Ingest the official IFC 4.3.2.0 release into local bSDD reference JSON.
+"""Ingest the official IFC 4.3.2.0 release into the local bSDD reference DuckDB.
 
 Alternative source for scripts/crawl_bsdd_ontology.py's IFC 4.3 portion: instead
 of crawling api.bsdd.buildingsmart.org one class/Pset at a time (subject to an
@@ -50,8 +50,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.crawl_bsdd_ontology import (  # noqa: E402
     DEFAULT_REFERENCE_DIR,
     IFC43_DICTIONARY_URI,
-    load_existing_reference_json,
-    save_local_reference_json,
+    load_existing_reference_data,
+    save_local_reference_data,
 )
 
 RELEASE_ZIP_URL = "https://raw.githubusercontent.com/buildingSMART/Standards-builds/main/IFC/RELEASE/IFC4_3/IFC4.3.2.0.zip"
@@ -435,7 +435,7 @@ def main() -> None:
         "--output-dir",
         type=Path,
         default=DEFAULT_REFERENCE_DIR,
-        help="Local directory to store the merged reference JSON files (default: data/reference/bsdd)",
+        help="Local directory to store the merged reference DuckDB file (default: data/reference/bsdd)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Parse and print counts without writing to disk")
     parser.add_argument("--skip-entities", action="store_true", help="Skip the EXPRESS entity hierarchy, ingest only Pset_/Qto_ classes")
@@ -468,7 +468,7 @@ def main() -> None:
                 new_props[uri] = row
             new_edges.extend(psd_edges)
 
-    existing_classes, existing_props, existing_edges = load_existing_reference_json(args.output_dir)
+    existing_classes, existing_props, existing_edges = load_existing_reference_data(args.output_dir)
     merged_classes, merged_props, merged_edges = merge_reference_data(
         existing_classes, existing_props, existing_edges, new_classes, new_props, new_edges
     )
@@ -482,7 +482,7 @@ def main() -> None:
         print("Dry run -- not writing to disk.")
         return
 
-    save_local_reference_json(
+    save_local_reference_data(
         args.output_dir,
         list(merged_classes.values()),
         list(merged_props.values()),

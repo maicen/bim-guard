@@ -1,22 +1,25 @@
 """Local-first and 100% database-independent lookup layer for the bSDD ontology.
 
-Sits in front of BSDDClient: curated reference ontologies are bundled locally
-under data/reference/bsdd/ (bsdd_classes.json, bsdd_properties.json,
-bsdd_class_properties.json), and dynamic live lookups persist to local JSON in
-data/cache/bsdd/. Lookups resolve entirely in-process (< 50ms cold start, < 1ms
-memory lookup) with zero database tables, zero network latency, and zero remote
-database reliance.
+Sits in front of BSDDClient: the curated reference ontology is bundled locally
+as a single DuckDB file (data/reference/bsdd/bsdd_ontology.duckdb, built by
+scripts/crawl_bsdd_ontology.py / scripts/ingest_ifc_release.py), and dynamic
+live lookups persist to a local DuckDB runtime cache in
+data/cache/bsdd/bsdd_runtime.duckdb (see app.services.bsdd_duckdb_store).
+Both are loaded into plain Python dicts on startup, so lookups resolve
+entirely in-process (< 50ms cold start, < 1ms memory lookup) with zero
+database *server*, zero network latency, and zero remote database reliance --
+DuckDB here is just an embedded file format, not a service to run or connect to.
 """
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from typing import Any, Optional
 
 from app.logging_config import get_logger
 from app.modules.contracts import BSDDClassItem, BSDDPropertyItem
+from app.services import bsdd_duckdb_store
 from app.services.bsdd_client import BSDDClient
 
 logger = get_logger(__name__)
@@ -44,58 +47,40 @@ class BSDDOntologyRepository:
 
     def _load_from_local_reference(self) -> bool:
         """Load curated bSDD baseline and dynamic runtime cache synchronously (< 50ms)."""
-        classes_file = self._reference_dir / "bsdd_classes.json"
-        props_file = self._reference_dir / "bsdd_properties.json"
-        edges_file = self._reference_dir / "bsdd_class_properties.json"
-
-        if not (classes_file.exists() and props_file.exists() and edges_file.exists()):
+        reference_db = self._reference_dir / "bsdd_ontology.duckdb"
+        if not reference_db.exists():
             return False
 
         try:
-            classes_rows = json.loads(classes_file.read_text(encoding="utf-8"))
-            props_rows = json.loads(props_file.read_text(encoding="utf-8"))
-            edges_rows = json.loads(edges_file.read_text(encoding="utf-8"))
-
-            if not classes_rows:
+            classes_by_uri, properties_by_uri, edge_rows = bsdd_duckdb_store.read_ontology_tables(reference_db)
+            if not classes_by_uri:
                 return False
 
-            self._classes_by_uri = {row["uri"]: row for row in classes_rows}
-            self._properties_by_uri = {row["uri"]: row for row in props_rows}
+            self._classes_by_uri = classes_by_uri
+            self._properties_by_uri = properties_by_uri
             edges_by_class: dict[str, list[dict[str, Any]]] = {}
-            for row in edges_rows:
+            for row in edge_rows:
                 edges_by_class.setdefault(row["class_uri"], []).append(row)
             self._edges_by_class = edges_by_class
 
-            # Merge dynamic runtime cache if present
-            runtime_classes_file = self._cache_dir / "runtime_classes.json"
-            runtime_props_file = self._cache_dir / "runtime_properties.json"
-            runtime_edges_file = self._cache_dir / "runtime_class_properties.json"
-
-            if runtime_classes_file.exists():
-                rt_classes = json.loads(runtime_classes_file.read_text(encoding="utf-8"))
-                for row in rt_classes:
-                    self._classes_by_uri[row["uri"]] = row
-
-            if runtime_props_file.exists():
-                rt_props = json.loads(runtime_props_file.read_text(encoding="utf-8"))
-                for row in rt_props:
-                    self._properties_by_uri[row["uri"]] = row
-
-            if runtime_edges_file.exists():
-                rt_edges = json.loads(runtime_edges_file.read_text(encoding="utf-8"))
-                for row in rt_edges:
-                    self._edges_by_class.setdefault(row["class_uri"], []).append(row)
+            # Merge dynamic runtime cache (live-fetched classes, cached opportunistically) if present.
+            runtime_db = self._cache_dir / "bsdd_runtime.duckdb"
+            rt_classes, rt_properties, rt_edges = bsdd_duckdb_store.read_ontology_tables(runtime_db)
+            self._classes_by_uri.update(rt_classes)
+            self._properties_by_uri.update(rt_properties)
+            for row in rt_edges:
+                self._edges_by_class.setdefault(row["class_uri"], []).append(row)
 
             self._cached_at = time.time()
             logger.debug(
-                "Loaded local bSDD reference files (%d classes, %d properties, %d classes with edges) in <50ms",
+                "Loaded local bSDD reference DuckDB (%d classes, %d properties, %d classes with edges) in <50ms",
                 len(self._classes_by_uri),
                 len(self._properties_by_uri),
                 len(self._edges_by_class),
             )
             return True
         except Exception:
-            logger.exception("Failed to load local bSDD reference JSON files")
+            logger.exception("Failed to load local bSDD reference DuckDB")
             return False
 
     def _refresh_if_stale(self) -> None:
@@ -215,6 +200,7 @@ class BSDDOntologyRepository:
                 "name": row["name"],
                 "class_type": row.get("class_type") or "Class",
                 "parent_class_uri": row.get("parent_class_uri"),
+                "dictionary_uri": row.get("dictionary_uri"),
             }
             for row in self._classes_by_uri.values()
         ]
@@ -251,11 +237,12 @@ class BSDDOntologyRepository:
     # ── Write path: opportunistic caching of a live bSDD lookup ────────────
 
     def persist_class(self, item: BSDDClassItem) -> None:
-        """Persist a live-fetched class into in-memory ontology and local JSON cache.
+        """Persist a live-fetched class into in-memory ontology and the local DuckDB runtime cache.
 
         Never raises: a caching failure must not break the live lookup that
-        triggered it. Persists to data/cache/bsdd/ so the next lookup or server
-        restart resolves it locally without repeating network calls.
+        triggered it. Persists to data/cache/bsdd/bsdd_runtime.duckdb so the
+        next lookup or server restart resolves it locally without repeating
+        network calls.
         """
         try:
             class_row = {
@@ -309,51 +296,9 @@ class BSDDOntologyRepository:
     def _persist_to_local_cache(
         self, class_row: dict[str, Any], prop_rows: list[dict[str, Any]], edge_rows: list[dict[str, Any]]
     ) -> None:
-        """Persist dynamic runtime records to data/cache/bsdd/*.json."""
-        self._cache_dir.mkdir(parents=True, exist_ok=True)
-
-        classes_file = self._cache_dir / "runtime_classes.json"
-        existing_classes = {}
-        if classes_file.exists():
-            try:
-                for row in json.loads(classes_file.read_text(encoding="utf-8")):
-                    existing_classes[row["uri"]] = row
-            except Exception:
-                pass
-        existing_classes[class_row["uri"]] = class_row
-        classes_file.write_text(json.dumps(list(existing_classes.values()), indent=2), encoding="utf-8")
-
-        if prop_rows:
-            props_file = self._cache_dir / "runtime_properties.json"
-            existing_props = {}
-            if props_file.exists():
-                try:
-                    for row in json.loads(props_file.read_text(encoding="utf-8")):
-                        existing_props[row["uri"]] = row
-                except Exception:
-                    pass
-            for p in prop_rows:
-                existing_props[p["uri"]] = p
-            props_file.write_text(json.dumps(list(existing_props.values()), indent=2), encoding="utf-8")
-
-        if edge_rows:
-            edges_file = self._cache_dir / "runtime_class_properties.json"
-            existing_edges = []
-            seen_keys = set()
-            if edges_file.exists():
-                try:
-                    for row in json.loads(edges_file.read_text(encoding="utf-8")):
-                        key = (row.get("class_uri"), row.get("property_uri"), row.get("property_set"))
-                        seen_keys.add(key)
-                        existing_edges.append(row)
-                except Exception:
-                    pass
-            for e in edge_rows:
-                key = (e.get("class_uri"), e.get("property_uri"), e.get("property_set"))
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    existing_edges.append(e)
-            edges_file.write_text(json.dumps(existing_edges, indent=2), encoding="utf-8")
+        """Persist dynamic runtime records to data/cache/bsdd/bsdd_runtime.duckdb."""
+        runtime_db = self._cache_dir / "bsdd_runtime.duckdb"
+        bsdd_duckdb_store.upsert_class(runtime_db, class_row, prop_rows, edge_rows)
 
     # ── Local-first orchestration ───────────────────────────────────────────
 

@@ -1,15 +1,46 @@
 <script lang="ts">
   import { BookText, Box, ExternalLink, Layers, Search, Tag } from "lucide-svelte";
   import { bsddApi } from "../lib/api";
-  import type { BSDDClassItem, BSDDOntologyClassSummary, BSDDOntologyPropertyDetail } from "../lib/types";
+  import type {
+    BSDDClassItem,
+    BSDDDictionaryItem,
+    BSDDOntologyClassSummary,
+    BSDDOntologyPropertyDetail,
+  } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import Select from "../lib/components/ui/Select.svelte";
 
   let classes = $state<BSDDOntologyClassSummary[]>([]);
   let isLoadingList = $state(true);
   let listError = $state("");
   let search = $state("");
+
+  // Dictionaries the loaded classes actually belong to (curated ones the
+  // ontology was crawled from -- IFC, Uniclass, ACCORD, ...) so the user can
+  // narrow the tree to one classification standard. Scoped to the dictionary
+  // URIs actually present in `classes` -- the full bSDD catalog (listDictionaries)
+  // has thousands of dictionaries this app never crawled, and showing those as
+  // filter options would just produce empty results when picked.
+  let dictionaries = $state<BSDDDictionaryItem[]>([]);
+  let activeDictionaryUri = $state<string>("");
+  let populatedDictionaryUris = $derived(new Set(classes.map((c) => c.dictionary_uri).filter((uri) => uri != null)));
+  let dictionaryOptions = $derived([
+    { value: "", label: "All dictionaries" },
+    ...dictionaries
+      .filter((d) => populatedDictionaryUris.has(d.uri))
+      .map((d) => ({ value: d.uri, label: `${d.name} (${d.version})` })),
+  ]);
+
+  async function loadDictionaries() {
+    try {
+      dictionaries = await bsddApi.listDictionaries();
+    } catch {
+      // Non-fatal: the dictionary filter just stays empty/"All" if this fails.
+    }
+  }
+  loadDictionaries();
 
   // GroupOfProperties classes (every Pset_/Qto_ definition) sit in the same
   // flat list as IFC entity classes but have no parent/child hierarchy of
@@ -30,8 +61,11 @@
     return c.code.startsWith("Qto_") ? "qtos" : "psets";
   }
 
+  let dictionaryScopedClasses = $derived(
+    activeDictionaryUri ? classes.filter((c) => c.dictionary_uri === activeDictionaryUri) : classes,
+  );
   let groupCounts = $derived(
-    classes.reduce(
+    dictionaryScopedClasses.reduce(
       (acc, c) => {
         acc[classGroup(c)]++;
         return acc;
@@ -70,7 +104,10 @@
   let classByUri = $derived(new Map(classes.map((c) => [c.uri, c])));
   let filteredClasses = $derived(
     (() => {
-      const scoped = activeGroup === "all" ? classes : classes.filter((c) => classGroup(c) === activeGroup);
+      const scoped =
+        activeGroup === "all"
+          ? dictionaryScopedClasses
+          : dictionaryScopedClasses.filter((c) => classGroup(c) === activeGroup);
       const needle = search.trim().toLowerCase();
       if (!needle) return scoped;
       return scoped.filter(
@@ -148,6 +185,13 @@
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
     <!-- Class list -->
     <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card/40 p-4">
+      <Select
+        options={dictionaryOptions}
+        bind:value={activeDictionaryUri}
+        placeholder="All dictionaries"
+        ariaLabel="Filter by dictionary"
+        triggerClass="h-8 text-nano"
+      />
       <div class="flex flex-wrap gap-1">
         {#each Object.keys(GROUP_LABELS) as g (g)}
           {@const key = g as ClassGroup}

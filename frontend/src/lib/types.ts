@@ -1358,6 +1358,7 @@ export interface BSDDOntologyClassSummary {
   /** bSDD classType, e.g. "Class" (an IFC entity) or "GroupOfProperties" (a Pset_/Qto_ definition). */
   class_type: string;
   parent_class_uri: string | null;
+  dictionary_uri: string | null;
 }
 
 /** Full property detail from the local ontology, plus which classes carry it. */
