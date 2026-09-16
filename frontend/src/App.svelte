@@ -118,6 +118,8 @@
   let targetProjectId: number | null = $state(getInitialProjectId());
   let targetElementGuid: string | null = $state(null);
   let targetBcfArtifactId: number | null = $state(null);
+  /** `analysis_slug` from the URL: which run's BCF a deep-linked element is in. */
+  let targetAnalysisSlug: string | null = $state(null);
   let targetFileId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
   // Clicking the header's running-pipeline badge opens the live tracker in a
@@ -246,6 +248,7 @@
     }
 
     targetElementGuid = params.get("element_guid");
+    targetAnalysisSlug = params.get("analysis_slug");
     const bcfArtifactId = Number(params.get("bcf_artifact_id"));
     targetBcfArtifactId = bcfArtifactId || null;
     const fileId = Number(params.get("file_id"));
@@ -257,6 +260,7 @@
     projectId: number,
     elementGuid?: string | null,
     bcfArtifactId?: number | null,
+    analysisSlug?: string | null,
   ): string {
     // A one-shot builder for a URL string, never read reactively, so the
     // plain built-in is correct here.
@@ -265,6 +269,10 @@
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    // Which analysis run owns the finding behind this link. The viewer needs it
+    // to ask /analyze/export for the right archive; without it every deep link
+    // fetched the corrosion BCF, whatever engine raised the finding.
+    if (analysisSlug) params.set("analysis_slug", analysisSlug);
     if (authState.activeOrganizationId) {
       params.set("org", String(authState.activeOrganizationId));
     }
@@ -343,8 +351,9 @@
     projectId: number,
     elementGuid?: string,
     bcfArtifactId?: number,
+    analysisSlug?: string,
   ) {
-    push(buildTargetUrl("viewer", projectId, elementGuid, bcfArtifactId));
+    push(buildTargetUrl("viewer", projectId, elementGuid, bcfArtifactId, analysisSlug));
   }
 
   // The wizard closes itself once the project is saved; this puts the new
@@ -585,6 +594,7 @@
             initialElementGuid={targetElementGuid}
             initialBcfArtifactId={targetBcfArtifactId}
             initialFileId={targetFileId}
+            initialAnalysisSlug={targetAnalysisSlug}
           />
         {:else if activeView === "documents"}
           <DocumentsView />

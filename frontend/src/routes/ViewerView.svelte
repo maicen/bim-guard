@@ -11,6 +11,12 @@
     initialElementGuid?: string | null;
     initialBcfArtifactId?: number | null;
     initialFileId?: number | null;
+    /**
+     * Which analysis run the deep-linked element's finding came from
+     * ("corrosion", "seismic", "architecture"). Forwarded to the viewer so its
+     * export fallback asks for that run's BCF rather than always corrosion's.
+     */
+    initialAnalysisSlug?: string | null;
   }
 
   let {
@@ -18,12 +24,14 @@
     initialElementGuid = null,
     initialBcfArtifactId = null,
     initialFileId = null,
+    initialAnalysisSlug = null,
   }: Props = $props();
 
   let projects: Project[] = $state([]);
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   let selectedElementGuid: string | null = $state(untrack(() => initialElementGuid));
   let selectedBcfArtifactId: number | null = $state(untrack(() => initialBcfArtifactId));
+  const selectedAnalysisSlug: string | null = $state(untrack(() => initialAnalysisSlug));
 
   /** Filled by IfcViewer when a deep-linked element could not be highlighted. */
   let elementNotFound: string | null = $state(null);
@@ -176,6 +184,7 @@
     fileName={selectedFile?.file_name ?? ""}
     elementGuid={selectedElementGuid}
     bcfArtifactId={selectedBcfArtifactId}
+    analysisSlug={selectedAnalysisSlug}
     {ifcFiles}
     onSelectFile={selectFile}
     bind:notFoundMessage={elementNotFound}

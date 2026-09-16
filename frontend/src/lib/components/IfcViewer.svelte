@@ -21,6 +21,14 @@
     elementGuid?: string | null;
     bcfArtifactId?: number | null;
     /**
+     * Which analysis run produced the finding behind `elementGuid`, as an
+     * `/analyze/export?slug=` value ("corrosion", "seismic", "architecture").
+     * The export fallback in `focusElement` asks for that run's archive; a
+     * seismic element is not in the corrosion BCF and vice versa. Null keeps
+     * the historical behaviour (corrosion) for links that carry no slug.
+     */
+    analysisSlug?: string | null;
+    /**
      * Which of the project's attached models to render, by project_ifc_files.id.
      * null renders the project's primary, which is also what a project whose
      * model predates that table resolves to.
@@ -44,6 +52,7 @@
     projectId = null,
     elementGuid = null,
     bcfArtifactId = null,
+    analysisSlug = null,
     fileId = null,
     fileName = "",
     ifcFiles = [],
@@ -120,7 +129,10 @@
    */
   async function focusElement(id: number, guid: string) {
     if (!viewerAPI) return;
-    const key = `${id}::${guid}`;
+    // The slug is part of the key: the same element can be a finding in two
+    // runs, and each lives in its own archive.
+    const slug = (analysisSlug || "corrosion").trim() || "corrosion";
+    const key = `${id}::${guid}::${slug}`;
     if (focusAttempted === key) return;
     focusAttempted = key;
 
@@ -137,6 +149,12 @@
       // actually answers. Exporting regenerates the archive from the cached
       // run, which is why it is second rather than first.
       //
+      // The export is asked for THIS finding's run. /analyze/export re-runs (or
+      // reads the cache of) exactly the slug it is given, so the slug used to be
+      // the whole bug: hardcoded "corrosion", every seismic, crevice or microbial
+      // deep link fetched an archive that does not contain its topic, and the
+      // viewer reported the element as missing from the model.
+      //
       // The viewer owns the rest: it cuts the archive down to this element
       // before parsing any of it, then loads, selects and frames it, logging
       // each stage under [bimguard-3d]. Never throws -- a failed stage comes
@@ -144,7 +162,7 @@
       const result = await viewerAPI.loadBcfForElement(
         [
           { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
-          { label: "export", url: analyzeApi.getExportUrl(id, "corrosion", "bcf") },
+          { label: `export:${slug}`, url: analyzeApi.getExportUrl(id, slug, "bcf") },
         ],
         guid,
         authHeaders,
@@ -174,7 +192,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-camera-autofit-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-band-colors-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
       viewerAPI = await mod.initViewer({
         viewport: viewportHost,
