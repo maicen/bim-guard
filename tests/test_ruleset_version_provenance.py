@@ -46,8 +46,9 @@ TEST_THRESHOLDS = {
 #: data/rulesets/sb001_seismic_clearance.json, and the two tests at the end of
 #: this file assert that those files are where the strings came from.
 XM_STAMP = "BIMGUARD-XM-001 v1.0.0"
-#: 1.1.0 since the 2026-09-13 provenance re-label of the SB-001 config.
-SB_STAMP = "BIMGUARD-SB-001 v1.1.0"
+#: 1.2.0 since the 2026-09-16 re-sourcing of the SB-001 brace angle constraints
+#: (1.1.0 was the 2026-09-13 provenance re-label).
+SB_STAMP = "BIMGUARD-SB-001 v1.2.0"
 
 
 def _element(element_id: str, material: str) -> PipingElement:
@@ -152,5 +153,5 @@ def test_the_sb_stamp_is_read_from_the_config_not_written_inline():
     """The version comes from the jurisdiction config the run loaded."""
     raw = json.loads(Path(DEFAULT_CONFIG_PATH).read_text(encoding="utf-8"))
     assert raw["metadata"]["ruleset_id"] == "BIMGUARD-SB-001"
-    assert raw["metadata"]["schema_version"] == "1.1.0"
+    assert raw["metadata"]["schema_version"] == "1.2.0"
     assert _ruleset_version(load_clearance_config(DEFAULT_CONFIG_PATH)) == SB_STAMP

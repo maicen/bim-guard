@@ -52,8 +52,8 @@ SB-001 runs from `data/rulesets/sb001_seismic_clearance.json`. Earlier versions
 described it as a combined profile of an EN 1998-1 edition dated 2020 and a
 DIN 4149 edition dated 2022; neither edition exists, and the values were not
 taken from either standard. It was
-corrected on 2026-09-13 (schema 1.1.0), and every threshold now records its
-provenance:
+corrected on 2026-09-13 (schema 1.1.0) and the brace angle was re-sourced on
+2026-09-16 (schema 1.2.0). Every threshold now records its provenance:
 
 - **Clearance from structure: 200 mm** — *authored*. No source held gives a
   clearance dimension for a braced service.
@@ -62,8 +62,11 @@ provenance:
   for ductile pipe, so BIMGUARD's values are far tighter than that reference.
 - **Pipe diameter threshold: 63 mm** — *authored*, inside the roughly 1–3 in
   exemption band FEMA E-74 reports for ASCE/SEI 7-10.
-- **Brace angle: 40°–65° from horizontal** — *authored*; no source gives a pipe or
-  duct brace angle. The 52.5° ideal and ±12.5° tolerance are *derived* arithmetic.
+- **Brace angle: 30°–60° from horizontal (45° ± 15°)** — *sourced* to the Hilti
+  Seismic Manual (05/2022), Annex A, which states a nominal brace tilt angle of
+  45° ± 15° on the horizontal level. A vendor design manual applying EN 1998-1,
+  not a code. This replaced a 40°–65° range on 2026-09-16; that range came from an
+  unverified AI research summary, not from BIMGUARD calibration as it was labelled.
 - **Importance factor: 1.5 for hospital, 1.0 for standard** — *sourced* to FEMA
   E-74 §5.3.1 and ASCE/SEI 7-10 §13.1.3 (corrected from 1.6).
 - **Duct area threshold: 0.557 m² (6 sq ft)** — *sourced* to FEMA E-74 §6.4.6.1.

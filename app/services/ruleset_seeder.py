@@ -762,7 +762,7 @@ def _seed_mc001(svc: RuleService) -> int:
 
 #: Why each SB-001 threshold has the value it has, as ``source_text``. Worded
 #: from the ``provenance`` notes in ``data/rulesets/sb001_seismic_clearance.json``
-#: (schema 1.1.0); tests/test_sb001_seeded_provenance.py holds the two together.
+#: (schema 1.2.0); tests/test_sb001_seeded_provenance.py holds the two together.
 _SB001_SOURCE_TEXT = {
     "SB-001.01": (
         "BIMGUARD SB-001 authored calibration. Within the ASCE 7-10 exemption band as "
@@ -790,53 +790,87 @@ _SB001_SOURCE_TEXT = {
         "FEMA E-74 App. A §3.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft (12.19 m) "
         "nonductile. Same screening rationale as the transverse value. Not applicable to ducts."
     ),
+    # Sourced, not authored: the only SB-001 threshold whose value a held document
+    # states. Same shape as the authored entries above — an attribution sentence
+    # followed by the configuration's own provenance note, verbatim.
     "SB-001.05": (
-        "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
-        "brace angle for pipe or duct. Datum: degrees from horizontal."
+        "Sourced to the Hilti Seismic Manual – Earthquake-resistant design of MEP supports, "
+        "MT System (05/2022), Annex A \"Tilt angle – for all bracings\": nominal brace tilt "
+        "angle 45° ± 15° on the horizontal level, i.e. 30-60° from horizontal. "
+        "Lower bound of the source's stated 45° ± 15° band (45 - 15). Datum: degrees from "
+        "horizontal, the same convention the source uses. Replaces the former 40.0, which "
+        "came from an unverified AI research summary; see changelog 1.2.0. FEMA E-74 "
+        "contains no brace angle for pipe or duct. A vendor design manual, not a code."
     ),
 }
 
-#: What SB-001 rows seeded before 2026-09-13 carry, and what replaces it. The
-#: descriptions attributed authored thresholds to EN 1998-1 / DIN 4149, which
-#: give no MEP brace spacing, and the angle range was the Hermes research
-#: summary's EN-only 35-70 degrees, not the 40-65 the configuration has always
-#: applied. A stored field is corrected only while it still holds exactly the
-#: old value, so a rule someone has since edited by hand is left as they left it.
+#: What superseded SB-001 rows carry, and what replaces it. Each entry maps a
+#: column to every stored value known to be stale (``from``) and the current one
+#: (``to``). A stored field is corrected only while it still holds exactly one of
+#: those values, so a rule someone has since edited by hand is left as they left it.
+#:
+#: Two generations are corrected here:
+#:
+#: - Rows seeded before 2026-09-13 attributed authored spacing thresholds to
+#:   EN 1998-1 / DIN 4149, which give no MEP brace spacing, and carried the Hermes
+#:   research summary's EN-only 35-70 degree angle range.
+#: - Rows seeded between 2026-09-13 and 2026-09-16 carried the 40-65 degree range
+#:   labelled BIMGUARD authored calibration. That label was wrong twice over: the
+#:   range was not BIMGUARD's calibration (it was the same unverified research
+#:   summary's invented DIN 4149 figure), and the angle is now sourced to the
+#:   Hilti Seismic Manual (05/2022) as 45° ± 15°, i.e. 30-60° from horizontal.
 _SB001_SUPERSEDED = {
     "SB-001.03": {
-        "description": (
-            "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
-            "Maximum transverse seismic brace spacing — 1.0 m, BIMGUARD SB-001 screening "
-            "calibration (authored, not a code value)",
-        ),
+        "description": {
+            "from": ("Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",),
+            "to": (
+                "Maximum transverse seismic brace spacing — 1.0 m, BIMGUARD SB-001 screening "
+                "calibration (authored, not a code value)"
+            ),
+        },
     },
     "SB-001.04": {
-        "description": (
-            "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
-            "Maximum longitudinal seismic brace spacing — 1.5 m, BIMGUARD SB-001 screening "
-            "calibration (authored, not a code value)",
-        ),
+        "description": {
+            "from": ("Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",),
+            "to": (
+                "Maximum longitudinal seismic brace spacing — 1.5 m, BIMGUARD SB-001 screening "
+                "calibration (authored, not a code value)"
+            ),
+        },
     },
     "SB-001.05": {
-        "description": (
-            "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
-            "Seismic brace installation angle — permissible range 40° to 65° from "
-            "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)",
-        ),
-        "value_min": (35.0, 40.0),
-        "value_max": (70.0, 65.0),
+        "description": {
+            "from": (
+                "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
+                "Seismic brace installation angle — permissible range 40° to 65° from "
+                "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)",
+            ),
+            "to": (
+                "Seismic brace installation angle — permissible range 30° to 60° from "
+                "horizontal (45° ± 15°), Hilti Seismic Manual 05/2022"
+            ),
+        },
+        "value_min": {"from": (35.0, 40.0), "to": 30.0},
+        "value_max": {"from": (70.0, 65.0), "to": 60.0},
+        "source_text": {
+            "from": (
+                "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
+                "brace angle for pipe or duct. Datum: degrees from horizontal.",
+            ),
+            "to": _SB001_SOURCE_TEXT["SB-001.05"],
+        },
     },
 }
 
 
 def _correct_superseded_seismic_rows(svc: RuleService) -> int:
-    """Correct SB-001 rows already stored with the pre-2026-09-13 content.
+    """Correct SB-001 rows already stored with superseded content.
 
     The insert pass skips any reference that exists, so without this a database
-    seeded before the correction would keep the old descriptions and angle range
-    indefinitely. Scoped to the SB-001 references in :data:`_SB001_SUPERSEDED`
-    and :data:`_SB001_SOURCE_TEXT`, and to fields still holding the exact old
-    value (or, for ``source_text``, still empty).
+    seeded earlier would keep the old descriptions and angle range indefinitely.
+    Scoped to the SB-001 references in :data:`_SB001_SUPERSEDED` and
+    :data:`_SB001_SOURCE_TEXT`, and to fields still holding one of the exact
+    superseded values (or, for ``source_text``, still empty).
 
     Returns:
         The number of rows changed.
@@ -847,13 +881,14 @@ def _correct_superseded_seismic_rows(svc: RuleService) -> int:
         if reference not in _SB001_SOURCE_TEXT:
             continue
         columns: dict[str, str] = {}
-        for field, (old, new) in _SB001_SUPERSEDED.get(reference, {}).items():
+        for field, change in _SB001_SUPERSEDED.get(reference, {}).items():
             stored = row.get(field)
-            if field == "description":
-                if str(stored or "").strip() == old:
-                    columns[field] = new
-            elif RuleService._parse_numeric(_json_scalar(stored)) == old:
-                columns[field] = json.dumps(new)
+            superseded, current = change["from"], change["to"]
+            if field in {"description", "source_text"}:
+                if str(stored or "").strip() in superseded:
+                    columns[field] = current
+            elif RuleService._parse_numeric(_json_scalar(stored)) in superseded:
+                columns[field] = json.dumps(current)
         if not str(row.get("source_text") or "").strip():
             columns["source_text"] = _SB001_SOURCE_TEXT[reference]
         if columns:
@@ -881,9 +916,11 @@ def _json_scalar(stored) -> str:
 def seed_seismic_rules(svc: RuleService) -> int:
     """Seed Blue Halo seismic bracing clearance rules (BIMGUARD-SB-001).
 
-    SB-001's thresholds are BIMGUARD screening calibration, not code values; each
-    row's ``source_text`` says so, citing FEMA E-74 where it bears on the value.
-    Rows seeded before that correction are brought up to date in place by
+    SB-001's spacing, clearance and pipe-diameter thresholds are BIMGUARD screening
+    calibration, not code values; each row's ``source_text`` says so, citing FEMA
+    E-74 where it bears on the value. The brace angle range is the exception: it is
+    sourced to the Hilti Seismic Manual (05/2022). Rows seeded with superseded
+    content are brought up to date in place by
     :func:`_correct_superseded_seismic_rows`.
 
     Returns:
@@ -925,7 +962,7 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.03"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.03"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "TransverseBraceSpacing",
             "operator": "<=",
@@ -940,7 +977,7 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.04"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.04"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "LongitudinalBraceSpacing",
             "operator": "<=",
@@ -955,12 +992,12 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_range",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.05"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.05"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "BraceAngle",
             "operator": "between",
-            "value_min": 40.0,
-            "value_max": 65.0,
+            "value_min": 30.0,
+            "value_max": 60.0,
             "unit": "deg",
             "ruleset_id": "BIMGUARD-SB-001",
             "mechanism": "SEISMIC",

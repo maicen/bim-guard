@@ -27,11 +27,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = json.loads(
     (REPO_ROOT / "data" / "rulesets" / "sb001_seismic_clearance.json").read_text(encoding="utf-8")
 )
-MIGRATION = (
-    REPO_ROOT / "supabase" / "migrations" / "20260913131052_correct_sb001_seeded_rule_provenance.sql"
+#: The migration that corrects deployed rows for the current (2026-09-16) angle
+#: change. The earlier 20260913131052 migration is applied and frozen, so it is
+#: not checked against today's seeder constants.
+ANGLE_MIGRATION = (
+    REPO_ROOT / "supabase" / "migrations" / "20260916120000_correct_sb001_angle_provenance.sql"
 )
 
-#: The rows as the pre-correction seeder stored them.
+#: The rows as the pre-2026-09-13 seeder stored them.
 LEGACY_ROWS = {
     "SB-001.03": {
         "description": "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
@@ -44,6 +47,21 @@ LEGACY_ROWS = {
         "value_min": "35.0",
         "value_max": "70.0",
     },
+}
+
+#: The SB-001.05 row as the 2026-09-13 seeder stored it: the 40-65 degree range
+#: labelled authored calibration, with the source_text that went with it.
+SUPERSEDED_ANGLE_ROW = {
+    "description": (
+        "Seismic brace installation angle — permissible range 40° to 65° from "
+        "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)"
+    ),
+    "value_min": "40.0",
+    "value_max": "65.0",
+    "source_text": (
+        "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
+        "brace angle for pipe or duct. Datum: degrees from horizontal."
+    ),
 }
 
 #: Which configuration provenance note each seeded rule's source_text restates.
@@ -98,11 +116,27 @@ def test_seeded_values_are_the_configuration_values(rules_service: RuleService):
 
 @pytest.mark.parametrize("reference", sorted(PROVENANCE_KEY))
 def test_source_text_restates_the_configuration_provenance(reference: str):
-    """source_text is the configuration's own note, labelled as authored calibration."""
+    """source_text is the configuration's own note, behind an attribution sentence."""
     note = CONFIG["provenance"][PROVENANCE_KEY[reference]]["note"]
     text = seeder._SB001_SOURCE_TEXT[reference]
-    assert text.startswith("BIMGUARD SB-001 authored calibration. ")
+    expected_prefix = (
+        "Sourced to the Hilti Seismic Manual"
+        if reference == "SB-001.05"
+        else "BIMGUARD SB-001 authored calibration. "
+    )
+    assert text.startswith(expected_prefix)
     assert text.endswith(note)
+
+
+def test_the_angle_is_the_only_sourced_threshold():
+    """The angle cites a document; every other row says authored calibration."""
+    assert CONFIG["provenance"]["angle_constraints.min_degrees"]["status"] == "sourced"
+    for reference, text in seeder._SB001_SOURCE_TEXT.items():
+        if reference == "SB-001.05":
+            assert "Hilti Seismic Manual" in text
+            assert "authored calibration" not in text
+        else:
+            assert "authored calibration" in text
 
 
 def test_rows_seeded_before_the_correction_are_corrected_in_place(rules_service: RuleService):
@@ -116,10 +150,25 @@ def test_rows_seeded_before_the_correction_are_corrected_in_place(rules_service:
     rows = _sb001(rules_service)
     assert len(rows) == 5
     for reference in LEGACY_ROWS:
-        assert rows[reference]["description"] == seeder._SB001_SUPERSEDED[reference]["description"][1]
+        assert rows[reference]["description"] == seeder._SB001_SUPERSEDED[reference]["description"]["to"]
         assert rows[reference]["source_text"] == seeder._SB001_SOURCE_TEXT[reference]
-    assert _number(rows["SB-001.05"]["value_min"]) == 40.0
-    assert _number(rows["SB-001.05"]["value_max"]) == 65.0
+    assert _number(rows["SB-001.05"]["value_min"]) == 30.0
+    assert _number(rows["SB-001.05"]["value_max"]) == 60.0
+
+
+def test_rows_seeded_with_the_superseded_angle_are_corrected_in_place(rules_service: RuleService):
+    """The 40-65 degree generation is rewritten too, source_text included."""
+    seeder.seed_seismic_rules(rules_service)
+    row = _sb001(rules_service)["SB-001.05"]
+    rules_service._rules.update(updates=dict(SUPERSEDED_ANGLE_ROW), pk_values=row["id"])
+
+    assert seeder.seed_seismic_rules(rules_service) == 0
+    after = _sb001(rules_service)["SB-001.05"]
+    assert _number(after["value_min"]) == 30.0
+    assert _number(after["value_max"]) == 60.0
+    assert after["description"] == seeder._SB001_SUPERSEDED["SB-001.05"]["description"]["to"]
+    assert after["source_text"] == seeder._SB001_SOURCE_TEXT["SB-001.05"]
+    assert "Hilti Seismic Manual" in after["source_text"]
 
 
 def test_a_second_run_changes_nothing(rules_service: RuleService):
@@ -134,15 +183,15 @@ def test_a_hand_edited_rule_is_left_as_edited(rules_service: RuleService):
     """Only fields still holding the exact superseded value are corrected."""
     seeder.seed_seismic_rules(rules_service)
     row = _sb001(rules_service)["SB-001.05"]
-    edited = {"description": "Project-specific brace angle", "value_min": "30.0", "value_max": "70.0"}
+    edited = {"description": "Project-specific brace angle", "value_min": "25.0", "value_max": "70.0"}
     rules_service._rules.update(updates=edited, pk_values=row["id"])
 
     seeder.seed_seismic_rules(rules_service)
     after = _sb001(rules_service)["SB-001.05"]
     assert after["description"] == "Project-specific brace angle"
-    assert after["value_min"] == "30.0"
-    # 70.0 is the superseded upper bound, so it alone is corrected.
-    assert _number(after["value_max"]) == 65.0
+    assert after["value_min"] == "25.0"
+    # 70.0 is a superseded upper bound, so it alone is corrected.
+    assert _number(after["value_max"]) == 60.0
 
 
 def test_other_rulesets_are_out_of_scope(rules_service: RuleService):
@@ -157,13 +206,16 @@ def test_other_rulesets_are_out_of_scope(rules_service: RuleService):
     assert copy["source_text"] == ""
 
 
-def test_migration_writes_the_seeder_strings():
-    """The SQL that corrects deployed rows uses the seeder's old and new text verbatim."""
-    sql = MIGRATION.read_text(encoding="utf-8")
-    for reference, fields in seeder._SB001_SUPERSEDED.items():
-        old, new = fields["description"]
-        assert f"description = '{old}'" in sql, reference
-        assert f"SET description = '{new}'" in sql, reference
-    for reference, text in seeder._SB001_SOURCE_TEXT.items():
-        assert f"SET source_text = '{text.replace(chr(39), chr(39) * 2)}'" in sql, reference
-    assert "requirements per EN 1998-1 / DIN 4149';" in sql
+def test_angle_migration_writes_the_seeder_strings():
+    """The SQL that corrects deployed rows uses the seeder's SB-001.05 text verbatim."""
+    sql = ANGLE_MIGRATION.read_text(encoding="utf-8")
+    angle = seeder._SB001_SUPERSEDED["SB-001.05"]
+    for superseded in angle["description"]["from"]:
+        assert f"'{superseded}'" in sql
+    assert f"SET description = '{angle['description']['to']}'" in sql
+    text = seeder._SB001_SOURCE_TEXT["SB-001.05"]
+    assert f"SET source_text = '{text.replace(chr(39), chr(39) * 2)}'" in sql
+    for superseded in angle["source_text"]["from"]:
+        assert superseded.replace(chr(39), chr(39) * 2) in sql
+    assert "SET value_min = '30.0'" in sql
+    assert "SET value_max = '60.0'" in sql

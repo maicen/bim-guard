@@ -38,7 +38,8 @@ this answer described it as a combined profile of an EN 1998-1 edition dated 202
 and a DIN 4149 edition dated 2022, with per-standard values. That was wrong: neither edition exists, and the
 per-standard values attributed to them were not taken from either standard. The
 file was corrected on 2026-09-13 (schema 1.1.0); the full account is in
-`docs/planning/sb001_provenance_2026-09-13.md`.
+`docs/planning/sb001_provenance_2026-09-13.md`. The brace angle was re-sourced to
+the Hilti Seismic Manual on 2026-09-16 (schema 1.2.0).
 
 Every threshold in the file now carries a provenance block with a `status`:
 
@@ -49,8 +50,8 @@ Every threshold in the file now carries a provenance block with a `status`:
 | Clearance from structure | 200 mm | authored | No source gives a braced-service clearance |
 | Restraint spacing, transverse / longitudinal | 1.0 m / 1.5 m | authored | Screening values far tighter than FEMA E-74's sample-spec maxima (40/80 ft ductile pipe) |
 | Pipe diameter threshold | 63 mm | authored | Inside the ~1–3 in exemption band FEMA E-74 reports for ASCE 7-10 |
-| Brace angle | 40°–65° from horizontal | authored | No source gives a pipe or duct brace angle |
-| Ideal angle / tolerance | 52.5° / 12.5° | derived | Midpoint and half-range of 40°–65° |
+| Brace angle | 30°–60° from horizontal | sourced | Hilti Seismic Manual (05/2022), Annex A: nominal 45° ± 15° on the horizontal level (vendor manual applying EN 1998-1, not a code) |
+| Ideal angle / tolerance | 45° / 15° | sourced | The same manual's stated nominal angle and tolerance |
 | Seismic-zone, hospital and adjacent-system additions | 0 mm | authored | No source gives a clearance addition |
 
 **Authored** means BIMGUARD screening calibration, not a code value. SB-001 is a

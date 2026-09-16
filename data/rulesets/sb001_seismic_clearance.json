@@ -1,13 +1,14 @@
 {
   "metadata": {
     "ruleset_id": "BIMGUARD-SB-001",
-    "schema_version": "1.1.0",
-    "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds, not code values)",
+    "schema_version": "1.2.0",
+    "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds except where marked sourced, not code values)",
     "region": "EU / Germany",
-    "created_by": "hermes_config_expanded.py (v1.0.0); provenance re-labelled by hand 2026-09-13 (v1.1.0)",
+    "created_by": "hermes_config_expanded.py (v1.0.0); provenance re-labelled by hand 2026-09-13 (v1.1.0); brace angle re-sourced by hand 2026-09-16 (v1.2.0)",
     "standards_cited": [
       "FEMA E-74 (4th ed., December 2012)",
-      "ASCE/SEI 7-10 \u00a713.6"
+      "ASCE/SEI 7-10 \u00a713.6",
+      "Hilti Seismic Manual \u2013 Earthquake-resistant design of MEP supports, MT System (05/2022)"
     ],
     "governing_codes": [
       {
@@ -30,6 +31,12 @@
         "code": "ASCE/SEI 7-10 \u00a713.6",
         "title": "Minimum Design Loads for Buildings and Other Structures",
         "note": "What FEMA E-74 defers to for the actual requirements. Cited as the upstream reference; not held."
+      },
+      {
+        "code": "Hilti Seismic Manual (05/2022)",
+        "title": "Earthquake-resistant design of MEP supports, MT System \u2013 Hilti Corporation, document W4571 EN, 05/2022",
+        "relevant_clause": "Annex A, \"Tilt angle \u2013 for all bracings\" (45\u00b0 \u00b1 15\u00b0); worked example \u00a72.4.3",
+        "note": "A vendor design manual applying EN 1998-1 to MEP supports, not a code. It is the source of angle_constraints. It states the brace tilt angle on the horizontal level, the same datum this config uses. NFPA 13-based product literature (Eaton, nVent, Hilti US anchor load tables) measures brace angle from vertical instead and tabulates 30-90 degrees from vertical; that convention is not used here."
       }
     ],
     "data_gaps": [
@@ -46,6 +53,17 @@
       "ASCE/SEI 7-10"
     ],
     "changelog": [
+      {
+        "version": "1.2.0",
+        "date": "2026-09-16",
+        "changes": [
+          "Replaced the brace angle constraints with values stated by a held source. angle_constraints.min_degrees 40.0 -> 30.0, max_degrees 65.0 -> 60.0, ideal_degrees 52.5 -> 45.0, tolerance_degrees 12.5 -> 15.0. The datum is unchanged: degrees from horizontal, which is the convention the source uses.",
+          "Source: Hilti Seismic Manual, Earthquake-resistant design of MEP supports, MT System (05/2022), Annex A \"Tilt angle – for all bracings\", nominal 45° ± 15°, repeated on the typical application sheets and used in the worked example (§2.4.3, \"Assuming α = 45°\").",
+          "All four angle thresholds are now status=sourced. They were previously status=authored (min/max) and status=derived (ideal/tolerance), and the 40-65 range was labelled BIMGUARD authored calibration. That label was inaccurate: the 40-65 range was not authored by BIMGUARD. It was the surviving output of an unverified AI-assisted research summary (docs/validation/data/hermes_standards_research_summary.json), whose invented \"DIN 4149:2022-03\" entry read \"40-65 degrees from horizontal\" and whose invented \"EN 1998-1:2020\" entry read \"35-70 degrees\"; hermes_config_expanded.py intersected the two and computed 52.5/12.5 as the midpoint and half-range.",
+          "No SB-001 code path evaluates a modelled brace angle at this commit: phase_6d_seismic.py never reads angle_constraints, and clearance findings are unaffected. The values are consumed by load_clearance_config (ClearanceRule.angle_in_range), by the seeded rule row SB-001.05 and by scripts/validate_blue_halo.py. No current finding changes.",
+          "provenance_summary updated: 7 sourced, 0 derived, 7 authored (was 3 / 2 / 9)."
+        ]
+      },
       {
         "version": "1.1.0",
         "date": "2026-09-13",
@@ -68,10 +86,10 @@
     ]
   },
   "provenance_summary": {
-    "sourced": 3,
-    "derived": 2,
-    "authored": 9,
-    "statement": "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 \u00a713.6 or EN 1998-1."
+    "sourced": 7,
+    "derived": 0,
+    "authored": 7,
+    "statement": "BIMGUARD SB-001 is a screening tool whose dimensional thresholds are authored calibration except where marked sourced, and it is not a substitute for design to ASCE/SEI 7-10 \u00a713.6 or EN 1998-1. Sourced: the two component importance factors and the duct area threshold (FEMA E-74), and the four brace angle constraints (Hilti Seismic Manual 05/2022). Spacing, clearance and the pipe diameter threshold remain authored screening calibration."
   },
   "provenance": {
     "importance_factors.hospital": {
@@ -145,36 +163,45 @@
       "note": "Within the ASCE 7-10 exemption band as reported by FEMA E-74 \u00a76.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) depending on seismic design category and occupancy. 63 mm \u2248 2.48 in falls inside that band. Not a stated standard value."
     },
     "angle_constraints.min_degrees": {
-      "value": 40.0,
-      "status": "authored",
+      "value": 30.0,
+      "status": "sourced",
       "source": {
-        "document": "BIMGUARD SB-001 authored calibration"
+        "document": "Hilti Seismic Manual – Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Annex A, \"Tilt angle – for all bracings\"",
+        "detail": "Nominal brace tilt angle 45° ± 15°, side view, stated as the bracing angle on the horizontal level; repeated on the typical application sheets as \"brace angle: 45° ± 15°\" and used in the worked example as \"Assuming α = 45°\".",
+        "upstream": "EN 1998-1:2004 §4.3.5 (the manual's design framework; EN 1998-1 itself states no brace angle)"
       },
-      "note": "Authored. No source. FEMA E-74 contains no brace angle for pipe or duct. Datum: degrees from horizontal."
+      "note": "Lower bound of the source's stated 45° ± 15° band (45 - 15). Datum: degrees from horizontal, the same convention the source uses. Replaces the former 40.0, which came from an unverified AI research summary; see changelog 1.2.0. FEMA E-74 contains no brace angle for pipe or duct. A vendor design manual, not a code."
     },
     "angle_constraints.max_degrees": {
-      "value": 65.0,
-      "status": "authored",
+      "value": 60.0,
+      "status": "sourced",
       "source": {
-        "document": "BIMGUARD SB-001 authored calibration"
+        "document": "Hilti Seismic Manual – Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Annex A, \"Tilt angle – for all bracings\"",
+        "detail": "Nominal brace tilt angle 45° ± 15°, side view, stated as the bracing angle on the horizontal level.",
+        "upstream": "EN 1998-1:2004 §4.3.5 (the manual's design framework; EN 1998-1 itself states no brace angle)"
       },
-      "note": "Authored. No source. FEMA E-74 contains no brace angle for pipe or duct. Datum: degrees from horizontal."
+      "note": "Upper bound of the source's stated 45° ± 15° band (45 + 15). Datum: degrees from horizontal. Replaces the former 65.0, which came from an unverified AI research summary; see changelog 1.2.0. A vendor design manual, not a code."
     },
     "angle_constraints.ideal_degrees": {
-      "value": 52.5,
-      "status": "derived",
+      "value": 45.0,
+      "status": "sourced",
       "source": {
-        "document": "Arithmetic on angle_constraints.min_degrees and max_degrees"
+        "document": "Hilti Seismic Manual – Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Annex A, \"Tilt angle – for all bracings\"; worked example §2.4.3",
+        "detail": "The nominal tilt angle the ± 15° band is stated about; the worked example computes brace actions at α = 45°."
       },
-      "note": "Midpoint of 40-65 degrees. Not sourced."
+      "note": "The source's stated nominal angle, not a midpoint computed by BIMGUARD. It is also the midpoint of 30-60 degrees. Replaces the former 52.5, which was the midpoint of the superseded 40-65 range."
     },
     "angle_constraints.tolerance_degrees": {
-      "value": 12.5,
-      "status": "derived",
+      "value": 15.0,
+      "status": "sourced",
       "source": {
-        "document": "Arithmetic on angle_constraints.min_degrees and max_degrees"
+        "document": "Hilti Seismic Manual – Earthquake-resistant design of MEP supports, MT System (05/2022)",
+        "section": "Annex A, \"Tilt angle – for all bracings\""
       },
-      "note": "Half-range of 40-65 degrees. Not sourced."
+      "note": "The source's stated tolerance about the 45° nominal (± 15°), not a half-range computed by BIMGUARD. Replaces the former 12.5, which was the half-range of the superseded 40-65 range. The source's separate plan-view limit (\"max. 5°\" deviation of the brace from the pipe axis) has no field in this schema."
     },
     "clearance_rules.seismic_zone_addition_mm": {
       "value": 0,
@@ -264,10 +291,10 @@
     "adjacent_system_mm": 0
   },
   "angle_constraints": {
-    "min_degrees": 40.0,
-    "ideal_degrees": 52.5,
-    "max_degrees": 65.0,
-    "tolerance_degrees": 12.5,
+    "min_degrees": 30.0,
+    "ideal_degrees": 45.0,
+    "max_degrees": 60.0,
+    "tolerance_degrees": 15.0,
     "datum": "degrees_from_horizontal"
   },
   "standards_full_citations": [
