@@ -113,6 +113,18 @@ class FakeBSDDClient:
         return self.matches
 
 
+class FakeOntology:
+    """Returns a fixed set of local-ontology property matches, recording the query received."""
+
+    def __init__(self, matches: list[BSDDPropertyItem]) -> None:
+        self.matches = matches
+        self.queries: list[str] = []
+
+    def search_properties(self, query: str, limit: int = 8):
+        self.queries.append(query)
+        return self.matches
+
+
 def _draft(property_set: str | None, property_name: str | None) -> RuleExtractionDraft:
     return RuleExtractionDraft(
         source_document_id=1,
@@ -128,10 +140,12 @@ def _draft(property_set: str | None, property_name: str | None) -> RuleExtractio
 
 
 def test_bsdd_grounding_corrects_invented_property_set():
-    bsdd = FakeBSDDClient(
+    """A local-ontology match grounds the draft without ever touching the live client."""
+    ontology = FakeOntology(
         [BSDDPropertyItem(uri="urn:x", name="OverallWidth", property_set="Pset_DoorCommon")]
     )
-    service = RuleExtractionService(bsdd_client=bsdd)
+    bsdd = FakeBSDDClient([])
+    service = RuleExtractionService(ontology=ontology, bsdd_client=bsdd)
     draft = _draft(property_set="Pset_Door", property_name="OverallWidth")
 
     grounded = service._ground_draft_with_bsdd(draft)
@@ -139,14 +153,15 @@ def test_bsdd_grounding_corrects_invented_property_set():
     assert grounded.proposed_rule.property_set == "Pset_DoorCommon"
     assert grounded.proposed_rule.property_name == "OverallWidth"
     assert "bSDD grounding" in (grounded.review_notes or "")
-    assert bsdd.queries == ["OverallWidth"]
+    assert ontology.queries == ["OverallWidth"]
+    assert bsdd.queries == []  # local match found -- live fallback never called
 
 
 def test_bsdd_grounding_leaves_already_correct_rule_untouched():
-    bsdd = FakeBSDDClient(
+    ontology = FakeOntology(
         [BSDDPropertyItem(uri="urn:x", name="OverallWidth", property_set="Pset_DoorCommon")]
     )
-    service = RuleExtractionService(bsdd_client=bsdd)
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
     draft = _draft(property_set="Pset_DoorCommon", property_name="OverallWidth")
 
     grounded = service._ground_draft_with_bsdd(draft)
@@ -155,9 +170,24 @@ def test_bsdd_grounding_leaves_already_correct_rule_untouched():
     assert grounded.review_notes is None
 
 
+def test_bsdd_grounding_falls_back_to_live_bsdd_when_local_ontology_has_no_match():
+    """A name the local ontology hasn't crawled still grounds via the live bSDD client."""
+    ontology = FakeOntology([])
+    bsdd = FakeBSDDClient(
+        [BSDDPropertyItem(uri="urn:x", name="OverallWidth", property_set="Pset_DoorCommon")]
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=bsdd)
+    draft = _draft(property_set="Pset_Door", property_name="OverallWidth")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.property_set == "Pset_DoorCommon"
+    assert ontology.queries == ["OverallWidth"]
+    assert bsdd.queries == ["OverallWidth"]
+
+
 def test_bsdd_grounding_skips_when_no_match_found():
-    bsdd = FakeBSDDClient([])
-    service = RuleExtractionService(bsdd_client=bsdd)
+    service = RuleExtractionService(ontology=FakeOntology([]), bsdd_client=FakeBSDDClient([]))
     draft = _draft(property_set="Pset_Door", property_name="TotallyMadeUpProperty")
 
     grounded = service._ground_draft_with_bsdd(draft)
@@ -166,11 +196,17 @@ def test_bsdd_grounding_skips_when_no_match_found():
 
 
 def test_bsdd_grounding_survives_lookup_failure():
+    """Both the local ontology and the live fallback failing must not crash extraction."""
+
+    class ExplodingOntology:
+        def search_properties(self, *args, **kwargs):
+            raise RuntimeError("local ontology load failed")
+
     class ExplodingBSDDClient:
         def search_properties(self, *args, **kwargs):
             raise RuntimeError("bSDD unreachable")
 
-    service = RuleExtractionService(bsdd_client=ExplodingBSDDClient())
+    service = RuleExtractionService(ontology=ExplodingOntology(), bsdd_client=ExplodingBSDDClient())
     draft = _draft(property_set="Pset_Door", property_name="OverallWidth")
 
     grounded = service._ground_draft_with_bsdd(draft)
@@ -179,7 +215,7 @@ def test_bsdd_grounding_survives_lookup_failure():
 
 
 def test_bsdd_grounding_skips_when_no_property_name():
-    service = RuleExtractionService(bsdd_client=FakeBSDDClient([]))
+    service = RuleExtractionService(ontology=FakeOntology([]), bsdd_client=FakeBSDDClient([]))
     draft = _draft(property_set=None, property_name=None)
 
     grounded = service._ground_draft_with_bsdd(draft)
