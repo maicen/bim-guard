@@ -1226,7 +1226,7 @@ export const analyzeApi = {
   getExportUrl(
     projectId: number,
     slug: string,
-    fmt: "bcf" | "csv" | "json",
+    fmt: "bcf" | "csv" | "json" | "ifc",
     engines?: string[],
     includeLow?: boolean,
     bands?: string[],
