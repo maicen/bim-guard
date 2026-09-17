@@ -439,8 +439,14 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "applicable_to": ["Piping (Corrosive)"],
     },
     {
+        # The id is left as it was coined: it may already appear in stored rows.
+        # "2025" was never an edition -- it is the worldstainless.org upload path
+        # the PDF is served from. The document is Materials and Applications
+        # Series Volume 10, ISBN 978-2-87997-263-3, (c) Euro Inox 2009, adapted
+        # from Merkblatt 829 (4th edition 2005). Held at
+        # docs/scraped_standards/corrosion_euro_inox_vol10_contact_other_metals.md.
         "id": "worldstainless-25",
-        "name": "WorldStainless / Euro Inox (2025)",
+        "name": "WorldStainless / Euro Inox Vol. 10 (2009)",
         "domain": "Galvanic Corrosion",
         "description": "Galvanic series, corrosion rate data, material compatibility",
         "source": "notebook",
