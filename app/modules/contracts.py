@@ -1431,6 +1431,15 @@ class WorkflowStatusContract(BaseModel):
 
     project_id: int
     status: str = Field(default="pending", description="Overall project analysis state")
+    run_key: str = Field(
+        default="default",
+        description=(
+            "Which concurrent run reported most recently -- 'default' for "
+            "corrosion, 'seismic' for Blue Halo, 'graph' for the graph engine. "
+            "A client scopes a progress average to this rather than averaging "
+            "one theme's engines against another theme's."
+        ),
+    )
     engines: dict[str, Any] = Field(default_factory=dict)
     timestamp: Optional[str] = None
 

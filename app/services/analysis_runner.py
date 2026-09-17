@@ -41,6 +41,8 @@ from app.services.models_service import ModelsService
 from app.services.pipeline_tracker import (
     CC_ENGINE,
     GC_ENGINE,
+    SB_ENGINE,
+    SEISMIC_RUN_KEY,
     Stage,
     complete,
     emit,
@@ -262,6 +264,79 @@ def _run_corrosion_tracked(
         return result
 
 
+def _run_seismic_tracked(
+    content: bytes,
+    project_id: int,
+    models: list[tuple[str, bytes]],
+) -> dict:
+    """Run Blue Halo, reporting its stages to the pipeline tracker.
+
+    WHY THIS IS TRACKED NOW, AND UNDER ITS OWN RUN KEY
+
+        It used to be untracked, on the grounds that "binding a tracker here
+        would reset a corrosion run's progress for the same project". That was
+        true of a store keyed by project id alone, and it is no longer how the
+        store is keyed: trackers live under ``(project_id, run_key)``, so
+        seismic binds :data:`SEISMIC_RUN_KEY` and the corrosion run keeps the
+        default key. Neither run's ``reset=True`` can reach the other's stages,
+        which is the conflict that was being avoided rather than fixed --
+        avoiding it cost the seismic run all of its progress reporting, so a run
+        that was working showed a frozen zero for its whole duration.
+
+        Registering SB-001 in ``pipeline_tracker.ENGINE_SPECS`` is the other
+        half: the workflow endpoint only reports engines it knows, and
+        ``tracker.run`` raises on a code it does not.
+
+    STAGES THE DRIVER OWNS HERE
+
+        Validation and Report Assembly, plus ``complete``. Stages 2-4 are the
+        kernel's, because it opens the models and runs clash detection itself --
+        see ``phase_6d_seismic``'s docstring. That is the same split the
+        corrosion path uses, drawn at the point where the work actually happens.
+
+    Args:
+        content: The primary model's bytes.
+        project_id: Project being analysed; half of the tracker key.
+        models: Every ``(label, bytes)`` the project holds, primary first, as
+            ``model_bytes_all`` returned them.
+
+    Returns:
+        The ``AnalysisResult`` from :func:`run_seismic_analysis`, unchanged.
+        Tracking never alters the result.
+    """
+    with tracking(project_id, run_key=SEISMIC_RUN_KEY):
+        emit(SB_ENGINE, Stage.VALIDATION, model_bytes=len(content), models_total=len(models))
+
+        # models[0][0] is the primary's file_name, from model_bytes_all. Passed
+        # so a federated clash names both files: without it the primary's
+        # elements were attributed to the literal "primary model".
+        result = run_seismic_analysis(
+            content,
+            primary_label=models[0][0] if models else "",
+            extra_models=models[1:],
+        )
+
+        error = result.get("compliance_error")
+        if error:
+            # The kernel already reported the stage it failed in; this is the
+            # driver's backstop for an error path that predates the
+            # instrumentation or is added later without it.
+            track_failure(SB_ENGINE, str(error))
+            return result
+
+        issues = result.get("audit_issues", [])
+        emit(
+            SB_ENGINE,
+            Stage.REPORT_ASSEMBLY,
+            issues=len(issues),
+            data_quality=sum(1 for i in issues if i.mechanism == DATA_QUALITY),
+        )
+        # Complete rather than advancing to Export, for the reason the corrosion
+        # path gives: export is a separate download request with no tracker bound.
+        complete(SB_ENGINE)
+        return result
+
+
 #: Band names an ``AuditIssue`` dict may carry, mapped onto the enum the
 #: exporter sorts and prioritises by. Anything unrecognised becomes LOW rather
 #: than raising: a band typo should cost one finding its severity, not a
@@ -330,8 +405,12 @@ def _run_architecture(project_id: int, enable_shacl: bool = False) -> dict:
 
     Not tracked: the orchestrator reports progress through its own
     ``log_progress`` and drives no engine the workflow endpoint knows about, so
-    binding a tracker here would reset a corrosion run's stages for the same
-    project -- the reason the seismic path stays untracked too.
+    there is nothing here for the endpoint to report. The seismic path used to
+    be untracked for a second reason -- that a tracker bound here would reset a
+    corrosion run's stages for the same project -- which per-run keys have since
+    settled; see :func:`_run_seismic_tracked`. Architecture would need an engine
+    registered in ``pipeline_tracker.ENGINE_SPECS`` before tracking it could
+    report anything, so it stays untracked until it has one.
     """
     # Errors cross this boundary as values, not exceptions -- the rule this
     # module opens with. The orchestrator breaks it in one place: its rule packs
@@ -453,17 +532,7 @@ def run_analysis(
     # touching the tracker: no engine ran, so reporting stages for one would
     # describe work that did not happen.
     if slug == "seismic":
-        # Not tracked: the seismic analysis is not one of the engines the
-        # workflow endpoint reports, and binding a tracker here would reset a
-        # corrosion run's progress for the same project.
-        # models[0][0] is the primary's file_name, from model_bytes_all. Passed
-        # so a federated clash names both files: without it the primary's
-        # elements were attributed to the literal "primary model".
-        result = run_seismic_analysis(
-            content,
-            primary_label=models[0][0] if models else "",
-            extra_models=models[1:],
-        )
+        result = _run_seismic_tracked(content, project_id, models)
     elif slug == "architecture":
         result = _run_architecture(project_id, enable_shacl=enable_shacl)
     else:

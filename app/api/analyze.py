@@ -55,7 +55,7 @@ from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
 from app.services.phase6_service import Phase6Service
-from app.services.pipeline_tracker import snapshot
+from app.services.pipeline_tracker import merged_snapshot
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
@@ -833,12 +833,18 @@ def get_analysis_results(
 def get_workflow_status(
     project_id: int, project: Annotated[dict, Depends(get_authorized_project_for_analyze)]
 ) -> WorkflowStatusContract:
-    """Get the current live workflow stages and metrics for a project."""
-    snap = snapshot(project_id)
+    """Get the current live workflow stages and metrics for a project.
+
+    Merged across run keys, so the polled fallback reports a seismic or graph
+    run exactly as the SSE stream does. Without the merge the two disagreed:
+    the stream carried the events and this reported every engine as pending.
+    """
+    snap = merged_snapshot(project_id)
     raw_engines = snap.get("engines", {})
     return WorkflowStatusContract(
         project_id=project_id,
         status="running" if any(isinstance(e, dict) and e.get("status") == "running" for e in raw_engines.values()) else "idle",
+        run_key=snap.get("run_key", "default"),
         engines=raw_engines,
         timestamp=snap.get("timestamp"),
     )

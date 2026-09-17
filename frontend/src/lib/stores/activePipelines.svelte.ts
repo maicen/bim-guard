@@ -60,10 +60,35 @@ class PipelineTrackerStore {
 
 export const pipelineTracker = new PipelineTrackerStore();
 
-/** Average progress across a run's active engines, 0-100. */
+/**
+ * Engine statuses that mean the engine actually started. A `pending` engine
+ * carries no `progress_percent` at all, so counting it dragged the average
+ * down by a constant: a finished corrosion run (GC-001 + CC-001 at 100)
+ * averaged against three idle engines reported 40% and stopped there.
+ */
+const STARTED = new Set(["running", "complete", "failed"]);
+
+/**
+ * Average progress across the engines of the run currently reporting, 0-100.
+ *
+ * Scoped two ways, because a project can have more than one analysis tracked
+ * at once — the backend keys trackers by project *and* run, so a seismic run
+ * and a corrosion run on one project are both in the payload:
+ *
+ *   - to engines that have started, so idle engines do not cap the bar; and
+ *   - to `status.run_key`, the run that reported most recently, so a seismic
+ *     run does not read as 83% because a corrosion run finished ten minutes
+ *     ago and is still inside the tracker's TTL.
+ *
+ * An engine with no `run_key` is treated as part of the active run, so a
+ * payload from before the runs were merged still averages the way it used to.
+ */
 export function avgPipelineProgress(status: WorkflowStatus | null | undefined): number {
   if (!status) return 0;
-  const engines = Object.values(status.engines || {}).filter((e) => e.status !== "not_implemented");
+  const activeRun = status.run_key ?? "default";
+  const engines = Object.values(status.engines || {}).filter(
+    (e) => STARTED.has(e.status) && (e.run_key ?? activeRun) === activeRun,
+  );
   if (!engines.length) return 0;
   return Math.round(engines.reduce((acc, e) => acc + (e.progress_percent || 0), 0) / engines.length);
 }

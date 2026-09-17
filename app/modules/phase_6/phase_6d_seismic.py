@@ -24,6 +24,20 @@ GEOMETRY IS READ, NOT ASSUMED
     the same four-step rule Session C follows. Nothing is silently skipped and
     no clearance is invented.
 
+PROGRESS IS REPORTED, AMBIENTLY
+
+    This kernel does its own IFC reading and its own clash detection, so the
+    driver cannot stamp stages around the parts a user waits on: from outside,
+    the whole run is one call. It therefore reports stages 2 (IFC Parsing),
+    3 (Engine Execution) and 4 (Risk Scoring) itself, through
+    :mod:`app.services.pipeline_tracker`, exactly as the corrosion engines do
+    and for the same reason -- the stage belongs to whoever genuinely does the
+    work. The driver keeps Validation and Report Assembly.
+
+    The calls are ambient and **no-ops when no tracker is bound**, so the CLI
+    demos, the validation sweep and the tests that call this function directly
+    behave exactly as they did before.
+
 NO DEMO MODE
 
     There is deliberately no synthetic-issue generator here. ``AnalysisResult``
@@ -56,6 +70,8 @@ from app.modules.blue_halo.halo_volume_generator import (
 )
 from app.modules.comparator.issue_adapter import IssueIdAllocator
 from app.modules.comparator.issue_schema import Issue, RiskBand, make_issue
+from app.services.pipeline_tracker import SB_ENGINE, Stage, emit, increment
+from app.services.pipeline_tracker import fail as track_failure
 
 logger = get_logger(__name__)
 
@@ -476,23 +492,26 @@ def run_seismic_analysis(
         config = load_clearance_config(config_path)
     except Exception as exc:
         logger.warning("Clearance config unavailable path=%s error=%s", config_path, exc)
-        return _result([], error=f"The seismic clearance config could not be loaded: {exc}")
+        reason = f"The seismic clearance config could not be loaded: {exc}"
+        track_failure(SB_ENGINE, reason)
+        return _result([], error=reason)
 
     rules = config.rules_for(brace_type)
     if not rules:
-        return _result(
-            [],
-            error=(
-                f"{config.jurisdiction} defines no {brace_type.value} bracing rule, "
-                "so no clearance can be applied."
-            ),
+        reason = (
+            f"{config.jurisdiction} defines no {brace_type.value} bracing rule, "
+            "so no clearance can be applied."
         )
+        track_failure(SB_ENGINE, reason)
+        return _result([], error=reason)
     rule = rules[0]
 
     try:
         import ifcopenshell
     except ImportError:
-        return _result([], error="ifcopenshell is not installed, so IFC files cannot be read.")
+        reason = "ifcopenshell is not installed, so IFC files cannot be read."
+        track_failure(SB_ENGINE, reason)
+        return _result([], error=reason)
 
     geometries: list[ElementGeometry] = []
     failures: list[tuple[str, str, str]] = []
@@ -501,11 +520,18 @@ def run_seismic_analysis(
     unread: dict[str, tuple[str, str, str]] = {}
     duplicates = 0
 
+    # Stage 2 belongs here rather than to the driver: this kernel federates the
+    # project's models itself, so on a large building the parse is most of the
+    # wait and the driver cannot see it happening.
+    emit(SB_ENGINE, Stage.IFC_PARSING, models_total=1 + len(extra_models))
+
     for label, content in ((primary_label.strip() or PRIMARY_MODEL_LABEL, ifc_bytes), *extra_models):
         try:
             model = ifcopenshell.file.from_string(content.decode("utf-8", errors="replace"))
         except Exception as exc:
-            return _result([], error=f"{label} could not be read as IFC: {exc}")
+            reason = f"{label} could not be read as IFC: {exc}"
+            track_failure(SB_ENGINE, reason)
+            return _result([], error=reason)
 
         model_geometries, model_failures = _geometries(model, unit_scale_to_mm(model))
         for geometry in model_geometries:
@@ -523,6 +549,8 @@ def run_seismic_analysis(
         for element_id, ifc_class, reason in model_failures:
             unread.setdefault(element_id, (element_id, ifc_class, reason))
             source_of.setdefault(element_id, label)
+        increment(SB_ENGINE, models_read=1)
+        emit(SB_ENGINE, None, elements_read=len(geometries))
 
     # An element is unreadable only if no model could read it. One discipline
     # federating a placeholder for an element another models properly is the
@@ -552,6 +580,7 @@ def run_seismic_analysis(
     # geometry does not resolve to a solid that estimate is unavailable rather
     # than small. Those elements are reported, not dropped -- see _bracing_scope.
     threshold_mm = config.pipe_diameter_threshold_mm
+    emit(SB_ENGINE, Stage.ENGINE_EXECUTION, elements_total=len(geometries))
     in_class = [g for g in geometries if g.ifc_class in BRACED_CLASSES]
     scoped: dict[str, list[ElementGeometry]] = {
         "braced": [],
@@ -562,6 +591,16 @@ def run_seismic_analysis(
         scoped[_bracing_scope(geometry, threshold_mm)].append(geometry)
 
     braced = scoped["braced"]
+    # ``elements_total`` stays the model's element count so it keeps meaning the
+    # same thing it does on a corrosion run; ``braced_total`` is what the halo
+    # loop below actually iterates, and what ``elements_assessed`` counts up to.
+    emit(
+        SB_ENGINE,
+        None,
+        braced_total=len(braced),
+        below_threshold=len(scoped["below_threshold"]),
+        unmeasurable=len(scoped["unmeasurable"]),
+    )
     for geometry in scoped["unmeasurable"]:
         issues.append(
             _data_quality_issue(
@@ -608,6 +647,14 @@ def run_seismic_analysis(
                     for chunk in chunks
                 ],
             )
+            # Recorded in one step, and deliberately not ticked per chunk in the
+            # loop below. ``run_in_pool`` gathers every result before it returns,
+            # so by the time anything here runs the assessment is already over --
+            # a counter climbing through that loop would be reporting finished
+            # work as though it were arriving. The pool path therefore has no
+            # intermediate progress to show; the sequential path below does, and
+            # reports it per element.
+            emit(SB_ENGINE, None, elements_assessed=len(braced))
             for chunk_clashes in chunk_results:
                 for clash, halo in chunk_clashes:
                     issues.append(_clash_issue(clash, halo, config, allocator, source_of))
@@ -616,9 +663,13 @@ def run_seismic_analysis(
                 "Parallel seismic clash detection failed; falling back to sequential: %s", exc
             )
             use_pool = False
+            # No counter to undo before the sequential pass re-assesses
+            # everything: the gather above is all-or-nothing, so a failure
+            # leaves ``elements_assessed`` unset rather than part-way.
 
     if not use_pool:
         for geometry in braced:
+            increment(SB_ENGINE, elements_assessed=1)
             halo = generate_halo_volume_from_geometry(
                 geometry,
                 brace_type,
@@ -649,6 +700,13 @@ def run_seismic_analysis(
     # Stamped here, over everything the run built, rather than in the two Issue
     # builders: a data-quality note is as much a statement about this ruleset as
     # a clash is, and one place cannot miss a branch the other added.
+    emit(
+        SB_ENGINE,
+        Stage.RISK_SCORING,
+        elements_total=len(geometries),
+        findings=sum(1 for i in issues if i.mechanism != DATA_QUALITY),
+        data_quality=sum(1 for i in issues if i.mechanism == DATA_QUALITY),
+    )
     version = _ruleset_version(config)
     for issue in issues:
         issue.metadata["ruleset_version"] = version
