@@ -557,9 +557,9 @@ def run_seismic_analysis(
     if use_pool:
         try:
             from app.services.compute_pool import (
-                get_compute_pool,
                 get_worker_count,
                 is_multiprocessing_enabled,
+                run_in_pool,
             )
 
             if not is_multiprocessing_enabled():
@@ -569,25 +569,22 @@ def run_seismic_analysis(
 
     if use_pool:
         try:
-            pool = get_compute_pool()
             workers = get_worker_count()
             chunk_size = max(5, len(braced) // (workers * 2))
             chunks = [braced[i : i + chunk_size] for i in range(0, len(braced), chunk_size)]
 
-            futures = [
-                pool.submit(
-                    _detect_halo_clashes_chunk,
-                    chunk,
-                    geometries,
-                    brace_type,
-                    rule,
-                    seismic_zone,
-                    building_type,
-                )
-                for chunk in chunks
-            ]
-            for future in futures:
-                for clash, halo in future.result():
+            # Every chunk is gathered before any Issue is built: a worker that
+            # died part-way used to leave the earlier chunks' issues (and their
+            # allocated ids) behind for the sequential fallback to duplicate.
+            chunk_results = run_in_pool(
+                _detect_halo_clashes_chunk,
+                [
+                    (chunk, geometries, brace_type, rule, seismic_zone, building_type)
+                    for chunk in chunks
+                ],
+            )
+            for chunk_clashes in chunk_results:
+                for clash, halo in chunk_clashes:
                     issues.append(_clash_issue(clash, halo, config, allocator, source_of))
         except Exception as exc:
             logger.warning(
