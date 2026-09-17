@@ -105,6 +105,9 @@ run_server.bat          # Windows
 ./run_production_server.sh  # macOS/Linux (or ./run_production_server.bat)
 run_production_server.bat   # Windows
 
+# Run Docker production stack at https://bim-guard.xyz (with Cloudflare Tunnel)
+docker compose --profile tunnel up -d --build
+
 # Run automated tests and lint
 uv run ruff check .
 uv run pytest tests/ -m 'not slow' -v
@@ -116,6 +119,67 @@ uv run pytest -m slow          # only the slow tests (full engine/pipeline runs)
 uv run pytest -m ""             # everything, including slow tests
 uv run pytest -m "not llm"      # skip tests that call an LLM
 ```
+
+## Production Serving at https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
+
+BIM Guard is served in production at `https://bim-guard.xyz` using **OrbStack / Docker Compose** and **Cloudflare Tunnel (`cloudflared`)**:
+
+### Stack Topology & Services (`docker-compose.yml`)
+
+1. **`bim-guard` (`bim-guard-app`)**: Multi-stage production container (`Dockerfile`) compiling the Svelte 5 SPA (`frontend/dist`) and running a 4-worker Uvicorn ASGI gateway on port `8000`. Health-checked via `curl -f http://localhost:8000/api/health`.
+2. **`neo4j` (`bim-guard-neo4j`)**: Self-hosted Neo4j 5.26 graph database (`bolt://neo4j:7687`, HTTP on `7474`), backing topological queries. Starts automatically and is marked healthy before `bim-guard` boots.
+3. **`docling-serve` (`bim-guard-docling`)**: Self-hosted CPU Docling REST parsing engine (`http://docling-serve:5001`), started by default and health-checked before `bim-guard` boots.
+4. **`opencde` (`bim-guard-opencde`)**: buildingSMART OpenCDE Documents API on port `8081` with Supabase JWT bearer token verification.
+5. **`cloudflared` (`bim-guard-cloudflared`)**: Official Cloudflare Zero Trust tunnel client running under the `tunnel` compose profile. Establishes outbound encrypted QUIC/HTTP2 tunnels to Cloudflare's edge, forwarding `https://bim-guard.xyz` traffic directly to `http://bim-guard:8000` without opening firewall ports.
+
+### Quickstart Commands
+
+```bash
+# Start the full stack with tunnel (builds SPA and backend)
+docker compose --profile tunnel up -d --build
+
+# Or set COMPOSE_PROFILES=tunnel in .env and run standard compose:
+docker compose up -d --build
+
+# Inspect container health and service logs:
+docker compose ps
+docker compose logs -f bim-guard
+docker compose logs -f cloudflared
+```
+
+### Environment Requirements (`.env`)
+
+```env
+# ── Cloudflare Tunnel & Domain Routing ────────────────────────────────────────
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+TUNNEL_TOKEN=<cloudflare-zero-trust-tunnel-token>
+COMPOSE_PROFILES=tunnel
+
+# ── Supabase & Auth Keys ──────────────────────────────────────────────────────
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_KEY=<anon-key>
+SUPABASE_PUBLISHABLE_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+SUPABASE_JWKS_URL=https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+
+# ── Inter-Service Networking ──────────────────────────────────────────────────
+DOCLING_LOCAL_URL=http://docling-serve:5001
+NEO4J_URI=bolt://neo4j:7687
+```
+
+### Cloudflare Zero Trust & Google OAuth Branding
+
+- **Tunnel Public Hostname**: Points `https://bim-guard.xyz` to `http://bim-guard:8000` (internal Docker hostname) with Type `HTTP`.
+- **Supabase Auth Redirects**: Supabase Dashboard &rarr; Auth &rarr; URL Configuration must register `https://bim-guard.xyz/**` and `https://bim-guard.xyz/`.
+- **Google OAuth Consent Screen**: Requires Authorized Domains:
+  1. `bim-guard.xyz` (the app domain)
+  2. `supabase.co` (the OAuth redirect host `https://<ref>.supabase.co/auth/v1/callback`)
+- **Public Compliance & SEO Endpoints**: Served directly at `https://bim-guard.xyz`:
+  - `/privacy` & `/privacy.html` — Standalone Privacy Policy (Google API Limited Use compliant).
+  - `/terms` & `/terms.html` — Standalone Terms of Service (with OpenBIM engineering disclaimers).
+  - `/sitemap.xml` — XML sitemap declaring homepage, privacy, and terms.
+  - `/robots.txt` — Crawler governance declaring `Sitemap: https://bim-guard.xyz/sitemap.xml`.
+  - `/og-image.png` — 1200x630 branded social sharing card for LinkedIn, X, Slack, and Teams.
 
 ## Local Dev Sign-In (Google OAuth bypass without weakening auth)
 
