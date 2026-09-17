@@ -19,6 +19,21 @@ SELF-HEALING
     parallel execution is suspended for :data:`BREAK_COOLDOWN_SECONDS`, so a
     repeatedly-crashing workload runs sequentially instead of respawning a full
     pool on every request.
+
+    A pool that broke must never be shut down with ``wait=True``. On Windows,
+    CPython 3.12 terminates the workers and then joins the call queue's feeder
+    thread, which can stay blocked forever writing a large pickled chunk into
+    the dead pipe; ``wait=True`` joins that same thread and hangs the caller.
+
+WORKER MEMORY
+
+    Each worker imports numpy and scipy, and OpenBLAS commits a buffer per
+    thread it expects to use -- one per logical CPU. On a 32-thread machine
+    that was ~1.7 GB of committed memory per worker (~154 MB with one BLAS
+    thread), so a 31-worker pool asked Windows for ~53 GB of commit charge and
+    workers died with ``WinError 1455`` (paging file too small) once a few
+    backends were running. The chunks are pure-Python loops that gain nothing
+    from BLAS threads, so worker processes are started with one.
 """
 
 from __future__ import annotations
@@ -51,6 +66,9 @@ _suspended_until = 0.0
 # Marker set on an executor once its break has been counted, so two callers
 # that both hit the same dead pool count it once.
 _BREAK_COUNTED = "_bimguard_break_counted"
+
+WORKER_THREAD_ENV_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+"""Native thread-pool sizes pinned to 1 for workers; see WORKER MEMORY above."""
 
 
 def is_multiprocessing_enabled() -> bool:
@@ -141,8 +159,23 @@ def get_compute_pool() -> ProcessPoolExecutor:
         if _POOL is None:
             workers = get_worker_count()
             logger.info("Initializing shared compute ProcessPoolExecutor workers=%d", workers)
+            _limit_worker_native_threads()
             _POOL = ProcessPoolExecutor(max_workers=workers)
         return _POOL
+
+
+def _limit_worker_native_threads() -> None:
+    """Start worker processes with single-threaded BLAS/OpenMP.
+
+    Spawned workers inherit this process's environment when they start, and
+    OpenBLAS reads its thread count only when it loads, so the variables are
+    set here rather than in a pool initializer (a worker may import numpy
+    before an initializer runs). ``setdefault`` leaves any value an operator
+    configured untouched. By the time a pool is built the backend has already
+    loaded numpy, so its own BLAS thread count is unaffected.
+    """
+    for name in WORKER_THREAD_ENV_VARS:
+        os.environ.setdefault(name, "1")
 
 
 def report_pool_broken(pool: ProcessPoolExecutor) -> None:
@@ -199,6 +232,9 @@ def shutdown_compute_pool(wait: bool = True) -> None:
     global _POOL
     with _LOCK:
         if _POOL is not None:
+            if wait and _is_broken(_POOL):
+                # Joining a broken pool's feeder thread can hang forever.
+                wait = False
             logger.info("Shutting down shared compute ProcessPoolExecutor wait=%s", wait)
             try:
                 _POOL.shutdown(wait=wait, cancel_futures=True)

@@ -8,6 +8,7 @@ crash or an out-of-memory kill produces -- so these tests exercise the real
 from __future__ import annotations
 
 import os
+import threading
 from concurrent.futures.process import BrokenProcessPool
 
 import pytest
@@ -99,6 +100,39 @@ def test_success_resets_break_counter(monkeypatch: pytest.MonkeyPatch) -> None:
         compute_pool.run_in_pool(_crash_worker, [(0,)])
 
     assert compute_pool.is_multiprocessing_enabled() is True
+
+
+def _worker_env(names: tuple[str, ...]) -> dict[str, str | None]:
+    """Report the worker process's view of ``names`` in its environment."""
+    return {name: os.environ.get(name) for name in names}
+
+
+def test_workers_start_with_single_threaded_blas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Workers get one BLAS thread; an operator's explicit setting is kept."""
+    names = compute_pool.WORKER_THREAD_ENV_VARS
+    for name in names:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("MKL_NUM_THREADS", "4")
+
+    [seen] = compute_pool.run_in_pool(_worker_env, [(names,)])
+
+    assert seen == {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "4"}
+
+
+def test_shutdown_with_wait_does_not_hang_on_broken_pool() -> None:
+    """App shutdown must not join a broken pool's possibly-stuck feeder thread."""
+    pool = compute_pool.get_compute_pool()
+    with pytest.raises(BrokenProcessPool):
+        pool.submit(_crash_worker, 0).result()
+
+    finished = threading.Event()
+    thread = threading.Thread(
+        target=lambda: (compute_pool.shutdown_compute_pool(wait=True), finished.set()),
+        daemon=True,
+    )
+    thread.start()
+    assert finished.wait(timeout=30), "shutdown_compute_pool(wait=True) hung on a broken pool"
+    assert compute_pool._POOL is None
 
 
 def test_corrosion_fallback_after_pool_break_matches_sequential(
