@@ -845,12 +845,21 @@ def get_workflow_status(
 
 
 
-@router.get("/export", summary="Export analysis report as BCF, CSV, or JSON")
+@router.get("/export", summary="Export analysis report as BCF, CSV, JSON or IFC")
 def export_analysis_report(
     project_id: Annotated[int, Query(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
     slug: str = Query("corrosion"),
-    fmt: str = Query("bcf", description="Export format: bcf, csv, or json"),
+    fmt: str = Query(
+        "bcf",
+        description=(
+            "Export format: bcf, csv, json or ifc. 'ifc' writes a standalone "
+            "IFC4 model of the SB-001 seismic clearance envelopes -- one "
+            "IfcBuildingElementProxy box per finding that carries one. A run "
+            "whose findings have no envelope geometry yields a valid but "
+            "empty model rather than an error."
+        ),
+    ),
     engines: list[str] | None = Query(
         None, description="Engine codes the export covers; omit for every engine"
     ),

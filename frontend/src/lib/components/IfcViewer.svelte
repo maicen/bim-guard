@@ -21,6 +21,14 @@
     elementGuid?: string | null;
     bcfArtifactId?: number | null;
     /**
+     * Which analysis run produced the finding behind `elementGuid`, as an
+     * `/analyze/export?slug=` value ("corrosion", "seismic", "architecture").
+     * The export fallback in `focusElement` asks for that run's archive; a
+     * seismic element is not in the corrosion BCF and vice versa. Null keeps
+     * the historical behaviour (corrosion) for links that carry no slug.
+     */
+    analysisSlug?: string | null;
+    /**
      * Which of the project's attached models to render, by project_ifc_files.id.
      * null renders the project's primary, which is also what a project whose
      * model predates that table resolves to.
@@ -44,12 +52,21 @@
     projectId = null,
     elementGuid = null,
     bcfArtifactId = null,
+    analysisSlug = null,
     fileId = null,
     fileName = "",
     ifcFiles = [],
     onSelectFile,
     notFoundMessage = $bindable(null),
   }: Props = $props();
+
+  /**
+   * The initViewer() argument contract this component speaks, checked against
+   * what the loaded bundle exports. Must match VIEWER_MOUNTS_API in
+   * static/js/viewer/viewer-mounts.js; scripts/dev/viewer_contract_check.mjs
+   * holds the two together.
+   */
+  const VIEWER_MOUNTS_API_EXPECTED = 2;
 
   let viewportHost: HTMLDivElement = $state();
   let detailsHost: HTMLDivElement = $state();
@@ -120,7 +137,10 @@
    */
   async function focusElement(id: number, guid: string) {
     if (!viewerAPI) return;
-    const key = `${id}::${guid}`;
+    // The slug is part of the key: the same element can be a finding in two
+    // runs, and each lives in its own archive.
+    const slug = (analysisSlug || "corrosion").trim() || "corrosion";
+    const key = `${id}::${guid}::${slug}`;
     if (focusAttempted === key) return;
     focusAttempted = key;
 
@@ -137,6 +157,12 @@
       // actually answers. Exporting regenerates the archive from the cached
       // run, which is why it is second rather than first.
       //
+      // The export is asked for THIS finding's run. /analyze/export re-runs (or
+      // reads the cache of) exactly the slug it is given, so the slug used to be
+      // the whole bug: hardcoded "corrosion", every seismic, crevice or microbial
+      // deep link fetched an archive that does not contain its topic, and the
+      // viewer reported the element as missing from the model.
+      //
       // The viewer owns the rest: it cuts the archive down to this element
       // before parsing any of it, then loads, selects and frames it, logging
       // each stage under [bimguard-3d]. Never throws -- a failed stage comes
@@ -144,7 +170,7 @@
       const result = await viewerAPI.loadBcfForElement(
         [
           { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
-          { label: "export", url: analyzeApi.getExportUrl(id, "corrosion", "bcf") },
+          { label: `export:${slug}`, url: analyzeApi.getExportUrl(id, slug, "bcf") },
         ],
         guid,
         authHeaders,
@@ -174,13 +200,47 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-isolate-camera-autofit-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-band-colors-2";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
-      viewerAPI = await mod.initViewer({
+
+      // The mount argument is deliberately both shapes at once: it IS the
+      // viewport element, and it carries the three mount names as properties.
+      // Current bundles read .viewport/.details/.drawings; a bundle from before
+      // that split takes the whole argument as its single container and calls
+      // DOM methods on it, which a real element answers natively.
+      //
+      // Passing a plain object instead is what produced
+      // "container.replaceChildren is not a function" in the browser on
+      // 2026-09-16: an older /static answered this import, took the object as
+      // its container, and died on the first DOM call with nothing in the
+      // message to say the assets were stale.
+      const mounts = Object.assign(viewportHost, {
         viewport: viewportHost,
         details: detailsHost,
         drawings: drawingsSheetBoardHost,
       });
+
+      // A bundle that exports no mounts-API version predates the contract.
+      // Mounting still proceeds — passing the element itself is what makes that
+      // survivable — but the reason is named once, in the console, rather than
+      // surfacing later as an unexplained DOM error.
+      if (mod.VIEWER_MOUNTS_API !== VIEWER_MOUNTS_API_EXPECTED) {
+        console.warn(
+          `[bimguard-3d] viewer bundle reports mounts API ${mod.VIEWER_MOUNTS_API ?? "none"}, ` +
+            `this app expects ${VIEWER_MOUNTS_API_EXPECTED}. ` +
+            `/static is being served from a different checkout than the frontend ` +
+            `(asset version ${mod.VIEWER_ASSET_VERSION ?? "unknown"}).`,
+        );
+      }
+
+      viewerAPI = await mod.initViewer(mounts);
+      if (!viewerAPI) {
+        throw new Error(
+          "The 3D viewer bundle could not mount. /static is likely being served " +
+            "from a different checkout than the frontend — restart the backend " +
+            "from this working copy, then retry.",
+        );
+      }
       isInitialized = true;
 
       if (projectId) {

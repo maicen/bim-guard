@@ -71,6 +71,25 @@ export class TableState<T, Id extends RowId = RowId> {
     this.sortField = options.initialSort?.field ?? "";
     this.sortAsc = options.initialSort?.asc ?? true;
     this.pageSize = options.initialPageSize ?? 10;
+    this.filters = this.#defaultFilters();
+  }
+
+  /**
+   * "ALL" for every declared filter key -- the sentinel every view already
+   * uses to mean "this filter is off" (see `filtered` below and
+   * `hasActiveFilters`). Every caller that renders a filter as
+   * `<Select bind:value={table.filters.key}>` needs that key to be defined
+   * from the very first render: a `bind:` target that reads as `undefined`
+   * while the bindable prop on the other end (`Select`'s
+   * `value = $bindable("")`) has a fallback throws `props_invalid_value` --
+   * Svelte cannot tell "nothing was passed, use the fallback" apart from
+   * "this is two-way bound to a real value that happens to be undefined
+   * right now", so it refuses to guess and throws instead. Starting from
+   * `{}` left every key undefined until the user touched that dropdown at
+   * least once, which crashed the whole view on mount.
+   */
+  #defaultFilters(): Record<string, string> {
+    return Object.fromEntries(Object.keys(this.#options.filters ?? {}).map((key) => [key, "ALL"]));
   }
 
   filtered = $derived.by(() => {
@@ -190,7 +209,7 @@ export class TableState<T, Id extends RowId = RowId> {
   /** Clear search and every filter. */
   reset() {
     this.search = "";
-    this.filters = {};
+    this.filters = this.#defaultFilters();
     this.requestedPage = 1;
   }
 

@@ -34,11 +34,13 @@ import zipfile
 from typing import Optional
 
 from app.modules.blue_halo.halo_volume_generator import (
+    PSET_HALO_RESERVATION,
     SCHEMA_VERSION as HALO_SCHEMA_VERSION,
     ClashReport,
     HaloVolume,
     _due_date_for_severity,
     export_halo_to_bcf,
+    halo_reservation_properties,
 )
 from app.modules.reporter.bcf_generator import (
     BCFIssue,
@@ -48,7 +50,10 @@ from app.modules.reporter.bcf_generator import (
     bcf_topic_guid,
 )
 
-PSET_HALO_RESERVATION = "Pset_HaloReservation"
+#: Re-exported from Module 2, which now owns the definition so that the BCF and
+#: IFC exports write the same property set. Kept as a module attribute here
+#: because callers and tests import it from this module.
+__all__ = ["PSET_HALO_RESERVATION", "generate_bcf_zip_from_halo_clashes", "generate_pset_halo_reservation"]
 
 _SEVERITY_TO_BCF_PRIORITY: dict[str, str] = {
     "critical": "Critical",
@@ -185,34 +190,33 @@ def generate_pset_halo_reservation(halo: HaloVolume) -> dict:
         {"Pset_HaloReservation": {property_name: value, ...}}
     """
     return {
-        PSET_HALO_RESERVATION: {
-            "SchemaVersion": HALO_SCHEMA_VERSION,
-            "SourceElementGlobalId": halo.source_element_id,
-            "SourceIfcClass": halo.source_ifc_class,
-            "BraceType": halo.brace_type.value,
-            "RuleVariant": halo.rule_variant or "",
-            "ClearanceMm": halo.clearance_mm,
-            "HaloVolumeMm3": halo.halo_bbox_mm.volume_mm3,
-            "ElementBBoxMinMm": [
+        PSET_HALO_RESERVATION: halo_reservation_properties(
+            source_element_id=halo.source_element_id,
+            source_ifc_class=halo.source_ifc_class,
+            brace_type=halo.brace_type.value,
+            rule_variant=halo.rule_variant or "",
+            clearance_mm=halo.clearance_mm,
+            halo_volume_mm3=halo.halo_bbox_mm.volume_mm3,
+            element_bbox_min_mm=(
                 halo.element_bbox_mm.min.x,
                 halo.element_bbox_mm.min.y,
                 halo.element_bbox_mm.min.z,
-            ],
-            "ElementBBoxMaxMm": [
+            ),
+            element_bbox_max_mm=(
                 halo.element_bbox_mm.max.x,
                 halo.element_bbox_mm.max.y,
                 halo.element_bbox_mm.max.z,
-            ],
-            "HaloBBoxMinMm": [
+            ),
+            halo_bbox_min_mm=(
                 halo.halo_bbox_mm.min.x,
                 halo.halo_bbox_mm.min.y,
                 halo.halo_bbox_mm.min.z,
-            ],
-            "HaloBBoxMaxMm": [
+            ),
+            halo_bbox_max_mm=(
                 halo.halo_bbox_mm.max.x,
                 halo.halo_bbox_mm.max.y,
                 halo.halo_bbox_mm.max.z,
-            ],
-            "GeneratedAt": halo.generated_at,
-        }
+            ),
+            generated_at=halo.generated_at,
+        )
     }

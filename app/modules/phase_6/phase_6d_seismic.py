@@ -218,6 +218,21 @@ def _data_quality_issue(
     )
 
 
+def _bbox_metadata(box: BoundingBox) -> dict:
+    """Render a bounding box as plain JSON for an Issue's metadata.
+
+    Lists rather than Point3D so the value survives the trip through the API
+    contract, the cache and the CSV/JSON exports unchanged. ``size_mm`` is
+    redundant with the corners and written anyway: every consumer wants the
+    extent, and recomputing it invites two subtly different subtractions.
+    """
+    return {
+        "min_mm": [box.min.x, box.min.y, box.min.z],
+        "max_mm": [box.max.x, box.max.y, box.max.z],
+        "size_mm": list(box.size),
+    }
+
+
 def _clash_issue(
     clash: ClashReport,
     halo: HaloVolume,
@@ -268,6 +283,16 @@ def _clash_issue(
             "brace_type": halo.brace_type.value,
             "rule_variant": halo.rule_variant,
             "jurisdiction": config.jurisdiction,
+            # The clearance envelope itself, carried rather than discarded once
+            # the clash maths is done. It is what makes a finding renderable as
+            # geometry -- reporter/halo_ifc_exporter.py writes one box per
+            # finding from these boxes, and the Pset_HaloReservation it attaches
+            # is rebuilt from these same values. Millimetres, model
+            # coordinates, axis-aligned: the box the clash was computed against.
+            "source_ifc_class": halo.source_ifc_class,
+            "halo_bbox": _bbox_metadata(halo.halo_bbox_mm),
+            "element_bbox": _bbox_metadata(halo.element_bbox_mm),
+            "halo_generated_at": halo.generated_at,
         },
         citations=_citations(config, halo),
     )
@@ -557,9 +582,9 @@ def run_seismic_analysis(
     if use_pool:
         try:
             from app.services.compute_pool import (
-                get_compute_pool,
                 get_worker_count,
                 is_multiprocessing_enabled,
+                run_in_pool,
             )
 
             if not is_multiprocessing_enabled():
@@ -569,25 +594,22 @@ def run_seismic_analysis(
 
     if use_pool:
         try:
-            pool = get_compute_pool()
             workers = get_worker_count()
             chunk_size = max(5, len(braced) // (workers * 2))
             chunks = [braced[i : i + chunk_size] for i in range(0, len(braced), chunk_size)]
 
-            futures = [
-                pool.submit(
-                    _detect_halo_clashes_chunk,
-                    chunk,
-                    geometries,
-                    brace_type,
-                    rule,
-                    seismic_zone,
-                    building_type,
-                )
-                for chunk in chunks
-            ]
-            for future in futures:
-                for clash, halo in future.result():
+            # Every chunk is gathered before any Issue is built: a worker that
+            # died part-way used to leave the earlier chunks' issues (and their
+            # allocated ids) behind for the sequential fallback to duplicate.
+            chunk_results = run_in_pool(
+                _detect_halo_clashes_chunk,
+                [
+                    (chunk, geometries, brace_type, rule, seismic_zone, building_type)
+                    for chunk in chunks
+                ],
+            )
+            for chunk_clashes in chunk_results:
+                for clash, halo in chunk_clashes:
                     issues.append(_clash_issue(clash, halo, config, allocator, source_of))
         except Exception as exc:
             logger.warning(

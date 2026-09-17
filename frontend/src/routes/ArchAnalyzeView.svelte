@@ -171,6 +171,10 @@
     params.set("project_id", String(projectId));
     if (elementGuid) params.set("element_guid", elementGuid);
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    // This view is the architectural pipeline, and it is the one that persists
+    // a BCF artifact, so the export fallback rarely runs. Naming the slug keeps
+    // it correct when it does (a project whose artifact has been cleared).
+    params.set("analysis_slug", "architecture");
     window.open(`/#/viewer?${params.toString()}`, "_blank");
   }
 
