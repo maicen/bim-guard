@@ -1297,9 +1297,9 @@ def run_corrosion_analysis(
     if use_pool:
         try:
             from app.services.compute_pool import (
-                get_compute_pool,
                 get_worker_count,
                 is_multiprocessing_enabled,
+                run_in_pool,
             )
 
             if not is_multiprocessing_enabled():
@@ -1309,17 +1309,18 @@ def run_corrosion_analysis(
 
     if use_pool:
         try:
-            pool = get_compute_pool()
             workers = get_worker_count()
             chunk_size = max(15, len(elements) // (workers * 2))
             chunks = [elements[i : i + chunk_size] for i in range(0, len(elements), chunk_size)]
 
-            futures = [
-                pool.submit(_assess_elements_chunk, chunk, spec_codes, include_low)
-                for chunk in chunks
-            ]
-            for future in futures:
-                chunk_items, chunk_mic_scored = future.result()
+            # Every chunk is gathered before any Issue is built, so a worker
+            # that dies part-way leaves nothing for the sequential fallback to
+            # duplicate.
+            chunk_results = run_in_pool(
+                _assess_elements_chunk,
+                [(chunk, spec_codes, include_low) for chunk in chunks],
+            )
+            for chunk_items, chunk_mic_scored in chunk_results:
                 if chunk_mic_scored:
                     mic_scored = True
                 for item in chunk_items:

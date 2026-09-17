@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Iterable, Literal, Optional, Sequence
 
 import ifcopenshell
 import ifcopenshell.util.placement
@@ -1005,6 +1005,57 @@ def detect_halo_clash(
 # ---------------------------------------------------------------------------
 
 HALO_PSET_NAME = "BlueHalo_ClearanceVolume"
+
+#: The property set written onto an exported clearance-zone element.
+#:
+#: Defined here rather than in reporter/blue_halo_bcf_exporter.py, which used to
+#: own it, because two exporters now need the same properties: the BCF path and
+#: the standalone IFC path (reporter/halo_ifc_exporter.py). Module 2 is upstream
+#: of Module 5, so the shared definition belongs on this side of the boundary
+#: and reporter re-exports it under its original name.
+PSET_HALO_RESERVATION = "Pset_HaloReservation"
+
+
+def halo_reservation_properties(
+    *,
+    source_element_id: str,
+    source_ifc_class: str,
+    brace_type: str,
+    rule_variant: str,
+    clearance_mm: float,
+    halo_volume_mm3: float,
+    element_bbox_min_mm: Sequence[float],
+    element_bbox_max_mm: Sequence[float],
+    halo_bbox_min_mm: Sequence[float],
+    halo_bbox_max_mm: Sequence[float],
+    generated_at: str,
+) -> dict:
+    """Build the Pset_HaloReservation property values from primitives.
+
+    Takes plain values rather than a :class:`HaloVolume` so that the same
+    property names and types are produced from either end: from a live halo
+    (the BCF path, via ``blue_halo_bcf_exporter.generate_pset_halo_reservation``)
+    or from a finding's stored metadata, long after the HaloVolume itself has
+    gone (the IFC path). One definition, so the two exports cannot drift.
+
+    Returns:
+        ``{property_name: value}`` -- the inner mapping only. Callers wrap it
+        under :data:`PSET_HALO_RESERVATION` or hand it to ifcopenshell.
+    """
+    return {
+        "SchemaVersion": SCHEMA_VERSION,
+        "SourceElementGlobalId": source_element_id,
+        "SourceIfcClass": source_ifc_class,
+        "BraceType": brace_type,
+        "RuleVariant": rule_variant or "",
+        "ClearanceMm": float(clearance_mm),
+        "HaloVolumeMm3": float(halo_volume_mm3),
+        "ElementBBoxMinMm": [float(v) for v in element_bbox_min_mm],
+        "ElementBBoxMaxMm": [float(v) for v in element_bbox_max_mm],
+        "HaloBBoxMinMm": [float(v) for v in halo_bbox_min_mm],
+        "HaloBBoxMaxMm": [float(v) for v in halo_bbox_max_mm],
+        "GeneratedAt": generated_at,
+    }
 
 
 def export_halo_to_ifc_property_set(halo: HaloVolume) -> dict:

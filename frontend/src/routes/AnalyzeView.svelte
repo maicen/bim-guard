@@ -39,7 +39,7 @@
   import HoverCard from "../lib/components/HoverCard.svelte";
   import PipingChecksExplainer from "../lib/components/PipingChecksExplainer.svelte";
   import { describeMechanism } from "../lib/glossary";
-  import { formatAnalysisDomain } from "../lib/analysisDomain";
+  import { analysisSlugForIssue, formatAnalysisDomain } from "../lib/analysisDomain";
   import type {
     AnalysisResult,
     Project,
@@ -64,6 +64,12 @@
       projectId: number,
       elementGuid?: string,
       bcfArtifactId?: number,
+      /**
+       * Which analysis run's BCF the viewer should fetch when it has to fall
+       * back to an export. Per finding, not per view: this list can hold rows
+       * from more than one engine.
+       */
+      analysisSlug?: string,
     ) => void;
   }
 
@@ -620,6 +626,23 @@
   // The stat cards read the whole-run totals, which every response carries
   // regardless of the window, so they are unaffected by paging.
   let dataQualityCount = $derived(result?.issue_stats?.data_quality ?? 0);
+
+  /**
+   * Whether an IFC clearance-zone export would contain anything.
+   *
+   * SB-001 is the only mechanism that computes a clearance envelope, and only
+   * a finding that clashed carries one, so the button appears when a finding
+   * on screen actually has `halo_bbox`. Read off the page rather than the run
+   * totals: `details` is only present on the issues the response carried, and
+   * a page with none means the export would be empty as filtered.
+   */
+  let hasClearanceZones = $derived(
+    activeCategory === "seismic" &&
+      pageIssues.some((issue) => {
+        const bbox = (issue.details ?? {})["halo_bbox"];
+        return Boolean(bbox && bbox.min_mm && bbox.max_mm);
+      }),
+  );
 </script>
 
 <div class="space-y-6 pb-12">
@@ -883,7 +906,8 @@
           <div class="flex items-center gap-2 pt-1">
             <button
               type="button"
-              onclick={() => onSelectProjectForViewer(currentProject.id)}
+              onclick={() =>
+                onSelectProjectForViewer(currentProject.id, undefined, undefined, selectedSlug)}
               class="inline-flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-blue-400"
             >
               <ScanEye class="h-3.5 w-3.5" />
@@ -1153,6 +1177,29 @@
                 <Download class="h-3.5 w-3.5" />
                 <span>JSON</span>
               </a>
+              <!-- Seismic only, and only when the findings on screen actually
+                   carry envelope geometry: SB-001 is the one mechanism that
+                   produces a clearance volume, and a run with no clash has
+                   nothing to draw. Offering the button anyway would download a
+                   valid but empty model, which reads as a broken export. -->
+              {#if hasClearanceZones}
+                <a
+                  href={analyzeApi.getExportUrl(
+                    selectedProjectId,
+                    selectedSlug,
+                    "ifc",
+                    requestedEngines,
+                    true,
+                    exportFilters.bands,
+                    exportFilters.includeDataQuality,
+                  )}
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-3.5 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                  title="Download the seismic clearance zones as a standalone IFC4 model for Revit, Navisworks or Solibri"
+                >
+                  <Download class="h-3.5 w-3.5" />
+                  <span>Export IFC</span>
+                </a>
+              {/if}
             {/if}
           </div>
         </div>
@@ -1438,7 +1485,12 @@
                           <button
                             type="button"
                             onclick={() =>
-                              onSelectProjectForViewer(selectedProjectId!, issue.element_id)}
+                              onSelectProjectForViewer(
+                                selectedProjectId!,
+                                issue.element_id,
+                                undefined,
+                                analysisSlugForIssue(issue, selectedSlug),
+                              )}
                             class="inline-flex items-center gap-1 rounded-lg bg-accent/20 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/30 hover:text-blue-300"
                           >
                             <ScanEye class="h-3.5 w-3.5" />
@@ -1702,9 +1754,10 @@
           type="button"
           onclick={() => {
             const elId = inspectedIssue?.element_id;
+            const slug = analysisSlugForIssue(inspectedIssue, selectedSlug);
             inspectedIssue = null;
             if (selectedProjectId && elId) {
-              onSelectProjectForViewer(selectedProjectId, elId);
+              onSelectProjectForViewer(selectedProjectId, elId, undefined, slug);
             }
           }}
           class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
