@@ -170,12 +170,48 @@ The Svelte frontend is available at [http://localhost:5173](http://localhost:517
 
 ### 4. Run Production Server
 
-To build the frontend and serve the compiled single-page application with multi-worker Uvicorn:
+To build the frontend and serve the compiled single-page application with multi-worker Uvicorn locally:
 
 - **macOS / Linux / WSL**: `./run_production_server.sh` (or `./run_production_server.bat`)
 - **Windows**: `run_production_server.bat`
 
-### 5. Run the Python agent
+### 5. Serving at https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
+
+To serve the complete production platform at `https://bim-guard.xyz` using OrbStack/Docker and Cloudflare Zero Trust:
+
+1. **Configure environment variables in `.env`**:
+   ```env
+   BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+   TUNNEL_TOKEN=<cloudflare-zero-trust-tunnel-token>
+   COMPOSE_PROFILES=tunnel
+   SUPABASE_JWKS_URL=${SUPABASE_URL}/auth/v1/.well-known/jwks.json
+   DOCLING_LOCAL_URL=http://docling-serve:5001
+   NEO4J_URI=bolt://neo4j:7687
+   ```
+
+2. **Launch the container stack**:
+   ```bash
+   docker compose --profile tunnel up -d --build
+   ```
+   *(Or simply `docker compose up -d --build` if `COMPOSE_PROFILES=tunnel` is set in `.env`)*.
+
+3. **Services running in `docker-compose.yml`**:
+   - **`bim-guard-app`**: Production 4-worker FastAPI gateway + compiled Svelte 5 SPA on `:8000`.
+   - **`bim-guard-neo4j`**: Neo4j 5.26 graph database on `:7474` and `:7687` for topological queries.
+   - **`bim-guard-docling`**: Self-hosted CPU Docling REST parsing engine on `:5001`.
+   - **`bim-guard-opencde`**: OpenCDE Documents API on `:8081` with Supabase JWT authentication.
+   - **`bim-guard-cloudflared`**: Outbound Cloudflare tunnel forwarding `https://bim-guard.xyz` to `http://bim-guard:8000`.
+
+4. **Public Legal & SEO Endpoints**:
+   - Privacy Policy: `https://bim-guard.xyz/privacy`
+   - Terms of Service: `https://bim-guard.xyz/terms`
+   - XML Sitemap: `https://bim-guard.xyz/sitemap.xml`
+   - Robots: `https://bim-guard.xyz/robots.txt`
+   - Social Preview Card: `https://bim-guard.xyz/og-image.png`
+
+For full domain setup, Google OAuth branding, and troubleshooting, see [docs/deployment_orbstack_cloudflare.md](docs/deployment_orbstack_cloudflare.md).
+
+### 6. Run the Python agent
 
 The terminal agent uses OpenRouter, repository-local coding tools, bounded tool
 turns and cost, server-side web search, and append-only JSONL sessions:

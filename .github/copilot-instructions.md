@@ -19,6 +19,7 @@ When making code changes:
 - Default validation rule: skip slow tests unless the task is explicitly about slow engine/pipeline behavior or a fast-path validation is not possible. Standard routine validation should use `uv run pytest tests/ -m 'not slow'`.
 - Universal Data Table UX Standards: All data tables (Projects, Documents, Reports & BCF, Rules Catalog, Extracted Rules, Findings/Issues, Revit Sync) must support multiple selection, full CRUD, bulk actions/edits (`BulkActionBar`), pagination (`TablePagination`), column sorting, search/filtering, and rich zero-states.
 - Reusable Component Architecture: Always reuse established UI components from `frontend/src/lib/components/` (`PageHeader`, `Modal`, `SortHeader`, `TableCheckbox`, `TablePagination`, `BulkActionBar`, `EmptyState`, `LoadingState`, `SeverityBadge`, `IsoGovernanceBadges`).
+- Production Serving at https://bim-guard.xyz: Serve the full stack using `docker compose --profile tunnel up -d --build` (orchestrating `bim-guard` on `:8000`, `neo4j` on `:7474`/`:7687`, `docling-serve` on `:5001`, `opencde` on `:8081`, and `cloudflared` for outbound Zero Trust domain tunneling).
 
 ## Mermaid Diagrams
 
