@@ -18,7 +18,7 @@ from app.logging_config import get_logger
 from app.services.membership_service import MembershipService
 from app.services.pipeline_tracker import (
     PipelineEvent,
-    snapshot,
+    merged_snapshot,
     subscribe_async,
     unsubscribe_async,
 )
@@ -57,7 +57,7 @@ async def _sse_generator(
     queue = subscribe_async(project_id)
     try:
         # 1. Yield initial snapshot
-        initial_snap = snapshot(project_id)
+        initial_snap = merged_snapshot(project_id)
         yield f"event: status\ndata: {json.dumps(initial_snap)}\n\n"
 
         yielded = 1
@@ -118,7 +118,7 @@ async def _sse_generator(
 
                 # Also send updated full snapshot on stage transitions or completion
                 if event.event_type in {"stage_transition", "engine_complete", "engine_failed"}:
-                    current_snap = snapshot(project_id)
+                    current_snap = merged_snapshot(project_id)
                     yield f"event: status\ndata: {json.dumps(current_snap)}\n\n"
                     yielded += 1
                     if effective_max is not None and yielded >= effective_max:
@@ -144,7 +144,12 @@ def get_workflow_snapshot(
     response: Response,
     project: Annotated[dict, Depends(get_authorized_project_for_sse)],
 ):
-    """Return every engine's current stage and metrics as JSON."""
+    """Return every engine's current stage and metrics as JSON.
+
+    Merged across run keys, so a seismic or graph run -- each of which tracks
+    under its own key so it cannot reset a corrosion run -- is reported here
+    rather than reading as an engine that never started.
+    """
     response.headers["Cache-Control"] = "no-store"
     if project_id <= 0:
         return JSONResponse(
@@ -152,7 +157,7 @@ def get_workflow_snapshot(
             content={"error": "A positive project ID is required."},
             headers={"Cache-Control": "no-store"},
         )
-    return snapshot(project_id)
+    return merged_snapshot(project_id)
 
 
 @router.get("/events/{project_id}", summary="Stream pipeline events via SSE")

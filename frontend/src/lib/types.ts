@@ -677,8 +677,22 @@ export interface StageRecord {
 }
 
 export interface EngineRun {
-  code: string;
-  label: string;
+  /**
+   * `code` and `label` are not in the workflow payload — the code is the key
+   * in `WorkflowStatus.engines`, and the human name arrives as `engine_name`.
+   * Both stay declared and optional for callers that build an EngineRun by
+   * hand, but read `engine_name` when rendering one that came from the API.
+   */
+  code?: string;
+  label?: string;
+  engine_name?: string;
+  /**
+   * Which concurrent run reported this engine — "default" (corrosion),
+   * "seismic" (Blue Halo) or "graph". Absent on an engine nothing has tracked
+   * yet; those are excluded from the progress average by their `pending`
+   * status, not by this field.
+   */
+  run_key?: string;
   status: "pending" | "running" | "complete" | "failed" | "not_implemented";
   current_stage?: number | null;
   stage_name?: string | null;
@@ -692,6 +706,13 @@ export interface EngineRun {
 export interface WorkflowStatus {
   project_id: number;
   status: string;
+  /**
+   * The run that reported most recently. A project can have a corrosion run
+   * and a seismic run tracked at once (the backend keys trackers by
+   * project + run), so a progress average scoped to this reports the run the
+   * user is actually waiting on instead of blending the two.
+   */
+  run_key?: string;
   engines: Record<string, EngineRun>;
   timestamp?: string | null;
 }

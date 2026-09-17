@@ -5,6 +5,7 @@
   import type { WorkflowStatus } from "../types";
   import { analyzeApi } from "../api";
   import { subscribeToPipelineEvents } from "../sse";
+  import { avgPipelineProgress } from "../stores/activePipelines.svelte";
   import { Activity, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-svelte";
   import { Progress } from "./ui";
 
@@ -33,20 +34,7 @@
 
   let currentStatus = $derived(status || internalStatus);
 
-  let activeEngines = $derived(
-    currentStatus
-      ? Object.entries(currentStatus.engines).filter(([_, e]) => e.status !== "not_implemented")
-      : [],
-  );
-
-  let avgProgress = $derived(
-    activeEngines.length > 0
-      ? Math.round(
-          activeEngines.reduce((acc, [_, e]) => acc + (e.progress_percent || 0), 0) /
-            activeEngines.length,
-        )
-      : 0,
-  );
+  let avgProgress = $derived(avgPipelineProgress(currentStatus));
 
   async function fetchStatus() {
     if (!projectId) return;
@@ -217,7 +205,9 @@
                   class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 font-mono text-xs font-bold text-fg-primary"
                   >{code}</span
                 >
-                <span class="text-xs font-semibold text-fg-secondary">{engine.label || code}</span>
+                <span class="text-xs font-semibold text-fg-secondary"
+                  >{engine.engine_name || engine.label || code}</span
+                >
               </div>
               <span
                 class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider {getStatusBadge(

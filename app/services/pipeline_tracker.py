@@ -35,6 +35,17 @@ INSTRUMENTATION IS AMBIENT, NOT A PARAMETER
     a threadpool that copies the context per request, so two projects analysed
     concurrently cannot write into each other's tracker.
 
+CONCURRENT RUNS, AND READING THEM BACK AS ONE
+    A project can have more than one analysis in flight -- corrosion, Blue Halo
+    seismic, the graph engine -- so the store is keyed by ``(project_id,
+    run_key)`` and each theme owns a key. That is what stops one theme's
+    ``reset=True`` from wiping another's in-flight stages.
+
+    Reporting has to put them back together, because a client asks about a
+    project, not about a run key. :func:`merged_snapshot` is the reporting
+    entry point and the one the API routes use; :func:`snapshot` reads a single
+    named run and stays available for a caller that genuinely wants just one.
+
 DECLARED STATUS FOR ENGINES THAT HAVE NOT RUN
     An engine nobody has tracked reports only its declared status --
     ``{"status": "pending"}`` -- rather than a stage-zero shape that would read
@@ -53,6 +64,7 @@ STORAGE
 from __future__ import annotations
 
 import asyncio
+import itertools
 import threading
 import time
 from collections import OrderedDict
@@ -175,6 +187,14 @@ class EngineSpec:
 #:     run from ``orchestrator._run_graph_intelligence`` under the same
 #:     ``enable_graph`` flag as ``graph_summary``. ``pending`` means "no run
 #:     yet", exactly as it does for GC-001/CC-001.
+#: ``SB-001``
+#:     Blue Halo seismic clearance (``app.modules.phase_6.phase_6d_seismic``).
+#:     Reported here for the same reason GRAPH-001 is: it is a real engine a
+#:     user can start from the analyse page, and an engine the endpoint does
+#:     not know about is an engine whose run the UI can only render as a frozen
+#:     zero. It runs under its own ``run_key`` (:data:`SEISMIC_RUN_KEY`), so it
+#:     reaches a client through :func:`merged_snapshot` rather than through the
+#:     default key. ``pending`` means "no run yet".
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
     EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
@@ -182,6 +202,7 @@ ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("XM-001", "Cross-material comparator", Status.PENDING),
     EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
     EngineSpec("GRAPH-001", "Graph topology intelligence", Status.PENDING),
+    EngineSpec("SB-001", "Blue Halo seismic clearance", Status.PENDING),
 )
 
 #: Lookup by code, built once.
@@ -196,6 +217,40 @@ ENGINE_CODES: tuple[str, ...] = tuple(spec.code for spec in ENGINE_SPECS)
 GC_ENGINE = "GC-001"
 CC_ENGINE = "CC-001"
 GRAPH_ENGINE = "GRAPH-001"
+SB_ENGINE = "SB-001"
+
+
+# ---------------------------------------------------------------------------
+# Run keys
+# ---------------------------------------------------------------------------
+
+#: The corrosion pipeline's run key, and the value every ``run_key`` argument
+#: defaults to. Named rather than spelled ``"default"`` at each call site so
+#: the three concurrent paths below read as three members of one set.
+DEFAULT_RUN_KEY = "default"
+
+#: The graph engine's run key (``orchestrator._run_graph_intelligence``).
+GRAPH_RUN_KEY = "graph"
+
+#: Blue Halo's run key (``analysis_runner`` seismic path). Distinct from
+#: :data:`DEFAULT_RUN_KEY` because both analyses can be started against one
+#: project: sharing a key would have the seismic run's ``reset=True`` discard
+#: an in-flight corrosion run's stages, which is the conflict that kept the
+#: seismic path untracked -- and unreportable -- until now.
+SEISMIC_RUN_KEY = "seismic"
+
+#: Which run key owns each engine. Every engine belongs to exactly one run, so
+#: a merge across run keys (see :func:`merged_snapshot`) can never have two
+#: trackers claiming one engine's cell.
+RUN_KEY_BY_ENGINE: dict[str, str] = {
+    GC_ENGINE: DEFAULT_RUN_KEY,
+    CC_ENGINE: DEFAULT_RUN_KEY,
+    "MM-001": DEFAULT_RUN_KEY,
+    "XM-001": DEFAULT_RUN_KEY,
+    "MC-001": DEFAULT_RUN_KEY,
+    GRAPH_ENGINE: GRAPH_RUN_KEY,
+    SB_ENGINE: SEISMIC_RUN_KEY,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +413,18 @@ class EngineRun:
                 return 0
             return round(int(self.current_stage) * 100 / TOTAL_STAGES)
 
+    def touched(self) -> bool:
+        """Whether this engine has reported anything at all.
+
+        Not simply ``current_stage is not None``: a run that fails before
+        entering a stage -- a seismic run whose clearance config is missing,
+        say -- has no stage and is still very much a report. Reading it as
+        untouched discarded the failure and reported ``pending``, which is the
+        one thing the status contract promises to distinguish.
+        """
+        with self.lock:
+            return self.current_stage is not None or self.status is not Status.PENDING
+
     def snapshot(self) -> dict[str, Any]:
         """Render this engine for the API payload.
 
@@ -366,7 +433,7 @@ class EngineRun:
         started" for "started and stalled at stage 0".
         """
         with self.lock:
-            if self.current_stage is None and self.status is Status.PENDING:
+            if not self.touched():
                 return {"status": ENGINES[self.code].declared_status.value}
 
             stage = self.current_stage or Stage.VALIDATION
@@ -412,6 +479,15 @@ class EngineRun:
 # ---------------------------------------------------------------------------
 
 
+#: Ticks once per report, so "which run reported most recently" is answerable
+#: without comparing clocks. ``time.monotonic`` cannot answer it: its
+#: resolution is ~15ms on Windows, so two runs started in the same request tie,
+#: and a tie resolved by insertion order names the *older* run as the active
+#: one -- which is exactly the case that matters, a seismic run starting while
+#: a just-finished corrosion run is still inside the TTL.
+_SEQUENCE = itertools.count()
+
+
 class PipelineTracker:
     """Every engine's progress for one project's analysis run.
 
@@ -421,7 +497,7 @@ class PipelineTracker:
     ever existed.
     """
 
-    def __init__(self, project_id: int, run_key: str = "default"):
+    def __init__(self, project_id: int, run_key: str = DEFAULT_RUN_KEY):
         self.project_id = project_id
         self.run_key = run_key
         self._lock = threading.RLock()
@@ -431,9 +507,10 @@ class PipelineTracker:
         }
         self.created_at = time.monotonic()
         self.updated_at = self.created_at
+        self.updated_seq = next(_SEQUENCE)
 
     def run(self, code: str) -> EngineRun:
-        """Return the :class:`EngineRun` for ``code``.
+        """Return the :class:`EngineRun` for ``code``, counting it as activity.
 
         Raises:
             KeyError: If ``code`` is not a registered engine. Loudly, because a
@@ -441,6 +518,28 @@ class PipelineTracker:
         """
         with self._lock:
             self.updated_at = time.monotonic()
+            self.updated_seq = next(_SEQUENCE)
+            try:
+                return self._runs[code]
+            except KeyError:
+                raise KeyError(
+                    f"Unknown engine {code!r}; expected one of {', '.join(ENGINE_CODES)}"
+                ) from None
+
+    def peek(self, code: str) -> EngineRun:
+        """Return ``code``'s run without counting as activity.
+
+        :meth:`run` stamps ``updated_at``, which is both the LRU heartbeat and
+        the TTL clock -- correct for an emitter, wrong for a reader. A poll that
+        went through :meth:`run` would keep a finished run alive for as long as
+        anything kept asking about it, and would make "most recently updated"
+        mean "most recently read". :meth:`snapshot` reads ``_runs`` directly for
+        the same reason; this is that access by engine code.
+
+        Raises:
+            KeyError: If ``code`` is not a registered engine.
+        """
+        with self._lock:
             try:
                 return self._runs[code]
             except KeyError:
@@ -451,7 +550,7 @@ class PipelineTracker:
     def touched(self) -> bool:
         """Whether any engine on this project has reported anything yet."""
         with self._lock:
-            return any(run.current_stage is not None for run in self._runs.values())
+            return any(run.touched() for run in self._runs.values())
 
     def snapshot(self) -> dict[str, Any]:
         """Render the full payload for ``GET /api/workflow/{project_id}``."""
@@ -498,7 +597,7 @@ class _TrackerStore:
         self._ttl = ttl_seconds
         self._lock = threading.Lock()
 
-    def get(self, project_id: int, run_key: str = "default") -> Optional[PipelineTracker]:
+    def get(self, project_id: int, run_key: str = DEFAULT_RUN_KEY) -> Optional[PipelineTracker]:
         """Return the tracker for ``(project_id, run_key)``, or ``None`` if absent or expired."""
         key = (project_id, run_key)
         with self._lock:
@@ -514,7 +613,7 @@ class _TrackerStore:
             self._trackers.move_to_end(key)
             return tracker
 
-    def get_or_create(self, project_id: int, run_key: str = "default") -> PipelineTracker:
+    def get_or_create(self, project_id: int, run_key: str = DEFAULT_RUN_KEY) -> PipelineTracker:
         """Return the tracker for ``(project_id, run_key)``, creating one if needed."""
         existing = self.get(project_id, run_key)
         if existing is not None:
@@ -529,10 +628,34 @@ class _TrackerStore:
                 logger.debug("Pipeline tracker evicted project_id=%d run_key=%s", *evicted)
             return tracker
 
-    def discard(self, project_id: int, run_key: str = "default") -> bool:
+    def discard(self, project_id: int, run_key: str = DEFAULT_RUN_KEY) -> bool:
         """Drop one project run's tracker. Returns whether one was there."""
         with self._lock:
             return self._trackers.pop((project_id, run_key), None) is not None
+
+    def for_project(self, project_id: int) -> list[PipelineTracker]:
+        """Every live tracker for ``project_id``, most recently updated first.
+
+        Ordered by :data:`_SEQUENCE` rather than by ``updated_at``: the TTL
+        needs a clock, but "most recent" needs a total order, and on a coarse
+        clock two runs in one request compare equal.
+
+        Expired entries are dropped as they are found, exactly as :meth:`get`
+        does, so a poll after a long idle period does not report a run that the
+        TTL has already retired.
+        """
+        with self._lock:
+            found: list[PipelineTracker] = []
+            now = time.monotonic()
+            for key, tracker in list(self._trackers.items()):
+                if key[0] != project_id:
+                    continue
+                if (now - tracker.updated_at) > self._ttl:
+                    del self._trackers[key]
+                    continue
+                found.append(tracker)
+            found.sort(key=lambda t: t.updated_seq, reverse=True)
+            return found
 
     def clear(self) -> None:
         """Empty the store. For tests and for a deliberate operational reset."""
@@ -544,7 +667,7 @@ class _TrackerStore:
 TRACKERS = _TrackerStore()
 
 
-def tracker_for(project_id: int, run_key: str = "default") -> PipelineTracker:
+def tracker_for(project_id: int, run_key: str = DEFAULT_RUN_KEY) -> PipelineTracker:
     """Return (creating if needed) the tracker for ``(project_id, run_key)``.
 
     ``run_key`` defaults to ``"default"``, the corrosion pipeline's run, so
@@ -555,7 +678,7 @@ def tracker_for(project_id: int, run_key: str = "default") -> PipelineTracker:
     return TRACKERS.get_or_create(project_id, run_key)
 
 
-def snapshot(project_id: int, run_key: str = "default") -> dict[str, Any]:
+def snapshot(project_id: int, run_key: str = DEFAULT_RUN_KEY) -> dict[str, Any]:
     """Return the workflow payload for ``(project_id, run_key)``.
 
     A project nothing has ever analysed is not an error: it reports every engine
@@ -568,6 +691,64 @@ def snapshot(project_id: int, run_key: str = "default") -> dict[str, Any]:
     if tracker is None:
         return PipelineTracker(project_id, run_key).snapshot()
     return tracker.snapshot()
+
+
+def merged_snapshot(project_id: int) -> dict[str, Any]:
+    """Return one workflow payload covering every run key for ``project_id``.
+
+    WHY THE REPORTING ROUTES NEED THIS
+
+        Per-run keys stopped a second analysis theme from resetting the
+        corrosion run's progress, but nothing taught the reporting side about
+        them: ``GET /api/workflow/{id}`` and every SSE ``status`` frame called
+        :func:`snapshot` with the default key, so a run under any other key was
+        tracked correctly and then reported as though it had never started.
+        That is what left a seismic run showing a frozen zero while its engine
+        worked -- the tracking was missing on one side and unreadable on the
+        other. Merging here fixes the reading half for SB-001 and for GRAPH-001
+        together, because they had the same cause.
+
+    HOW ENGINES ARE RESOLVED
+
+        Every engine belongs to exactly one run (:data:`RUN_KEY_BY_ENGINE`), so
+        its cell is taken from that run's tracker. An engine its owner has not
+        touched falls back to whichever live tracker *has* touched it -- a
+        caller emitting under a key of its own choosing is reported rather than
+        silently dropped -- and then to the declared status, which is the
+        truthful answer for a run that has not started.
+
+    ``run_key`` names the run that reported most recently, so a client can tell
+    which analysis the payload is really about and scope a progress average to
+    it instead of averaging one theme's engines against another's. Each touched
+    engine also carries its own ``run_key`` for the same reason.
+
+    Returns:
+        The same four top-level keys :meth:`PipelineTracker.snapshot` returns,
+        so this is a drop-in replacement at a reporting call site.
+    """
+    trackers = TRACKERS.for_project(project_id)
+    by_key = {tracker.run_key: tracker for tracker in trackers}
+
+    engines: dict[str, dict[str, Any]] = {}
+    for code in ENGINE_CODES:
+        owner = by_key.get(RUN_KEY_BY_ENGINE.get(code, DEFAULT_RUN_KEY))
+        source = owner if owner is not None and owner.peek(code).touched() else None
+        if source is None:
+            # ``trackers`` is ordered most-recently-updated first, so the
+            # fallback picks the freshest report of this engine.
+            source = next((t for t in trackers if t.peek(code).touched()), None)
+        if source is None:
+            engines[code] = {"status": ENGINES[code].declared_status.value}
+            continue
+        engines[code] = {**source.peek(code).snapshot(), "run_key": source.run_key}
+
+    active = next((t.run_key for t in trackers if t.touched()), DEFAULT_RUN_KEY)
+    return {
+        "project_id": project_id,
+        "run_key": active,
+        "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "engines": engines,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +771,7 @@ def active() -> Optional[PipelineTracker]:
 
 @contextmanager
 def tracking(
-    project_id: int, *, reset: bool = True, run_key: str = "default"
+    project_id: int, *, reset: bool = True, run_key: str = DEFAULT_RUN_KEY
 ) -> Iterator[PipelineTracker]:
     """Bind a tracker for ``(project_id, run_key)`` for the duration of the block.
 
