@@ -19,9 +19,41 @@ BIM-Guard uses a modern, decoupled architecture:
 - Build frontend: `cd frontend && npm run build`
 - Run full dev stack (FastAPI + Svelte): `./run_server.sh` (macOS/Linux) or `run_server.bat` (Windows)
 - Run production stack (build + multi-worker): `./run_production_server.sh` (macOS/Linux) or `run_production_server.bat` (Windows)
+- Run Docker production stack at https://bim-guard.xyz: `docker compose --profile tunnel up -d --build`
 
 The backend is available at `http://127.0.0.1:8000` (OpenAPI interactive docs at `/api/docs`).
 The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to backend).
+
+### Serving at https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
+
+The platform is served in production at `https://bim-guard.xyz` via **OrbStack / Docker Compose** and **Cloudflare Tunnel (`cloudflared`)**:
+
+1. **Start the stack**:
+   ```bash
+   docker compose --profile tunnel up -d --build
+   ```
+   *(If `COMPOSE_PROFILES=tunnel` is set in `.env`, `docker compose up -d --build` automatically starts `cloudflared`).*
+
+2. **Container services in `docker-compose.yml`**:
+   - **`bim-guard` (`bim-guard-app`)**: Production 4-worker FastAPI gateway on port `8000` serving the compiled Svelte 5 SPA from `frontend/dist` and `/api` REST/SSE endpoints.
+   - **`neo4j` (`bim-guard-neo4j`)**: Graph database on ports `7474` (HTTP) and `7687` (Bolt), health-checked before `bim-guard` initializes.
+   - **`docling-serve` (`bim-guard-docling`)**: Self-hosted CPU Docling document parsing engine on port `5001` (starts by default; healthy before `bim-guard` starts).
+   - **`opencde` (`bim-guard-opencde`)**: OpenCDE Documents API on port `8081` with Supabase JWT authentication parity.
+   - **`cloudflared` (`bim-guard-cloudflared`)**: Outbound encrypted tunnel to Cloudflare's edge under profile `tunnel`, routing `https://bim-guard.xyz` directly to `http://bim-guard:8000` without opening local ports.
+
+3. **Required `.env` configuration**:
+   ```env
+   BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+   TUNNEL_TOKEN=<cloudflare-zero-trust-tunnel-token>
+   COMPOSE_PROFILES=tunnel
+   SUPABASE_JWKS_URL=${SUPABASE_URL}/auth/v1/.well-known/jwks.json
+   DOCLING_LOCAL_URL=http://docling-serve:5001
+   NEO4J_URI=bolt://neo4j:7687
+   ```
+
+4. **Google OAuth & Public Endpoints**:
+   - **OAuth Consent Screen**: Google Cloud Console branding requires Authorized Domains: (1) `bim-guard.xyz` and (2) `supabase.co` (for Supabase callback `https://<ref>.supabase.co/auth/v1/callback`).
+   - **Public Endpoints**: `/privacy` (Privacy Policy), `/terms` (Terms of Service), `/sitemap.xml` (Search Sitemap), `/robots.txt` (Crawler Directives), and `/og-image.png` (Social Preview Card).
 
 ### Local dev sign-in
 
