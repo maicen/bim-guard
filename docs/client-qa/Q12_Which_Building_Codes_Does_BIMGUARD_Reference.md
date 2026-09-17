@@ -46,19 +46,27 @@ which is NACE (now AMPP). See
 ### Seismic clearance — screening calibration with per-threshold provenance
 
 SB-001's configuration (`data/rulesets/sb001_seismic_clearance.json`, schema
-1.1.0) cites **FEMA E-74** (4th ed., December 2012) and, upstream of it,
-**ASCE/SEI 7-10 §13.6**. It names the governing codes as
+1.3.0) cites **FEMA E-74** (4th ed., December 2012), the **Hilti Seismic Manual**
+(05/2022) and, upstream of these, **ASCE/SEI 7-10 §13.6** and (via the Hilti
+manual) **NFPA 13** / **EN 12845 Annex E**. It names the governing codes as
 **EN 1998-1:2004+A1:2013** (non-structural elements, §4.3.5) and
 **DIN EN 1998-1/NA:2018-10**, and records that neither gives MEP brace spacing or
 clearance dimensions; DIN 4149 is withdrawn.
 
 Earlier versions cited an EN 1998-1 edition dated 2020 and a DIN 4149 edition
-dated 2022, neither of which exists; that was corrected on 2026-09-13. Each threshold now carries a `provenance`
-block with a status. Three values are **sourced** (importance factors 1.5 / 1.0,
-and the 0.557 m² duct area threshold); two are **derived** arithmetic (ideal brace
-angle and tolerance); the other nine — including the 200 mm clearance, the
-1.0 / 1.5 m spacing, the 63 mm pipe threshold and the 40°–65° angle band — are
-**authored** screening calibration. See Q08 for the table.
+dated 2022, neither of which exists; that was corrected on 2026-09-13. The brace
+angle was re-sourced to the Hilti Seismic Manual on 2026-09-16 (schema 1.2.0)
+and the brace spacing was re-sourced to the same manual later the same day
+(schema 1.3.0); both had been fabricated by the same unverified AI research
+pass, the spacing further corrupted by a feet-written-as-inches unit error.
+Each threshold now carries a `provenance` block with a status. Nine values are
+**sourced** (importance factors 1.5 / 1.0, the 0.557 m² duct area threshold,
+the four brace angle constraints at 30°–60° from horizontal, and the 12 m / 24 m
+transverse / longitudinal spacing); four — the 200 mm clearance and the three
+0 mm clearance additions — are **authored** screening calibration; and one, the
+63 mm pipe diameter threshold, is **unsourced**: checked against the same
+fabrication pattern as the angle and spacing, found to carry it, and left
+unchanged only because no sourced replacement exists. See Q08 for the table.
 
 ### Architecture compliance — a baseline pack plus what you add
 

@@ -23,12 +23,21 @@ threshold:
 | Parameter | Value | Status | Basis |
 | --- | --- | --- | --- |
 | Clearance from structure | **200 mm** | authored | No source held gives a braced-service clearance |
-| Restraint spacing, transverse | **1.0 m** | authored | Screening value; FEMA E-74's sample spec allows up to 40 ft for ductile pipe |
-| Restraint spacing, longitudinal | **1.5 m** | authored | Screening value; FEMA E-74's sample spec allows up to 80 ft for ductile pipe |
-| Pipe diameter threshold | **63 mm** | authored | Inside the ~1–3 in exemption band FEMA E-74 reports for ASCE/SEI 7-10 |
-| Brace angle range | **40°–65° from horizontal** | authored | No source gives a pipe or duct brace angle |
+| Restraint spacing, transverse | **12 m** | sourced | Hilti Seismic Manual (05/2022), citing NFPA 13 / EN 12845 Annex E |
+| Restraint spacing, longitudinal | **24 m** | sourced | Hilti Seismic Manual (05/2022), citing NFPA 13 / EN 12845 Annex E |
+| Pipe diameter threshold | **63 mm** | unsourced | Same fabrication pattern as the former angle and spacing values; no sourced replacement found |
+| Brace angle range | **30°–60° from horizontal** | sourced | Hilti Seismic Manual (05/2022), Annex A: nominal 45° ± 15° on the horizontal level |
 | Importance factor, hospital | **1.5** | sourced | FEMA E-74 §5.3.1; ASCE/SEI 7-10 §13.1.3 |
 | Importance factor, standard | **1.0** | sourced | Same |
+
+The restraint spacing and brace angle were re-sourced to the Hilti Seismic
+Manual on 2026-09-16 (schema 1.2.0 for the angle, 1.3.0 for the spacing); both
+were previously labelled BIMGUARD authored calibration, which was wrong — they
+were an unverified AI research pass's fabricated figures, the spacing further
+corrupted by a feet-written-as-inches unit error. The pipe diameter threshold
+was checked against the same fabrication signature and found to carry it, but
+no sourced replacement exists, so it is now labelled unsourced rather than
+authored; the value itself is unchanged.
 
 The nearest sourced rule to a clearance is narrower than it looks: FEMA E-74's
 sample specification (App. A §3.9.D.9) asks for horizontal clearance of at least

@@ -762,13 +762,33 @@ def _seed_mc001(svc: RuleService) -> int:
 
 #: Why each SB-001 threshold has the value it has, as ``source_text``. Worded
 #: from the ``provenance`` notes in ``data/rulesets/sb001_seismic_clearance.json``
-#: (schema 1.1.0); tests/test_sb001_seeded_provenance.py holds the two together.
+#: (schema 1.3.0); tests/test_sb001_seeded_provenance.py holds the two together.
+#:
+#: Three prefixes, matching the three provenance categories the configuration
+#: uses: "Sourced to ..." (a held document states the value), "BIMGUARD SB-001
+#: authored calibration. " (no source; BIMGUARD chose the value as a screening
+#: threshold), and "Unsourced placeholder ... " (no source, and the value is not
+#: a BIMGUARD choice either — it is an unverified figure with no known origin
+#: BIMGUARD can stand behind, kept only because no sourced replacement exists).
 _SB001_SOURCE_TEXT = {
+    # Unsourced, not authored: 63.0 is not a BIMGUARD screening choice. It is the
+    # same fabricated Hermes research pass that produced the pre-2026-09-16 angle
+    # and pre-2026-09-16 spacing values (same unit-mirroring signature), and no
+    # document held gives a pipe-diameter seismic-bracing exemption threshold to
+    # replace it with.
     "SB-001.01": (
-        "BIMGUARD SB-001 authored calibration. Within the ASCE 7-10 exemption band as "
-        "reported by FEMA E-74 §6.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) depending on "
-        "seismic design category and occupancy. 63 mm ≈ 2.48 in falls inside that band. "
-        "Not a stated standard value."
+        "Unsourced placeholder. "
+        "Not a BIMGUARD authored calibration and not a stated standard value: this is an "
+        "unverified figure carried over from the same fabricated Hermes research pass that "
+        "produced the brace angle and brace spacing values (see changelog 1.2.0 and 1.3.0), "
+        "flagged by the same unit-mirroring signature (EN 63 mm ≈ 2.48 in, close to NFPA's "
+        "reported ≈2.5 in). Falls within the ASCE 7-10 exemption band FEMA E-74 §6.4.3.1 "
+        "reports (roughly 1 to 3 in / 25.4-76.2 mm depending on seismic design category and "
+        "occupancy), but that band does not fix a single threshold, so it does not confirm "
+        "the value. No document in D:/claude-workspace/hilti-seismic/sources (NFPA 13, "
+        "UFGS 23 05 48.19, Hilti Seismic Manual) states a pipe-diameter seismic-bracing "
+        "exemption threshold, so no sourced replacement is available; the value is left at "
+        "63.0 pending one and is marked unsourced/placeholder rather than authored."
     ),
     "SB-001.02": (
         "BIMGUARD SB-001 authored calibration. Authored. No source. Also the value of "
@@ -777,66 +797,159 @@ _SB001_SOURCE_TEXT = {
         "hanger length, but only for unbraced (exempt) piping. No braced-service clearance "
         "dimension exists in any source held."
     ),
+    # Sourced, not authored: same shape as SB-001.05 below — an attribution
+    # sentence followed by the configuration's own provenance note, verbatim.
     "SB-001.03": (
-        "BIMGUARD SB-001 authored calibration. Authored conservative calibration. Upstream "
-        "reference: FEMA E-74 App. A §3.9.D.6-7 gives maxima of 40 ft (12.19 m) for "
-        "ductile and 20 ft (6.10 m) for nonductile pipe, from a sample specification "
-        "intended to be customised. BIMGUARD's value is approximately 6-12× tighter and "
-        "is a screening threshold, not a code requirement. Not applicable to ducts: E-74 "
-        "gives no duct brace spacing."
+        "Sourced to the Hilti Seismic Manual – Earthquake-resistant design of MEP supports, "
+        "MT System (05/2022), citing NFPA 13 / EN 12845 Annex E: transverse restraint "
+        "spacing 12 m. "
+        "Sourced. Replaces the former 1.0, which was not BIMGUARD calibration: it was the "
+        "same unverified Hermes research pass that produced the fabricated brace angle, "
+        "with an additional feet-written-as-inches unit corruption -- the same figure, "
+        "stated once in metres and once (corrupted) in inches by that pass's two invented "
+        "per-standard entries, survived a min() merge across them. The real value the "
+        "corrupted figure belongs to is 40 ft (12.19 m), which this source states directly "
+        "as 12 m. See changelog 1.3.0 and "
+        "D:/claude-workspace/hilti-seismic/sb001_spacing_investigation.md."
     ),
     "SB-001.04": (
-        "BIMGUARD SB-001 authored calibration. Authored conservative calibration. Upstream: "
-        "FEMA E-74 App. A §3.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft (12.19 m) "
-        "nonductile. Same screening rationale as the transverse value. Not applicable to ducts."
+        "Sourced to the Hilti Seismic Manual – Earthquake-resistant design of MEP supports, "
+        "MT System (05/2022), citing NFPA 13 / EN 12845 Annex E: longitudinal restraint "
+        "spacing 24 m. "
+        "Sourced. Replaces the former 1.5, from the same fabricated Hermes pass as the "
+        "transverse value, with an extra digit change (the real 80 ft became 60 in before "
+        "conversion to 1.5 m). The real NFPA 13 value is 80 ft (24.38 m), which this source "
+        "states directly as 24 m. See changelog 1.3.0 and "
+        "D:/claude-workspace/hilti-seismic/sb001_spacing_investigation.md."
     ),
     "SB-001.05": (
-        "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
-        "brace angle for pipe or duct. Datum: degrees from horizontal."
+        "Sourced to the Hilti Seismic Manual – Earthquake-resistant design of MEP supports, "
+        "MT System (05/2022), Annex A \"Tilt angle – for all bracings\": nominal brace tilt "
+        "angle 45° ± 15° on the horizontal level, i.e. 30-60° from horizontal. "
+        "Lower bound of the source's stated 45° ± 15° band (45 - 15). Datum: degrees from "
+        "horizontal, the same convention the source uses. Replaces the former 40.0, which "
+        "came from an unverified AI research summary; see changelog 1.2.0. FEMA E-74 "
+        "contains no brace angle for pipe or duct. A vendor design manual, not a code."
     ),
 }
 
-#: What SB-001 rows seeded before 2026-09-13 carry, and what replaces it. The
-#: descriptions attributed authored thresholds to EN 1998-1 / DIN 4149, which
-#: give no MEP brace spacing, and the angle range was the Hermes research
-#: summary's EN-only 35-70 degrees, not the 40-65 the configuration has always
-#: applied. A stored field is corrected only while it still holds exactly the
-#: old value, so a rule someone has since edited by hand is left as they left it.
+#: What superseded SB-001 rows carry, and what replaces it. Each entry maps a
+#: column to every stored value known to be stale (``from``) and the current one
+#: (``to``). A stored field is corrected only while it still holds exactly one of
+#: those values, so a rule someone has since edited by hand is left as they left it.
+#:
+#: Three generations are corrected here:
+#:
+#: - Rows seeded before 2026-09-13 attributed authored spacing thresholds to
+#:   EN 1998-1 / DIN 4149, which give no MEP brace spacing, and carried the Hermes
+#:   research summary's EN-only 35-70 degree angle range.
+#: - Rows seeded between 2026-09-13 and 2026-09-16 carried the 40-65 degree range
+#:   labelled BIMGUARD authored calibration, and (for spacing) a 1.0 m / 1.5 m
+#:   value likewise labelled BIMGUARD authored calibration. Both labels were
+#:   wrong twice over: neither range nor spacing pair was BIMGUARD's calibration
+#:   (they were the same unverified research summary's invented DIN 4149 and
+#:   EN 1998-1 figures, the spacing pair additionally corrupted by a
+#:   feet-written-as-inches unit error), and both are now sourced to the Hilti
+#:   Seismic Manual (05/2022): the angle as 45° ± 15° (30-60° from horizontal),
+#:   the spacing as 12 m transverse / 24 m longitudinal (citing NFPA 13 /
+#:   EN 12845 Annex E).
+#: - The pipe diameter threshold (SB-001.01) never changed value, but its
+#:   source_text is corrected here too: it was labelled "BIMGUARD SB-001
+#:   authored calibration", which is also wrong (see sb001_spacing_investigation.md);
+#:   there being no sourced replacement, it is now labelled unsourced/placeholder.
 _SB001_SUPERSEDED = {
+    "SB-001.01": {
+        "source_text": {
+            "from": (
+                "BIMGUARD SB-001 authored calibration. Within the ASCE 7-10 exemption band "
+                "as reported by FEMA E-74 §6.4.3.1: roughly 1 to 3 in (25.4-76.2 mm) "
+                "depending on seismic design category and occupancy. 63 mm ≈ 2.48 in falls "
+                "inside that band. Not a stated standard value.",
+            ),
+            "to": _SB001_SOURCE_TEXT["SB-001.01"],
+        },
+    },
     "SB-001.03": {
-        "description": (
-            "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
-            "Maximum transverse seismic brace spacing — 1.0 m, BIMGUARD SB-001 screening "
-            "calibration (authored, not a code value)",
-        ),
+        "description": {
+            "from": (
+                "Maximum transverse seismic brace spacing — 1.0 m per EN 1998-1 / DIN 4149",
+                "Maximum transverse seismic brace spacing — 1.0 m, BIMGUARD SB-001 screening "
+                "calibration (authored, not a code value)",
+            ),
+            "to": (
+                "Maximum transverse seismic brace spacing — 12 m, Hilti Seismic Manual "
+                "05/2022 (NFPA 13 / EN 12845 Annex E)"
+            ),
+        },
+        "check_value": {"from": (1.0,), "to": 12.0},
+        "source_text": {
+            "from": (
+                "BIMGUARD SB-001 authored calibration. Authored conservative calibration. "
+                "Upstream reference: FEMA E-74 App. A §3.9.D.6-7 gives maxima of 40 ft "
+                "(12.19 m) for ductile and 20 ft (6.10 m) for nonductile pipe, from a sample "
+                "specification intended to be customised. BIMGUARD's value is approximately "
+                "6-12× tighter and is a screening threshold, not a code requirement. Not "
+                "applicable to ducts: E-74 gives no duct brace spacing.",
+            ),
+            "to": _SB001_SOURCE_TEXT["SB-001.03"],
+        },
     },
     "SB-001.04": {
-        "description": (
-            "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
-            "Maximum longitudinal seismic brace spacing — 1.5 m, BIMGUARD SB-001 screening "
-            "calibration (authored, not a code value)",
-        ),
+        "description": {
+            "from": (
+                "Maximum longitudinal seismic brace spacing — 1.5 m per EN 1998-1 / DIN 4149",
+                "Maximum longitudinal seismic brace spacing — 1.5 m, BIMGUARD SB-001 "
+                "screening calibration (authored, not a code value)",
+            ),
+            "to": (
+                "Maximum longitudinal seismic brace spacing — 24 m, Hilti Seismic Manual "
+                "05/2022 (NFPA 13 / EN 12845 Annex E)"
+            ),
+        },
+        "check_value": {"from": (1.5,), "to": 24.0},
+        "source_text": {
+            "from": (
+                "BIMGUARD SB-001 authored calibration. Authored conservative calibration. "
+                "Upstream: FEMA E-74 App. A §3.9.D.6 gives 80 ft (24.38 m) ductile / 40 ft "
+                "(12.19 m) nonductile. Same screening rationale as the transverse value. Not "
+                "applicable to ducts.",
+            ),
+            "to": _SB001_SOURCE_TEXT["SB-001.04"],
+        },
     },
     "SB-001.05": {
-        "description": (
-            "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
-            "Seismic brace installation angle — permissible range 40° to 65° from "
-            "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)",
-        ),
-        "value_min": (35.0, 40.0),
-        "value_max": (70.0, 65.0),
+        "description": {
+            "from": (
+                "Seismic brace installation angle — permissible range 35° to 70° from horizontal",
+                "Seismic brace installation angle — permissible range 40° to 65° from "
+                "horizontal, BIMGUARD SB-001 screening calibration (authored, not a code value)",
+            ),
+            "to": (
+                "Seismic brace installation angle — permissible range 30° to 60° from "
+                "horizontal (45° ± 15°), Hilti Seismic Manual 05/2022"
+            ),
+        },
+        "value_min": {"from": (35.0, 40.0), "to": 30.0},
+        "value_max": {"from": (70.0, 65.0), "to": 60.0},
+        "source_text": {
+            "from": (
+                "BIMGUARD SB-001 authored calibration. Authored. No source. FEMA E-74 contains no "
+                "brace angle for pipe or duct. Datum: degrees from horizontal.",
+            ),
+            "to": _SB001_SOURCE_TEXT["SB-001.05"],
+        },
     },
 }
 
 
 def _correct_superseded_seismic_rows(svc: RuleService) -> int:
-    """Correct SB-001 rows already stored with the pre-2026-09-13 content.
+    """Correct SB-001 rows already stored with superseded content.
 
     The insert pass skips any reference that exists, so without this a database
-    seeded before the correction would keep the old descriptions and angle range
-    indefinitely. Scoped to the SB-001 references in :data:`_SB001_SUPERSEDED`
-    and :data:`_SB001_SOURCE_TEXT`, and to fields still holding the exact old
-    value (or, for ``source_text``, still empty).
+    seeded earlier would keep the old descriptions and angle range indefinitely.
+    Scoped to the SB-001 references in :data:`_SB001_SUPERSEDED` and
+    :data:`_SB001_SOURCE_TEXT`, and to fields still holding one of the exact
+    superseded values (or, for ``source_text``, still empty).
 
     Returns:
         The number of rows changed.
@@ -847,13 +960,14 @@ def _correct_superseded_seismic_rows(svc: RuleService) -> int:
         if reference not in _SB001_SOURCE_TEXT:
             continue
         columns: dict[str, str] = {}
-        for field, (old, new) in _SB001_SUPERSEDED.get(reference, {}).items():
+        for field, change in _SB001_SUPERSEDED.get(reference, {}).items():
             stored = row.get(field)
-            if field == "description":
-                if str(stored or "").strip() == old:
-                    columns[field] = new
-            elif RuleService._parse_numeric(_json_scalar(stored)) == old:
-                columns[field] = json.dumps(new)
+            superseded, current = change["from"], change["to"]
+            if field in {"description", "source_text"}:
+                if str(stored or "").strip() in superseded:
+                    columns[field] = current
+            elif RuleService._parse_numeric(_json_scalar(stored)) in superseded:
+                columns[field] = json.dumps(current)
         if not str(row.get("source_text") or "").strip():
             columns["source_text"] = _SB001_SOURCE_TEXT[reference]
         if columns:
@@ -881,10 +995,14 @@ def _json_scalar(stored) -> str:
 def seed_seismic_rules(svc: RuleService) -> int:
     """Seed Blue Halo seismic bracing clearance rules (BIMGUARD-SB-001).
 
-    SB-001's thresholds are BIMGUARD screening calibration, not code values; each
-    row's ``source_text`` says so, citing FEMA E-74 where it bears on the value.
-    Rows seeded before that correction are brought up to date in place by
-    :func:`_correct_superseded_seismic_rows`.
+    Only the base clearance (SB-001.02) and the clearance additions are BIMGUARD
+    screening calibration with no source; each such row's ``source_text`` says so.
+    The brace angle (SB-001.05) and brace spacing (SB-001.03, SB-001.04) are
+    sourced to the Hilti Seismic Manual (05/2022). The pipe diameter threshold
+    (SB-001.01) is neither: it is an unverified figure with no known BIMGUARD
+    rationale and no sourced replacement, so its ``source_text`` says that
+    plainly instead of calling it authored. Rows seeded with superseded content
+    are brought up to date in place by :func:`_correct_superseded_seismic_rows`.
 
     Returns:
         The number of rows inserted.
@@ -925,11 +1043,11 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.03"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.03"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "TransverseBraceSpacing",
             "operator": "<=",
-            "check_value": 1.0,
+            "check_value": 12.0,
             "unit": "m",
             "ruleset_id": "BIMGUARD-SB-001",
             "mechanism": "SEISMIC",
@@ -940,11 +1058,11 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_comparison",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.04"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.04"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "LongitudinalBraceSpacing",
             "operator": "<=",
-            "check_value": 1.5,
+            "check_value": 24.0,
             "unit": "m",
             "ruleset_id": "BIMGUARD-SB-001",
             "mechanism": "SEISMIC",
@@ -955,12 +1073,12 @@ def seed_seismic_rules(svc: RuleService) -> int:
             "rule_type": "numeric_range",
             "rule_category": "property_check",
             "category": "seismic",
-            "description": _SB001_SUPERSEDED["SB-001.05"]["description"][1],
+            "description": _SB001_SUPERSEDED["SB-001.05"]["description"]["to"],
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "BraceAngle",
             "operator": "between",
-            "value_min": 40.0,
-            "value_max": 65.0,
+            "value_min": 30.0,
+            "value_max": 60.0,
             "unit": "deg",
             "ruleset_id": "BIMGUARD-SB-001",
             "mechanism": "SEISMIC",

@@ -50,8 +50,8 @@ after a "clash-free" coordination sign-off is worth doing rather than assuming
 the model is clean.
 
 **A restraint feasibility problem.** Even where the pipe clears the structure,
-there may be no room to install the brace at a permitted angle — the combined
-profile requires 40°–65° — and no room for the brace footprint. A pipe 220 mm
+there may be no room to install the brace at a permitted angle — the sourced
+range requires 30°–60° from horizontal — and no room for the brace footprint. A pipe 220 mm
 from a beam clears the 200 mm envelope but may still be un-braceable if the only
 available anchor point puts the brace at 25°. The engine's envelope is sized to
 make bracing feasible, which is why the number is larger than a bare clash
