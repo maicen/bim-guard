@@ -56,14 +56,38 @@ bounds for this session. Nothing matched.
 
 | Citation | Held |
 | --- | --- |
-| NASA-STD-6012 | No |
-| WorldStainless / Euro Inox (2025) | No |
+| NASA-STD-6012 | No. Title corrected 2026-09-17: the payload called it "Corrosion Control and Treatment for Aerospace Vehicles"; it is "Corrosion Protection for Space Flight Hardware". |
+| WorldStainless / Euro Inox (2025) | **Yes, from 2026-09-17** — `docs/scraped_standards/corrosion_euro_inox_vol10_contact_other_metals.md`. See the addendum below; the citation is now dated Vol. 10 (2009). |
 | AUCSC Basic Corrosion Course (2024) | No |
 | IMOA Design Manual, 4th Ed. | No |
 | Prosoco Technical Note 104 | No |
 | American Galvanizers Association (2023) | No. `docs/scraped_standards/corrosion_mil_std_889_galvanic.md` holds a scraped AGA web page on galvanised steel in contact with other metals. It is not the coating-life data cited. |
 | ISO 19650 | No (information management, no corrosion values) |
 | buildingSMART BCF 2.1 | Not a document of values (exchange format) |
+
+#### Addendum, 2026-09-17 — one cited document is now held
+
+The statement above that nothing matched was true when written. Euro Inox Vol. 10
+has since been obtained and extracted into the corpus, so the GC-001 claim that
+"none of the cited documents is held" no longer holds; it is corrected in the
+PROVENANCE block of `app/engines/bimguard_corrosion_engine.py`.
+
+Reading it settled three things:
+
+- The document is Materials and Applications Series Volume 10, ISBN
+  978-2-87997-263-3, © Euro Inox 2009, adapted from Merkblatt 829 (4th edition
+  2005). **"(2025)" was never an edition** — it is the worldstainless.org upload
+  path the PDF is served from. The citation now reads Vol. 10 (2009).
+- Its galvanic series (Figure 2) is plotted in mV SCE from −2000 to +500, negative
+  for active metals, and is credited onward to Francis, *Galvanic Corrosion: a
+  Practical Guide for Engineers* (NACE International, 2001). The GC-001 series is
+  an authored index, not this document's figures — which confirms §1 rather than
+  contradicting it.
+- It does hold quantitative corrosion-rate and compatibility tables (Tables 1–7),
+  none of which GC-001 consumes: the engine scores 0–1 and computes no rate.
+
+Still unverified: every GC-001 value. Holding the document makes the verification
+§1 calls for possible; it does not perform it.
 
 MIL-STD-889B is held in part, as `data/reference/mil_std_889b_table_ii.json`, and
 the engine reads it (`app/engines/bimguard_corrosion_engine.py:130,155`). The

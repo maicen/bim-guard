@@ -3,8 +3,9 @@ BIMGUARD AI — Galvanic Corrosion Engine
 Ruleset: BIMGUARD-GC-001 v1.0.0
 
 Standards referenced:
-  - NASA-STD-6012 (voltage thresholds by environment class)
-  - WorldStainless / Euro Inox (2025) (galvanic series, corrosion rate data)
+  - NASA-STD-6012, Corrosion Protection for Space Flight Hardware
+    (governing standard named for the environment voltage thresholds)
+  - WorldStainless / Euro Inox Vol. 10 (2009) (galvanic series, corrosion rate data)
   - AUCSC Basic Corrosion Course (2024) (galvanic series, electrolyte conductivity)
   - IMOA Design Manual 4th Ed. (PREN formula and grade selection)
   - Prosoco Technical Note 104 (area ratio analysis)
@@ -17,9 +18,14 @@ PROVENANCE:
   class boundaries -- are a calibration authored for BIMGUARD-GC-001. They are
   NOT quoted from the standards listed above. Each citation names the standard
   or body of practice that GOVERNS THE MECHANISM, not a document from which the
-  digit was read. None of the cited source documents is held by this project,
-  and no value has been verified against one. The ruleset was generated with AI
-  assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
+  digit was read. One cited document is now held -- Euro Inox Vol. 10, at
+  docs/scraped_standards/corrosion_euro_inox_vol10_contact_other_metals.md --
+  and reading it confirmed the galvanic series below is an authored index and
+  not that document's figures: it plots its series in mV SCE, negative for
+  active metals, and credits it onward to Francis, Galvanic Corrosion (NACE
+  International, 2001). No other cited document is held, and no value in this
+  ruleset has been verified against any of them. The ruleset was generated with
+  AI assistance from NotebookLM prompts in April 2026 (docs/RESOURCES.md:97-104).
   A corrosion engineer must verify every value against the cited source before
   any value is relied on. Per-value status and counts:
   docs/planning/corrosion_provenance_2026-09-13.md.
@@ -742,7 +748,7 @@ Recommended mitigations:
 Standards referenced:
   NASA-STD-6012 — Voltage threshold: {r.env_threshold_v}V for {r.environment_label}
   IMOA Design Manual 4th Ed. — PREN adequacy check
-  WorldStainless / Euro Inox (2025) — Galvanic series data"""
+  WorldStainless / Euro Inox Vol. 10 (2009) — Galvanic series data"""
     return BCFIssue(
         guid=str(uuid.uuid4()).upper(),
         title=f"GC-001 Galvanic Risk — {r.risk_band} — {r.material_anode_label} / {r.material_cathode_label}",

@@ -367,6 +367,57 @@ def _seed_risk_bands(
 
 # ── GC-001 — Galvanic Corrosion ───────────────────────────────────────────────
 
+#: The corrected citation for the GC-001 environment voltage thresholds. The
+#: payload names "NASA-STD-6012 Table 1"; no table of that standard was ever
+#: read, and NASA-STD-6012 (Corrosion Protection for Space Flight Hardware)
+#: qualifies surface treatments for space flight hardware rather than
+#: dimensioning a building-services E1-E7 environment taxonomy. Per
+#: docs/planning/corrosion_provenance_2026-09-13.md §8, the standard is named
+#: for the governing mechanism only and no table is named until one is read.
+#: Identical to what migration 20260917190000 writes.
+_GC001_ENV_SOURCE_TEXT = (
+    "Source: NASA-STD-6012, governing standard for the mechanism only "
+    "(no table of it has been read); threshold is GC-001 authored calibration"
+)
+
+#: The corrected citation for the GC-001 galvanic series rows. The cited
+#: documents supply the ordering of the series; the potentials are an authored
+#: index, as Euro Inox Vol. 10 (held) plots its own series in mV SCE. The year
+#: is corrected here too: 2025 was the worldstainless.org upload path, not an
+#: edition. Identical to what migration 20260917190000 writes.
+_GC001_SERIES_SOURCE_TEXT = (
+    "Source: WorldStainless / Euro Inox Vol. 10 (2009) and AUCSC Basic "
+    "Corrosion Course (2024), ordering only; potential is GC-001 authored "
+    "calibration"
+)
+
+#: Payload ``source`` string -> seeded ``source_text``, for the two GC-001
+#: payload keys carrying a superseded citation. Keyed by the exact payload
+#: string; any other value is seeded as ``Source: <value>`` unchanged.
+_GC001_SUPERSEDED_SOURCES = {
+    "NASA-STD-6012 Table 1": _GC001_ENV_SOURCE_TEXT,
+    "WorldStainless / Euro Inox (2025) and AUCSC Basic Corrosion Course (2024)": (
+        _GC001_SERIES_SOURCE_TEXT
+    ),
+}
+
+
+def _gc001_source_text(block: dict, *, corrected: str, default: str) -> str:
+    """Return the ``source_text`` seeded for one GC-001 payload citation block.
+
+    Handles both payload shapes. Migration 20260917190000 renames these two
+    ``source`` keys to ``governing_reference`` and adds ``provenance:
+    authored``; a payload carrying the new key is seeded with *corrected*
+    directly. A payload still holding the old ``source`` string has it replaced
+    when it is one of the superseded citations, and emitted unchanged
+    otherwise. The seeder inserts only, so rows already stored are corrected by
+    that migration; this keeps a fresh seed from reintroducing the old text.
+    """
+    if block.get("governing_reference"):
+        return corrected
+    legacy = block.get("source", default)
+    return _GC001_SUPERSEDED_SOURCES.get(legacy, f"Source: {legacy}")
+
 
 def _seed_gc001(svc: RuleService) -> int:
     RULESET_ID = "BIMGUARD-GC-001"
@@ -402,9 +453,14 @@ def _seed_gc001(svc: RuleService) -> int:
     _seed_risk_bands(svc, ruleset_id=RULESET_ID, prefix="GC-001", bands=gc["risk_bands"])
 
     # ── Environment classes (E1–E7) ───────────────────────────────────────────
-    env_src = gc["environment_classes"].get("source", "NASA-STD-6012")
-    for key, data in gc["environment_classes"].items():
-        if key == "source":
+    env_block = gc["environment_classes"]
+    env_src = _gc001_source_text(
+        env_block, corrected=_GC001_ENV_SOURCE_TEXT, default="NASA-STD-6012"
+    )
+    for key, data in env_block.items():
+        # Citation keys sit alongside the classes in this block, so every one
+        # of them has to be skipped here or it is read as a class.
+        if key in ("source", "governing_reference", "provenance"):
             continue
         _r(
             reference=f"GC-001.ENV.{key}",
@@ -414,7 +470,7 @@ def _seed_gc001(svc: RuleService) -> int:
             check_value=data["voltage_threshold_v"],
             operator="<=",
             unit="V",
-            source_text=f"Source: {env_src}",
+            source_text=env_src,
             parameters=json.dumps({**data, "class_key": key}),
         )
 
@@ -435,7 +491,11 @@ def _seed_gc001(svc: RuleService) -> int:
         )
 
     # ── Galvanic series materials ─────────────────────────────────────────────
-    mat_src = gc["galvanic_series"].get("source", "WorldStainless / Euro Inox")
+    mat_src = _gc001_source_text(
+        gc["galvanic_series"],
+        corrected=_GC001_SERIES_SOURCE_TEXT,
+        default="WorldStainless / Euro Inox Vol. 10 (2009)",
+    )
     for mat_key, mat in gc["galvanic_series"]["materials"].items():
         noble_label = "noble (cathodic)" if mat.get("noble") else "active (anodic)"
         _r(
@@ -446,7 +506,7 @@ def _seed_gc001(svc: RuleService) -> int:
             check_value=mat["potential_v"],
             unit="V",
             keyword=mat_key,
-            source_text=f"Source: {mat_src}",
+            source_text=mat_src,
             parameters=json.dumps({**mat, "material_key": mat_key}),
         )
 
