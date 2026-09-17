@@ -8,6 +8,20 @@ import * as THREE from "https://esm.sh/three@0.182.0";
 // same version has to be pulled alongside rather than reached through OBC).
 import JSZip from "https://esm.sh/jszip@3.10.1";
 import { filterBcfArchive, priorityRank } from "./bcf-filter.js?v=viewer-isolate-5";
+import { colorGroupsFromComponentColors, styleNameForColor } from "./bcf-colors.js?v=viewer-band-colors-1";
+import { normalizeMounts, VIEWER_MOUNTS_API } from "./viewer-mounts.js?v=viewer-band-colors-2";
+
+/**
+ * What the Svelte host checks before it trusts this module.
+ *
+ * A bundle that exports nothing here predates the mounts contract, which means
+ * /static is being served from an older checkout than the app. Re-exported
+ * rather than redefined so there is one source of truth.
+ */
+export { VIEWER_MOUNTS_API };
+
+/** Cache-busting token this file is published under; kept beside the API version. */
+export const VIEWER_ASSET_VERSION = "viewer-band-colors-2";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -175,13 +189,69 @@ function installErrorHighlighting(components, world) {
         applyIsolation(null);
     }
 
+    /**
+     * Highlighter style names created from BCF colours so far, so each one is
+     * cleared before the next viewpoint paints and registered only once.
+     */
+    const bcfColorStyles = new Set();
+
+    /** Drop every BCF-colour highlight, leaving the fixed error style alone. */
+    async function clearBcfColorStyles() {
+        for (const name of bcfColorStyles) await highlighter.clear(name);
+    }
+
+    /**
+     * Paint a viewpoint's Coloring block, one highlighter style per colour.
+     *
+     * The colours are the exporter's, not the viewer's: bcf_generator gives the
+     * subject its risk band's colour (Critical FFC00000, High FFC05000, Medium
+     * FFFF8C00, Low FF107C10) and the implicated partners a contrasting
+     * FF0070C0. Returns false when the archive carries no usable colours, so
+     * the caller can fall back to the single error style rather than leaving
+     * the element unpainted.
+     */
+    async function applyViewpointColors(viewpoint) {
+        const groups = colorGroupsFromComponentColors(viewpoint?.componentColors);
+        if (groups.length === 0) return false;
+        const fragments = components.get(OBC.FragmentsManager);
+        let painted = false;
+        for (const { hex, guids } of groups) {
+            let map;
+            try {
+                map = await fragments.guidsToModelIdMap(guids);
+            } catch (err) {
+                console.warn(`${LOG} colour lookup failed for ${hex}:`, err);
+                continue;
+            }
+            if (!map || OBC.ModelIdMapUtils.isEmpty(map)) continue;
+            const styleName = styleNameForColor(hex);
+            if (!bcfColorStyles.has(styleName)) {
+                highlighter.styles.set(styleName, {
+                    color: new THREE.Color(`#${hex}`),
+                    opacity: 1,
+                    transparent: false,
+                    renderedFaces: 0,
+                });
+                bcfColorStyles.add(styleName);
+            }
+            await highlighter.highlightByID(styleName, map, false, false);
+            painted = true;
+        }
+        return painted;
+    }
+
     // What the patched go() calls back into, for this mount only.
     async function applyViewpointSelection(viewpoint) {
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        await clearBcfColorStyles();
         const selectionMap = await viewpoint.getSelectionMap();
         const map = OBC.ModelIdMapUtils.isEmpty(selectionMap) ? null : selectionMap;
+        // Isolate and framing follow the whole selection, however it is painted.
         setSelectionMap(map);
-        if (map) {
+        // Band colours first; the fixed red is the fallback for an archive with
+        // no Coloring block (or one whose guids match nothing loaded).
+        const painted = await applyViewpointColors(viewpoint);
+        if (map && !painted) {
             await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, selectionMap, false, false);
         }
     }
@@ -203,6 +273,11 @@ function installErrorHighlighting(components, world) {
             if (!OBC.ModelIdMapUtils.isEmpty(map)) maps.push(map);
         }
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        // A multi-select spans topics of different bands, so one colour per
+        // element would be arbitrary: the joined selection takes the single
+        // error style, and any band colours from a previous single-topic
+        // viewpoint are cleared rather than left painted underneath.
+        await clearBcfColorStyles();
         const joined = maps.length > 0 ? OBC.ModelIdMapUtils.join(maps) : null;
         setSelectionMap(joined);
         if (joined) {
@@ -215,6 +290,9 @@ function installErrorHighlighting(components, world) {
     // GlobalId lookup) rather than a set of BCF topics.
     async function highlightMap(map) {
         await highlighter.clear(ERROR_HIGHLIGHT_STYLE);
+        // No viewpoint here, so no band colours to read: clear any left over
+        // from one, or they stay painted under this highlight.
+        await clearBcfColorStyles();
         setSelectionMap(map);
         if (map) await highlighter.highlightByID(ERROR_HIGHLIGHT_STYLE, map, false, false);
     }
@@ -994,11 +1072,27 @@ function createDrawingsModule(components, world, viewsModule, layersModule, topi
 }
 
 export async function initViewer(mounts) {
-    const viewportHost = mounts?.viewport;
-    const detailsHost = mounts?.details;
-    const drawingsHost = mounts?.drawings;
-    if (!viewportHost) {
-        console.error("initViewer: a viewport mount element is required", mounts);
+    // Both the current { viewport, details, drawings } form and the older
+    // single-container one are accepted; see viewer-mounts.js for why, and for
+    // the error text when neither resolves.
+    let viewportHost;
+    let detailsHost;
+    let drawingsHost;
+    try {
+        const resolved = normalizeMounts(mounts, {
+            getElementById: (id) => document.getElementById(id),
+        });
+        viewportHost = resolved.viewport;
+        detailsHost = resolved.details;
+        drawingsHost = resolved.drawings;
+        if (resolved.form !== "mounts") {
+            console.warn(
+                `${LOG} initViewer received the legacy ${resolved.form} form; ` +
+                "the details dock and drawings board will not be mounted.",
+            );
+        }
+    } catch (err) {
+        console.error(`${LOG} ${err.message}`, mounts);
         return null;
     }
 
