@@ -31,7 +31,7 @@
   let selectedProjectId: number | null = $state(untrack(() => initialProjectId));
   let selectedElementGuid: string | null = $state(untrack(() => initialElementGuid));
   let selectedBcfArtifactId: number | null = $state(untrack(() => initialBcfArtifactId));
-  const selectedAnalysisSlug: string | null = $state(untrack(() => initialAnalysisSlug));
+  let selectedAnalysisSlug: string | null = $state(untrack(() => initialAnalysisSlug));
 
   /** Filled by IfcViewer when a deep-linked element could not be highlighted. */
   let elementNotFound: string | null = $state(null);
@@ -121,6 +121,12 @@
   $effect(() => {
     if (initialBcfArtifactId !== undefined) {
       selectedBcfArtifactId = initialBcfArtifactId;
+    }
+  });
+
+  $effect(() => {
+    if (initialAnalysisSlug !== undefined) {
+      selectedAnalysisSlug = initialAnalysisSlug;
     }
   });
 </script>
