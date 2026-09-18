@@ -307,12 +307,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # injected by an XSS bug. Tightening this further would require
             # moving both scripts to hashed/nonced sources tracked in lockstep
             # with the built frontend/dist/index.html.
+            #
+            # esm.sh and unpkg.com are on script-src because
+            # static/js/viewer/ifc-viewer.js dynamically imports the ThatOpen
+            # viewer stack and three.js from esm.sh, and index.html's
+            # importmap pins web-ifc to unpkg.com -- both are CSP script
+            # sources even though nothing is a <script src> tag. fonts.
+            # googleapis.com/gstatic.com are on style-src/font-src for the
+            # Google Fonts stylesheet index.html links.
             "default-src 'self'; "
             "img-src 'self' data: blob: https:; "
-            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://esm.sh https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "connect-src 'self' ws: wss: https: http:; "
-            "font-src 'self' data:; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
             "frame-ancestors 'none'; "
             "object-src 'none';",
         )
