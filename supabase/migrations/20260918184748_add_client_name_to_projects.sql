@@ -1,0 +1,21 @@
+-- Adds projects.client_name: the appointing party (the building client) a
+-- project is delivered for. Captured as the first, required field of the New
+-- Project wizard's Details step, and offered back to later projects as a
+-- pick-list built from the distinct values already on this column
+-- (GET /api/projects/client-names).
+--
+-- A plain text column rather than a separate clients table: nothing in the
+-- schema models a client entity today (public.organizations is the BIM-Guard
+-- tenant that owns a project, not the client it is delivered for, and
+-- public.client_documents is per-project evidence), and the wizard only needs
+-- a name and a distinct list. A clients table can be introduced from these
+-- values later if clients ever carry attributes of their own.
+--
+-- Required at the application layer (ProjectCreateRequest in
+-- app/modules/contracts.py) for every new project; the column itself is
+-- NOT NULL DEFAULT '' -- the same pattern as projects.short_name -- so rows
+-- that predate it and internal callers that do not set one are not broken.
+--
+-- Idempotent: safe to re-run.
+alter table public.projects
+  add column if not exists client_name text not null default '';

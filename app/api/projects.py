@@ -54,6 +54,7 @@ from app.modules.contracts import (
     ProjectBulkActionResponse,
     ProjectBulkDeleteRequest,
     ProjectBulkUpdateRequest,
+    ProjectClientNamesResponse,
     ProjectCreateRequest,
     ProjectDocumentBindingsResponse,
     ProjectDocumentBindingsUpdateRequest,
@@ -333,6 +334,40 @@ def get_project_options(response: Response) -> ProjectOptionsResponse:
     )
 
 
+@router.get(
+    "/client-names",
+    response_model=ProjectClientNamesResponse,
+    summary="Client names already used on the caller's projects",
+)
+def list_client_names(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
+) -> ProjectClientNamesResponse:
+    """Return the distinct client names on the projects the caller can see.
+
+    Feeds the New Project wizard's client pick-list. Scoped exactly as
+    ``GET /api/projects`` is, so one organization's clients are never offered
+    to another. Declared above ``/{project_id}`` for the same reason as
+    ``/options``.
+    """
+    effective_org_id: Optional[int] = organization_id
+    if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
+        effective_org_id = int(x_org_id.strip())
+
+    rows = visible_project_rows(
+        service.list_projects(),
+        user_id=current_user.id,
+        organization_id=effective_org_id,
+        memberships=memberships,
+        profiles=profiles,
+    )
+    return ProjectClientNamesResponse(client_names=service.distinct_client_names(rows))
+
+
 @router.post(
     "/bulk-delete",
     response_model=ProjectBulkActionResponse,
@@ -474,9 +509,14 @@ def create_project(
         created = service.create_project(
             name=payload.name,
             short_name=payload.short_name,
+            client_name=payload.client_name,
             organization_id=target_org_id,
             description=payload.description or "",
-            status=payload.status,
+            # The wizard no longer asks for a lifecycle status; a project is
+            # Active from the moment it is set up. The column is still read
+            # (dashboard badge and filter, edit modal, bulk update), so it is
+            # set here rather than left to the table default.
+            status="Active",
             country=payload.country,
             analysis_type=payload.analysis_type,
             building_code=payload.building_code,

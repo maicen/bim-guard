@@ -150,6 +150,8 @@ export interface Project extends IsoGovernanceFieldsRequired, Timestamps {
   name: string;
   /** Short display nickname shown in the header/breadcrumbs instead of the full name. */
   short_name?: string;
+  /** The client (appointing party) the project is delivered for; '' on projects that predate it. */
+  client_name?: string;
   organization_id?: number | null;
   description?: string;
   status: string;
@@ -251,9 +253,10 @@ export interface ProjectCreatePayload {
   name: string;
   /** Required: short display nickname shown in the header/breadcrumbs. 2-24 characters. */
   short_name: string;
+  /** Required: the client (appointing party) the project is delivered for. */
+  client_name: string;
   organization_id?: number | null;
   description?: string;
-  status?: string;
   country?: string;
   analysis_type?: AnalysisDomain | string;
   building_code?: string | null;
@@ -304,6 +307,11 @@ export interface ProjectOptions {
   analysis_types: string[];
   standards: StandardOption[];
   building_codes: BuildingCodeOption[];
+}
+
+/** Distinct client names on the caller's visible projects, for the wizard's pick-list. */
+export interface ProjectClientNamesResponse {
+  client_names: string[];
 }
 
 export interface ProjectUpdatePayload extends IsoGovernanceFieldsOptional {

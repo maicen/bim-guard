@@ -366,8 +366,20 @@ class TimestampFields(BaseModel):
 
 
 class ProjectCreateRequest(BaseModel):
-    """Payload for creating a project."""
+    """Payload for creating a project.
 
+    Carries no workflow status: every project created through this contract
+    starts ``Active`` (set by the route), so the wizard no longer asks.
+    """
+
+    client_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        # At least one non-space character: a blank client is not a client.
+        pattern=r"\S",
+        description="Client (appointing party) the project is delivered for",
+    )
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
     short_name: str = Field(
         ...,
@@ -376,7 +388,6 @@ class ProjectCreateRequest(BaseModel):
         description="Short display nickname shown in the header and breadcrumbs",
     )
     description: Optional[str] = Field(default="", description="Optional description")
-    status: str = Field(default="Draft", description="Workflow status")
     country: str = Field(..., description="Jurisdiction governing code applicability")
     analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
     organization_id: Optional[int] = Field(default=None, description="Owning organization ID")
@@ -428,6 +439,15 @@ class ProjectCreateRequest(BaseModel):
     )
     standards_codes: list[str] = Field(
         default_factory=list, description="Notebook standard IDs to link"
+    )
+
+
+class ProjectClientNamesResponse(BaseModel):
+    """Distinct client names already used on the caller's visible projects."""
+
+    client_names: list[str] = Field(
+        default_factory=list,
+        description="Case-insensitively distinct client names, sorted alphabetically",
     )
 
 
@@ -502,6 +522,7 @@ class ProjectResponse(IsoGovernanceFieldsRequired, TimestampFields):
     id: int
     name: str
     short_name: Optional[str] = ""
+    client_name: Optional[str] = ""
     organization_id: Optional[int] = None
     description: Optional[str] = ""
     status: Optional[str] = "Draft"

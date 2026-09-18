@@ -80,6 +80,7 @@ def test_create_project_rejects_unknown_building_code():
         "/api/projects",
         json={
             "name": "Unknown code project",
+            "client_name": "Test Client",
             "short_name": "UnkCode",
             "project_code": "UNK",
             "country": "Canada",
@@ -99,6 +100,7 @@ def test_create_project_persists_building_code():
         "/api/projects",
         json={
             "name": "Building code round-trip",
+            "client_name": "Test Client",
             "short_name": "BldgCode",
             "project_code": "BCRT",
             "country": "Canada",
@@ -122,6 +124,7 @@ def test_create_project_without_building_code_is_allowed():
         "/api/projects",
         json={
             "name": "Corrosion, no code",
+            "client_name": "Test Client",
             "short_name": "NoCode",
             "project_code": "NOC",
             "country": "Canada",
@@ -144,6 +147,7 @@ def test_create_project_persists_classification_standard():
         "/api/projects",
         json={
             "name": "Classification standard round-trip",
+            "client_name": "Test Client",
             "short_name": "ClassStd",
             "project_code": "CLS",
             "country": "Canada",
@@ -261,6 +265,7 @@ def test_create_project_persists_project_type():
         "/api/projects",
         json={
             "name": "Commercial Building",
+            "client_name": "Test Client",
             "short_name": "CommBldg",
             "project_code": "COMM",
             "country": "US",
@@ -282,6 +287,7 @@ def test_create_project_rejects_invalid_project_type():
         "/api/projects",
         json={
             "name": "Invalid Type Project",
+            "client_name": "Test Client",
             "short_name": "InvType",
             "project_code": "INVT",
             "country": "US",

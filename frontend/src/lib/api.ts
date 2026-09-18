@@ -90,6 +90,7 @@ import type {
   ModelUploadResponse,
   ProjectDocumentBindingsResponse,
   ProjectOptions,
+  ProjectClientNamesResponse,
   ProjectListResponse,
   ProjectRulesetBindingsResponse,
   ProjectUpdatePayload,
@@ -559,6 +560,18 @@ export const projectsApi = {
       },
       options,
     );
+  },
+
+  /**
+   * Distinct client names already used on projects the caller can see, scoped
+   * to the active organization the same way list() is. Not cached: it is read
+   * once per wizard opening and must include a client added a moment ago.
+   */
+  async clientNames(organizationId?: number | null): Promise<ProjectClientNamesResponse> {
+    const effectiveOrg = organizationId !== undefined ? organizationId : getActiveOrgId();
+    const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+    const res = await apiFetch(`${API_BASE}/projects/client-names${query}`);
+    return handleResponse<ProjectClientNamesResponse>(res);
   },
 
   async create(payload: ProjectCreatePayload): Promise<Project> {

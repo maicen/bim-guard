@@ -130,6 +130,7 @@ def test_attach_repo_models_endpoint(client: TestClient) -> None:
         "/api/projects",
         json={
             "name": "Repo Attach Target",
+            "client_name": "Test Client",
             "short_name": "RepoAttach",
             "project_code": "RAT",
             "description": "test",

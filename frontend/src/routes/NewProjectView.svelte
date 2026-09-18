@@ -8,12 +8,9 @@
   import { authState } from "../lib/auth.svelte";
   import {
     IFC_FILE_ROLES,
-    PROJECT_CODE_MAX_LENGTH,
     PROJECT_CODE_MIN_LENGTH,
     PROJECT_CODE_PATTERN,
-    SHORT_NAME_MAX_LENGTH,
     SHORT_NAME_MIN_LENGTH,
-    PROJECT_TYPES,
   } from "../lib/types";
   import type {
     BSDDDictionaryItem,
@@ -23,6 +20,7 @@
     NamingConfigPayload,
   } from "../lib/types";
   import NamingConfigStep from "../lib/components/NamingConfigStep.svelte";
+  import ProjectDetailsStep from "../lib/components/ProjectDetailsStep.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
   interface Props {
@@ -38,11 +36,11 @@
   let submitStatusMessage = $state("");
 
   // Form State
+  let clientName = $state("");
   let name = $state("");
   let shortName = $state("");
   let projectCode = $state("");
   let description = $state("");
-  let status = $state("Active");
   let country = $state("Canada");
   let analysisType = $state("Arch");
   // Chosen on step 3 rather than step 1: which code governs a model is a
@@ -326,8 +324,12 @@
     }
   }
 
-  /** Step 1 requires a name plus a short name and ISO 19650 project code. */
+  /**
+   * Step 1 requires a client, a name, a short name, an ISO 19650 project code
+   * and a project type. Checked in the same order the fields unlock.
+   */
   function step1ValidationError(): string {
+    if (!clientName.trim()) return "Please provide a client name.";
     if (!name.trim()) return "Please provide a project name.";
     if (!shortName.trim() || shortName.trim().length < SHORT_NAME_MIN_LENGTH) {
       return `Short name must be at least ${SHORT_NAME_MIN_LENGTH} characters.`;
@@ -384,7 +386,7 @@
               short_name: shortName.trim(),
               project_code: projectCode.trim().toUpperCase(),
               description,
-              status,
+              client_name: clientName.trim(),
               country,
               analysis_type: analysisType,
               building_code: buildingCode || null,
@@ -521,212 +523,20 @@
 
       {#if currentStep === 1}
         <!-- Step 1: Project Details -->
-        <div class="space-y-4">
-          <div>
-            <label
-              for="wizard-name"
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-            >
-              Project Name *
-            </label>
-            <input
-              id="wizard-name"
-              type="text"
-              bind:value={name}
-              placeholder="e.g. BIM Headquarters Phase 1"
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                for="wizard-short-name"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-              >
-                Short Name *
-              </label>
-              <input
-                id="wizard-short-name"
-                type="text"
-                bind:value={shortName}
-                maxlength={SHORT_NAME_MAX_LENGTH}
-                placeholder="e.g. BG HQ Phase 1"
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-              />
-              <p class="mt-1 text-caption text-fg-muted">
-                Shown in the header and breadcrumbs instead of the full name ({SHORT_NAME_MIN_LENGTH}-{SHORT_NAME_MAX_LENGTH}
-                characters).
-              </p>
-            </div>
-            <div>
-              <label
-                for="wizard-project-code"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-              >
-                Project Code *
-              </label>
-              <input
-                id="wizard-project-code"
-                type="text"
-                bind:value={projectCode}
-                maxlength={PROJECT_CODE_MAX_LENGTH}
-                placeholder="e.g. BGHQ1"
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm uppercase text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-              />
-              <p class="mt-1 text-caption text-fg-muted">
-                ISO 19650 container naming code: {PROJECT_CODE_MIN_LENGTH}-{PROJECT_CODE_MAX_LENGTH}
-                alphanumeric characters, no spaces or separators.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <label
-              for="wizard-desc"
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-            >
-              Project Description
-            </label>
-            <textarea
-              id="wizard-desc"
-              bind:value={description}
-              rows="4"
-              placeholder="Scope, regulatory framework, and notes..."
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-            ></textarea>
-          </div>
-          <div>
-            <label
-              for="wizard-status"
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-            >
-              Lifecycle Status
-            </label>
-            <select
-              id="wizard-status"
-              bind:value={status}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Draft">Draft</option>
-              <option value="Active">Active</option>
-              <option value="Archived">Archived</option>
-            </select>
-          </div>
-
-          <div>
-            <label
-              for="wizard-jurisdiction"
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-            >
-              Jurisdiction *
-            </label>
-            <select
-              id="wizard-jurisdiction"
-              bind:value={country}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              {#if options.countries.length}
-                {#each options.countries as c (c)}
-                  <option value={c}>{c}</option>
-                {/each}
-              {:else}
-                <!-- Options endpoint unreachable: the four jurisdictions with
-                     a bundled ruleset keep the wizard usable. -->
-                <option value="Canada">Canada</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="United States">United States</option>
-                <option value="International">International</option>
-              {/if}
-            </select>
-            <p class="mt-1 text-caption text-fg-muted">
-              Required for Architectural compliance checks; optional for Piping corrosion
-              analysis. The building code is chosen on step 3, from the codes this jurisdiction
-              publishes.
-            </p>
-          </div>
-
-          <div>
-            <div class="mb-1.5 flex items-center justify-between">
-              <span class="block text-xs font-semibold uppercase tracking-wider text-fg-secondary">
-                Project Type <span class="text-rose-400">*</span>
-              </span>
-              {#if projectType}
-                <span class="rounded bg-accent/20 px-2 py-0.5 font-mono text-micro font-bold text-blue-400">
-                  {projectType}
-                </span>
-              {/if}
-            </div>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {#each (options.project_types?.length ? options.project_types : PROJECT_TYPES) as type (type)}
-                <button
-                  type="button"
-                  onclick={() => (projectType = type)}
-                  class="flex items-center justify-center rounded-xl border px-2.5 py-2.5 text-center text-caption font-semibold transition-all {projectType ===
-                  type
-                    ? 'border-accent bg-accent/15 text-fg-primary ring-1 ring-accent'
-                    : 'border-border-default bg-surface-canvas text-fg-muted hover:border-border-interactive hover:text-fg-primary'}"
-                >
-                  {type}
-                </button>
-              {/each}
-            </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label
-                for="wizard-size"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-              >
-                Size (m²)
-              </label>
-              <input
-                id="wizard-size"
-                type="number"
-                min="0"
-                step="any"
-                bind:value={projectSizeSqm}
-                placeholder="5000"
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label
-                for="wizard-buildings"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-              >
-                Buildings
-              </label>
-              <input
-                id="wizard-buildings"
-                type="number"
-                min="0"
-                step="1"
-                bind:value={buildingsCount}
-                placeholder="1"
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label
-                for="wizard-floors"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-              >
-                Floors
-              </label>
-              <input
-                id="wizard-floors"
-                type="number"
-                min="0"
-                step="1"
-                bind:value={floorsCount}
-                placeholder="2"
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-              />
-            </div>
-          </div>
-        </div>
+        <ProjectDetailsStep
+          bind:clientName
+          bind:name
+          bind:shortName
+          bind:projectCode
+          bind:description
+          bind:country
+          bind:projectType
+          bind:projectSizeSqm
+          bind:buildingsCount
+          bind:floorsCount
+          countries={options.countries}
+          projectTypes={options.project_types}
+        />
       {:else if currentStep === 2}
         <!-- Step 2: IFC Upload -->
         <div class="space-y-4">
@@ -1049,6 +859,10 @@
         <div class="space-y-3 text-xs">
           <div class="space-y-2 rounded-xl border border-border-default bg-surface-canvas p-4">
             <div class="flex justify-between border-b border-border-default py-1">
+              <span class="font-medium text-fg-muted">Client:</span>
+              <span class="font-semibold text-fg-primary">{clientName}</span>
+            </div>
+            <div class="flex justify-between border-b border-border-default py-1">
               <span class="font-medium text-fg-muted">Project Name:</span>
               <span class="font-semibold text-fg-primary">{name}</span>
             </div>
@@ -1057,10 +871,6 @@
               <span class="font-semibold text-fg-primary"
                 >{shortName} / {projectCode.toUpperCase()}</span
               >
-            </div>
-            <div class="flex justify-between border-b border-border-default py-1">
-              <span class="font-medium text-fg-muted">Status:</span>
-              <span class="font-semibold text-fg-primary">{status}</span>
             </div>
             <div class="flex justify-between border-b border-border-default py-1">
               <span class="font-medium text-fg-muted">Jurisdiction:</span>

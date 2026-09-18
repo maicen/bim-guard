@@ -75,6 +75,7 @@ class ProjectsService:
                     "id": int,
                     "name": str,
                     "short_name": str,
+                    "client_name": str,
                     "description": str,
                     "status": str,
                     "country": str,
@@ -153,6 +154,28 @@ class ProjectsService:
         """Return all projects ordered by newest first."""
         return rows_desc_by_id(self._projects)
 
+    @staticmethod
+    def distinct_client_names(rows: list[dict]) -> list[str]:
+        """Return the distinct client names used across ``rows``, sorted.
+
+        Names are compared trimmed and case-insensitively, so "Acme" and
+        "acme " offer one entry rather than two. The spelling kept is the one
+        on the newest row (highest id), which is the one most recently typed.
+
+        Args:
+            rows: Project rows, already filtered to what the caller may see.
+
+        Returns:
+            Client names, sorted case-insensitively; blanks are left out.
+        """
+        newest_first = sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+        by_key: dict[str, str] = {}
+        for row in newest_first:
+            client_name = (row.get("client_name") or "").strip()
+            if client_name:
+                by_key.setdefault(client_name.casefold(), client_name)
+        return sorted(by_key.values(), key=str.casefold)
+
     def total_projects(self) -> int:
         """Return the number of stored projects."""
         return len(self.list_projects())
@@ -201,7 +224,7 @@ class ProjectsService:
 
     #: Columns added by later migrations that follow the same
     #: retry-without-them fallback as ``_WIZARD_COLUMNS``.
-    _OPTIONAL_COLUMNS = _WIZARD_COLUMNS + ("classification_standard",)
+    _OPTIONAL_COLUMNS = _WIZARD_COLUMNS + ("classification_standard", "client_name")
 
     def _insert_project_row(self, row: dict):
         """Insert a project row, dropping optional columns the schema lacks.
@@ -232,8 +255,9 @@ class ProjectsService:
             logger.warning(
                 "Projects table is missing optional columns; created without "
                 "them. Apply the add_wizard_fields_to_projects, "
-                "add_building_code_to_projects, and "
-                "add_classification_standard_to_projects migrations. dropped=%s",
+                "add_building_code_to_projects, "
+                "add_classification_standard_to_projects, and "
+                "add_client_name_to_projects migrations. dropped=%s",
                 sorted(set(row) - set(trimmed)),
             )
             return self._projects.insert(trimmed)
@@ -242,6 +266,7 @@ class ProjectsService:
         self,
         name: str,
         short_name: str = "",
+        client_name: str = "",
         description: str = "",
         status: str = "Draft",
         ifc_file_path: str = "",
@@ -275,6 +300,9 @@ class ProjectsService:
                 ``POST /api/projects`` contract; left optional here since
                 other internal callers (tests, the legacy multipart upload
                 endpoint) do not all set one.
+            client_name: The client (appointing party) the project is
+                delivered for. Required by the ``POST /api/projects``
+                contract; optional here for the same reason as short_name.
             description: Optional free-text description.
             status: Workflow status.
             ifc_file_path: Storage reference for the uploaded IFC model.
@@ -301,6 +329,7 @@ class ProjectsService:
         """
         name = name.strip()
         short_name = short_name.strip()
+        client_name = client_name.strip()
         country = country.strip()
         project_code = project_code.strip().upper()
         analysis_type = normalize_analysis_type(analysis_type.strip())
@@ -365,6 +394,7 @@ class ProjectsService:
             ("buildings_count", buildings_count),
             ("floors_count", floors_count),
             ("classification_standard", classification_standard),
+            ("client_name", client_name),
         ):
             if value is not None and value != "":
                 row[column] = value

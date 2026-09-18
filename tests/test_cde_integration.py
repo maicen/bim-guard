@@ -23,6 +23,7 @@ def cde_test_project():
             "/api/projects",
             json={
                 "name": name,
+                "client_name": "Test Client",
                 "short_name": name[:24],
                 "project_code": f"CDE{len(created_ids)}",
                 "country": country,
