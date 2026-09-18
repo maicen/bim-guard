@@ -316,12 +316,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # googleapis.com/gstatic.com are on style-src/font-src for the
             # Google Fonts stylesheet index.html links.
             #
+            # static.cloudflareinsights.com is on script-src because
+            # Cloudflare Web Analytics automatically injects beacon.min.js
+            # when serving bim-guard.xyz through Cloudflare's edge network.
+            #
             # worker-src and child-src include 'self' and blob: because
             # @thatopen/fragments uses multithreading web workers instantiated
             # dynamically from blob: URLs via URL.createObjectURL.
             "default-src 'self'; "
             "img-src 'self' data: blob: https:; "
-            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://esm.sh https://unpkg.com; "
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://esm.sh https://unpkg.com https://static.cloudflareinsights.com; "
             "worker-src 'self' blob:; "
             "child-src 'self' blob:; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "

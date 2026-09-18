@@ -114,4 +114,5 @@ them.
 `SecurityHeadersMiddleware` (`app/main.py`) sets `X-Content-Type-Options`,
 `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and a `Content-Security-Policy`
 (including `worker-src` and `child-src` allowing `'self'` and `blob:` for `@thatopen/fragments`
-3D viewer web workers) on every response.
+3D viewer web workers, and `https://static.cloudflareinsights.com` for Cloudflare Web Analytics)
+on every response.
