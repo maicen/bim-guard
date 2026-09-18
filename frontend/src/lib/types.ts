@@ -228,6 +228,8 @@ export interface ModelUploadResponse {
   primary_id: number | null;
   /** True while storing/attaching still runs in the background; poll ModelAttachStatusResponse. */
   processing: boolean;
+  /** Non-blocking notes, e.g. a filename outside ISO 19650 container naming. */
+  warnings: string[];
 }
 
 /** Progress of a background attach job. Mirrors ModelAttachStatusResponse. */

@@ -64,6 +64,7 @@ def _make_gate_node(target: CDEState):
                 "allowed": outcome.allowed,
                 "reason": outcome.reason,
                 "target_state": outcome.target_state.value,
+                "warnings": list(outcome.warnings),
             }
         }
 

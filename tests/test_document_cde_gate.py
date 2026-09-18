@@ -32,7 +32,8 @@ def wip_document():
     service.delete_document(doc_id)
 
 
-def test_wip_to_shared_blocked_on_bad_filename(client: TestClient) -> None:
+def test_wip_to_shared_not_blocked_by_non_iso_filename(client: TestClient) -> None:
+    """ISO 19650 container naming is a warning at the CDE gate, not a block."""
     service = DocumentService()
     created = service.create_document(
         md5_hash="dummy-md5-bad-filename",
@@ -43,9 +44,8 @@ def test_wip_to_shared_blocked_on_bad_filename(client: TestClient) -> None:
     doc_id = created["id"]
     try:
         response = client.put(f"/api/documents/{doc_id}", json={"cde_state": "SHARED"})
-        assert response.status_code == 400
-        # The document's cde_state must be unchanged after a rejected transition.
-        assert service.get_document(doc_id)["cde_state"] == "WIP"
+        assert response.status_code == 200, response.text
+        assert response.json()["cde_state"] == "SHARED"
     finally:
         service.delete_document(doc_id)
 

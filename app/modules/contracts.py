@@ -623,6 +623,13 @@ class ModelUploadResponse(BaseModel):
             "completion instead of expecting `files`/`primary_id` here yet."
         ),
     )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Non-blocking notes on the upload, e.g. a filename that does not "
+            "follow ISO 19650 container naming and so carries no naming metadata."
+        ),
+    )
 
 
 class ModelAttachStatusResponse(BaseModel):

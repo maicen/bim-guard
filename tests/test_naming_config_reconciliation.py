@@ -69,14 +69,39 @@ def test_gate1_uses_configured_convention_when_project_has_one():
         naming_config_service=stub,
     )
     assert result.allowed, result.reason
+    assert result.warnings == ()
 
     # The same filename fails the *default* ISO19650Validator 7-field
-    # hyphenated scheme, proving the configured convention -- not the
-    # fallback -- is what actually validated it.
+    # hyphenated scheme (reported as a warning, never a block), proving the
+    # configured convention -- not the fallback -- is what validated it.
     default_result = CDEStateMachine.evaluate_transition(
         "WIP", "SHARED", filename=filename, project_id=None
     )
-    assert not default_result.allowed
+    assert default_result.allowed
+    assert default_result.warnings
+
+
+def test_gate1_non_compliant_name_does_not_block_a_configured_project():
+    naming = NamingConfigService.__new__(NamingConfigService)
+    config = {
+        **DEFAULTS,
+        "project_code": "PRJ1",
+        "originator_code": "BIMG",
+        "active_convention": "iso19650",
+        "separator": "_",
+        "is_configured": True,
+    }
+    assert not naming.validate_name(config, "west_riverside_hospital_arc_ifc4.ifc")[0]
+
+    result = CDEStateMachine.evaluate_transition(
+        "WIP",
+        "SHARED",
+        filename="west_riverside_hospital_arc_ifc4.ifc",
+        project_id=42,
+        naming_config_service=_StubNamingConfigService(config),
+    )
+    assert result.allowed, result.reason
+    assert "configured naming convention" in result.warnings[0]
 
 
 def test_gate1_falls_back_to_default_scheme_when_unconfigured():

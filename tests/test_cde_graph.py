@@ -35,7 +35,7 @@ CASES = [
         "WIP",
         "SHARED",
         {"filename": "not-a-valid-iso19650-name.ifc"},
-        False,
+        True,  # naming is a warning, not a gate
     ),
     (
         "shared-to-published-no-approval",
@@ -71,6 +71,7 @@ def test_graph_matches_evaluate_transition(label, current, target, kwargs, expec
     assert wrapped["allowed"] == direct.allowed
     assert wrapped["reason"] == direct.reason
     assert wrapped["target_state"] == direct.target_state.value
+    assert wrapped["warnings"] == list(direct.warnings)
 
 
 def test_graph_topology_has_one_node_per_cde_state():

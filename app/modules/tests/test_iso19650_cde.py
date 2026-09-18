@@ -59,7 +59,7 @@ def test_cde_state_machine_wip_to_shared_success():
     assert res.target_state == CDEState.SHARED
 
 
-def test_cde_state_machine_wip_to_shared_blocked_on_invalid_naming():
+def test_cde_state_machine_wip_to_shared_warns_on_invalid_naming():
     res = CDEStateMachine.evaluate_transition(
         current_state="WIP",
         target_state="SHARED",
@@ -67,8 +67,32 @@ def test_cde_state_machine_wip_to_shared_blocked_on_invalid_naming():
         critical_issues_count=0,
         ids_check_passed=True,
     )
+    assert res.allowed is True
+    assert len(res.warnings) == 1
+    assert "container naming not followed" in res.warnings[0]
+
+
+def test_cde_state_machine_compliant_naming_has_no_warning():
+    res = CDEStateMachine.evaluate_transition(
+        current_state="WIP",
+        target_state="SHARED",
+        filename="PRJ1-BIMG-01-00-M3-A-0001.ifc",
+    )
+    assert res.allowed is True
+    assert res.warnings == ()
+
+
+def test_cde_state_machine_naming_warning_survives_a_real_block():
+    """A non-compliant name is still reported when something else blocks the transition."""
+    res = CDEStateMachine.evaluate_transition(
+        current_state="WIP",
+        target_state="SHARED",
+        filename="west_riverside_hospital_arc_ifc4.ifc",
+        critical_issues_count=2,
+    )
     assert res.allowed is False
-    assert "container naming validation failed" in res.reason
+    assert "critical compliance issues" in res.reason
+    assert res.warnings
 
 
 def test_cde_state_machine_wip_to_shared_blocked_on_critical_issues():

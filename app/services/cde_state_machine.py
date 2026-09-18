@@ -2,7 +2,8 @@
 CDE State Machine Enforcement Engine.
 
 Controls transitions across standard ISO 19650 CDE workflow states:
-- WIP -> SHARED: Requires 100% ISO container naming pass, 0 critical compliance/clash violations, and 100% IDS check pass.
+- WIP -> SHARED: Requires 0 critical compliance/clash violations and 100% IDS check pass.
+  ISO container naming is checked but only reported as a warning.
 - SHARED -> PUBLISHED: Requires explicit lead appointed party approval.
 - PUBLISHED -> ARCHIVED: Standard archival lifecycle.
 """
@@ -11,12 +12,15 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+from app.logging_config import get_logger
 from app.modules.contracts import CDEState
 from app.modules.document_parsing.iso_validator import ISO19650Validator
 from app.services.model_lineage import SupabaseModelLineageRepository
 from app.services.naming_config_service import NamingConfigService
 from app.services.projects_service import ProjectsService
 from app.utils import invalidate_cache, now_iso_utc
+
+logger = get_logger(__name__)
 
 
 def _validate_container_filename(filename: str, *, project_id: int | None, naming_config: NamingConfigService) -> tuple[bool, list[str]]:
@@ -43,6 +47,9 @@ class TransitionResult(NamedTuple):
     allowed: bool
     reason: str
     target_state: CDEState
+    #: Non-blocking findings, e.g. a container name outside the naming
+    #: convention. They never change ``allowed``.
+    warnings: tuple[str, ...] = ()
 
 
 class CDEStateMachine:
@@ -87,6 +94,10 @@ class CDEStateMachine:
 
         # WIP -> SHARED Gateway
         if cur == CDEState.WIP and tgt == CDEState.SHARED:
+            # Container naming is reported, not enforced: the parsed fields are
+            # metadata only, and BIM-Guard's own outputs do not follow the
+            # convention either, so a non-compliant name must not block sharing.
+            warnings: tuple[str, ...] = ()
             if filename:
                 is_valid, errors = _validate_container_filename(
                     filename,
@@ -94,24 +105,27 @@ class CDEStateMachine:
                     naming_config=naming_config_service or NamingConfigService(),
                 )
                 if not is_valid:
-                    return TransitionResult(
-                        allowed=False,
-                        reason=f"ISO 19650 container naming validation failed: {'; '.join(errors)}",
-                        target_state=tgt,
-                    )
+                    warnings = (f"ISO 19650 container naming not followed: {'; '.join(errors)}",)
             if critical_issues_count > 0:
                 return TransitionResult(
                     allowed=False,
                     reason=f"Cannot transition to SHARED: {critical_issues_count} critical compliance issues unresolved.",
                     target_state=tgt,
+                    warnings=warnings,
                 )
             if not ids_check_passed:
                 return TransitionResult(
                     allowed=False,
                     reason="Cannot transition to SHARED: buildingSMART IDS / LOIN verification failed.",
                     target_state=tgt,
+                    warnings=warnings,
                 )
-            return TransitionResult(allowed=True, reason="WIP to SHARED requirements satisfied.", target_state=tgt)
+            return TransitionResult(
+                allowed=True,
+                reason="WIP to SHARED requirements satisfied.",
+                target_state=tgt,
+                warnings=warnings,
+            )
 
         # SHARED -> PUBLISHED Gateway
         if cur == CDEState.SHARED and tgt == CDEState.PUBLISHED:
@@ -171,6 +185,8 @@ class CDEStateMachine:
 
         if not res.allowed:
             raise ValueError(res.reason)
+        for warning in res.warnings:
+            logger.warning("CDE transition warning project_id=%d: %s", project_id, warning)
 
         tgt = res.target_state.value
         updates: dict[str, Any] = {"cde_state": tgt, "updated_at": now_iso_utc()}
@@ -200,6 +216,7 @@ class CDEStateMachine:
                 "ids_check_passed": ids_check_passed,
                 "approved_by": approved_by,
                 "reason": res.reason,
+                "warnings": list(res.warnings),
             },
         )
 
