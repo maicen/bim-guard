@@ -35,6 +35,7 @@
   let currentStep = $state(1);
   let isSubmitting = $state(false);
   let errorMessage = $state("");
+  let submitStatusMessage = $state("");
 
   // Form State
   let name = $state("");
@@ -400,7 +401,12 @@
 
       if (ifcFiles.length) {
         try {
-          await modelsApi.upload(createdProject.id, ifcFiles, primaryIndex, ifcRoles);
+          submitStatusMessage = "Attaching models...";
+          await modelsApi.uploadAndWait(createdProject.id, ifcFiles, primaryIndex, ifcRoles, {
+            onProgress: (attached, total) => {
+              submitStatusMessage = `Attaching models... (${attached}/${total})`;
+            },
+          });
         } catch (uploadErr: any) {
           // The project row is already saved. Reporting that plainly and
           // staying open is better than closing on an error the user would
@@ -411,6 +417,8 @@
             `Create again — the models will attach to the project that already exists.`;
           currentStep = 2;
           return;
+        } finally {
+          submitStatusMessage = "";
         }
         // The primary is mirrored onto projects.ifc_file_path server-side, so
         // the row fetched before the upload names no model yet.
@@ -1148,7 +1156,11 @@
           onclick={handleFinish}
           class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-xs shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
         >
-          <span>{isSubmitting ? "Creating & launching..." : "Create & Launch Audit"}</span>
+          <span
+            >{isSubmitting
+              ? submitStatusMessage || "Creating & launching..."
+              : "Create & Launch Audit"}</span
+          >
           <Check class="h-3.5 w-3.5" />
         </button>
       {/if}

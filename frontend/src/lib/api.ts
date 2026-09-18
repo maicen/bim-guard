@@ -85,6 +85,7 @@ import type {
   ProjectBulkUpdatePayload,
   ProjectCreatePayload,
   Model,
+  ModelAttachStatusResponse,
   ModelListResponse,
   ModelUploadResponse,
   ProjectDocumentBindingsResponse,
@@ -751,6 +752,45 @@ export const modelsApi = {
     // caller holding a project row fetched before this call should re-read it
     // with { forceRefresh: true } -- the cache cannot know the column moved.
     return handleResponse<ModelUploadResponse>(res);
+  },
+
+  /** Poll the background attach job started by `upload()`. */
+  async attachStatus(projectId: number): Promise<ModelAttachStatusResponse> {
+    const res = await apiFetch(`${API_BASE}/projects/${projectId}/models/attach-status`);
+    return handleResponse<ModelAttachStatusResponse>(res);
+  },
+
+  /**
+   * Attach IFC models and wait for the background job to finish.
+   *
+   * `upload()` returns as soon as the request is validated -- storing and
+   * attaching the files runs after the response, because doing it inline
+   * routinely outran the Cloudflare Tunnel's ~100s idle timeout for large or
+   * multi-file attaches (HTTP 524). This polls attach-status until the job is
+   * done, surfacing progress through `onProgress`, and throws if the job
+   * reports an error.
+   */
+  async uploadAndWait(
+    projectId: number,
+    files: File[],
+    primaryIndex: number,
+    roles: string[],
+    options?: { onProgress?: (attached: number, total: number) => void; pollMs?: number },
+  ): Promise<void> {
+    const initial = await modelsApi.upload(projectId, files, primaryIndex, roles);
+    if (!initial.processing) return;
+
+    const pollMs = options?.pollMs ?? 1500;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+      const job = await modelsApi.attachStatus(projectId);
+      options?.onProgress?.(job.attached, job.total);
+      if (job.error) {
+        throw new Error(job.error);
+      }
+      if (!job.processing) return;
+    }
   },
 };
 

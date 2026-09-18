@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.api.dependencies import (
@@ -25,11 +25,13 @@ from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AttachRepoModelsRequest,
+    ModelAttachStatusResponse,
     ModelListResponse,
     ModelResponse,
     ModelUpdateRequest,
     ModelUploadResponse,
 )
+from app.services import model_attach_tracker
 from app.services.github_repo_service import GitHubRepoService
 from app.services.iso_validator import ISO19650ValidationError, validate_and_parse_filename
 from app.services.models_service import ModelsService
@@ -171,17 +173,27 @@ async def upload_models(
     service: Annotated[ModelsService, Depends(get_models_service)],
     phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
     naming_service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
+    background_tasks: BackgroundTasks,
     files: Annotated[list[UploadFile], File(description="IFC models to attach")],
     primary_index: Annotated[int, Form()] = 0,
     roles: Annotated[list[str], Form()] = [],
 ) -> ModelUploadResponse:
-    """Store every uploaded model and record it against the project.
+    """Validate the upload, then store and attach every model in the background.
 
     The model at ``primary_index`` becomes the project's primary: the one a
     corrosion run analyses, and the one ``projects.ifc_file_path`` keeps
     pointing at so every reader that predates ``project_ifc_files`` still
     resolves a model. The rest are attached alongside it, which is what lets a
     seismic run see the whole building rather than one discipline of it.
+
+    Everything that can be checked from the request alone (file extensions,
+    ``primary_index``, ``roles``, ISO 19650 filenames) still happens here and
+    still fails the request synchronously. The slow part -- an IFC preflight
+    parse plus a network upload to Supabase Storage, per file -- runs after
+    the response, because doing it inline routinely exceeded the Cloudflare
+    Tunnel's ~100s idle timeout (HTTP 524) for large or multi-file attaches,
+    even though the origin kept working and finished anyway. Poll
+    ``GET /projects/{id}/models/attach-status`` for completion.
 
     Args:
         project_id: Project to attach the models to.
@@ -192,8 +204,8 @@ async def upload_models(
     Raises:
         HTTPException: 404 if the project does not exist; 400 if the uploads are
             not all IFC models, if ``primary_index`` is out of range, or if
-            ``roles`` is given with a different length than ``files``; 500 if
-            storage rejects a model, naming it and how many were stored first.
+            ``roles`` is given with a different length than ``files``; 422 if a
+            filename fails ISO 19650 validation.
     """
     names = _validated_ifc_names(files)
     if not 0 <= primary_index < len(names):
@@ -205,7 +217,7 @@ async def upload_models(
             ),
         )
     file_roles = _roles_for(roles, len(names), primary_index)
-    
+
     naming_config = naming_service.get_for_project(project_id)
     is_configured = bool(naming_config and naming_config.get("is_configured"))
     convention = naming_service.resolve_convention(naming_config) if is_configured else {}
@@ -229,53 +241,118 @@ async def upload_models(
                 detail=str(e),
             )
 
-    attached: list[ModelResponse] = []
-    for index, (upload, name, parsed) in enumerate(zip(files, names, parsed_files)):
-        content = await upload.read()
-        stored = phase6_service.upload_service.upload(
-            name, content, project_id=project_id, kind="ifc"
-        )
-        if not stored.success or stored.ref is None:
-            # The models stored before this one keep their rows. Rolling them
-            # back would delete bytes that are safely stored and correctly
-            # recorded to undo nothing; the caller is told how far the upload
-            # got so the retry can be the remainder.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    f"{name} could not be stored: {stored.error or 'unknown error'}. "
-                    f"{len(attached)} of {len(names)} models were attached."
-                ),
-            )
+    # Bytes must be read from the request while it's still open; storing them
+    # is the slow part deferred below.
+    contents = [await upload.read() for upload in files]
 
-        row = service.attach_model(
-            project_id,
-            file_path=stored.ref.storage_ref,
-            file_name=stored.ref.filename,
-            role=file_roles[index],
-            is_primary=index == primary_index,
-            project_code=parsed.get("project_code"),
-            originator=parsed.get("originator"),
-            volume_system=parsed.get("volume_system"),
-            level=parsed.get("level"),
-            type_code=parsed.get("type"),
-            role_iso=parsed.get("role"),
-            number=parsed.get("number"),
-            cde_state="WIP",
-        )
-        attached.append(ModelResponse(**{"project_id": project_id, **row}))
-
-    primary = service.get_primary(project_id)
-    logger.info(
-        "Project IFC models attached project_id=%d count=%d primary=%s",
-        project_id,
-        len(attached),
-        (primary or {}).get("file_path"),
+    model_attach_tracker.start(project_id, total=len(names))
+    background_tasks.add_task(
+        _attach_files_in_background,
+        project_id=project_id,
+        names=names,
+        contents=contents,
+        parsed_files=parsed_files,
+        file_roles=file_roles,
+        primary_index=primary_index,
+        service=service,
+        phase6_service=phase6_service,
     )
-    return ModelUploadResponse(
-        success=True,
-        files=attached,
-        primary_id=(primary or {}).get("id"),
+
+    return ModelUploadResponse(success=True, files=[], primary_id=None, processing=True)
+
+
+def _attach_files_in_background(
+    *,
+    project_id: int,
+    names: list[str],
+    contents: list[bytes],
+    parsed_files: list[dict],
+    file_roles: list[str],
+    primary_index: int,
+    service: ModelsService,
+    phase6_service: Phase6Service,
+) -> None:
+    """Store and attach every file, off the request/response cycle.
+
+    Runs in a worker thread after the response is sent (see ``BackgroundTasks``
+    in :func:`upload_models`). Reports progress through
+    :mod:`app.services.model_attach_tracker` since there is no request left to
+    answer.
+    """
+    attached_count = 0
+    try:
+        for index, (name, content, parsed) in enumerate(zip(names, contents, parsed_files)):
+            stored = phase6_service.upload_service.upload(
+                name, content, project_id=project_id, kind="ifc"
+            )
+            if not stored.success or stored.ref is None:
+                # The models stored before this one keep their rows. Rolling
+                # them back would delete bytes that are safely stored and
+                # correctly recorded to undo nothing.
+                model_attach_tracker.finish(
+                    project_id,
+                    error=(
+                        f"{name} could not be stored: {stored.error or 'unknown error'}. "
+                        f"{attached_count} of {len(names)} models were attached."
+                    ),
+                )
+                return
+
+            service.attach_model(
+                project_id,
+                file_path=stored.ref.storage_ref,
+                file_name=stored.ref.filename,
+                role=file_roles[index],
+                is_primary=index == primary_index,
+                project_code=parsed.get("project_code"),
+                originator=parsed.get("originator"),
+                volume_system=parsed.get("volume_system"),
+                level=parsed.get("level"),
+                type_code=parsed.get("type"),
+                role_iso=parsed.get("role"),
+                number=parsed.get("number"),
+                cde_state="WIP",
+            )
+            attached_count += 1
+            model_attach_tracker.progress(project_id, attached=attached_count)
+
+        primary = service.get_primary(project_id)
+        logger.info(
+            "Project IFC models attached project_id=%d count=%d primary=%s",
+            project_id,
+            attached_count,
+            (primary or {}).get("file_path"),
+        )
+        model_attach_tracker.finish(project_id)
+    except Exception as exc:
+        logger.exception("Background model attach failed project_id=%d", project_id)
+        model_attach_tracker.finish(project_id, error=str(exc))
+
+
+@router.get(
+    "/projects/{project_id}/models/attach-status",
+    response_model=ModelAttachStatusResponse,
+    summary="Poll the status of a background model-attach job",
+)
+def get_attach_status(
+    project_id: int,
+    project: Annotated[dict, Depends(get_authorized_project)],
+) -> ModelAttachStatusResponse:
+    """Report progress of the attach job started by the last model upload.
+
+    ``processing`` is ``False`` both before any attach has run and once the
+    last one has finished -- the caller distinguishes those by ``attached``
+    and ``error``, or simply by having just received ``processing: True`` from
+    the upload call that started this job.
+    """
+    job = model_attach_tracker.get(project_id)
+    if job is None:
+        return ModelAttachStatusResponse(processing=False, total=0, attached=0, error=None)
+    return ModelAttachStatusResponse(
+        processing=not job.done,
+        total=job.total,
+        attached=job.attached,
+        error=job.error,
     )
 
 

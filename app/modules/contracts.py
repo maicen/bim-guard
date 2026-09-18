@@ -594,6 +594,23 @@ class ModelUploadResponse(BaseModel):
     primary_id: Optional[int] = Field(
         default=None, description="id of the model the analysis runs start from"
     )
+    processing: bool = Field(
+        default=False,
+        description=(
+            "True when storing and attaching the models is still running in the "
+            "background -- poll GET /projects/{id}/models/attach-status for "
+            "completion instead of expecting `files`/`primary_id` here yet."
+        ),
+    )
+
+
+class ModelAttachStatusResponse(BaseModel):
+    """Progress of a background model-attach job started by a model upload."""
+
+    processing: bool
+    total: int
+    attached: int
+    error: Optional[str] = None
 
 
 class ModelListResponse(BaseModel):
@@ -2037,6 +2054,17 @@ class BSDDPropertyItem(BaseModel):
 
     uri: str = Field(..., description="Unique bSDD URI for the property")
     name: str = Field(..., description="Property name (e.g. FireRating, Material)")
+    code: Optional[str] = Field(
+        None,
+        description=(
+            "The dictionary's own machine identifier for this property, when distinct from `name` "
+            "-- e.g. clean camelCase 'FireRating' for an IFC 4.3 entry whose `name` is the "
+            "human-readable 'Fire Rating'. Some dictionaries (e.g. ACCORD) instead store a raw "
+            "GUID here and keep the clean identifier in `name` -- callers that need a real IFC "
+            "attribute key to look up on a parsed model should check both, never assume either is "
+            "always the safe one."
+        ),
+    )
     property_set: Optional[str] = Field(None, description="Standard property set name (e.g. Pset_PipeSegmentCommon)")
     data_type: Optional[str] = Field(None, description="IFC or XSD data type (e.g. IfcLabel, IfcReal, IfcBoolean)")
     units: Optional[str] = Field(None, description="Physical units (e.g. mm, m/s, degC)")

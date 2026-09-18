@@ -224,6 +224,16 @@ export interface ModelUploadResponse {
   success: boolean;
   files: Model[];
   primary_id: number | null;
+  /** True while storing/attaching still runs in the background; poll ModelAttachStatusResponse. */
+  processing: boolean;
+}
+
+/** Progress of a background attach job. Mirrors ModelAttachStatusResponse. */
+export interface ModelAttachStatusResponse {
+  processing: boolean;
+  total: number;
+  attached: number;
+  error: string | null;
 }
 
 /** A project's attached IFC models. Mirrors ModelListResponse. */

@@ -20,6 +20,7 @@
   let primaryIndex = $state(0);
   let isSubmitting = $state(false);
   let errorMessage = $state("");
+  let statusMessage = $state("");
 
   function reset() {
     selectedFiles = [];
@@ -46,15 +47,21 @@
     if (!projectId || selectedFiles.length === 0) return;
     isSubmitting = true;
     errorMessage = "";
+    statusMessage = "Attaching models...";
     try {
-      const res = await modelsApi.upload(projectId, selectedFiles, primaryIndex, roles);
+      await modelsApi.uploadAndWait(projectId, selectedFiles, primaryIndex, roles, {
+        onProgress: (attached, total) => {
+          statusMessage = `Attaching models... (${attached}/${total})`;
+        },
+      });
       const updated = await modelsApi.list(projectId);
-      onUploaded(updated.length ? updated : res.files);
+      onUploaded(updated);
       reset();
     } catch (err: any) {
       errorMessage = err?.message || "Upload failed.";
     } finally {
       isSubmitting = false;
+      statusMessage = "";
     }
   }
 
@@ -140,7 +147,7 @@
       disabled={isSubmitting || selectedFiles.length === 0 || !projectId}
       class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {isSubmitting ? "Uploading…" : "Attach Models"}
+      {isSubmitting ? statusMessage || "Uploading…" : "Attach Models"}
     </button>
   {/snippet}
 </Modal>
