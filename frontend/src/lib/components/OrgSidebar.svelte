@@ -150,6 +150,28 @@
 
         {#each section.items as item (item.id)}
           {@const isActive = activeView === item.id}
+          {#if item.id === "dashboard"}
+            <a
+              href={getNavHref("new-project")}
+              use:link
+              onclick={onCloseMobile}
+              class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
+              'new-project'
+                ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
+                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
+              title={collapsed ? "New Project" : undefined}
+            >
+              <Plus
+                class="h-4 w-4 shrink-0 {activeView === 'new-project'
+                  ? 'text-fg-primary'
+                  : 'text-fg-muted group-hover:text-fg-primary'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left">New Project</span>
+              {/if}
+            </a>
+          {/if}
+
           <a
             href={getNavHref(item.id)}
             use:link
@@ -178,28 +200,6 @@
               <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
             {/if}
           </a>
-
-          {#if item.id === "dashboard"}
-            <a
-              href={getNavHref("new-project")}
-              use:link
-              onclick={onCloseMobile}
-              class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-              'new-project'
-                ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
-                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-              title={collapsed ? "New Project" : undefined}
-            >
-              <Plus
-                class="h-4 w-4 shrink-0 {activeView === 'new-project'
-                  ? 'text-fg-primary'
-                  : 'text-fg-muted group-hover:text-fg-primary'}"
-              />
-              {#if !collapsed}
-                <span class="truncate text-left">New Project</span>
-              {/if}
-            </a>
-          {/if}
         {/each}
       </div>
     {/each}
