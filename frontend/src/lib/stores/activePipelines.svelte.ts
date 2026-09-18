@@ -16,7 +16,32 @@ export interface TrackedPipeline {
   projectId: number;
   projectName: string;
   status: WorkflowStatus | null;
+  /**
+   * Whether a `running` frame has arrived since tracking began. Until one has,
+   * a `complete`/`failed` frame describes the *previous* run — the backend
+   * keeps a finished run readable for its TTL, and the SSE stream's first
+   * frame is that snapshot — so it must not end tracking of the new one.
+   */
+  sawRunning: boolean;
   unsubscribe: () => void;
+}
+
+/** What a status frame means for a tracked run. */
+export type PipelineOutcome = "complete" | "failed" | null;
+
+/**
+ * Decide whether `status` ends a tracked run.
+ *
+ * Returns `"complete"` or `"failed"` only for a terminal frame that follows a
+ * `running` one (`sawRunning`); anything else — including a terminal frame
+ * left over from the previous run — returns `null` and tracking continues.
+ * A run that finishes before the stream ever reports it running is left to
+ * the view that started it, which untracks when its request settles.
+ */
+export function pipelineOutcome(status: WorkflowStatus, sawRunning: boolean): PipelineOutcome {
+  if (!sawRunning) return null;
+  if (status.status === "complete" || status.status === "failed") return status.status;
+  return null;
 }
 
 class PipelineTrackerStore {
@@ -32,7 +57,7 @@ class PipelineTrackerStore {
     const unsubscribe = subscribeToPipelineEvents(projectId, {
       onStatus: (status) => this.#handleStatus(projectId, status),
     });
-    this.tracked.push({ projectId, projectName, status: null, unsubscribe });
+    this.tracked.push({ projectId, projectName, status: null, sawRunning: false, unsubscribe });
   }
 
   /** Stop following a project's pipeline without waiting for it to finish. */
@@ -47,11 +72,13 @@ class PipelineTrackerStore {
     const entry = this.tracked.find((t) => t.projectId === projectId);
     if (!entry) return;
     entry.status = status;
+    if (status.status === "running") entry.sawRunning = true;
 
-    if (status.status === "complete") {
+    const outcome = pipelineOutcome(status, entry.sawRunning);
+    if (outcome === "complete") {
       toasts.success(`Analysis pipeline finished for "${entry.projectName}".`, "Pipeline complete");
       this.untrack(projectId);
-    } else if (status.status === "failed") {
+    } else if (outcome === "failed") {
       toasts.error(`Analysis pipeline failed for "${entry.projectName}".`, "Pipeline failed");
       this.untrack(projectId);
     }

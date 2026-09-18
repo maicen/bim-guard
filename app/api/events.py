@@ -24,6 +24,7 @@ from app.services.pipeline_tracker import (
 )
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.workflow_status import status_snapshot
 
 logger = get_logger(__name__)
 
@@ -57,7 +58,7 @@ async def _sse_generator(
     queue = subscribe_async(project_id)
     try:
         # 1. Yield initial snapshot
-        initial_snap = merged_snapshot(project_id)
+        initial_snap = status_snapshot(project_id)
         yield f"event: status\ndata: {json.dumps(initial_snap)}\n\n"
 
         yielded = 1
@@ -118,7 +119,7 @@ async def _sse_generator(
 
                 # Also send updated full snapshot on stage transitions or completion
                 if event.event_type in {"stage_transition", "engine_complete", "engine_failed"}:
-                    current_snap = merged_snapshot(project_id)
+                    current_snap = status_snapshot(project_id)
                     yield f"event: status\ndata: {json.dumps(current_snap)}\n\n"
                     yielded += 1
                     if effective_max is not None and yielded >= effective_max:
@@ -171,7 +172,9 @@ async def sse_pipeline_events(
     """Stream real-time compliance pipeline progress and metrics via Server-Sent Events.
 
     Clients receive:
-    - ``event: status``: Full snapshot of all engine stages and progress percentages.
+    - ``event: status``: Full snapshot of all engine stages and progress percentages,
+      with a top-level ``status`` (``idle`` / ``running`` / ``complete`` / ``failed``)
+      that reaches ``complete`` once every engine of the run has finished.
     - ``event: pipeline_event``: Individual stage transition, metric increment, or completion.
     - ``: keep-alive ping``: Periodic heartbeat every 15s to keep connections alive.
     """
