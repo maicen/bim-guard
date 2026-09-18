@@ -20,6 +20,7 @@ BIM-Guard uses a modern, decoupled architecture:
 - Run full dev stack (FastAPI + Svelte): `./run_server.sh` (macOS/Linux) or `run_server.bat` (Windows)
 - Run production stack (build + multi-worker): `./run_production_server.sh` (macOS/Linux) or `run_production_server.bat` (Windows)
 - Run Docker production stack at https://bim-guard.xyz: `docker compose --profile tunnel up -d --build`
+- Rebuild & re-serve app updates at https://bim-guard.xyz (fast path): `docker compose --profile tunnel up -d --build bim-guard`
 
 The backend is available at `http://127.0.0.1:8000` (OpenAPI interactive docs at `/api/docs`).
 The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to backend).
@@ -28,11 +29,16 @@ The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to back
 
 The platform is served in production at `https://bim-guard.xyz` via **OrbStack / Docker Compose** and **Cloudflare Tunnel (`cloudflared`)**:
 
-1. **Start the stack**:
-   ```bash
-   docker compose --profile tunnel up -d --build
-   ```
-   *(If `COMPOSE_PROFILES=tunnel` is set in `.env`, `docker compose up -d --build` automatically starts `cloudflared`).*
+1. **Start or update the stack**:
+   - **Full stack startup**:
+     ```bash
+     docker compose --profile tunnel up -d --build
+     ```
+   - **Fast iterative app redeployment** (recompiles Svelte 5 SPA and restarts FastAPI without restarting Neo4j, Docling, or Cloudflared):
+     ```bash
+     docker compose --profile tunnel up -d --build bim-guard
+     ```
+   *(If `COMPOSE_PROFILES=tunnel` is set in `.env`, `docker compose up -d --build [bim-guard]` automatically includes the tunnel).*
 
 2. **Container services in `docker-compose.yml`**:
    - **`bim-guard` (`bim-guard-app`)**: Production 4-worker FastAPI gateway on port `8000` serving the compiled Svelte 5 SPA from `frontend/dist` and `/api` REST/SSE endpoints.

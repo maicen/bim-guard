@@ -143,6 +143,33 @@ Expected output:
 - `bim-guard-opencde` (Up on port `8081`)
 - `bim-guard-cloudflared` (Up, running tunnel connection)
 
+### Step 3b: Fast Iterative Redeployment of App Code
+
+When pushing frontend UI enhancements, API endpoint updates, or bug fixes, you do **not** need to rebuild or restart the entire stack. Instead, rebuild and recreate only the `bim-guard` application container:
+
+```bash
+# Rebuild Svelte 5 SPA + FastAPI gateway and restart only bim-guard-app
+docker compose --profile tunnel up -d --build bim-guard
+```
+
+**Why this is recommended for code iterations:**
+- **Zero Database Downtime**: The `neo4j` graph database remains online and connected.
+- **Zero Parser Restart**: The `docling-serve` container remains warm and ready.
+- **Zero Tunnel Interruption**: Cloudflare Tunnel (`bim-guard-cloudflared`) maintains its persistent outbound edge connection; traffic seamlessly routes to the recreated container as soon as it passes its healthcheck.
+- **Fast Build Time**: Multi-stage Docker caching rebuilds and redeploys in ~1–2 minutes.
+
+**Verify Live Bundle Updates:**
+```bash
+# 1. Inspect the updated asset hash served on the homepage:
+curl -s https://bim-guard.xyz/ | grep -o 'assets/index-[^"]*'
+
+# 2. Check health endpoint:
+curl -sI https://bim-guard.xyz/health
+
+# 3. Stream live gateway logs:
+docker compose logs -f bim-guard
+```
+
 ---
 
 ## 4. Alternative: Host CLI-Managed Tunnel

@@ -54,10 +54,13 @@ Editor/agent tooling (Claude Code, Antigravity, VS Code) starts the same two dev
 To serve the complete production stack (FastAPI + Svelte 5 SPA + Neo4j + Docling + OpenCDE) exposed securely at `https://bim-guard.xyz` via OrbStack / Docker and Cloudflare Tunnel:
 
 ```bash
-# Build and run with Cloudflare Tunnel enabled
+# Build and run full stack with Cloudflare Tunnel enabled
 docker compose --profile tunnel up -d --build
+
+# Fast iterative redeploy (rebuilds Svelte 5 SPA + FastAPI backend without restarting Neo4j, Docling, or Cloudflared)
+docker compose --profile tunnel up -d --build bim-guard
 ```
-*(Or set `COMPOSE_PROFILES=tunnel` in `.env` and run `docker compose up -d --build`).*
+*(Or set `COMPOSE_PROFILES=tunnel` in `.env` and run `docker compose up -d --build [bim-guard]`).*
 
 - **Container Services (`docker-compose.yml`)**:
   - `bim-guard` (`bim-guard-app`): 4-worker Uvicorn ASGI gateway on `:8000` serving Svelte 5 SPA from `frontend/dist` and `/api` REST/SSE endpoints.

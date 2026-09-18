@@ -189,11 +189,15 @@ To serve the complete production platform at `https://bim-guard.xyz` using OrbSt
    NEO4J_URI=bolt://neo4j:7687
    ```
 
-2. **Launch the container stack**:
+2. **Launch or update the container stack**:
    ```bash
+   # Start full production stack
    docker compose --profile tunnel up -d --build
+
+   # Fast iterative redeploy of app code (recompiles SPA and restarts FastAPI without restarting Neo4j/Docling/Cloudflared)
+   docker compose --profile tunnel up -d --build bim-guard
    ```
-   *(Or simply `docker compose up -d --build` if `COMPOSE_PROFILES=tunnel` is set in `.env`)*.
+   *(Or simply `docker compose up -d --build [bim-guard]` if `COMPOSE_PROFILES=tunnel` is set in `.env`)*.
 
 3. **Services running in `docker-compose.yml`**:
    - **`bim-guard-app`**: Production 4-worker FastAPI gateway + compiled Svelte 5 SPA on `:8000`.

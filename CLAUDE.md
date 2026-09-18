@@ -108,6 +108,9 @@ run_production_server.bat   # Windows
 # Run Docker production stack at https://bim-guard.xyz (with Cloudflare Tunnel)
 docker compose --profile tunnel up -d --build
 
+# Fast iterative update of app container only (keeps Neo4j, Docling, Cloudflared running)
+docker compose --profile tunnel up -d --build bim-guard
+
 # Run automated tests and lint
 uv run ruff check .
 uv run pytest tests/ -m 'not slow' -v
@@ -140,6 +143,10 @@ docker compose --profile tunnel up -d --build
 
 # Or set COMPOSE_PROFILES=tunnel in .env and run standard compose:
 docker compose up -d --build
+
+# Fast iterative redeploy: rebuild and re-serve only the app container
+# (keeps Neo4j, Docling, and Cloudflared running with zero connection disruption):
+docker compose --profile tunnel up -d --build bim-guard
 
 # Inspect container health and service logs:
 docker compose ps
