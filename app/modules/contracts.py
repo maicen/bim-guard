@@ -1447,7 +1447,13 @@ class WorkflowStatusContract(BaseModel):
     """Overall workflow snapshot for a project."""
 
     project_id: int
-    status: str = Field(default="pending", description="Overall project analysis state")
+    status: str = Field(
+        default="pending",
+        description=(
+            "Overall run state: 'idle' (nothing tracked), 'running', or -- once "
+            "every engine of the active run has finished -- 'complete' / 'failed'."
+        ),
+    )
     run_key: str = Field(
         default="default",
         description=(

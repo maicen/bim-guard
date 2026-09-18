@@ -715,6 +715,11 @@ export interface EngineRun {
 
 export interface WorkflowStatus {
   project_id: number;
+  /**
+   * Overall run state: "idle" (nothing tracked), "running", or — once every
+   * engine of the run named by `run_key` has finished — "complete" / "failed".
+   * Carried by `/api/analyze/status/{id}` and every SSE `status` frame.
+   */
   status: string;
   /**
    * The run that reported most recently. A project can have a corrosion run

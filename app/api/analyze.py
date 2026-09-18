@@ -55,10 +55,10 @@ from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
 from app.services.phase6_service import Phase6Service
-from app.services.pipeline_tracker import merged_snapshot
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
+from app.services.workflow_status import status_snapshot
 
 logger = get_logger(__name__)
 
@@ -838,14 +838,18 @@ def get_workflow_status(
     Merged across run keys, so the polled fallback reports a seismic or graph
     run exactly as the SSE stream does. Without the merge the two disagreed:
     the stream carried the events and this reported every engine as pending.
+
+    ``status`` is the overall run state shared with the SSE ``status`` frames
+    (:func:`app.services.workflow_status.overall_status`): ``complete`` or
+    ``failed`` once every engine of the active run has finished, rather than
+    falling back to ``idle`` the moment nothing is running.
     """
-    snap = merged_snapshot(project_id)
-    raw_engines = snap.get("engines", {})
+    snap = status_snapshot(project_id)
     return WorkflowStatusContract(
         project_id=project_id,
-        status="running" if any(isinstance(e, dict) and e.get("status") == "running" for e in raw_engines.values()) else "idle",
+        status=snap["status"],
         run_key=snap.get("run_key", "default"),
-        engines=raw_engines,
+        engines=snap.get("engines", {}),
         timestamp=snap.get("timestamp"),
     )
 
