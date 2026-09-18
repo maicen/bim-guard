@@ -133,7 +133,12 @@ export interface ApiError extends Error {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let errorDetail = res.statusText;
+    // `res.statusText` is always "" over HTTP/2 (no reason phrase in the
+    // protocol, e.g. behind the Cloudflare Tunnel), so it's not a reliable
+    // fallback on its own -- pair it with the numeric status so a non-JSON
+    // error body (a proxy timeout page, an unhandled exception) still shows
+    // something other than a bare "unknown error".
+    let errorDetail = res.statusText ? `${res.statusText} (${res.status})` : `HTTP ${res.status}`;
     try {
       const errJson = await res.json();
       const detail = errJson.detail ?? errJson.error;
