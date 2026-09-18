@@ -2,9 +2,14 @@
 
 Mirrors the ambient-tracking pattern in `app.services.pipeline_tracker`
 (used by the compliance engines): binding a tracker for `project_id` and
-calling `emit()` per tool call means the same `GET /api/events/{project_id}`
-SSE channel used for engine runs also carries Digital Inspector tool-call
-progress, rather than a second event system.
+reporting under the registered `DIGITAL-INSPECTOR` engine means the same
+`GET /api/events/{project_id}` SSE channel used for engine runs also carries
+Digital Inspector progress, rather than a second event system.
+
+What is reported is one start metric (`query_chars`), then `complete` (with the
+`tool_calls` count) or `fail`: once per run, not per tool call, and with no
+`Stage` transitions. The run binds its own run key so that a question asked
+while an analysis is running cannot reset that analysis's progress.
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ from app.services import pipeline_tracker
 
 logger = get_logger(__name__)
 
-_TRACKER_CODE = "DIGITAL-INSPECTOR"
+_TRACKER_CODE = pipeline_tracker.DIGITAL_INSPECTOR_ENGINE
 
 
 async def run_inspection(
@@ -28,7 +33,7 @@ async def run_inspection(
 
     graph = build_digital_inspector_graph(organization_id)
 
-    with pipeline_tracker.tracking(project_id):
+    with pipeline_tracker.tracking(project_id, run_key=pipeline_tracker.INSPECTOR_RUN_KEY):
         pipeline_tracker.emit(_TRACKER_CODE, query_chars=len(query))
         try:
             result = await graph.ainvoke(

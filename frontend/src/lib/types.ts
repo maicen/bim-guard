@@ -698,9 +698,9 @@ export interface EngineRun {
   engine_name?: string;
   /**
    * Which concurrent run reported this engine — "default" (corrosion),
-   * "seismic" (Blue Halo) or "graph". Absent on an engine nothing has tracked
-   * yet; those are excluded from the progress average by their `pending`
-   * status, not by this field.
+   * "seismic" (Blue Halo), "graph" or "inspector" (Digital Inspector). Absent
+   * on an engine nothing has tracked yet; those are excluded from the progress
+   * average by their `pending` status, not by this field.
    */
   run_key?: string;
   status: "pending" | "running" | "complete" | "failed" | "not_implemented";

@@ -1458,7 +1458,8 @@ class WorkflowStatusContract(BaseModel):
         default="default",
         description=(
             "Which concurrent run reported most recently -- 'default' for "
-            "corrosion, 'seismic' for Blue Halo, 'graph' for the graph engine. "
+            "corrosion, 'seismic' for Blue Halo, 'graph' for the graph engine, "
+            "'inspector' for the Digital Inspector agent. "
             "A client scopes a progress average to this rather than averaging "
             "one theme's engines against another theme's."
         ),

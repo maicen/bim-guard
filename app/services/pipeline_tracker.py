@@ -37,9 +37,9 @@ INSTRUMENTATION IS AMBIENT, NOT A PARAMETER
 
 CONCURRENT RUNS, AND READING THEM BACK AS ONE
     A project can have more than one analysis in flight -- corrosion, Blue Halo
-    seismic, the graph engine -- so the store is keyed by ``(project_id,
-    run_key)`` and each theme owns a key. That is what stops one theme's
-    ``reset=True`` from wiping another's in-flight stages.
+    seismic, the graph engine, a Digital Inspector question -- so the store is
+    keyed by ``(project_id, run_key)`` and each theme owns a key. That is what
+    stops one theme's ``reset=True`` from wiping another's in-flight stages.
 
     Reporting has to put them back together, because a client asks about a
     project, not about a run key. :func:`merged_snapshot` is the reporting
@@ -195,6 +195,21 @@ class EngineSpec:
 #:     zero. It runs under its own ``run_key`` (:data:`SEISMIC_RUN_KEY`), so it
 #:     reaches a client through :func:`merged_snapshot` rather than through the
 #:     default key. ``pending`` means "no run yet".
+#: ``DIGITAL-INSPECTOR``
+#:     The LangGraph agent behind ``POST /api/projects/{id}/inspect``
+#:     (``app.digital_inspector.runner``). Registered because its runner binds a
+#:     tracker before its first emit and ``tracker.run`` raises on a code it does
+#:     not know, so until this entry existed every inspector question failed
+#:     with ``KeyError``. It runs under its own ``run_key``
+#:     (:data:`INSPECTOR_RUN_KEY`), for SB-001's reason: a question asked while
+#:     an analysis is running must not reset that analysis's stages.
+#:     It is a driver around an LLM, not a compliance kernel, so it reports no
+#:     :class:`Stage` transitions: it records ``query_chars`` when a question
+#:     starts, then finishes with ``complete(tool_calls=...)`` or ``fail``. A
+#:     metric alone does not make a run touched (:meth:`EngineRun.touched`), so
+#:     ``pending`` here means "no run yet" *or* "answering now"; a finished run
+#:     is stamped Export/100%, and a failed one Validation/0%, stages it never
+#:     entered.
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
     EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
@@ -203,6 +218,7 @@ ENGINE_SPECS: tuple[EngineSpec, ...] = (
     EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
     EngineSpec("GRAPH-001", "Graph topology intelligence", Status.PENDING),
     EngineSpec("SB-001", "Blue Halo seismic clearance", Status.PENDING),
+    EngineSpec("DIGITAL-INSPECTOR", "Digital Inspector agent", Status.PENDING),
 )
 
 #: Lookup by code, built once.
@@ -218,6 +234,7 @@ GC_ENGINE = "GC-001"
 CC_ENGINE = "CC-001"
 GRAPH_ENGINE = "GRAPH-001"
 SB_ENGINE = "SB-001"
+DIGITAL_INSPECTOR_ENGINE = "DIGITAL-INSPECTOR"
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +256,14 @@ GRAPH_RUN_KEY = "graph"
 #: seismic path untracked -- and unreportable -- until now.
 SEISMIC_RUN_KEY = "seismic"
 
+#: The Digital Inspector's run key (``app.digital_inspector.runner``). Distinct
+#: from :data:`DEFAULT_RUN_KEY` because a question can be asked about a project
+#: while its corrosion analysis is running: sharing a key would have the
+#: inspector's ``reset=True`` discard that analysis's in-flight stages, and
+#: would fold the inspector's progress into the corrosion progress average,
+#: which the frontend scopes by run key.
+INSPECTOR_RUN_KEY = "inspector"
+
 #: Which run key owns each engine. Every engine belongs to exactly one run, so
 #: a merge across run keys (see :func:`merged_snapshot`) can never have two
 #: trackers claiming one engine's cell.
@@ -250,6 +275,7 @@ RUN_KEY_BY_ENGINE: dict[str, str] = {
     "MC-001": DEFAULT_RUN_KEY,
     GRAPH_ENGINE: GRAPH_RUN_KEY,
     SB_ENGINE: SEISMIC_RUN_KEY,
+    DIGITAL_INSPECTOR_ENGINE: INSPECTOR_RUN_KEY,
 }
 
 
