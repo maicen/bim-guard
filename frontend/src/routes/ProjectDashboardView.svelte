@@ -7,9 +7,9 @@
     Activity,
     CheckCircle2,
   } from "lucide-svelte";
-  import { modelsApi } from "../lib/api";
+  import { modelsApi, projectsApi } from "../lib/api";
   import type { Project, Model } from "../lib/types";
-  import { formatAnalysisDomain } from "../lib/analysisDomain";
+  import { formatAnalysisDomain, viewForAnalysisDomain } from "../lib/analysisDomain";
   import PageHeader from "../lib/components/PageHeader.svelte";
 
   interface Props {
@@ -59,6 +59,41 @@
 
   let primaryFile = $derived(ifcFiles.find((f) => f.is_primary) || ifcFiles[0] || null);
 
+  const AUDIT_ACTION = "audit";
+
+  /**
+   * The project's analysis domain, for choosing its audit tab.
+   *
+   * selectedProject can briefly name a different project than the one this
+   * dashboard is for (see the stale-id note on loadToken above), so it is only
+   * trusted when its id matches; otherwise the project is read by id. Any
+   * failure yields null, which viewForAnalysisDomain maps to Architectural.
+   */
+  async function projectAnalysisDomain(): Promise<string | null> {
+    if (selectedProject && selectedProject.id === initialProjectId) {
+      return selectedProject.analysis_type ?? null;
+    }
+    if (!initialProjectId) return null;
+    try {
+      return (await projectsApi.get(initialProjectId)).analysis_type ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Navigate for a quick-action card. Compliance Audit opens the Architectural,
+   * Piping or Seismic tab matching the project's domain -- it used to hardcode
+   * "arch", so every project landed on the Architectural tab.
+   */
+  async function openQuickAction(view: string) {
+    if (view !== AUDIT_ACTION) {
+      onNavigate(view);
+      return;
+    }
+    onNavigate(viewForAnalysisDomain(await projectAnalysisDomain()));
+  }
+
   const QUICK_ACTIONS = [
     {
       view: "models",
@@ -68,7 +103,9 @@
       color: "blue",
     },
     {
-      view: "arch",
+      // Not a route: resolved on click to the audit tab for this project's
+      // own domain (see openQuickAction).
+      view: AUDIT_ACTION,
       label: "Compliance Audit",
       description: "Run architectural, piping or seismic checks.",
       icon: LayoutList,
@@ -136,7 +173,7 @@
     {#each QUICK_ACTIONS as action (action.view)}
       <button
         type="button"
-        onclick={() => onNavigate(action.view)}
+        onclick={() => openQuickAction(action.view)}
         class="group rounded-2xl border border-border-default bg-surface-card/40 p-5 text-left transition-colors hover:border-border-interactive hover:bg-surface-hover"
       >
         <div
