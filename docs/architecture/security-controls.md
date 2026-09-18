@@ -113,4 +113,5 @@ them.
 
 `SecurityHeadersMiddleware` (`app/main.py`) sets `X-Content-Type-Options`,
 `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and a `Content-Security-Policy`
-on every response.
+(including `worker-src` and `child-src` allowing `'self'` and `blob:` for `@thatopen/fragments`
+3D viewer web workers) on every response.

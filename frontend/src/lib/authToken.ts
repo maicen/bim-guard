@@ -6,8 +6,11 @@
  * auth.svelte.ts back from api.ts would be a cycle.
  */
 
+import { isAuthConfigured, supabase } from "./supabaseClient";
+
 let currentToken: string | null = null;
 let currentOrgId: number | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
 /**
  * Resolves once the initial Supabase session lookup has settled (or auth
@@ -41,6 +44,40 @@ export function setActiveOrgId(orgId: number | null): void {
 
 export function getActiveOrgId(): number | null {
   return currentOrgId;
+}
+
+/**
+ * Attempts to refresh the current Supabase session token.
+ * Deduplicates concurrent refresh attempts so only one network call hits Supabase.
+ */
+export async function refreshAuthToken(): Promise<string | null> {
+  if (!isAuthConfigured) return null;
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (!error && data?.session?.access_token) {
+        setAuthToken(data.session.access_token);
+        return data.session.access_token;
+      }
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (!sessionErr && sessionData?.session?.access_token) {
+        setAuthToken(sessionData.session.access_token);
+        return sessionData.session.access_token;
+      }
+      setAuthToken(null);
+      return null;
+    } catch (err) {
+      console.warn("[Auth] Token refresh attempt failed:", err);
+      setAuthToken(null);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 /**

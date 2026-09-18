@@ -163,6 +163,9 @@ export class SWRStore<K, V> implements ISubscribable<V> {
           this.storage.set(key, freshData);
           this.notify(key, freshData);
           return freshData;
+        } catch (err) {
+          console.warn("[SWR] Background revalidation failed for key:", key, err);
+          return cached;
         } finally {
           this.inFlight.delete(key);
         }

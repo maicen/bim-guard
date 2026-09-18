@@ -122,7 +122,14 @@ import {
   type SWROptions,
   type Unsubscribe,
 } from "./cache";
-import { authHeaders, authReady, getActiveOrgId, withAuthToken } from "./authToken";
+import {
+  authHeaders,
+  authReady,
+  getActiveOrgId,
+  getAuthToken,
+  refreshAuthToken,
+  withAuthToken,
+} from "./authToken";
 import { getPersistentCache, setPersistentCache } from "./localCache";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -189,7 +196,23 @@ async function handleResponse<T>(res: Response): Promise<T> {
 async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   await authReady;
   const headers = { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) };
-  return fetch(input, { ...init, headers });
+  let res = await fetch(input, { ...init, headers });
+
+  // If 401 Unauthorized and a token was attached, the token may have expired.
+  // Attempt to refresh the session token once and retry with the new token.
+  if (res.status === 401 && getAuthToken()) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      const retryHeaders = {
+        ...authHeaders(),
+        ...(init.headers as Record<string, string> | undefined),
+        Authorization: `Bearer ${newToken}`,
+      };
+      res = await fetch(input, { ...init, headers: retryHeaders });
+    }
+  }
+
+  return res;
 }
 
 export const authApi = {

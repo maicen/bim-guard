@@ -315,11 +315,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # sources even though nothing is a <script src> tag. fonts.
             # googleapis.com/gstatic.com are on style-src/font-src for the
             # Google Fonts stylesheet index.html links.
+            #
+            # worker-src and child-src include 'self' and blob: because
+            # @thatopen/fragments uses multithreading web workers instantiated
+            # dynamically from blob: URLs via URL.createObjectURL.
             "default-src 'self'; "
             "img-src 'self' data: blob: https:; "
-            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://esm.sh https://unpkg.com; "
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://esm.sh https://unpkg.com; "
+            "worker-src 'self' blob:; "
+            "child-src 'self' blob:; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "connect-src 'self' ws: wss: https: http:; "
+            "connect-src 'self' ws: wss: https: http: blob:; "
             "font-src 'self' data: https://fonts.gstatic.com; "
             "frame-ancestors 'none'; "
             "object-src 'none';",

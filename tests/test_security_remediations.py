@@ -65,6 +65,8 @@ def test_security_headers_present_on_api_responses():
     assert headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
     assert "geolocation=()" in headers.get("Permissions-Policy", "")
     assert "default-src 'self'" in headers.get("Content-Security-Policy", "")
+    assert "worker-src 'self' blob:" in headers.get("Content-Security-Policy", "")
+    assert "child-src 'self' blob:" in headers.get("Content-Security-Policy", "")
 
 
 def test_security_headers_present_on_spa_routes():
