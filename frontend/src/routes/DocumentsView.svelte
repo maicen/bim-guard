@@ -600,9 +600,18 @@
   {parsingEngines}
   onClose={() => (isUploadModalOpen = false)}
   onUploaded={(created) => {
-    documents = [created, ...documents];
+    // The backend dedupes by content hash: re-uploading a byte-identical file
+    // returns the *existing* document (still a 201), which is already in this
+    // list. Prepending it blindly would put one id in the keyed table twice
+    // and crash the view (each_key_duplicate).
+    const alreadyListed = documents.some((d) => d.id === created.id);
+    documents = [created, ...documents.filter((d) => d.id !== created.id)];
     isUploadModalOpen = false;
-    flashSuccess(`Uploaded "${created.filename}".`);
+    flashSuccess(
+      alreadyListed
+        ? `"${created.filename}" was already uploaded — showing the existing document.`
+        : `Uploaded "${created.filename}".`,
+    );
   }}
 />
 
