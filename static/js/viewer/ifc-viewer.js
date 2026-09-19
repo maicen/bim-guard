@@ -764,11 +764,41 @@ function createViewsModule(components, world, viewport, topicsWorkspace) {
     const elevationIds = new Set();
     const sectionIds = new Set();
 
+    // Re-implementation of OBC.Views#createFromIfcStoreys that skips storeys
+    // missing a Name or Elevation attribute instead of throwing. The upstream
+    // method does `"value" in u.Name` unconditionally, which crashes with
+    // "Cannot use 'in' operator to search for 'value' in undefined" as soon as
+    // one IfcBuildingStorey in the model lacks a Name (common in real-world
+    // IFC exports).
+    async function createPlansFromIfcStoreys() {
+        const created = [];
+        const fragments = components.get(OBC.FragmentsManager);
+        const offset = 0.25;
+        const down = new THREE.Vector3(0, -1, 0);
+        for (const [, model] of fragments.list) {
+            const storeyIds = Object.values(
+                await model.getItemsOfCategories([/BUILDINGSTOREY/]),
+            ).flat();
+            if (storeyIds.length === 0) continue;
+            const storeys = await model.getItemsData(storeyIds);
+            const [, coords] = await model.getCoordinates();
+            for (const storey of storeys) {
+                if (!storey?.Name || !("value" in storey.Name)) continue;
+                if (!storey?.Elevation || !("value" in storey.Elevation)) continue;
+                const { value: name } = storey.Name;
+                const elevation = storey.Elevation.value + coords + offset;
+                const plane = new THREE.Plane(down, elevation);
+                created.push(views.createFromPlane(plane, { id: name }));
+            }
+        }
+        return created;
+    }
+
     async function ensurePlans() {
         if (storeyViewsReady) return;
         storeyViewsReady = true;
         try {
-            const created = await views.createFromIfcStoreys({});
+            const created = await createPlansFromIfcStoreys();
             for (const v of created) planIds.add(v.id);
         } catch (e) {
             console.warn("Could not create plan views:", e);
