@@ -1,6 +1,7 @@
 """LLM-only compliance rule extraction from pre-extracted document text."""
 
 import asyncio
+import re
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
@@ -29,6 +30,65 @@ logger = get_logger(__name__)
 # oversized section still reaches the provider instead of failing with
 # "Part exceeded maximum size of 1024KB".
 _MAX_CHUNK_CHARS = 400_000
+
+_CAMEL_WORD_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
+_NON_ALNUM = re.compile(r"[^a-z0-9]")
+
+
+def _camel_to_spaced(name: str) -> str:
+    """Split camelCase into words, e.g. 'FireRating' -> 'Fire Rating'.
+
+    Lets a camelCase query substring-match bSDD's human-readable spaced
+    property names (e.g. "Fire Rating", "Riser Height") the same way it
+    matches bSDD's own camelCase names (e.g. "ClearWidth") -- the local
+    ontology mixes both naming conventions depending on which dictionary a
+    property came from.
+    """
+    return _CAMEL_WORD_BOUNDARY.sub(" ", name).strip()
+
+
+def _normalize_property_key(name: str) -> str:
+    """Case/space/punctuation-insensitive key, e.g. 'FireRating' and 'Fire Rating' both -> 'firerating'.
+
+    Used to compare an LLM-proposed IFC-style property identifier against a
+    bSDD property name regardless of which of the two naming conventions
+    either side happens to use.
+    """
+    return _NON_ALNUM.sub("", name.lower())
+
+
+_GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+
+
+def _is_safe_property_identifier(value: str | None) -> bool:
+    """Whether `value` looks like a real IFC attribute key rather than a display label or a GUID.
+
+    Downstream compliance engines (e.g.
+    app/modules/comparator/compliance_runner.py's `prop_name in info` /
+    `info["psets"][pset][prop_name]` / `hasattr(element, prop_name)`) match
+    property_name against a parsed IFC model's actual attribute keys by
+    exact, case-sensitive string -- production rules always store the
+    clean identifier form (e.g. "FireRating", "RiserHeight"), never a
+    spaced display label or a dictionary GUID.
+    """
+    return bool(value) and " " not in value and not _GUID_RE.match(value)
+
+
+def _canonical_property_name(match: contracts.BSDDPropertyItem) -> str | None:
+    """Resolve the machine-actionable identifier for a matched bSDD property, or None if unsafe.
+
+    bSDD's own `code` column is usually that identifier (e.g.
+    "FireRating" for an IFC 4.3 entry whose `name` is the human-readable
+    "Fire Rating"), but some dictionaries (e.g. ACCORD) store a GUID as
+    `code` and keep the real identifier in `name` instead -- so both are
+    checked, and a correction is only made when one of them is confirmed
+    safe to write back into a rule.
+    """
+    if _is_safe_property_identifier(match.code):
+        return match.code
+    if _is_safe_property_identifier(match.name):
+        return match.name
+    return None
 
 
 def _split_oversized(text: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
@@ -143,9 +203,20 @@ class RuleExtractionService:
         pattern: the curated/previously-cached ontology answers the common
         case instantly and without a network round trip, and only a name bSDD
         knows about but this app hasn't crawled falls through to the live API.
+
+        The LLM emits IFC-style camelCase identifiers (e.g. "FireRating",
+        per the extraction prompt's own example) but a large share of the
+        local ontology's property names are bSDD's human-readable
+        space-separated form (e.g. "Fire Rating") -- a plain substring
+        search on the raw camelCase query never matches those, so a spaced
+        variant is tried as a fallback before treating it as a genuine miss.
         """
         try:
             local_matches = self._ontology.search_properties(prop_name, limit=5)
+            if not local_matches:
+                spaced = _camel_to_spaced(prop_name)
+                if spaced != prop_name:
+                    local_matches = self._ontology.search_properties(spaced, limit=5)
         except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
             logger.warning("Local bSDD ontology lookup failed property_name=%s error=%s", prop_name, exc)
             local_matches = []
@@ -158,39 +229,151 @@ class RuleExtractionService:
             logger.warning("bSDD grounding lookup failed property_name=%s error=%s", prop_name, exc)
             return []
 
-    def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
+    def _search_classes_grounded(self, class_name: str) -> list[contracts.BSDDClassItem]:
+        """Local ontology first, live bSDD only on a local miss.
+
+        The local ontology (in-process DuckDB, <1ms, offline) includes the
+        full IFC 4.3 entity hierarchy ingested by
+        scripts/ingest_ifc_release.py. Mirrors
+        _search_properties_grounded's local-first-then-live pattern.
+        """
+        try:
+            local_matches = self._ontology.search_classes(class_name, limit=5)
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning("Local bSDD ontology class lookup failed class_name=%s error=%s", class_name, exc)
+            local_matches = []
+        if local_matches:
+            return local_matches
+
+        try:
+            return self._bsdd_client.search_classes(class_name, limit=5).classes
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning("bSDD class grounding lookup failed class_name=%s error=%s", class_name, exc)
+            return []
+
+    def _ground_target_class(
+        self, rule: contracts.RuleCreateRequest
+    ) -> tuple[contracts.RuleCreateRequest, str | None]:
+        """Correct an extracted rule's target_ifc_class casing/spelling against bSDD.
+
+        The LLM is prompted for a real IFC entity type (e.g. "IfcDoor") but
+        sometimes drifts on casing ("ifcdoor") or spelling. When bSDD's own
+        class search -- which includes the full normative IFC 4.3 entity
+        hierarchy, not just classification systems -- has a case-insensitive
+        exact code match, that canonical spelling replaces whatever the LLM
+        produced. Leaves the rule untouched when nothing resolves, for the
+        same reason _search_properties_grounded does: a miss is not itself
+        evidence the class is wrong, only that it could not be confirmed.
+        """
+        class_name = (rule.target_ifc_class or "").strip()
+        if not class_name:
+            return rule, None
+
+        matches = self._search_classes_grounded(class_name)
+        match = next((m for m in matches if m.code.strip().lower() == class_name.lower()), None)
+        if match is None or match.code == class_name:
+            return rule, None
+
+        corrected_rule = rule.model_copy(update={"target_ifc_class": match.code})
+        note = f"bSDD grounding: corrected target IFC class to {match.code} (was {class_name})."
+        return corrected_rule, note
+
+    def _class_properties_grounded(self, class_name: str) -> list[contracts.BSDDPropertyItem]:
+        """Property list -- each carrying a real property_set -- for one bSDD/IFC class.
+
+        `property_set` is a class-property *relation* attribute in bSDD, not
+        a property attribute: a bare property-name search (local or live)
+        structurally can never carry one (see BSDDClient.get_property's own
+        docstring). Only a class's own property list, assembled from its
+        class-property edges, does. This is the one place that list is
+        available to a name search.
+        """
+        matches = self._search_classes_grounded(class_name)
+        target = next((c for c in matches if c.code.strip().lower() == class_name.strip().lower()), None)
+        return target.properties if target is not None else []
+
+    def _ground_property(
+        self, rule: contracts.RuleCreateRequest
+    ) -> tuple[contracts.RuleCreateRequest, str | None]:
         """Correct an extracted rule's property_set/property_name against bSDD.
 
         The LLM frequently invents or misnames property sets (e.g.
         "Pset_Door" instead of the real "Pset_DoorCommon", or "DoorWidth"
-        instead of "OverallWidth"). When bSDD's own property search has an
-        exact case-insensitive name match carrying a property_set, that
-        canonical pairing replaces whatever the LLM produced, and a note of
-        the correction is attached so a reviewer can see why it changed.
-        Silently leaves the draft untouched when nothing resolves against
-        bSDD — that is not itself evidence the property is wrong, only that
-        it could not be confirmed offline/against this dictionary.
+        instead of "OverallWidth"). Resolution goes through the rule's own
+        (already-grounded) target_ifc_class first, since that is the only
+        place bSDD actually attaches a property_set to a property name; a
+        flat cross-class property search is tried only as a fallback, and
+        can at most confirm a name exists somewhere in bSDD; it essentially
+        never carries a property_set to correct with (an offline fallback
+        catalog entry is the sole exception). Leaves the rule untouched
+        when nothing resolves — that is not itself evidence the property is
+        wrong, only that it could not be confirmed.
         """
-        rule = draft.proposed_rule
         prop_name = (rule.property_name or "").strip()
         if not prop_name:
-            return draft
+            return rule, None
+        prop_key = _normalize_property_key(prop_name)
+
+        class_name = (rule.target_ifc_class or "").strip()
+        if class_name:
+            class_props = self._class_properties_grounded(class_name)
+            match = next(
+                (p for p in class_props if p.property_set and _normalize_property_key(p.name) == prop_key),
+                None,
+            )
+            if match is not None:
+                return self._apply_property_match(rule, match)
 
         matches = self._search_properties_grounded(prop_name)
-        match = next((m for m in matches if m.name.strip().lower() == prop_name.lower()), None)
+        match = next((m for m in matches if _normalize_property_key(m.name) == prop_key), None)
         if match is None or not match.property_set:
-            return draft
-        if rule.property_set == match.property_set and rule.property_name == match.name:
-            return draft
+            return rule, None
+        return self._apply_property_match(rule, match)
+
+    def _apply_property_match(
+        self, rule: contracts.RuleCreateRequest, match: contracts.BSDDPropertyItem
+    ) -> tuple[contracts.RuleCreateRequest, str | None]:
+        # match.name is bSDD's own display label and is sometimes spaced
+        # ("Fire Rating") -- never safe to write into property_name, which
+        # the audit engine looks up as a literal IFC attribute key. Skip
+        # the correction entirely (rather than only half-applying it)
+        # when neither candidate resolves to a safe identifier.
+        canonical_name = _canonical_property_name(match)
+        if canonical_name is None:
+            return rule, None
+        if rule.property_set == match.property_set and rule.property_name == canonical_name:
+            return rule, None
 
         corrected_rule = rule.model_copy(
-            update={"property_set": match.property_set, "property_name": match.name}
+            update={"property_set": match.property_set, "property_name": canonical_name}
         )
         note = (
-            f"bSDD grounding: corrected property to {match.property_set}.{match.name} "
+            f"bSDD grounding: corrected property to {match.property_set}.{canonical_name} "
             f"(was {rule.property_set or '—'}.{rule.property_name or '—'})."
         )
-        return draft.model_copy(update={"proposed_rule": corrected_rule, "review_notes": note})
+        return corrected_rule, note
+
+    def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
+        """Correct an extracted rule's target_ifc_class and property_set/property_name against bSDD.
+
+        A note of each correction actually made is attached to
+        review_notes so a reviewer can see why the draft changed; the draft
+        is returned untouched (no review_notes) when nothing resolves.
+        """
+        rule = draft.proposed_rule
+        notes: list[str] = []
+
+        rule, class_note = self._ground_target_class(rule)
+        if class_note:
+            notes.append(class_note)
+
+        rule, property_note = self._ground_property(rule)
+        if property_note:
+            notes.append(property_note)
+
+        if not notes:
+            return draft
+        return draft.model_copy(update={"proposed_rule": rule, "review_notes": " ".join(notes)})
 
     async def extract_rules_from_text(
         self, text: str, *, model: str | None = None, organization_id: int | None = None

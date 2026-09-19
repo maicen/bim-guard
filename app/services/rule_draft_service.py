@@ -21,6 +21,28 @@ from app.utils import now_iso_utc
 logger = get_logger(__name__)
 
 
+def _duplicate_key(payload: RuleCreateRequest) -> tuple:
+    """Identity of one rule's check content, independent of its `reference`/`rule_id` text.
+
+    Mirrors app/services/ruleset_seeder.py's own duplicate-prevention
+    approach, but keyed on the actual check (target class + property +
+    comparison) rather than `reference` -- two rules citing the same
+    threshold under different reference strings (e.g. an LLM re-extracting
+    the same clause from a re-uploaded document, or one wording it
+    "OBC 9.6.4" and another "CODE 9.6.4") are still the same duplicate risk
+    that a reference-keyed check would miss (see
+    supabase/migrations/20260918155453_dedupe_part9_rules_by_content.sql).
+    """
+    return (
+        str(payload.target_ifc_class or "").strip().lower(),
+        str(payload.property_name or "").strip().lower(),
+        str(payload.operator or "").strip(),
+        str(payload.check_value or "").strip(),
+        str(payload.value_min or "").strip(),
+        str(payload.value_max or "").strip(),
+    )
+
+
 class RuleDraftService:
     """CRUD + review workflow for `rule_extraction_drafts`."""
 
@@ -132,6 +154,19 @@ class RuleDraftService:
             )
 
         payload = RuleCreateRequest.model_validate(row.get("proposed_rule") or {})
+
+        existing_duplicate = self._find_existing_duplicate(payload)
+        if existing_duplicate is not None:
+            self._drafts.update(updates={"promoted_rule_id": existing_duplicate.get("id")}, pk_values=draft_id)
+            logger.info(
+                "Skipped promoting rule extraction draft draft_id=%d: an equivalent rule "
+                "already exists in ruleset_id=%s (existing_rule_id=%s) -- linked instead of duplicating",
+                draft_id,
+                payload.ruleset_id,
+                existing_duplicate.get("id"),
+            )
+            return existing_duplicate
+
         clause_meta = row.get("clause") or {}
         created = self._rule_service.create_rule(
             rule_id=payload.rule_id,
@@ -174,3 +209,32 @@ class RuleDraftService:
         self._drafts.update(updates={"promoted_rule_id": created.get("id")}, pk_values=draft_id)
         logger.info("Promoted rule extraction draft draft_id=%d rule_id=%s", draft_id, created.get("id"))
         return created
+
+    def _find_existing_duplicate(self, payload: RuleCreateRequest) -> dict[str, Any] | None:
+        """Find an existing rule in the same ruleset with the same check content, if any.
+
+        Skipped entirely when the draft has no `ruleset_id` (nothing to
+        dedupe against) or no `target_ifc_class`/`property_name` (too
+        unspecific a key to safely treat as a duplicate match -- e.g. a
+        count/relationship rule with no single property). Reads
+        `rows_for_ruleset` uncached, the same idempotency-check pattern
+        `app/services/ruleset_seeder.py` already established, since a
+        cached read could miss a row another process just wrote.
+        """
+        ruleset_id = str(payload.ruleset_id or "").strip()
+        if not ruleset_id or not payload.target_ifc_class or not payload.property_name:
+            return None
+
+        key = _duplicate_key(payload)
+        for existing_row in self._rule_service.rows_for_ruleset(ruleset_id):
+            existing_payload = RuleCreateRequest.model_construct(
+                target_ifc_class=existing_row.get("target_ifc_class"),
+                property_name=existing_row.get("property_name"),
+                operator=existing_row.get("operator"),
+                check_value=existing_row.get("check_value"),
+                value_min=existing_row.get("value_min"),
+                value_max=existing_row.get("value_max"),
+            )
+            if _duplicate_key(existing_payload) == key:
+                return existing_row
+        return None

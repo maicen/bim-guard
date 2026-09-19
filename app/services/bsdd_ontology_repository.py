@@ -102,6 +102,7 @@ class BSDDOntologyRepository:
                 BSDDPropertyItem(
                     uri=prop_row["uri"],
                     name=prop_row["name"],
+                    code=prop_row.get("code"),
                     property_set=edge.get("property_set"),
                     data_type=edge.get("data_type") or prop_row.get("data_type"),
                     units=units[0] if units else None,
@@ -181,6 +182,7 @@ class BSDDOntologyRepository:
             BSDDPropertyItem(
                 uri=row["uri"],
                 name=row["name"],
+                code=row.get("code"),
                 data_type=row.get("data_type"),
                 units=(row.get("units") or [None])[0],
                 allowed_values=[],

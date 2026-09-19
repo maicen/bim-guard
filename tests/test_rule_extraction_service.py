@@ -182,8 +182,104 @@ def test_bsdd_grounding_falls_back_to_live_bsdd_when_local_ontology_has_no_match
     grounded = service._ground_draft_with_bsdd(draft)
 
     assert grounded.proposed_rule.property_set == "Pset_DoorCommon"
-    assert ontology.queries == ["OverallWidth"]
+    # The camelCase name is retried in spaced form against the local
+    # ontology (bSDD's own property names are often space-separated) before
+    # falling through to the live client.
+    assert ontology.queries == ["OverallWidth", "Overall Width"]
     assert bsdd.queries == ["OverallWidth"]
+
+
+def test_bsdd_grounding_never_writes_a_spaced_display_name_into_property_name():
+    """A bSDD hit whose only name is a human-readable label must not overwrite property_name.
+
+    The audit engine (app/modules/comparator/compliance_runner.py) looks up
+    property_name as a literal IFC attribute key on the parsed model
+    (`prop_name in info`, `hasattr(element, prop_name)`) -- a spaced label
+    like "Fire Rating" would never match the real "FireRating" key, so
+    grounding must leave the rule untouched rather than "fix" it into
+    something the audit can no longer find.
+    """
+    ontology = FakeOntology(
+        [BSDDPropertyItem(uri="urn:x", name="Fire Rating", property_set="Pset_DoorCommon")]
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name="FireRating")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.property_name == "FireRating"
+    assert grounded.proposed_rule.property_set is None
+    assert grounded.review_notes is None
+
+
+def test_bsdd_grounding_prefers_code_over_spaced_display_name():
+    """When bSDD's `code` is the clean identifier, it -- not `name` -- is written back.
+
+    Mirrors the real local ontology's IFC 4.3 entries, where `name` is a
+    human-readable label ("Fire Rating") but `code` is the actual
+    machine-actionable IFC attribute key ("FireRating").
+    """
+    ontology = FakeOntology(
+        [BSDDPropertyItem(uri="urn:x", name="Fire Rating", code="FireRating", property_set="Pset_DoorCommon")]
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set="Pset_Door", property_name="FireRating")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.property_name == "FireRating"
+    assert grounded.proposed_rule.property_set == "Pset_DoorCommon"
+    assert "bSDD grounding" in (grounded.review_notes or "")
+
+
+def test_bsdd_grounding_falls_back_to_name_when_code_is_a_dictionary_guid():
+    """A `code` that is a raw dictionary GUID (e.g. ACCORD) is skipped in favor of a clean `name`.
+
+    Mirrors a real local-ontology ACCORD entry: `code` is a GUID, `name`
+    ("ClearWidth") is itself already a clean identifier, so it is the safe
+    fallback -- property_set still gets corrected, property_name doesn't
+    change because it already equals the canonical form.
+    """
+    ontology = FakeOntology(
+        [
+            BSDDPropertyItem(
+                uri="urn:x",
+                name="ClearWidth",
+                code="122f5ab6-de6f-4bec-b198-3f6a2ddfd827",
+                property_set="Pset_DoorCommon",
+            )
+        ]
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name="ClearWidth")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.property_name == "ClearWidth"
+    assert grounded.proposed_rule.property_set == "Pset_DoorCommon"
+    assert "bSDD grounding" in (grounded.review_notes or "")
+
+
+def test_bsdd_grounding_skips_when_neither_code_nor_name_is_safe():
+    """When `code` is a GUID and `name` is a spaced display label, no correction is made at all."""
+    ontology = FakeOntology(
+        [
+            BSDDPropertyItem(
+                uri="urn:x",
+                name="Clear Width",
+                code="122f5ab6-de6f-4bec-b198-3f6a2ddfd827",
+                property_set="Pset_DoorCommon",
+            )
+        ]
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name="ClearWidth")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.property_name == "ClearWidth"
+    assert grounded.proposed_rule.property_set is None
+    assert grounded.review_notes is None
 
 
 def test_bsdd_grounding_skips_when_no_match_found():

@@ -128,15 +128,39 @@ def _existing_references(svc: RuleService, ruleset_id: str) -> set[str]:
     return svc.references_for_ruleset(ruleset_id)
 
 
+# Part 9's seed content has, at different times, cited the same clause
+# under two conventions -- "OBC 9.6.4" and "CODE 9.6.4" -- same clause
+# number, different prefix. Comparing raw `reference` strings missed that
+# these are the same rule, letting the rename accumulate a duplicate row
+# every time the other convention's seed source ran (audit: 18 rows across
+# 12 clauses found 2026-09-18, see
+# supabase/migrations/20260918155453_dedupe_part9_rules_by_content.sql and
+# its 2026-09-18 follow-up). Normalizing the prefix away here closes that
+# gap at its source instead of relying on a one-time cleanup migration.
+_LEGACY_REFERENCE_PREFIXES = ("OBC ", "CODE ")
+
+
+def _normalize_reference(reference: str) -> str:
+    """Strip a known reference-prefix rename so the same clause dedupes as one rule."""
+    stripped = reference.strip()
+    upper = stripped.upper()
+    for prefix in _LEGACY_REFERENCE_PREFIXES:
+        if upper.startswith(prefix):
+            return stripped[len(prefix) :].strip()
+    return stripped
+
+
 def _rule_key(reference: str, target: str, prop: str) -> tuple[str, str, str]:
     """Identity of one code rule within its ruleset.
 
     Reference alone is not unique: Part 9 cites one clause against several
     element classes (9.8.2.2.(3) covers both IfcStairFlight and IfcSlab), and
     the QA rules share the reference "BIMGuard QA" entirely. Target class and
-    property name are what separate them.
+    property name are what separate them. The reference component is
+    normalized (see _normalize_reference) so a bare renumbering of the same
+    clause's citation prefix is not mistaken for a new rule.
     """
-    return (reference.strip(), target.strip(), prop.strip())
+    return (_normalize_reference(reference), target.strip(), prop.strip())
 
 
 def _seed_json_ruleset(svc: RuleService, filename: str) -> int:
@@ -287,10 +311,13 @@ def seed_architectural_code_rules(svc: RuleService) -> int:
             "severity": "recommended",
         })
 
-    existing_refs = svc.all_references()
+    # Normalized the same way as _rule_key: these hardcoded "CODE ..."
+    # references duplicate clauses the JSON-imported rulesets above already
+    # seeded under an "OBC ..." prefix, and a raw-reference guard missed that.
+    existing_refs = {_normalize_reference(ref) for ref in svc.all_references()}
 
     for item in rules_to_seed:
-        if item["reference"] not in existing_refs:
+        if _normalize_reference(item["reference"]) not in existing_refs:
             _create(svc, **item)
             count += 1
 
