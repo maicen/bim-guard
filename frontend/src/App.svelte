@@ -97,6 +97,24 @@
   $effect(() => {
     if (authGateBlocking) push("/");
   });
+
+  // If the route's audit domain drifts from the selected project's own domain
+  // (a stale link, back/forward, or a manually edited URL -- the tab strip
+  // itself only ever offers the matching domain now), snap back to the
+  // project's domain instead of running an engine that doesn't apply to it.
+  $effect(() => {
+    if (
+      (activeView === "arch" ||
+        activeView === "piping" ||
+        activeView === "seismic" ||
+        activeView === "analyze") &&
+      projectAuditDomain &&
+      auditDomain !== projectAuditDomain &&
+      targetProjectId
+    ) {
+      untrack(() => push(buildTargetUrl(projectAuditDomain!, targetProjectId!)));
+    }
+  });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
 
@@ -122,6 +140,14 @@
   let targetAnalysisSlug: string | null = $state(null);
   let targetFileId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
+  // The audit tab strip only ever shows the domain a project was actually
+  // created with (e.g. an "Arch" project never offers Piping/Seismic) --
+  // undefined (all domains shown) until the matching project has loaded.
+  let projectAuditDomain: AnalysisDomainTab | undefined = $derived(
+    selectedProject && selectedProject.id === targetProjectId
+      ? (viewForAnalysisDomain(selectedProject.analysis_type) as AnalysisDomainTab)
+      : undefined,
+  );
   // Clicking the header's running-pipeline badge opens the live tracker in a
   // drawer rather than navigating to a dedicated page — the same information
   // was previously duplicated across an inline panel, a standalone page, and
@@ -611,7 +637,11 @@
              tab strip is how you switch between them without a trip back to
              the sidebar. "analyze" is a legacy alias for "piping". -->
           <div class="space-y-5">
-            <AnalysisDomainTabs active={auditDomain} onSelect={handleSelectAuditDomain} />
+            <AnalysisDomainTabs
+              active={auditDomain}
+              onSelect={handleSelectAuditDomain}
+              allowedDomains={projectAuditDomain ? [projectAuditDomain] : undefined}
+            />
             {#if activeView === "arch"}
               <ArchAnalyzeView initialProjectId={targetProjectId} />
             {:else}

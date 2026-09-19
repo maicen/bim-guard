@@ -6,15 +6,21 @@
   interface Props {
     active: AnalysisDomainTab;
     onSelect: (domain: AnalysisDomainTab) => void;
+    /** Restrict the strip to a project's own domain, e.g. an "Arch" project only ever shows "Architectural". Omit to show all three. */
+    allowedDomains?: AnalysisDomainTab[];
   }
 
-  let { active, onSelect }: Props = $props();
+  let { active, onSelect, allowedDomains }: Props = $props();
 
-  const TABS: { id: AnalysisDomainTab; label: string; icon: typeof LayoutList }[] = [
+  const ALL_TABS: { id: AnalysisDomainTab; label: string; icon: typeof LayoutList }[] = [
     { id: "arch", label: "Architectural", icon: LayoutList },
     { id: "piping", label: "Piping", icon: Cpu },
     { id: "seismic", label: "Seismic", icon: Compass },
   ];
+
+  let TABS = $derived(
+    allowedDomains ? ALL_TABS.filter((tab) => allowedDomains.includes(tab.id)) : ALL_TABS,
+  );
 </script>
 
 <!--
