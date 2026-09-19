@@ -163,8 +163,16 @@ def test_physics_engines_implement_rule_evaluator_directly():
     assert c_res.rule_type == "CC-001"
     assert "crevice_geometry" in c_res.details
 
-    # Test mic evaluate directly returns RuleEvaluationResult
-    m_res = mic.evaluate({"material": "carbon_steel", "guid": "P-3", "nominal_diameter_m": 0.1})
+    # Test mic evaluate directly returns RuleEvaluationResult. MC-001 applies
+    # only to water, so the element must name a water system to be scored.
+    m_res = mic.evaluate(
+        {
+            "material": "carbon_steel",
+            "guid": "P-3",
+            "nominal_diameter_m": 0.1,
+            "system_type": "DOMESTICCOLDWATER",
+        }
+    )
     assert isinstance(m_res, RuleEvaluationResult)
     assert m_res.rule_type == "MC-001"
     assert "flow_class" in m_res.details

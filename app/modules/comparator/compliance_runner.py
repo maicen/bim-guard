@@ -2,7 +2,12 @@ from typing import Any
 
 from app.engines.bimguard_corrosion_engine import GCElement, assess_galvanic_risk
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
-from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
+from app.engines.bimguard_mic_engine import (
+    MEDIUM_APPLICABLE,
+    MICElement,
+    assess_mic_risk,
+    medium_scope,
+)
 from app.modules.comparator.engine_registry import DEFAULT_ENGINE_REGISTRY, register_default_engines
 
 
@@ -51,6 +56,9 @@ def _coerce_mic_element(element: Any) -> MICElement:
         insulation_condition=str(info.get("insulation_condition") or getattr(element, "insulation_condition", "unknown") or "unknown"),
         floor=str(info.get("floor") or getattr(element, "floor", "Unknown") or "Unknown"),
         zone=str(info.get("zone") or getattr(element, "zone", "Unknown") or "Unknown"),
+        medium_hints=tuple(
+            str(n) for n in (getattr(element, "Name", None) or getattr(element, "name", None),) if n
+        ),
     )
 
 
@@ -89,8 +97,24 @@ def run_crevice_compliance_check(element: Any) -> dict[str, Any]:
 
 
 def run_mic_compliance_check(element: Any) -> dict[str, Any]:
-    """Compatibility wrapper returning the runner payload used by Module 4."""
-    result = assess_mic_risk(_coerce_mic_element(element))
+    """Compatibility wrapper returning the runner payload used by Module 4.
+
+    A non-water or unresolved medium returns ``band: None`` -- no verdict --
+    rather than scoring Legionella rules against it.
+    """
+    mic_element = _coerce_mic_element(element)
+    scope = medium_scope(mic_element)
+    if scope.status != MEDIUM_APPLICABLE:
+        return {
+            "band": None,
+            "score": 0.0,
+            "details": {
+                "medium_scope": scope.status,
+                "medium": scope.medium,
+                "piping_system": scope.piping_system,
+            },
+        }
+    result = assess_mic_risk(mic_element)
     return {
         "band": result.risk_band,
         "score": result.composite_score,

@@ -52,6 +52,12 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 
 from app.modules.contracts import RuleEvaluationResult
+from app.modules.ifc_reader.piping_producer import (
+    AQUEOUS_MEDIA,
+    UNKNOWN_MEDIUM,
+    classify_system,
+    media_for_system,
+)
 from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 from app.services.corrosion_rule_catalog import load_mc_catalog
 
@@ -260,6 +266,58 @@ def select_mitigation(
     return list(dict.fromkeys(mits))  # deduplicate preserving order
 
 
+# ── MEDIUM SCOPE ──────────────────────────────────────────────────────────────
+# Every MC-001 input -- the TM13 temperature danger zone, the HSG274 dead-leg
+# and flow-velocity classes, MIT-MIC-001..010 -- describes microbial growth in
+# liquid water. On a pipe carrying acid, fuel or gas they describe nothing, and
+# scoring one anyway turned a stagnant 30 °C acid branch into a Critical
+# Legionella finding. So the medium is resolved before any of them is applied.
+#
+# The medium is not a new reading. It is the one the rest of the codebase
+# already uses (MM-001 included): the IFC system classification --
+# piping_producer.classify_system over the system name, its ObjectType and
+# PredefinedType, and the element name -- mapped through media_for_system.
+
+#: The medium is liquid water; MC-001 applies.
+MEDIUM_APPLICABLE = "applicable"
+#: The medium is known and is not water; MC-001 does not apply.
+MEDIUM_NOT_APPLICABLE = "not_applicable"
+#: The medium could not be determined. Not water by default: the caller must
+#: refuse to score and say why, never assume a Legionella-relevant medium.
+MEDIUM_UNRESOLVED = "unresolved"
+
+
+@dataclass(frozen=True)
+class MediumScope:
+    """Whether MC-001 applies to an element, and the medium that decided it."""
+
+    status: str  # one of MEDIUM_APPLICABLE / MEDIUM_NOT_APPLICABLE / MEDIUM_UNRESOLVED
+    medium: str  # media_for_system key, e.g. "cold_water", "chemical", "unknown"
+    piping_system: str  # PipingSystem value the hints classified to
+
+
+def resolve_medium_scope(*hints: Optional[str]) -> MediumScope:
+    """Classify the medium an element carries and decide whether MC-001 applies.
+
+    Args:
+        *hints: System name, system ObjectType / PredefinedType, element name
+            -- most authoritative first, as :func:`classify_system` expects.
+
+    Returns:
+        A :class:`MediumScope`. ``unknown`` resolves to
+        :data:`MEDIUM_UNRESOLVED`, never to water.
+    """
+    system = classify_system(*hints)
+    medium = media_for_system(system)
+    if medium in AQUEOUS_MEDIA:
+        status = MEDIUM_APPLICABLE
+    elif medium == UNKNOWN_MEDIUM:
+        status = MEDIUM_UNRESOLVED
+    else:
+        status = MEDIUM_NOT_APPLICABLE
+    return MediumScope(status=status, medium=medium, piping_system=system.value)
+
+
 # ── MAIN ASSESSMENT DATACLASS ─────────────────────────────────────────────────
 @dataclass
 class MICElement:
@@ -280,6 +338,14 @@ class MICElement:
     position_x: float = 0.0
     position_y: float = 0.0
     position_z: float = 0.0
+    #: Further medium hints after system_type (system ObjectType/PredefinedType,
+    #: element name), most authoritative first. See medium_scope().
+    medium_hints: tuple[str, ...] = ()
+
+
+def medium_scope(element: MICElement) -> MediumScope:
+    """Return whether MC-001 applies to ``element``, from its system and hints."""
+    return resolve_medium_scope(element.system_type, *element.medium_hints)
 
 
 @dataclass
@@ -421,10 +487,12 @@ class MICEngine:
             or (element.get("element_type") if isinstance(element, dict) else None)
             or "IfcPipeSegment"
         )
+        # The getattr default must be falsy: a truthy "Unknown" there shadowed a
+        # dict's own system_type, and the system is what decides the medium.
         system_type = str(
             info.get("system_type")
-            or getattr(element, "system_type", "Unknown")
-            or (element.get("system_type") if isinstance(element, dict) else "Unknown")
+            or getattr(element, "system_type", None)
+            or (element.get("system_type") if isinstance(element, dict) else None)
             or "Unknown"
         )
         material = str(
@@ -470,6 +538,12 @@ class MICEngine:
             or (element.get("zone") if isinstance(element, dict) else "Unknown")
             or "Unknown"
         )
+        name = (
+            info.get("Name")
+            or getattr(element, "Name", None)
+            or getattr(element, "name", None)
+            or (element.get("name") if isinstance(element, dict) else None)
+        )
         return MICElement(
             global_id=str(guid),
             element_type=str(element_type),
@@ -482,6 +556,7 @@ class MICEngine:
             insulation_condition=insulation_condition,
             floor=floor,
             zone=zone,
+            medium_hints=(str(name),) if name else (),
         )
 
     def evaluate(
@@ -490,8 +565,29 @@ class MICEngine:
         *,
         context: Any = None,
     ) -> RuleEvaluationResult:
-        """Assess MIC risk directly adhering to RuleEvaluator protocol."""
+        """Assess MIC risk directly adhering to RuleEvaluator protocol.
+
+        An element whose medium is not water returns ``NOT_APPLICABLE`` and one
+        whose medium is unknown returns ``NOT_ASSESSED``, both with no band, so
+        neither can be read as a verdict. See :func:`resolve_medium_scope`.
+        """
         mic_element = self.coerce_element(element)
+        scope = medium_scope(mic_element)
+        if scope.status != MEDIUM_APPLICABLE:
+            return RuleEvaluationResult(
+                rule_type=self.rule_type,
+                band=None,
+                score=0.0,
+                element_id=mic_element.global_id,
+                details={
+                    "medium_scope": scope.status,
+                    "medium": scope.medium,
+                    "piping_system": scope.piping_system,
+                },
+                status=(
+                    "NOT_APPLICABLE" if scope.status == MEDIUM_NOT_APPLICABLE else "NOT_ASSESSED"
+                ),
+            )
         result = assess_mic_risk(mic_element)
         return RuleEvaluationResult(
             rule_type=self.rule_type,

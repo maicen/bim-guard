@@ -94,7 +94,13 @@ from app.engines.bimguard_corrosion_engine import (
     assess_galvanic_risk,
 )
 from app.engines.bimguard_crevice_engine import CCElement, assess_crevice_risk
-from app.engines.bimguard_mic_engine import MICElement, assess_mic_risk
+from app.engines.bimguard_mic_engine import (
+    MEDIUM_NOT_APPLICABLE,
+    MEDIUM_UNRESOLVED,
+    MICElement,
+    assess_mic_risk,
+    medium_scope,
+)
 from app.logging_config import get_logger
 from app.modules.comparator import cross_material, material_media
 from app.modules.comparator.issue_adapter import IssueIdAllocator
@@ -344,6 +350,7 @@ def _mic_element(element: ServiceElement) -> MICElement:
         flow_velocity_ms=element.flow_velocity_ms,
         operating_temp_c=element.operating_temp_c,
         dead_leg_length_m=element.dead_leg_length_m,
+        medium_hints=(*element.system_hints, element.name),
     )
 
 
@@ -557,6 +564,46 @@ def _hydraulics_gate(mic_element: MICElement) -> tuple[str, dict[str, Any]] | No
     return None
 
 
+def _medium_gate(mic_element: MICElement) -> tuple[str, dict[str, Any]] | None:
+    """Return ``(reason, inputs)`` if MC-001 cannot tell what the pipe carries.
+
+    MC-001's temperature danger zone, dead-leg and flow classes and its
+    MIT-MIC mitigations are Legionella/biofilm rules for liquid water. An
+    unresolved medium is refused here rather than assumed to be water, so it
+    cannot produce a Legionella verdict. A medium that *is* resolved and is not
+    water never reaches this gate: see :func:`_out_of_scope`.
+    """
+    scope = medium_scope(mic_element)
+    if scope.status == MEDIUM_UNRESOLVED:
+        return (
+            "the medium this pipe carries could not be determined from its IFC "
+            f"system ({mic_element.system_type!r}) or name; MC-001's Legionella "
+            "rules apply only to water, and water is not assumed",
+            {
+                "medium": scope.medium,
+                "piping_system": scope.piping_system,
+                "system": mic_element.system_type,
+                "medium_hints": list(mic_element.medium_hints),
+            },
+        )
+    return None
+
+
+def _out_of_scope(element: ServiceElement, spec: MechanismSpec) -> bool:
+    """Report that ``spec`` does not apply to ``element`` at all.
+
+    Distinct from :func:`_preflight`: a gated element *should* have been
+    assessed and could not be, which is a data-quality Issue. An out-of-scope
+    element never should be. Today that is MC-001 on a pipe whose medium is
+    known and is not water -- acid, fuel, gas, steam -- where no Legionella
+    rule means anything. No Issue is raised: a data-quality note would
+    wrongly report missing data, and a Low finding would be a fabricated pass.
+    """
+    if spec is not MIC:
+        return False
+    return medium_scope(_mic_element(element)).status == MEDIUM_NOT_APPLICABLE
+
+
 def _preflight(element: ServiceElement, spec: MechanismSpec) -> tuple[str, str, dict] | None:
     """Return ``(check, reason, inputs)`` if ``spec`` must not run on ``element``.
 
@@ -569,7 +616,11 @@ def _preflight(element: ServiceElement, spec: MechanismSpec) -> tuple[str, str, 
             return ("material_unresolved", *gated)
         return None
     if spec is MIC:
-        gated = _hydraulics_gate(_mic_element(element))
+        mic_element = _mic_element(element)
+        gated = _medium_gate(mic_element)
+        if gated is not None:
+            return ("medium_unresolved", *gated)
+        gated = _hydraulics_gate(mic_element)
         if gated is not None:
             return ("hydraulics_unavailable", *gated)
         return None
@@ -1201,6 +1252,8 @@ def _assess_elements_chunk(
 
     for element in elements_chunk:
         for spec in specs:
+            if _out_of_scope(element, spec):
+                continue
             catalog = catalogs[spec.code]
             gated = _preflight(element, spec)
             if gated is not None:
@@ -1353,6 +1406,8 @@ def run_corrosion_analysis(
     if not use_pool:
         for element in elements:
             for spec in active_elementwise:
+                if _out_of_scope(element, spec):
+                    continue
                 gated = _preflight(element, spec)
                 if gated is not None:
                     check, reason, gate_inputs = gated

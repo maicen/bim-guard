@@ -150,6 +150,11 @@ class PipingSystem(str, Enum):
     FIRE_WET_RISER = "fire_wet_riser"
     FIRE_SPRINKLER = "fire_sprinkler"
     UNKNOWN = "unknown"
+    #: Process chemicals: acid/alkali waste, chemical transfer. Not water, so
+    #: no Legionella or MC-001 assessment applies (see media_for_system).
+    CHEMICAL = "chemical"
+    #: Fuel oil and diesel supply. Not water, for the same reason.
+    FUEL = "fuel"
 
 
 # ---------------------------------------------------------------------------

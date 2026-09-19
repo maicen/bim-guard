@@ -441,6 +441,16 @@ _SYSTEM_RULES: tuple[tuple[tuple[str, ...], PipingSystem], ...] = (
     (("pool", "dos"), PipingSystem.POOL_CHEMICAL_DOSING),
     (("chemical", "dos"), PipingSystem.POOL_CHEMICAL_DOSING),
     (("pool",), PipingSystem.POOL_CIRCULATION),
+    # Process chemicals and fuels come before every water rule, and in
+    # particular before ("waste",): "Acid Waste" is a chemical drain, and
+    # reading it as foul water would put an acid line under the Legionella
+    # rules.
+    (("acid",), PipingSystem.CHEMICAL),
+    (("alkali",), PipingSystem.CHEMICAL),
+    (("caustic",), PipingSystem.CHEMICAL),
+    (("chemical",), PipingSystem.CHEMICAL),
+    (("fuel",), PipingSystem.FUEL),
+    (("diesel",), PipingSystem.FUEL),
     (("sprinkler",), PipingSystem.FIRE_SPRINKLER),
     (("wet riser",), PipingSystem.FIRE_WET_RISER),
     (("fire",), PipingSystem.FIRE_SPRINKLER),
@@ -455,6 +465,7 @@ _SYSTEM_RULES: tuple[tuple[tuple[str, ...], PipingSystem], ...] = (
     (("steam",), PipingSystem.STEAM_LP),
     (("condensate",), PipingSystem.CONDENSATE_RETURN),
     (("condenser",), PipingSystem.CONDENSER_WATER),
+    (("cooling", "water"), PipingSystem.CONDENSER_WATER),
     (("chilled", "return"), PipingSystem.CHILLED_WATER_RETURN),
     (("chilled",), PipingSystem.CHILLED_WATER_FLOW),
     (("chw", "r"), PipingSystem.CHILLED_WATER_RETURN),
@@ -477,13 +488,38 @@ _SYSTEM_RULES: tuple[tuple[tuple[str, ...], PipingSystem], ...] = (
 )
 
 
+#: IfcDistributionSystemEnum values that name one medium unambiguously. Enum
+#: tokens carry no spaces ("DOMESTICCOLDWATER"), so the substring rules above
+#: never match them; they are matched whole instead. Values that do not fix a
+#: medium (USERDEFINED, NOTDEFINED, VENTILATION, WATERSUPPLY -- hot or cold
+#: is unstated) are deliberately absent.
+_IFC_SYSTEM_ENUM: dict[str, PipingSystem] = {
+    "DOMESTICCOLDWATER": PipingSystem.DOMESTIC_COLD_WATER,
+    "DOMESTICHOTWATER": PipingSystem.DOMESTIC_HOT_WATER,
+    "CHILLEDWATER": PipingSystem.CHILLED_WATER_FLOW,
+    "CONDENSERWATER": PipingSystem.CONDENSER_WATER,
+    "HEATING": PipingSystem.HEATING_FLOW,
+    "FIREPROTECTION": PipingSystem.FIRE_SPRINKLER,
+    "RAINWATER": PipingSystem.RAINWATER,
+    "STORMWATER": PipingSystem.RAINWATER,
+    "SEWAGE": PipingSystem.FOUL_DRAINAGE,
+    "WASTEWATER": PipingSystem.FOUL_DRAINAGE,
+    "COMPRESSEDAIR": PipingSystem.COMPRESSED_AIR,
+    "GAS": PipingSystem.NATURAL_GAS,
+    "CHEMICAL": PipingSystem.CHEMICAL,
+    "FUEL": PipingSystem.FUEL,
+    "OIL": PipingSystem.FUEL,
+}
+
+
 def classify_system(*hints: Optional[str]) -> PipingSystem:
     """Classify a piping system from free-text hints.
 
     Args:
         *hints: Candidate strings (system name, element name, predefined
             type). Checked in the order given; the first hint that matches
-            any rule wins.
+            any rule wins. A hint that is exactly an IfcDistributionSystemEnum
+            token (see :data:`_IFC_SYSTEM_ENUM`) matches that token.
 
     Returns:
         A PipingSystem member, or PipingSystem.UNKNOWN when nothing matches.
@@ -492,6 +528,9 @@ def classify_system(*hints: Optional[str]) -> PipingSystem:
         if not hint:
             continue
         text = hint.lower().strip()
+        enum_member = _IFC_SYSTEM_ENUM.get(text.upper().replace("_", "").replace(" ", ""))
+        if enum_member is not None:
+            return enum_member
         for needles, system in _SYSTEM_RULES:
             if all(needle in text for needle in needles):
                 return system
@@ -529,8 +568,32 @@ SYSTEM_TO_MEDIA: dict[PipingSystem, str] = {
     PipingSystem.POOL_CIRCULATION: "pool_water",
     PipingSystem.FIRE_WET_RISER: "stagnant_water",
     PipingSystem.FIRE_SPRINKLER: "stagnant_water",
+    PipingSystem.CHEMICAL: "chemical",
+    PipingSystem.FUEL: "fuel",
     PipingSystem.UNKNOWN: "unknown",
 }
+
+#: Media that are liquid water, the only media in which microbial growth --
+#: Legionella, biofilm, sulphate-reducing bacteria -- is a corrosion or health
+#: concern. MC-001 (CIBSE TM13 / HSE HSG274) is scoped to these. Gases, steam,
+#: vacuum, fuels and process chemicals are not water; "unknown" is not in the
+#: set either, and must never be read as though it were.
+AQUEOUS_MEDIA: frozenset[str] = frozenset(
+    {
+        "cold_water",
+        "hot_water",
+        "chilled_water",
+        "condenser_water",
+        "condensate",
+        "foul_water",
+        "rainwater",
+        "pool_water",
+        "stagnant_water",
+    }
+)
+
+#: The medium key for a system that could not be classified.
+UNKNOWN_MEDIUM = "unknown"
 
 
 def media_for_system(system: PipingSystem) -> str:

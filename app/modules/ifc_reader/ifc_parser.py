@@ -137,6 +137,14 @@ class ServiceElement:
     #: HYDRAULIC_SOURCE_* — read from an IFC property set, or absent.
     dead_leg_source: str = HYDRAULIC_SOURCE_ABSENT
 
+    # --- Medium -----------------------------------------------------------
+    #: Classification hints beyond ``system`` (the system's ObjectType and
+    #: PredefinedType, then the element's), most authoritative first. The
+    #: system Name is often a bare tag ("OX 50") while its ObjectType carries
+    #: the service ("PIPING - OXYGEN"); MC-001 needs the medium to decide
+    #: whether it applies at all. Empty when the model carries none.
+    system_hints: tuple[str, ...] = ()
+
 
 # Mapping from IFC type to plain English service category
 IFC_SERVICE_LABELS = {
@@ -564,12 +572,46 @@ def read_secondary_material(element) -> dict:
 
 def get_system_name(element, ifc_model) -> str:
     """Find MEP system this element belongs to."""
+    group = _system_group(element, ifc_model)
+    if group is None:
+        return "Unassigned"
+    return group.Name or "Unnamed system"
+
+
+def _system_group(element, ifc_model):
+    """Return the IfcSystem / IfcDistributionSystem the element is assigned to, or None."""
     for rel in ifc_model.get_inverse(element):
         if rel.is_a("IfcRelAssignsToGroup"):
             group = rel.RelatingGroup
             if group.is_a("IfcSystem") or group.is_a("IfcDistributionSystem"):
-                return group.Name or "Unnamed system"
-    return "Unassigned"
+                return group
+    return None
+
+
+def get_system_hints(element, ifc_model) -> tuple[str, ...]:
+    """Return the medium classification hints an element carries beyond its system Name.
+
+    In order: the system's ObjectType and PredefinedType (IFC4
+    IfcDistributionSystem only), then the element's ObjectType and
+    PredefinedType. Empty and enum-placeholder values (NOTDEFINED,
+    USERDEFINED) are dropped, since they say nothing about the medium.
+    """
+    candidates = []
+    group = _system_group(element, ifc_model)
+    for entity in (group, element):
+        if entity is None:
+            continue
+        for attribute in ("ObjectType", "PredefinedType"):
+            try:
+                candidates.append(getattr(entity, attribute, None))
+            except Exception:
+                continue
+    hints = []
+    for value in candidates:
+        text = str(value).strip() if value is not None else ""
+        if text and text.upper() not in ("NOTDEFINED", "USERDEFINED") and text not in hints:
+            hints.append(text)
+    return tuple(hints)
 
 
 def parse_ifc_model(model) -> list[ServiceElement]:
@@ -616,6 +658,7 @@ def parse_ifc_model(model) -> list[ServiceElement]:
 
             floor = get_floor_name(el, model)
             system = get_system_name(el, model)
+            system_hints = get_system_hints(el, model)
 
             # Try to get space from containing zone or description
             space_name = ""
@@ -651,6 +694,7 @@ def parse_ifc_model(model) -> list[ServiceElement]:
                     material_confidence=mat_a_confidence,
                     environment_source=env_source,
                     environment_confidence=env_confidence,
+                    system_hints=system_hints,
                     **secondary,
                     **read_hydraulics(el),
                 )

@@ -1621,7 +1621,10 @@ class RuleEvaluationResult(BaseModel):
     band: Optional[str] = Field(None, description="Assessed risk band (Low, Medium, High, Critical)")
     score: float = Field(0.0, description="Calculated composite risk score [0.0, 1.0]")
     details: dict[str, Any] = Field(default_factory=dict, description="Mechanism-specific engineering metrics")
-    status: str = Field("PASS", description="Compliance status: PASS, FAIL, or NOT_ASSESSED")
+    status: str = Field(
+        "PASS",
+        description="Compliance status: PASS, FAIL, NOT_ASSESSED, or NOT_APPLICABLE (outside rule scope)",
+    )
     element_id: Optional[str] = Field(None, description="GlobalId or identifier of the evaluated element")
     mitigation: Optional[str] = Field(None, description="Remediation guidance")
     action: Optional[str] = Field(None, description="Operational compliance action")
