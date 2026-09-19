@@ -541,6 +541,15 @@ async def upload_document(
             end_page=end_page,
         )
     except NoParsingEngineConfiguredError as exc:
+        if exc.had_instance:
+            # An engine *was* resolved but it failed (e.g. the self-hosted
+            # docling-serve container is down) -- telling the caller to
+            # "configure a parsing engine" would send them the wrong way.
+            logger.warning("Parsing engine failed during upload: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"{exc} Check that the parsing service is running, or choose a different instance.",
+            ) from exc
         detail = _no_parsing_engine_detail(target_org_id, current_user, permissions)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail) from exc
     except (ValueError, RuntimeError) as exc:

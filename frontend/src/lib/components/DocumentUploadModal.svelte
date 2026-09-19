@@ -29,6 +29,7 @@
   let isUploading = $state(false);
   let uploadError = $state("");
   let noParsingEngineConfigured = $state(false);
+  let parsingEngineFailed = $state(false);
 
   // Inline role check for now (matches the pattern in TopHeader.svelte /
   // UserMenu.svelte / DashboardView.svelte) -- swap for a proper
@@ -86,6 +87,7 @@
     uploadEndPage = "";
     uploadError = "";
     noParsingEngineConfigured = false;
+    parsingEngineFailed = false;
     isUploading = false;
   }
 
@@ -100,6 +102,7 @@
     isUploading = true;
     uploadError = "";
     noParsingEngineConfigured = false;
+    parsingEngineFailed = false;
     try {
       const usePageRange = isPdfSelected && uploadLimitPages && !uploadPageRangeError;
       const created = await documentsApi.upload(uploadFile, uploadDocType, {
@@ -113,8 +116,14 @@
       onUploaded(created);
     } catch (err: any) {
       const apiErr = err as ApiError;
-      uploadError = apiErr.message || "Failed to upload document.";
+      // `fetch()` rejects with a bare TypeError ("Failed to fetch") when no
+      // HTTP response arrived at all -- the backend is down or unreachable.
+      uploadError =
+        err instanceof TypeError
+          ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
+          : apiErr.message || "Failed to upload document.";
       noParsingEngineConfigured = apiErr.status === 422;
+      parsingEngineFailed = apiErr.status === 502;
     } finally {
       isUploading = false;
     }
@@ -131,6 +140,11 @@
     {#if uploadError}
       <div class="space-y-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
         <p>{uploadError}</p>
+        {#if parsingEngineFailed && generateDoclangOnUpload}
+          <p class="text-rose-200">
+            You can also turn off “Convert to DocLang now” to store the file and convert it later.
+          </p>
+        {/if}
         {#if noParsingEngineConfigured && canManageParsing}
           <a
             href={`#/external-providers?tab=parsing${authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : ""}`}
