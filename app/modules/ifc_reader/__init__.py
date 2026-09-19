@@ -975,13 +975,62 @@ class IFCReader:
     def _matches_reclass_hint(self, element, keywords: list[str]) -> bool:
         """Return True if element's name/type fields hint at one of *keywords*.
 
+        Used to reclassify generic IfcBuildingElementProxy elements that a
+        model exported instead of the proper IfcDoor/IfcWindow class, so they
+        aren't silently dropped from compliance checks entirely. See
+        _matched_reclass_keyword() for which fields are checked.
+        """
+        return self._matched_reclass_keyword(element, keywords) is not None
+
+    def _class_fallback_warning(self, el, target: str) -> str | None:
+        """Return a data-quality caveat if the model does not classify *el* as *target*.
+
+        Returns None when *el* really is a *target*. Otherwise the caveat names
+        the class it is modelled as.
+
+        _get_elements_with_fallback() substitutes other IFC classes when the
+        model has no *target* elements at all, and the result is merged into
+        the normal element list -- without this caveat a reclassified
+        IfcBuildingElementProxy is indistinguishable in the results from a
+        properly-typed IfcDoor/IfcWindow. Kept free of any ruleset or clause
+        reference: it describes the element, not the rule that reached it.
+        """
+        try:
+            if el.is_a(target):
+                return None
+            actual_class = el.is_a()
+        except Exception:
+            return None
+
+        advice = "Confirm it is the intended element, or reclassify it in the authoring tool."
+        if actual_class == "IfcBuildingElementProxy":
+            keyword = self._matched_reclass_keyword(
+                el, _PROXY_RECLASSIFY_HINTS.get(target) or []
+            )
+            if keyword:
+                return (
+                    f"Modelled as IfcBuildingElementProxy, not {target}: included "
+                    f'because its name/type mentions "{keyword}". {advice}'
+                )
+            # A proxy class with no keyword hints (e.g. IfcCovering) takes every
+            # proxy in the model -- the weakest evidence a fallback can give.
+            return (
+                f"Modelled as IfcBuildingElementProxy, not {target}: every proxy "
+                f"in the model is treated as {target}, with no name/type check. "
+                f"{advice}"
+            )
+        return (
+            f"Modelled as {actual_class}, not {target}: evaluated as {target} "
+            f"through a class fallback because the model has no {target} "
+            f"elements. {advice}"
+        )
+
+    def _matched_reclass_keyword(self, element, keywords: list[str]) -> str | None:
+        """Return the first of *keywords* that *element* hints at, or None.
+
         Checks Name/ObjectType/Tag/PredefinedType — or its type object's Name
         (e.g. a Revit family/type like "Door-Single-36in") — for a
         case-insensitive substring match against *keywords*.
-
-        Used to reclassify generic IfcBuildingElementProxy elements that a
-        model exported instead of the proper IfcDoor/IfcWindow class, so they
-        aren't silently dropped from compliance checks entirely.
         """
         fields = [
             getattr(element, "Name", None),
@@ -997,7 +1046,7 @@ class IFCReader:
             pass
 
         haystack = " ".join(str(f) for f in fields if f).lower()
-        return any(kw in haystack for kw in keywords)
+        return next((kw for kw in keywords if kw in haystack), None)
 
     @staticmethod
     def _lookup_in_psets(psets: dict, prop_name: str):
@@ -1872,6 +1921,14 @@ class IFCReader:
                             position_mm = None
                     _position_cache[eid] = position_mm
 
+                # A class-fallback caveat leads the list: whether the element
+                # is the kind of thing this rule targets at all outranks any
+                # caveat about how well one of its properties was measured.
+                data_quality_warnings = list(rich_detail.get("warnings") or [])
+                fallback_warning = self._class_fallback_warning(el, target)
+                if fallback_warning:
+                    data_quality_warnings.insert(0, fallback_warning)
+
                 element_results.append(
                     {
                         # Core compliance fields (consumed by Module 4)
@@ -1895,13 +1952,15 @@ class IFCReader:
                         "enum_values": rich_detail.get("enum_values"),
                         # Geometry-analysis caveats (e.g. ifc_stair flagging a
                         # winder flight, or a guard whose baluster spacing
-                        # isn't computed) -- surfaced regardless of PASS/FAIL
-                        # status, because a caveat matters most on a PASS: a
+                        # isn't computed), plus a note when the element was only
+                        # reached through a class fallback (e.g. a reclassified
+                        # IfcBuildingElementProxy) -- surfaced regardless of
+                        # PASS/FAIL status, because a caveat matters most on a PASS: a
                         # value that looks compliant but was measured along
                         # the wrong axis for a curved stair is the case a
                         # reviewer most needs to see flagged, not just a
                         # failure they'd investigate anyway.
-                        "data_quality_warnings": rich_detail.get("warnings") or None,
+                        "data_quality_warnings": data_quality_warnings or None,
                         # Gap 2: spatial + type
                         "storey": spatial.get("storey_name"),
                         "space": spatial.get("space_name"),

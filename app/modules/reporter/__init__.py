@@ -34,6 +34,18 @@ class ComplianceReporter:
     # ── Public API ────────────────────────────────────────────────────────────
 
     @staticmethod
+    def _data_quality_text(failure: dict) -> str:
+        """Return one "Data quality" line per caveat on a failing element, or "".
+
+        A BCF topic is all a coordinator sees of a failure, so a caveat like
+        "this proxy was only treated as a door because its name says so" has
+        to travel with it -- otherwise the topic reads as a firm finding
+        against a properly-typed element.
+        """
+        warnings = failure.get("data_quality_warnings") or []
+        return "".join(f"\nData quality: {w}" for w in warnings)
+
+    @staticmethod
     def _lowest_confidence_label(rule: dict) -> str:
         """The least-authoritative confidence category among a rule's evaluated
         elements — e.g. if even one element's value came from a geometry
@@ -166,6 +178,7 @@ class ComplianceReporter:
                 f"Property  : {rule.get('property_name')}\n"
                 f"Issue     : {failure.get('reason')}\n"
                 f"Confidence: {confidence.get('label', 'Unresolved')} — {confidence.get('description', '')}"
+                f"{self._data_quality_text(failure)}"
             ),
             "type":         "Error" if rule.get("severity") == "mandatory" else "Warning",
             "status":       "Open",
@@ -306,6 +319,7 @@ class ComplianceReporter:
                             f"Floor/room: {failure.get('storey') or '—'} / "
                             f"{failure.get('space') or '—'}\n"
                             f"Issue   : {failure.get('reason', '')}"
+                            f"{self._data_quality_text(failure)}"
                         ),
                         priority=priority,
                         status=status,
