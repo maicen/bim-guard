@@ -116,12 +116,16 @@
       onUploaded(created);
     } catch (err: any) {
       const apiErr = err as ApiError;
-      // `fetch()` rejects with a bare TypeError ("Failed to fetch") when no
-      // HTTP response arrived at all -- the backend is down or unreachable.
-      uploadError =
-        err instanceof TypeError
-          ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
-          : apiErr.message || "Failed to upload document.";
+      // `fetch()` rejects with a bare TypeError when no HTTP response arrived
+      // at all -- the backend is down or unreachable. The wording is
+      // browser-specific ("Failed to fetch" / "NetworkError when attempting
+      // to fetch resource." / "Load failed"), so match on it rather than on
+      // TypeError alone, which would also swallow unrelated bugs.
+      const isNetworkFailure =
+        err instanceof TypeError && /fetch|network|load failed/i.test(err.message);
+      uploadError = isNetworkFailure
+        ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
+        : apiErr.message || "Failed to upload document.";
       noParsingEngineConfigured = apiErr.status === 422;
       parsingEngineFailed = apiErr.status === 502;
     } finally {
