@@ -34,6 +34,11 @@ PROGRESS IS REPORTED, AMBIENTLY
     and for the same reason -- the stage belongs to whoever genuinely does the
     work. The driver keeps Validation and Report Assembly.
 
+    Progress is reported *within* a model as well as between them
+    (``model_elements_scanned`` of ``model_elements``, and ``current_model``):
+    one large model is the longest step of a run, and a stage that reports
+    nothing until it finishes cannot be told from a hang.
+
     The calls are ambient and **no-ops when no tracker is bound**, so the CLI
     demos, the validation sweep and the tests that call this function directly
     behave exactly as they did before.
@@ -48,6 +53,7 @@ NO DEMO MODE
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
@@ -61,6 +67,7 @@ from app.modules.blue_halo.halo_volume_generator import (
     ClearanceConfig,
     ElementGeometry,
     HaloVolume,
+    MappedSourceCache,
     detect_halo_clash_against_geometry,
     element_bbox_mm,
     element_diameter_mm,
@@ -105,6 +112,12 @@ SEVERITY_TO_BAND: dict[str, RiskBand] = {
     "major": RiskBand.HIGH,
     "minor": RiskBand.MEDIUM,
 }
+
+#: Elements scanned between progress reports while one model's geometry is
+#: read. A report is a lock, a metric write and an SSE event, so it is spread out
+#: to keep the cost invisible, yet dense enough that the largest model reports
+#: dozens of times rather than once.
+GEOMETRY_PROGRESS_INTERVAL = 250
 
 #: IFC classes treated as braced MEP services. Everything else in the model is
 #: a clash candidate rather than a halo source.
@@ -371,6 +384,12 @@ def _bracing_scope(geometry: ElementGeometry, threshold_mm: float | None) -> str
 def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[str, str, str]]]:
     """Extract a bounding box for every element in the model.
 
+    Reports ``model_elements`` and ``model_elements_scanned`` to the pipeline
+    tracker as it goes. Reading one large model's geometry is the longest single
+    step of a seismic run and used to report nothing until it finished, which
+    from outside is indistinguishable from a hang: an 80 MB architecture model
+    sat at "IFC Parsing" for the whole of it.
+
     Returns:
         ``(geometries, failures)`` where each failure is
         ``(element_id, ifc_class, reason)`` for an element whose geometry could
@@ -385,13 +404,21 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
         logger.warning("Could not enumerate model elements: %s", exc)
         return [], []
 
-    for entity in entities:
+    # Vertices of each mapped source, shared by every element of this model that
+    # instantiates it. Per model because step ids only identify an entity within
+    # one file.
+    mapped_sources: MappedSourceCache = {}
+    emit(SB_ENGINE, None, model_elements=len(entities), model_elements_scanned=0)
+
+    for scanned, entity in enumerate(entities, start=1):
+        if scanned % GEOMETRY_PROGRESS_INTERVAL == 0:
+            emit(SB_ENGINE, None, model_elements_scanned=scanned)
         element_id = str(getattr(entity, "GlobalId", "") or "")
         ifc_class = entity.is_a() if hasattr(entity, "is_a") else ""
         if not element_id:
             continue
         try:
-            bbox: BoundingBox | None = element_bbox_mm(entity, scale)
+            bbox: BoundingBox | None = element_bbox_mm(entity, scale, mapped_sources)
         except Exception as exc:
             failures.append((element_id, ifc_class, str(exc)))
             continue
@@ -411,6 +438,9 @@ def _geometries(model, scale: float) -> tuple[list[ElementGeometry], list[tuple[
             )
         )
 
+    # The loop only reports on the interval, so close the model out at its total
+    # rather than leaving it a few elements short of done.
+    emit(SB_ENGINE, None, model_elements_scanned=len(entities))
     return geometries, failures
 
 
@@ -526,6 +556,8 @@ def run_seismic_analysis(
     emit(SB_ENGINE, Stage.IFC_PARSING, models_total=1 + len(extra_models))
 
     for label, content in ((primary_label.strip() or PRIMARY_MODEL_LABEL, ifc_bytes), *extra_models):
+        emit(SB_ENGINE, None, current_model=label)
+        parse_started = time.perf_counter()
         try:
             model = ifcopenshell.file.from_string(content.decode("utf-8", errors="replace"))
         except Exception as exc:
@@ -533,7 +565,23 @@ def run_seismic_analysis(
             track_failure(SB_ENGINE, reason)
             return _result([], error=reason)
 
+        geometry_started = time.perf_counter()
         model_geometries, model_failures = _geometries(model, unit_scale_to_mm(model))
+        # One line per model, with the two costs apart: ``parse_s`` is
+        # ifcopenshell reading the file and is roughly linear in its size;
+        # ``geometry_s`` is this module reading every element's vertices and is
+        # what grows with how the model was authored. A slow run names its slow
+        # model here instead of leaving the log silent until the end.
+        logger.info(
+            "Seismic IFC read model=%s bytes=%d parse_s=%.1f geometry_s=%.1f "
+            "readable=%d unreadable=%d",
+            label,
+            len(content),
+            geometry_started - parse_started,
+            time.perf_counter() - geometry_started,
+            len(model_geometries),
+            len(model_failures),
+        )
         for geometry in model_geometries:
             # One element, one envelope. The same GlobalId in two models is the
             # same element federated twice -- a linked reference, or one

@@ -56,6 +56,7 @@ from typing import Any, Iterable, Literal, Optional, Sequence
 import ifcopenshell
 import ifcopenshell.util.placement
 import ifcopenshell.util.unit
+import numpy as np
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -416,7 +417,9 @@ class ElementGeometry:
 # ---------------------------------------------------------------------------
 # Vertex-based bounding box extraction, not full ifcopenshell.geom
 # tessellation — adequate for a clearance envelope and far cheaper on
-# whole-model runs. Mirrors the approach in ifc_reader/piping_producer.py.
+# whole-model runs. Mirrors the approach in ifc_reader/piping_producer.py,
+# but reads leaf geometry as raw arguments and shares mapped sources across
+# elements (see the note above _as_points) so a large model stays tractable.
 
 
 def unit_scale_to_mm(model: IfcModel) -> float:
@@ -449,12 +452,29 @@ def _placement_matrix(entity: IfcElement) -> Optional[Any]:
         return None
 
 
-def _apply(matrix: Any, x: float, y: float, z: float) -> tuple[float, float, float]:
-    """Transform a local point by a 4x4 placement matrix."""
-    return (
-        float(matrix[0][0] * x + matrix[0][1] * y + matrix[0][2] * z + matrix[0][3]),
-        float(matrix[1][0] * x + matrix[1][1] * y + matrix[1][2] * z + matrix[1][3]),
-        float(matrix[2][0] * x + matrix[2][1] * y + matrix[2][2] * z + matrix[2][3]),
+def _apply_many(matrix: Any, points: np.ndarray) -> np.ndarray:
+    """Transform an ``(N, 3)`` array of local points by a 4x4 placement matrix.
+
+    The arithmetic is ``m00*x + m01*y + m02*z + m03`` applied elementwise, in
+    that order, and deliberately not a matrix product: BLAS is free to reorder
+    and fuse the sums of a product, and a bounding box that moves in its last
+    digit can flip a clash that only just touches. The same operations in the
+    same order give the result of transforming one point at a time, bit for bit.
+
+    Args:
+        matrix: A 4x4 transform, indexable as ``matrix[row][col]``.
+        points: Local coordinates, one point per row.
+
+    Returns:
+        The transformed points, same shape as *points*.
+    """
+    x, y, z = points[:, 0], points[:, 1], points[:, 2]
+    return np.column_stack(
+        [
+            matrix[0][0] * x + matrix[0][1] * y + matrix[0][2] * z + matrix[0][3],
+            matrix[1][0] * x + matrix[1][1] * y + matrix[1][2] * z + matrix[1][3],
+            matrix[2][0] * x + matrix[2][1] * y + matrix[2][2] * z + matrix[2][3],
+        ]
     )
 
 
@@ -463,66 +483,110 @@ def _apply(matrix: Any, x: float, y: float, z: float) -> tuple[float, float, flo
 #: that maps a representation onto itself cannot recurse forever.
 _MAX_MAPPED_DEPTH = 4
 
+#: The result for an item that contributes no vertices. Read-only because it is
+#: shared: callers concatenate it, and none may write to it.
+_NO_POINTS = np.empty((0, 3), dtype=np.float64)
+_NO_POINTS.flags.writeable = False
 
-def _face_vertices(faces: Any) -> list[tuple[float, float, float]]:
-    """Collect the polyloop points of a sequence of ``IfcFace``.
+#: Vertices of one mapped source, keyed ``(MappedRepresentation step id, depth)``.
+#: One per model: step ids are only unique within a file.
+MappedSourceCache = dict[tuple[int, int], np.ndarray]
 
-    Args:
-        faces: Any iterable of ``IfcFace``, or None.
 
-    Returns:
-        Every explicit vertex on every bound of every face. A bound that is not
-        a polyloop (a trimmed curve, say) contributes nothing rather than
-        raising: for a clearance envelope a missing curve is a slightly small
-        box, not a failure.
+# WHY THE LEAF WALKERS READ RAW ARGUMENTS
+#
+#     ``entity_instance.__getattr__`` costs about six wrapper calls per
+#     attribute (category, index, method table, ``get_argument``, ``wrap_value``
+#     and a recursive Python ``walk`` that builds a wrapper object for every
+#     point in a tuple). Walking a faceted brep that way is per-vertex Python,
+#     and a hospital architecture model holds millions of vertices: an 80 MB
+#     file took ~580 ms per proxy element, ~2.5 h projected for the model, with
+#     the seismic run sitting at "IFC Parsing" the whole time.
+#
+#     The walkers below therefore read ``wrapped_data.get_argument(0)``
+#     directly. Index 0 is the attribute wanted on every entity they touch --
+#     Outer, CfsFaces, FbsmFaces, SbsmBoundary, Bounds, Bound, Polygon,
+#     Coordinates, CoordList -- in IFC2X3, IFC4 and IFC4X3, and
+#     IfcRepresentationItem declares no attributes ahead of them.
+
+
+def _as_points(rows: Sequence[Sequence[float]]) -> np.ndarray:
+    """Return ``(x, y[, z])`` rows as an ``(N, 3)`` float array; 2D points get z=0.
+
+    Raises:
+        ValueError: The rows are ragged or neither 2D nor 3D. The caller's
+            ``except`` turns that into "no vertices", as an unreadable item
+            always was.
     """
-    vertices: list[tuple[float, float, float]] = []
-    for face in faces or []:
-        for bound in getattr(face, "Bounds", []) or []:
-            loop = getattr(bound, "Bound", None)
-            for point in getattr(loop, "Polygon", []) or []:
-                coords = getattr(point, "Coordinates", None)
-                if not coords:
-                    continue
-                vertices.append(
-                    (
-                        float(coords[0]),
-                        float(coords[1]),
-                        float(coords[2]) if len(coords) > 2 else 0.0,
-                    )
-                )
-    return vertices
+    if not len(rows):
+        return _NO_POINTS
+    points = np.asarray(rows, dtype=np.float64)
+    if points.ndim != 2 or points.shape[1] not in (2, 3):
+        raise ValueError(f"unusable point rows of shape {points.shape}")
+    if points.shape[1] == 2:
+        points = np.column_stack([points, np.zeros(len(points))])
+    return points
 
 
-def _boundary_faces(item: Any) -> Any:
-    """Return the ``IfcFace`` list behind a boundary-representation item.
+def _brep_faces(item: Any) -> Any:
+    """Return the raw ``IfcFace`` sequence behind a boundary-representation item.
 
     Args:
         item: A representation item.
 
     Returns:
-        The faces the item is built from, or an empty list when the item is not
-        a boundary representation.
+        The faces the item is built from as raw ``wrapped_data`` instances, or
+        an empty tuple when the item is not a boundary representation.
     """
+    raw = item.wrapped_data
     if item.is_a("IfcManifoldSolidBrep"):
         # Covers IfcFacetedBrep and IfcAdvancedBrep: the outer shell's faces.
-        return getattr(getattr(item, "Outer", None), "CfsFaces", []) or []
+        outer = raw.get_argument(0)
+        return (outer.get_argument(0) or ()) if outer is not None else ()
     if item.is_a("IfcFaceBasedSurfaceModel"):
         faces: list[Any] = []
-        for face_set in getattr(item, "FbsmFaces", []) or []:
-            faces.extend(getattr(face_set, "CfsFaces", []) or [])
+        for face_set in raw.get_argument(0) or ():
+            faces.extend(face_set.get_argument(0) or ())
         return faces
     if item.is_a("IfcShellBasedSurfaceModel"):
         faces = []
-        for shell in getattr(item, "SbsmBoundary", []) or []:
-            faces.extend(getattr(shell, "CfsFaces", []) or [])
+        for shell in raw.get_argument(0) or ():
+            faces.extend(shell.get_argument(0) or ())
         return faces
     if item.is_a("IfcConnectedFaceSet"):
-        return getattr(item, "CfsFaces", []) or []
-    return []
+        return raw.get_argument(0) or ()
+    return ()
 
 
-def _item_vertices(item: Any, depth: int = 0) -> list[tuple[float, float, float]]:
+def _face_vertices(faces: Any) -> np.ndarray:
+    """Collect the polyloop points of a sequence of raw ``IfcFace`` instances.
+
+    Args:
+        faces: Raw faces from :func:`_brep_faces`.
+
+    Returns:
+        Every explicit vertex on every bound of every face. A bound that is not
+        a polyloop (an edge loop, say) contributes nothing rather than
+        raising: for a clearance envelope a missing curve is a slightly small
+        box, not a failure.
+    """
+    rows: list[tuple[float, float, float]] = []
+    for face in faces:
+        for bound in face.get_argument(0) or ():
+            loop = bound.get_argument(0)
+            if loop is None or not loop.is_a("IfcPolyLoop"):
+                continue
+            for point in loop.get_argument(0) or ():
+                coords = point.get_argument(0)
+                if not coords:
+                    continue
+                rows.append((coords[0], coords[1], coords[2] if len(coords) > 2 else 0.0))
+    return _as_points(rows)
+
+
+def _item_vertices(
+    item: Any, depth: int = 0, cache: MappedSourceCache | None = None
+) -> np.ndarray:
     """Collect the local vertices of one representation item.
 
     Handles the shapes real exports actually use: tessellated face sets,
@@ -542,27 +606,36 @@ def _item_vertices(item: Any, depth: int = 0) -> list[tuple[float, float, float]
         item: The representation item to read.
         depth: Current ``IfcMappedItem`` nesting level, used only to bound
             recursion.
+        cache: Vertices already read for a mapped source, shared across the
+            elements of one model. A source is read once however many elements
+            instantiate it -- one door type mapped onto a few hundred doors
+            was being walked a few hundred times -- and the mapping transform
+            is applied per instance to the cached result. The depth is part of
+            the key because it decides whether the recursion cap cuts the
+            source short. ``None`` reads every source afresh.
 
     Returns:
-        Vertices in the item's local coordinate system. An item whose shape is
-        not understood yields none, which the caller reports as missing
-        geometry rather than as a clearance verdict.
+        Vertices in the item's local coordinate system, one per row. An item
+        whose shape is not understood yields none, which the caller reports as
+        missing geometry rather than as a clearance verdict.
     """
     try:
         kind = item.is_a()
 
         if kind in ("IfcTriangulatedFaceSet", "IfcPolygonalFaceSet"):
-            coords = item.Coordinates.CoordList or []
-            return [(float(c[0]), float(c[1]), float(c[2])) for c in coords]
+            coordinates = item.wrapped_data.get_argument(0)
+            coord_list = coordinates.get_argument(0) or ()
+            points = np.asarray(coord_list, dtype=np.float64) if len(coord_list) else _NO_POINTS
+            if points.size and (points.ndim != 2 or points.shape[1] != 3):
+                raise ValueError("a face set's points must be 3D")
+            return points
 
         if kind == "IfcPolyline":
-            points = []
+            rows = []
             for point in item.Points or []:
                 c = point.Coordinates
-                points.append(
-                    (float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0)
-                )
-            return points
+                rows.append((float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0))
+            return _as_points(rows)
 
         if kind == "IfcExtrudedAreaSolid":
             # Reduced to the extrusion axis: the profile is not read, so the
@@ -574,34 +647,46 @@ def _item_vertices(item: Any, depth: int = 0) -> list[tuple[float, float, float]
                 origin = (float(c[0]), float(c[1]), float(c[2]))
             ratios = item.ExtrudedDirection.DirectionRatios
             depth_m = float(item.Depth)
-            return [
-                origin,
-                (
-                    origin[0] + float(ratios[0]) * depth_m,
-                    origin[1] + float(ratios[1]) * depth_m,
-                    origin[2] + float(ratios[2]) * depth_m,
-                ),
-            ]
+            return np.array(
+                [
+                    origin,
+                    (
+                        origin[0] + float(ratios[0]) * depth_m,
+                        origin[1] + float(ratios[1]) * depth_m,
+                        origin[2] + float(ratios[2]) * depth_m,
+                    ),
+                ],
+                dtype=np.float64,
+            )
 
         if kind == "IfcMappedItem":
             if depth >= _MAX_MAPPED_DEPTH:
-                return []
+                return _NO_POINTS
             source = getattr(item, "MappingSource", None)
             mapped = getattr(source, "MappedRepresentation", None)
             if mapped is None:
-                return []
-            local: list[tuple[float, float, float]] = []
-            for sub_item in getattr(mapped, "Items", []) or []:
-                local.extend(_item_vertices(sub_item, depth + 1))
-            if not local:
-                return []
+                return _NO_POINTS
+
+            key = (mapped.id(), depth)
+            local = cache.get(key) if cache is not None else None
+            if local is None:
+                parts = [
+                    _item_vertices(sub_item, depth + 1, cache)
+                    for sub_item in getattr(mapped, "Items", []) or []
+                ]
+                parts = [part for part in parts if len(part)]
+                local = np.concatenate(parts) if parts else _NO_POINTS
+                if cache is not None:
+                    cache[key] = local
+            if not len(local):
+                return _NO_POINTS
             matrix = ifcopenshell.util.placement.get_mappeditem_transformation(item)
             if matrix is None:
                 # A 2D transformation operator, which the helper does not
                 # parse. The untransformed vertices still bound the shape's
                 # size, so they are better than discarding the element.
                 return local
-            return [_apply(matrix, x, y, z) for x, y, z in local]
+            return _apply_many(matrix, local)
 
         if kind in ("IfcBooleanResult", "IfcBooleanClippingResult"):
             # The result of a difference or clip is contained in its first
@@ -609,50 +694,68 @@ def _item_vertices(item: Any, depth: int = 0) -> list[tuple[float, float, float]
             # never smaller than the true shape, which is the safe direction
             # for a clearance check.
             first = getattr(item, "FirstOperand", None)
-            return _item_vertices(first, depth) if first is not None else []
+            return _item_vertices(first, depth, cache) if first is not None else _NO_POINTS
 
         if kind == "IfcGeometricSet":
-            vertices: list[tuple[float, float, float]] = []
+            parts = []
+            rows = []
             for element in getattr(item, "Elements", []) or []:
                 if element.is_a("IfcCartesianPoint"):
                     c = element.Coordinates
-                    vertices.append(
-                        (float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0)
-                    )
+                    rows.append((float(c[0]), float(c[1]), float(c[2]) if len(c) > 2 else 0.0))
                 else:
-                    vertices.extend(_item_vertices(element, depth))
-            return vertices
+                    parts.append(_item_vertices(element, depth, cache))
+            if rows:
+                parts.append(_as_points(rows))
+            parts = [part for part in parts if len(part)]
+            return np.concatenate(parts) if parts else _NO_POINTS
 
-        return _face_vertices(_boundary_faces(item))
+        return _face_vertices(_brep_faces(item))
     except Exception:
-        return []
+        return _NO_POINTS
 
 
-def _local_vertices(entity: IfcElement) -> list[tuple[float, float, float]]:
+def _local_vertices(entity: IfcElement, cache: MappedSourceCache | None = None) -> np.ndarray:
     """Collect raw vertices from an entity's shape representation.
 
     Walks every item of every representation through :func:`_item_vertices`,
     which resolves mapped items and boundary representations. Anything it does
     not understand yields no vertices.
+
+    Args:
+        entity: The IFC entity to read.
+        cache: Mapped-source cache, as for :func:`_item_vertices`.
+
+    Returns:
+        The vertices in the entity's local space, one per row.
     """
     representation = getattr(entity, "Representation", None)
     if representation is None:
-        return []
+        return _NO_POINTS
 
-    vertices: list[tuple[float, float, float]] = []
+    parts = []
     for shape in getattr(representation, "Representations", []) or []:
         for item in getattr(shape, "Items", []) or []:
-            vertices.extend(_item_vertices(item))
-    return vertices
+            part = _item_vertices(item, 0, cache)
+            if len(part):
+                parts.append(part)
+    if not parts:
+        return _NO_POINTS
+    return np.concatenate(parts) if len(parts) > 1 else parts[0]
 
 
-def element_bbox_mm(entity: IfcElement, scale_to_mm: float) -> Optional[BoundingBox]:
+def element_bbox_mm(
+    entity: IfcElement, scale_to_mm: float, cache: MappedSourceCache | None = None
+) -> Optional[BoundingBox]:
     """Compute an element's world-space axis-aligned bounding box, in mm.
 
     Args:
         entity: The IFC entity to measure.
         scale_to_mm: Factor converting the model's length unit to mm, from
             unit_scale_to_mm(model).
+        cache: Mapped-source cache to share with the other elements of the same
+            model, as for :func:`_item_vertices`. Pass one dict per model when
+            measuring a whole model; leave ``None`` for a one-off measurement.
 
     Returns:
         The bounding box, or None if the entity has no placement or no
@@ -662,18 +765,17 @@ def element_bbox_mm(entity: IfcElement, scale_to_mm: float) -> Optional[Bounding
     if matrix is None:
         return None
 
-    local = _local_vertices(entity)
-    if not local:
+    local = _local_vertices(entity, cache)
+    if not len(local):
         return None
 
-    world = [_apply(matrix, x, y, z) for x, y, z in local]
-    xs = [p[0] * scale_to_mm for p in world]
-    ys = [p[1] * scale_to_mm for p in world]
-    zs = [p[2] * scale_to_mm for p in world]
+    world = _apply_many(matrix, local) * scale_to_mm
+    low = world.min(axis=0)
+    high = world.max(axis=0)
 
     return BoundingBox(
-        min=Point3D(x=min(xs), y=min(ys), z=min(zs)),
-        max=Point3D(x=max(xs), y=max(ys), z=max(zs)),
+        min=Point3D(x=float(low[0]), y=float(low[1]), z=float(low[2])),
+        max=Point3D(x=float(high[0]), y=float(high[1]), z=float(high[2])),
     )
 
 
