@@ -209,6 +209,42 @@ def test_document_access_checker_enforces_organization_grants():
     assert "Document 999 not found" in exc_info.value.detail
 
 
+def test_document_mutation_check_resolves_the_callers_role_via_a_real_method():
+    """Mutating a granted document consults the caller's org role.
+
+    Uses ``spec=MembershipService`` so calling a method the service doesn't
+    have (this check once called a nonexistent ``get_role``, turning every
+    non-superadmin edit/delete into a 500) raises AttributeError here instead
+    of being silently accepted by a bare MagicMock.
+    """
+    from unittest.mock import MagicMock
+
+    from app.api.documents import _require_document_grant
+    from app.services.membership_service import MembershipService
+
+    user = CurrentUser(id="user-123", email="u@example.com", claims={})
+    memberships = MagicMock(spec=MembershipService)
+    document_access = MagicMock()
+    profiles = MagicMock()
+    profiles.is_superadmin.return_value = False
+    memberships.org_ids_for_user.return_value = [5]
+    document_access.list_org_grants.return_value = [999]
+
+    for role in ("owner", "admin", "member"):
+        memberships.role_for_user.return_value = role
+        _require_document_grant(999, user, memberships, document_access, profiles, for_mutation=True)
+
+    # Any other role may still read a granted document, but not change it --
+    # and, like an ungranted document, that surfaces as 404.
+    memberships.role_for_user.return_value = "viewer"
+    _require_document_grant(999, user, memberships, document_access, profiles)
+    with pytest.raises(HTTPException) as exc_info:
+        _require_document_grant(999, user, memberships, document_access, profiles, for_mutation=True)
+    assert exc_info.value.status_code == 404
+
+    memberships.role_for_user.assert_called_with(5, "user-123")
+
+
 def test_document_route_returns_404_for_ungranted_document():
     """Integration-level check that GET /api/documents/{id} is wired to the real DocumentAccessChecker.
 

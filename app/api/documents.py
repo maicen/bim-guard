@@ -110,7 +110,7 @@ def _require_document_grant(
     for org_id in org_ids:
         if document_id in document_access.list_org_grants(org_id):
             if for_mutation:
-                role = memberships.get_role(org_id, current_user.id)
+                role = memberships.role_for_user(org_id, current_user.id)
                 if role not in ("owner", "admin", "member"):
                     continue
             return
