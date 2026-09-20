@@ -8,6 +8,7 @@ from litellm import acompletion
 from app.agent.config import AgentConfig
 from app.agent.session import AgentSession
 from app.agent.tools import TOOL_SCHEMAS, execute_tool
+from app.services.llm_call_context import llm_call_context
 
 SYSTEM_PROMPT = """You are the BIM Guard coding and compliance assistant.
 Work only inside the current repository. Use tools proactively to inspect facts.
@@ -52,9 +53,10 @@ class OpenRouterAgent:
             }
             if self.config.web_search:
                 request["plugins"] = [{"id": "web", "max_results": 5}]
-            response = await acompletion(
-                **request,
-            )
+            with llm_call_context(context="coding_agent"):
+                response = await acompletion(
+                    **request,
+                )
             self._record_cost(response)
             if self.total_cost > self.config.max_cost:
                 raise RuntimeError(

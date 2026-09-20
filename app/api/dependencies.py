@@ -17,6 +17,7 @@ from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
+from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
@@ -135,6 +136,11 @@ def get_permission_service() -> PermissionService:
 def get_audit_log_service() -> AuditLogService:
     """Return the configured AuditLogService instance."""
     return get_container().audit_log_service
+
+
+def get_llm_call_log_service() -> LLMCallLogService:
+    """Return the configured LLMCallLogService instance."""
+    return get_container().llm_call_log_service
 
 
 def get_llm_provider_instances_service() -> LLMProviderInstancesService:

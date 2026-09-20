@@ -50,6 +50,9 @@ from app.api import (
     graph_routes as api_graph,
 )
 from app.api import (
+    llm_calls as api_llm_calls,
+)
+from app.api import (
     llm_provider_instances as api_llm_provider_instances,
 )
 from app.api import (
@@ -425,6 +428,7 @@ app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
 app.include_router(api_graph.router, prefix="/api", tags=["Graph & Spatial Intelligence"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 app.include_router(api_audit_log.router, prefix="/api/audit-log", tags=["Audit Log"])
+app.include_router(api_llm_calls.router, prefix="/api/llm-calls", tags=["LLM Call Log"])
 app.include_router(api_scim.router, prefix="/api/scim/v2", tags=["SCIM"])
 
 

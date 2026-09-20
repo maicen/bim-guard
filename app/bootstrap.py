@@ -32,6 +32,7 @@ from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.kuzu_provider import KuzuDatabaseProvider
+from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
@@ -105,6 +106,7 @@ class ApplicationContainer:
     project_document_bindings_repo: DatabaseAdapter
     profiles_repo: DatabaseAdapter
     audit_log_repo: DatabaseAdapter
+    llm_call_log_repo: DatabaseAdapter
     scim_tokens_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
@@ -123,6 +125,7 @@ class ApplicationContainer:
     permission_service: PermissionService
     user_admin_service: UserAdminService
     audit_log_service: AuditLogService
+    llm_call_log_service: LLMCallLogService
     scim_token_service: ScimTokenService
     scim_service: ScimService
     ruleset_access_service: RulesetAccessService
@@ -138,6 +141,25 @@ class ApplicationContainer:
 
 
 _container: ApplicationContainer | None = None
+
+
+def _register_llm_call_logging_callback(llm_call_log_service: LLMCallLogService) -> None:
+    """Register the LLM call logger on litellm.callbacks, once per process.
+
+    litellm.callbacks is process-wide global state, not a per-request
+    dependency, so this can't go through the usual constructor-injection
+    path -- it's the same trade-off every litellm observability integration
+    (Langfuse, Helicone, ...) makes. Guarded by type-check so rebuilding the
+    container (e.g. in tests) does not stack duplicate loggers that would
+    each write their own copy of every call.
+    """
+    import litellm
+
+    from app.services.llm_logging_callback import LLMCallLoggingCallback
+
+    litellm.callbacks = [
+        cb for cb in litellm.callbacks if not isinstance(cb, LLMCallLoggingCallback)
+    ] + [LLMCallLoggingCallback(llm_call_log_service)]
 
 
 def build_default_container() -> ApplicationContainer:
@@ -443,6 +465,30 @@ def build_default_container() -> ApplicationContainer:
         },
     )
 
+    llm_call_log_repo = PersistenceService.get_table(
+        "llm_calls",
+        {
+            "id": int,
+            "occurred_at": str,
+            "organization_id": int,
+            "project_id": int,
+            "run_key": str,
+            "context": str,
+            "provider": str,
+            "model": str,
+            "input": list,
+            "output": str,
+            "status": str,
+            "error": str,
+            "input_tokens": int,
+            "output_tokens": int,
+            "total_tokens": int,
+            "cost": float,
+            "latency_ms": int,
+            "metadata": dict,
+        },
+    )
+
     scim_tokens_repo = PersistenceService.get_table(
         "scim_tokens",
         {
@@ -578,6 +624,9 @@ def build_default_container() -> ApplicationContainer:
     user_admin_service = UserAdminService(PersistenceService.get_db())
 
     audit_log_service = AuditLogService(audit_log_repo=audit_log_repo)
+
+    llm_call_log_service = LLMCallLogService(llm_call_log_repo=llm_call_log_repo)
+    _register_llm_call_logging_callback(llm_call_log_service)
 
     scim_token_service = ScimTokenService(scim_tokens_repo=scim_tokens_repo)
 
@@ -794,6 +843,7 @@ def build_default_container() -> ApplicationContainer:
         project_document_bindings_repo=project_document_bindings_repo,
         profiles_repo=profiles_repo,
         audit_log_repo=audit_log_repo,
+        llm_call_log_repo=llm_call_log_repo,
         scim_tokens_repo=scim_tokens_repo,
         lineage=lineage,
         static_data_service=static_data_service,
@@ -812,6 +862,7 @@ def build_default_container() -> ApplicationContainer:
         permission_service=permission_service,
         user_admin_service=user_admin_service,
         audit_log_service=audit_log_service,
+        llm_call_log_service=llm_call_log_service,
         scim_token_service=scim_token_service,
         scim_service=scim_service,
         ruleset_access_service=ruleset_access_service,

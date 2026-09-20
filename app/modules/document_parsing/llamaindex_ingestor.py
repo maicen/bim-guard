@@ -218,20 +218,22 @@ class LlamaIndexIngestor:
             return []
 
         from app.modules.document_parsing.llamaindex_program import extract_deontic_statement
+        from app.services.llm_call_context import llm_call_context
 
         statements: list[DeonticStatement] = []
-        for node in candidates:
-            try:
-                statement = await extract_deontic_statement(
-                    node.text, clause=node.metadata, organization_id=organization_id
-                )
-            except Exception as exc:  # noqa: BLE001 - a single bad node must not abort the batch
-                logger.warning(
-                    "Deontic extraction failed node_id=%s error=%s", node.node_id, exc
-                )
-                continue
-            if statement is not None:
-                statements.append(statement)
+        with llm_call_context(context="deontic_extraction", organization_id=organization_id):
+            for node in candidates:
+                try:
+                    statement = await extract_deontic_statement(
+                        node.text, clause=node.metadata, organization_id=organization_id
+                    )
+                except Exception as exc:  # noqa: BLE001 - a single bad node must not abort the batch
+                    logger.warning(
+                        "Deontic extraction failed node_id=%s error=%s", node.node_id, exc
+                    )
+                    continue
+                if statement is not None:
+                    statements.append(statement)
                 node.deontic_statements.append(statement)
 
         return statements

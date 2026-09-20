@@ -1990,6 +1990,40 @@ class AuditLogListResponse(BaseModel):
 
 
 # ==============================================================================
+# LLM Call Log Contracts (see app/services/llm_call_log_service.py)
+# ==============================================================================
+
+
+class LLMCallLogEntryResponse(BaseModel):
+    """One recorded LLM API call."""
+
+    id: int
+    occurred_at: str
+    organization_id: Optional[int] = None
+    project_id: Optional[int] = None
+    run_key: Optional[str] = None
+    context: str
+    provider: Optional[str] = None
+    model: str
+    input: list[dict] = Field(default_factory=list)
+    output: Optional[str] = None
+    status: str
+    error: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    cost: Optional[float] = None
+    latency_ms: Optional[int] = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class LLMCallLogListResponse(BaseModel):
+    """A page of LLM call log entries, newest first."""
+
+    entries: list[LLMCallLogEntryResponse]
+
+
+# ==============================================================================
 # LLM Provider Instance Contracts (org-scoped — see app/modules/llm_providers)
 # ==============================================================================
 

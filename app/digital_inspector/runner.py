@@ -30,15 +30,22 @@ async def run_inspection(
     from langchain_core.messages import AIMessage
 
     from app.digital_inspector.graph import build_digital_inspector_graph
+    from app.services.llm_call_context import llm_call_context
 
     graph = build_digital_inspector_graph(organization_id)
 
     with pipeline_tracker.tracking(project_id, run_key=pipeline_tracker.INSPECTOR_RUN_KEY):
         pipeline_tracker.emit(_TRACKER_CODE, query_chars=len(query))
         try:
-            result = await graph.ainvoke(
-                {"messages": [{"role": "user", "content": query}]}
-            )
+            with llm_call_context(
+                context="digital_inspector",
+                organization_id=organization_id,
+                project_id=project_id,
+                run_key=pipeline_tracker.INSPECTOR_RUN_KEY,
+            ):
+                result = await graph.ainvoke(
+                    {"messages": [{"role": "user", "content": query}]}
+                )
         except Exception:
             pipeline_tracker.fail(_TRACKER_CODE, "graph invocation failed")
             raise
