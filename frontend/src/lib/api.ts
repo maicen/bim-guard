@@ -1688,8 +1688,15 @@ export const ruleExtractionApi = {
     documentId: number,
     model?: string,
     text?: string,
+    organizationId?: number | null,
   ): Promise<RuleExtractionDraftListResponse> {
-    const query = model ? `?model=${encodeURIComponent(model)}` : "";
+    // Documents carry no organization, so the server can't tell whose LLM
+    // provider key to use unless we say which organization is active.
+    const effectiveOrg = organizationId !== undefined ? organizationId : getActiveOrgId();
+    const params = new URLSearchParams();
+    if (model) params.set("model", model);
+    if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
+    const query = params.toString() ? `?${params.toString()}` : "";
     const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-drafts${query}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -64,7 +64,7 @@ from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
-from app.services.rule_extraction_service import RuleExtractionService
+from app.services.rule_extraction_service import RuleExtractionService, RuleGenerationFailedError
 from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
@@ -347,6 +347,48 @@ def _row_to_detail_response(row: dict, service: "DocumentService") -> DocumentDe
         revision_code=row.get("revision_code", "P01.01"),
         cde_state=row.get("cde_state") or "WIP",
     )
+
+
+def _resolve_llm_organization_id(
+    document_id: int,
+    doc: dict,
+    requested_org_id: Optional[int],
+    x_org_id: Optional[str],
+    current_user: CurrentUser,
+    memberships: MembershipService,
+    document_access: DocumentAccessService,
+    profiles: ProfileService,
+) -> Optional[int]:
+    """Pick the organization whose LLM provider settings an AI call on *document_id* uses.
+
+    Documents carry no ``organization_id`` (access is granted per organization),
+    so without this the key lookup got ``None`` and skipped the organization's
+    saved provider key entirely, falling back to a server environment variable
+    that is usually unset -- every model call then went out with no credentials.
+
+    An explicitly requested organization (query parameter or header) wins, but
+    only if the caller belongs to it (superadmins excepted), so nobody can spend
+    another organization's provider key by guessing its id. With nothing
+    requested, use the caller's organization that holds a grant on the document
+    when exactly one does.
+    """
+    org_id = requested_org_id
+    if org_id is None and x_org_id and x_org_id.strip().isdigit():
+        org_id = int(x_org_id.strip())
+
+    user_org_ids = memberships.org_ids_for_user(current_user.id)
+    if org_id is not None:
+        if not profiles.is_superadmin(current_user.id) and org_id not in user_org_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not belong to organization {org_id}.",
+            )
+        return org_id
+
+    granted = [oid for oid in user_org_ids if document_id in document_access.list_org_grants(oid)]
+    if len(granted) == 1:
+        return granted[0]
+    return doc.get("organization_id")
 
 
 def _resolve_parsing_instance(
@@ -1071,7 +1113,15 @@ async def extract_rule_drafts(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
     access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
     model: Optional[str] = None,
+    organization_id: Optional[int] = Query(
+        None, description="Organization whose LLM provider key to use; defaults to the caller's."
+    ),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     body: Optional[RuleDraftExtractionRequest] = None,
 ) -> RuleExtractionDraftListResponse:
     """Ingest a document and generate LlamaIndex rule drafts awaiting review.
@@ -1100,10 +1150,18 @@ async def extract_rule_drafts(
             detail="Document has no extracted text to extract rules from.",
         )
 
-    extraction_service = RuleExtractionService()
-    drafts = await extraction_service.extract_rule_drafts(
-        document_id, text, model=model, organization_id=doc.get("organization_id")
+    llm_org_id = _resolve_llm_organization_id(
+        document_id, doc, organization_id, x_org_id, current_user, memberships, document_access, profiles
     )
+    extraction_service = RuleExtractionService()
+    try:
+        drafts = await extraction_service.extract_rule_drafts(
+            document_id, text, model=model, organization_id=llm_org_id
+        )
+    except RuleGenerationFailedError as exc:
+        # The model rejected every clause (bad/missing key, no credit, ...): report the
+        # provider's own reason, not an empty "success".
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return RuleExtractionDraftListResponse(drafts=drafts)
 
 

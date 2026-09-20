@@ -473,3 +473,58 @@ def test_extract_rule_drafts_survives_one_node_failing():
     snap = extraction_progress.snapshot(9)
     assert snap.completed == 3
     assert snap.status == "complete"
+
+
+def _service_with_generator(generator, node_count: int) -> RuleExtractionService:
+    return RuleExtractionService(
+        ingestor=FakeIngestor(node_count),
+        generator=generator,
+        bsdd_client=FakeBSDDClient([]),
+        draft_service=RuleDraftService(drafts_repo=FakeDraftsTable()),
+        pages_service=FakePagesService(),
+    )
+
+
+def test_extract_rule_drafts_raises_the_models_reason_when_every_node_fails():
+    import pytest
+
+    from app.services.rule_extraction_service import RuleGenerationFailedError
+
+    class RejectingGenerator(FakeGenerator):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+            raise RuntimeError(
+                'OpenrouterException - {"error":{"message":"No cookie auth credentials found","code":401}}'
+            )
+
+    extraction_progress.STORE.clear()
+    service = _service_with_generator(RejectingGenerator(), node_count=3)
+
+    with pytest.raises(RuleGenerationFailedError) as exc_info:
+        asyncio.run(service.extract_rule_drafts(document_id=11, text="irrelevant"))
+
+    message = str(exc_info.value)
+    assert "failed on all 3 clauses" in message
+    assert "No cookie auth credentials found" in message
+    assert "LLM Providers" in message  # points at where the key is fixed
+    snap = extraction_progress.snapshot(11)
+    assert snap.status == "failed"
+
+
+def test_extract_rule_drafts_error_never_echoes_an_api_key():
+    import pytest
+
+    from app.services.rule_extraction_service import RuleGenerationFailedError
+
+    class LeakyGenerator(FakeGenerator):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+            raise RuntimeError("Incorrect API key provided: sk-or-v1-abcdef1234567890abcdef")
+
+    extraction_progress.STORE.clear()
+    service = _service_with_generator(LeakyGenerator(), node_count=1)
+
+    with pytest.raises(RuleGenerationFailedError) as exc_info:
+        asyncio.run(service.extract_rule_drafts(document_id=12, text="irrelevant"))
+
+    assert "sk-or-v1-abcdef1234567890abcdef" not in str(exc_info.value)
+    assert "failed on all 1 clause," in str(exc_info.value)
+

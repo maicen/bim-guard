@@ -34,6 +34,45 @@ _MAX_CHUNK_CHARS = 400_000
 _CAMEL_WORD_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
 _NON_ALNUM = re.compile(r"[^a-z0-9]")
 
+# Provider error text is shown to the user verbatim, so anything shaped like an
+# API key or bearer token is masked first -- providers occasionally echo the
+# (possibly partial) credential back in the error body.
+_SECRET_PATTERNS = (
+    re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"AIza[0-9A-Za-z_\-]{20,}"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
+)
+
+
+class RuleGenerationFailedError(RuntimeError):
+    """Every clause of a document failed at the AI model, so nothing was extracted.
+
+    Raised only when *all* clauses fail (a bad or missing API key, no credit,
+    an unavailable model); a single failing clause is still dropped and the
+    rest returned. Its message is written for the end user and shown as-is.
+    """
+
+
+def _redact_secrets(text: str) -> str:
+    for pattern in _SECRET_PATTERNS:
+        text = pattern.sub("***", text)
+    return text
+
+
+def _describe_generation_failures(failures: list[Exception], total: int) -> str:
+    """Build the user-facing message for a run where every clause's model call failed."""
+    first = failures[0]
+    reason = _redact_secrets(str(first)).strip()[:400] or type(first).__name__
+    lowered = f"{type(first).__name__} {reason}".lower()
+    hint = ""
+    if any(marker in lowered for marker in ("authentication", "401", "api key", "no auth credentials")):
+        hint = (
+            " This usually means the API key for the selected model's provider is missing or "
+            "invalid -- check it under Admin → External Providers → LLM Providers."
+        )
+    clause_word = "clause" if total == 1 else "clauses"
+    return f"The AI model failed on all {total} {clause_word}, so no rules were extracted. Reason: {reason}{hint}"
+
 
 def _camel_to_spaced(name: str) -> str:
     """Split camelCase into words, e.g. 'FireRating' -> 'Fire Rating'.
@@ -491,6 +530,7 @@ class RuleExtractionService:
 
         extraction_progress.start(document_id, total=len(nodes))
         semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
+        failures: list[Exception] = []
 
         async def process_node(node: contracts.DocumentNodeContract) -> list[contracts.RuleExtractionDraft]:
             async with semaphore:
@@ -503,6 +543,7 @@ class RuleExtractionService:
                     )
                 except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                     logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
+                    failures.append(exc)
                     return []
                 finally:
                     extraction_progress.increment(document_id)
@@ -526,6 +567,15 @@ class RuleExtractionService:
             extraction_progress.fail(document_id, str(exc))
             raise
         drafts = [draft for node_drafts in per_node_drafts for draft in node_drafts]
+
+        # A lone failing clause is tolerated above, but if the model failed on
+        # every clause the run is a failure, not an empty result -- returning
+        # [] here surfaced as a vague "no valid rules" with the real cause
+        # (e.g. a rejected API key) visible only in the server log.
+        if nodes and len(failures) == len(nodes):
+            message = _describe_generation_failures(failures, len(nodes))
+            extraction_progress.fail(document_id, message)
+            raise RuleGenerationFailedError(message) from failures[0]
 
         saved_drafts = draft_service.save_drafts(drafts)
         extraction_progress.complete(document_id)

@@ -117,7 +117,10 @@ def extract_rules_from_document(document_id: int) -> dict:
     import asyncio
 
     from app.bootstrap import get_container
-    from app.services.rule_extraction_service import RuleExtractionService
+    from app.services.rule_extraction_service import (
+        RuleExtractionService,
+        RuleGenerationFailedError,
+    )
 
     documents_service = get_container().documents_service
     doc = documents_service.get_document(document_id)
@@ -127,7 +130,10 @@ def extract_rules_from_document(document_id: int) -> dict:
     if not text.strip():
         return {"document_id": document_id, "error": "document has no extracted text"}
 
-    drafts = asyncio.run(RuleExtractionService().extract_rule_drafts(document_id, text))
+    try:
+        drafts = asyncio.run(RuleExtractionService().extract_rule_drafts(document_id, text))
+    except RuleGenerationFailedError as exc:
+        return {"document_id": document_id, "error": str(exc)}
     return {
         "document_id": document_id,
         "draft_count": len(drafts),
