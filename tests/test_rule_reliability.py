@@ -20,9 +20,14 @@ _KNOWN_PSETS = frozenset(
 )
 
 
+#: Stand-in for the property names bSDD defines (normalised).
+_BSDD_PROPERTIES = frozenset({"firerating", "smokestop", "clearwidth", "globalid", "somestandardthing"})
+
+
 @pytest.fixture(autouse=True)
 def _fixed_dictionary(monkeypatch):
     monkeypatch.setattr(rule_reliability, "_standard_property_sets", lambda: _KNOWN_PSETS)
+    monkeypatch.setattr(rule_reliability, "_bsdd_property_names", lambda: _BSDD_PROPERTIES)
 
 
 @pytest.mark.parametrize(
@@ -87,6 +92,33 @@ def test_the_pset_prefix_is_read_from_the_raw_name_not_the_normalised_one():
     # Normalising strips underscores; a "Pset_" prefix must still be recognised.
     assert assess_property("Pset_DoorCommon", "Reference").level == "medium"
     assert assess_property("PSET_DOORCOMMON", "FireRating").level == "medium"
+
+
+def test_bsdd_is_a_reference_not_a_verdict():
+    # Defined in bSDD, yet still graded by what real models carry: FireRating is medium,
+    # SmokeStop and ClearWidth stay low.
+    assert assess_property("Pset_DoorCommon", "FireRating").level == "medium"
+    assert assess_property("Pset_DoorCommon", "SmokeStop").level == "low"
+    assert assess_property("", "ClearWidth").level == "low"
+    assert assess_property("Pset_DoorCommon", "FireRating").bsdd_defined is True
+    assert assess_property("Pset_DoorCommon", "SmokeStop").bsdd_defined is True
+
+
+def test_bsdd_lifts_a_property_that_would_otherwise_be_unrecognised():
+    lifted = assess_property("", "SomeStandardThing")
+    assert lifted.level == "medium"
+    assert lifted.category == "bsdd_defined"
+    assert lifted.bsdd_defined is True
+    # Not defined there either: still low.
+    unknown = assess_property("", "SomethingNobodyHeardOf")
+    assert unknown.level == "low"
+    assert unknown.bsdd_defined is False
+
+
+def test_the_bsdd_flag_is_unknown_when_the_dictionary_is_unavailable(monkeypatch):
+    monkeypatch.setattr(rule_reliability, "_bsdd_property_names", lambda: frozenset())
+    assert assess_property("Pset_DoorCommon", "FireRating").bsdd_defined is None
+    assert assess_property("", "SomeStandardThing").level == "low"  # nothing to lift it with
 
 
 def test_a_pset_prefix_alone_does_not_make_a_property_set_standard():
@@ -158,5 +190,6 @@ def test_assess_reliability_endpoint_grades_before_a_rule_is_saved():
         RuleReliabilityRequest(property_set="Pset_DoorCommon", property_name="FireRating")
     )
     assert graded.reliability.level == "medium"
+    assert graded.reliability.bsdd_defined is True
     # Nothing to grade until a property is named (e.g. a half-filled form).
     assert assess_rule_reliability(RuleReliabilityRequest(property_set="Attributes")).reliability is None

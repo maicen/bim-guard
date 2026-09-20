@@ -55,7 +55,7 @@
       description:
         "Run AI extraction against documents or pasted specification text. Gemini parses natural language sentences into structured rules (IFC entity, property set, property name, operator, target value, severity).",
       result:
-        "Result: Extracted rules can be edited, toggled, and persisted into the live database catalog.",
+        "Result: Extracted rules can be edited, toggled, and persisted into the live database catalog. Each rule also carries a High / Medium / Low reliability grade showing how dependably it can be checked against a real IFC model (hover the grade, or open \"How reliability is graded\").",
       actions: [{ label: "Rule Extraction", view: "extraction", primary: true }],
     },
     {

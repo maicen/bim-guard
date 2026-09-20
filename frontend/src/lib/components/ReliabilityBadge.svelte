@@ -19,7 +19,8 @@
 <script lang="ts">
   import HoverCard from "./HoverCard.svelte";
   import { cn } from "../utils/cn";
-  import type { RuleReliability, RuleReliabilityLevel } from "../types";
+  import { RELIABILITY_STYLES } from "../reliability";
+  import type { RuleReliability } from "../types";
 
   interface Props {
     reliability?: RuleReliability | null;
@@ -33,25 +34,7 @@
 
   let { reliability = null, showReason = false, fallback = "—", loading = false }: Props = $props();
 
-  const STYLES: Record<RuleReliabilityLevel, { label: string; badge: string; dot: string }> = {
-    high: {
-      label: "High",
-      badge: "bg-success-bg text-success border-success-border",
-      dot: "bg-success",
-    },
-    medium: {
-      label: "Medium",
-      badge: "bg-caution-bg text-caution border-caution-border",
-      dot: "bg-caution",
-    },
-    low: {
-      label: "Low",
-      badge: "bg-warning-bg text-warning border-warning-border",
-      dot: "bg-warning",
-    },
-  };
-
-  let style = $derived(reliability ? STYLES[reliability.level] : null);
+  let style = $derived(reliability ? RELIABILITY_STYLES[reliability.level] : null);
 </script>
 
 {#snippet pill()}
@@ -69,11 +52,24 @@
   {/if}
 {/snippet}
 
+{#snippet bsddReference()}
+  {#if reliability?.bsdd_defined === true}
+    <p class="text-caption text-fg-muted">
+      Reference: defined in the buildingSMART Data Dictionary (bSDD).
+    </p>
+  {:else if reliability?.bsdd_defined === false}
+    <p class="text-caption text-fg-muted">
+      Reference: not found in the buildingSMART Data Dictionary (bSDD).
+    </p>
+  {/if}
+{/snippet}
+
 {#if reliability && style}
   {#if showReason}
     <div class="space-y-1">
       {@render pill()}
       <p class="text-caption text-fg-muted">{reliability.reason}</p>
+      {@render bsddReference()}
     </div>
   {:else}
     <HoverCard
@@ -84,7 +80,10 @@
       subtitle="Graded from the IFC property this rule checks"
     >
       {#snippet trigger()}{@render pill()}{/snippet}
-      <p class="text-xs text-fg-secondary">{reliability.reason}</p>
+      <div class="space-y-1.5">
+        <p class="text-xs text-fg-secondary">{reliability.reason}</p>
+        {@render bsddReference()}
+      </div>
     </HoverCard>
   {/if}
 {:else}

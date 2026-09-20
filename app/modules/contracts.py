@@ -927,6 +927,10 @@ class RuleReliability(BaseModel):
     level: Literal["high", "medium", "low"]
     category: str = Field(description="Machine-readable basis, e.g. 'standard_attribute', 'custom', 'derived'")
     reason: str = Field(description="Plain-language explanation shown to the user")
+    bsdd_defined: Optional[bool] = Field(
+        default=None,
+        description="Whether the buildingSMART Data Dictionary defines the property; null when it can't be checked",
+    )
 
 
 def build_rule_reliability(rule: Any) -> Optional[RuleReliability]:
@@ -934,7 +938,12 @@ def build_rule_reliability(rule: Any) -> Optional[RuleReliability]:
     assessment = assess_rule(rule)
     if assessment is None:
         return None
-    return RuleReliability(level=assessment.level, category=assessment.category, reason=assessment.reason)
+    return RuleReliability(
+        level=assessment.level,
+        category=assessment.category,
+        reason=assessment.reason,
+        bsdd_defined=assessment.bsdd_defined,
+    )
 
 
 class RuleReliabilityRequest(BaseModel):

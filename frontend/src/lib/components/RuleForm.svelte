@@ -7,6 +7,7 @@
   import BsddAutocomplete from "./BsddAutocomplete.svelte";
   import BsddBadge from "./BsddBadge.svelte";
   import LiveReliability from "./LiveReliability.svelte";
+  import ReliabilityLegend from "./ReliabilityLegend.svelte";
 
   interface Props {
     editingRule?: Rule | null;
@@ -404,8 +405,11 @@
 
   <!-- How reliably this rule can be checked against a real IFC model, graded from the property above. -->
   <div class="rounded-xl border border-border-default bg-surface-canvas/60 px-3.5 py-2.5">
-    <div class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-fg-secondary">
-      Reliability
+    <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+      <span class="text-xs font-semibold uppercase tracking-wider text-fg-secondary">
+        Reliability
+      </span>
+      <ReliabilityLegend variant="trigger" />
     </div>
     <LiveReliability
       propertySet={formPropertySet}

@@ -103,6 +103,21 @@ class BSDDOntologyRepository:
             if edge.get("property_set")
         )
 
+    def known_property_names(self) -> frozenset[str]:
+        """Normalised (lower-case, letters and digits only) name and code of every defined property.
+
+        Lets callers ask "does bSDD define a property called FireRating?" without caring about
+        spacing or case. Empty when the local reference data is unavailable.
+        """
+        self._refresh_if_stale()
+        names: set[str] = set()
+        for record in self._properties_by_uri.values():
+            for field in ("name", "code"):
+                normalised = "".join(ch for ch in str(record.get(field) or "").lower() if ch.isalnum())
+                if normalised:
+                    names.add(normalised)
+        return frozenset(names)
+
     def _class_item(self, uri: str) -> Optional[BSDDClassItem]:
         row = self._classes_by_uri.get(uri)
         if row is None:

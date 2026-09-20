@@ -54,6 +54,7 @@
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import DropdownMenu from "../lib/components/DropdownMenu.svelte";
   import ReliabilityBadge from "../lib/components/ReliabilityBadge.svelte";
+  import ReliabilityLegend from "../lib/components/ReliabilityLegend.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import Badge from "../lib/components/Badge.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
@@ -1145,6 +1146,8 @@
           onBulkEdit={openBulkEditRulesModal}
           onBulkDelete={() => (isBulkDeleteModalOpen = true)}
         />
+
+        <ReliabilityLegend class="px-1" />
 
         <!-- Table Container -->
         <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">

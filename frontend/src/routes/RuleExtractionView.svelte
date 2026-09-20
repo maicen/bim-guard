@@ -49,6 +49,7 @@
   import LiveReliability from "../lib/components/LiveReliability.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import ReliabilityBadge from "../lib/components/ReliabilityBadge.svelte";
+  import ReliabilityLegend from "../lib/components/ReliabilityLegend.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -785,6 +786,7 @@
           Accept or reject each candidate, then promote accepted drafts into the compliance rule
           library. Drafts persist across sessions.
         </p>
+        <ReliabilityLegend class="mt-2" />
       </div>
 
       {#if isLoadingDrafts}
@@ -1013,6 +1015,7 @@
           <p class="text-xs text-fg-muted">
             Review, modify properties, filter, and select rules to persist to the library.
           </p>
+          <ReliabilityLegend class="mt-2" />
         </div>
 
         <div class="flex flex-wrap items-center gap-2">

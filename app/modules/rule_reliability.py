@@ -43,6 +43,8 @@ class Assessment:
     level: Level
     category: str
     reason: str
+    #: Whether the buildingSMART Data Dictionary defines this property; None when it can't be checked.
+    bsdd_defined: Optional[bool] = None
 
 
 def _key(text: Optional[str]) -> str:
@@ -132,6 +134,10 @@ _REASONS = {
         "Named like a standard property set but not in the buildingSMART dictionary, so it is treated "
         "as a custom set that may be missing or named differently."
     ),
+    "bsdd_defined": (
+        "Defined in the buildingSMART Data Dictionary but not a core IFC attribute, so it is only as "
+        "reliable as the model's authoring."
+    ),
     "unrecognised": (
         "Not recognised as a standard IFC attribute or property-set property, so BIMGuard can't rely "
         "on it being present."
@@ -154,15 +160,33 @@ def _standard_property_sets() -> frozenset[str]:
         return frozenset()
 
 
+@lru_cache(maxsize=1)
+def _bsdd_property_names() -> frozenset[str]:
+    """Normalised names of every property the local bSDD dictionary defines (empty if unavailable)."""
+    try:
+        from app.services.bsdd_ontology_repository import get_bsdd_ontology_repository
+
+        return get_bsdd_ontology_repository().known_property_names()
+    except Exception:  # noqa: BLE001 - grading must never fail just because bSDD isn't loadable
+        return frozenset()
+
+
 def assess_property(property_set: Optional[str], property_name: Optional[str]) -> Optional[Assessment]:
-    """Grade a single ``(property set, property)`` pair, or ``None`` when no property is named."""
+    """Grade a single ``(property set, property)`` pair, or ``None`` when no property is named.
+
+    bSDD is a *reference*, not a verdict: being defined there shows a property is a standard one,
+    not that real models fill it in reliably (``FireRating`` is defined in bSDD and still grades
+    medium). It only ever lifts a property that would otherwise be "unrecognised".
+    """
     name = _key(property_name)
     if not name:
         return None
+    known_bsdd = _bsdd_property_names()
+    bsdd_defined = (name in known_bsdd) if known_bsdd else None
 
     for category, reason, pattern in _LOW_BY_NAME:
         if pattern.search(name):
-            return Assessment("low", category, reason)
+            return Assessment("low", category, reason, bsdd_defined)
 
     # Prefixes are read from the raw text: the normalised key has lost its underscores.
     raw_pset = (property_set or "").strip().lower()
@@ -174,23 +198,25 @@ def assess_property(property_set: Optional[str], property_name: Optional[str]) -
         is_standard_set = raw_pset in known if known else named_like_standard
         if not is_standard_set:
             reason = _REASONS["custom_pset_name"] if named_like_standard else _REASONS["custom"]
-            return Assessment("low", "custom", reason)
+            return Assessment("low", "custom", reason, bsdd_defined)
     else:
         is_standard_set = False
     is_quantity_set = is_standard_set and raw_pset.startswith("qto_")
     if is_quantity_set:
-        return Assessment("high", "quantity", _REASONS["quantity"])
+        return Assessment("high", "quantity", _REASONS["quantity"], bsdd_defined)
 
     if name in _STANDARD_ATTRIBUTES:
-        return Assessment("high", "standard_attribute", _REASONS["standard_attribute"])
+        return Assessment("high", "standard_attribute", _REASONS["standard_attribute"], bsdd_defined)
     if name in _GEOMETRY_AND_QUANTITIES:
-        return Assessment("high", "geometry", _REASONS["geometry"])
+        return Assessment("high", "geometry", _REASONS["geometry"], bsdd_defined)
     if _RELATIONSHIP.match(name):
-        return Assessment("high", "relationship", _REASONS["relationship"])
+        return Assessment("high", "relationship", _REASONS["relationship"], bsdd_defined)
     if is_standard_set or name in _STANDARD_PSET_PROPERTIES:
-        return Assessment("medium", "property_set", _REASONS["property_set"])
+        return Assessment("medium", "property_set", _REASONS["property_set"], bsdd_defined)
 
-    return Assessment("low", "unrecognised", _REASONS["unrecognised"])
+    if bsdd_defined:
+        return Assessment("medium", "bsdd_defined", _REASONS["bsdd_defined"], True)
+    return Assessment("low", "unrecognised", _REASONS["unrecognised"], bsdd_defined)
 
 
 def _get(rule: Any, *names: str) -> Optional[str]:
@@ -227,5 +253,7 @@ def assess_rule(rule: Any) -> Optional[Assessment]:
 
     name, weakest = min(graded, key=lambda item: _RANK[item[1].level])
     if name != primary_name:
-        return Assessment(weakest.level, weakest.category, f"Compared against {name}: {weakest.reason}")
+        return Assessment(
+            weakest.level, weakest.category, f"Compared against {name}: {weakest.reason}", weakest.bsdd_defined
+        )
     return weakest

@@ -488,6 +488,8 @@ export interface RuleReliability {
   category: string;
   /** Plain-language explanation shown to the user. */
   reason: string;
+  /** Whether the buildingSMART Data Dictionary (bSDD) defines the property; null when it can't be checked. */
+  bsdd_defined?: boolean | null;
 }
 
 /** The rule fields that decide reliability, for grading a rule before it is saved. */
