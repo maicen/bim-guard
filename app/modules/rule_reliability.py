@@ -1,27 +1,38 @@
 """How far a rule can be trusted to run against a real IFC model.
 
-A rule is only as dependable as the data it reads. This module grades that from
-the property a rule checks, independent of what the source PDF says, so an
-extracted rule and a hand-written one get the same answer:
+Reliability here means one thing: **if the value is present, is it true?**
 
-* **high** -- standard IFC attributes, geometry, quantities and relationships
-  (GlobalId, width, height, area, host wall, storey): BIMGuard reads and
-  verifies these straight from the model.
-* **medium** -- standard property-set data (fire rating, U-value, glazing
-  material, acoustic rating): reliable only when the property was authored and
-  exported correctly from the authoring tool.
-* **low** -- custom parameters, calculated or derived values, and anything that
-  needs project context IFC does not reliably record (clear opening dimensions,
-  escape compliance, smoke protection, manufacturer data, user-defined types).
+* **High** -- the value is stored in the file, on a path with only one source: an
+  IFC attribute the schema itself defines, the element's own entity type, or an
+  explicit stored relationship (contained-in-storey, fills/voids an opening,
+  defined-by-type) that BIMGuard reads without any interpretation. A person (or
+  the authoring tool) put it there; BIMGuard cannot get it wrong.
+* **Medium** -- the value lives in a standard property set. It is still real,
+  authored data -- true if found -- but whether the model has it at all depends
+  on the authoring tool exporting it, and BIMGuard has to search for it by name.
+* **Low** -- either nothing in the model actually holds this value, so BIMGuard's
+  own geometry engine estimates it (an estimate can be wrong even when it looks
+  plausible), or the value is genuinely not standard data at all (a project's
+  own custom field, a manufacturer field, a user-defined type).
 
-The tiers follow the reliability guidance the project team supplied. They are
-a heuristic on property *names* and property-set *naming*, kept here as data so
-they can be tuned without touching the callers. A property this module cannot
-place is graded ``low`` rather than assumed safe.
+Every grade below cites a concrete source for that reason, not a guess at what
+the name suggests:
 
-Whether a ``Pset_...`` name is a *real* buildingSMART property set is decided from the
-local bSDD dictionary (a project can borrow the ``Pset_`` prefix for its own data). Only when
-that dictionary cannot be loaded does grading fall back to the prefix alone.
+1. The live IFC schema (IFC2X3 / IFC4 / IFC4X3, via ifcopenshell) -- is this a
+   defined attribute of a real building-element class?
+2. The local buildingSMART Data Dictionary (bSDD) -- is this a defined property
+   of a real, named property set?
+3. ``app.modules.ifc_reader.ifc_geometry._GEOMETRY_PROPERTY_MAP`` -- the exact
+   list of property names BIMGuard's own geometry engine can compute when
+   nothing stored resolves them (``get_geometry_value``, invoked by the property
+   resolver in ``app.modules.ifc_reader`` only as its last-resort pass, after
+   every stored-attribute and property-set lookup has failed).
+4. A short, explicit list of categories named in the project's own reliability
+   reference image (clear-opening/clearance dimensions, escape/smoke compliance,
+   manufacturer data, user-defined types) -- not inferred, just recorded here.
+
+Anything not covered by 1-4 has no known source and grades low rather than
+being assumed safe.
 """
 
 from __future__ import annotations
@@ -52,112 +63,84 @@ def _key(text: Optional[str]) -> str:
     return re.sub(r"[^a-z0-9]", "", (text or "").lower())
 
 
-# -- LOW: matched on the property name, checked before anything else ---------------------------------
+# -- Source 1: the live IFC schema --------------------------------------------------------------------
 
-#: (category, reason, pattern over the normalised property name), first match wins.
-_LOW_BY_NAME: tuple[tuple[str, str, "re.Pattern[str]"], ...] = (
-    (
-        "user_defined",
-        "A user-defined value: its meaning is set per project, so it can't be compared reliably.",
-        re.compile(r"userdefined"),
-    ),
-    (
-        "manufacturer",
-        "Manufacturer or product data, which is rarely filled in consistently in IFC models.",
-        re.compile(r"manufacturer|modellabel|modelreference|articlenumber|productionyear|assemblyplace"),
-    ),
-    (
-        "derived",
-        "A clear-opening or clearance dimension: it is calculated from geometry and hardware, "
-        "not stored as standard IFC data.",
-        re.compile(r"clear(opening|width|height|depth|ance)"),
-    ),
-    (
-        "contextual",
-        "Depends on project context (such as escape routes or smoke protection) that IFC does not "
-        "reliably record.",
-        re.compile(r"escape|egress|smoke|compliance|traveldistance"),
-    ),
-    (
-        "derived",
-        "A calculated or derived value rather than data stored in the model.",
-        re.compile(r"calculated|derived|computed"),
-    ),
-)
+#: Building-element classes checked for attribute membership. Not exhaustive of the IFC schema --
+#: a name true here is definitely a real attribute; a name false here may still be an attribute of a
+#: class not listed (grading then falls through to the other sources rather than claiming "no").
+_SCHEMA_CLASSES = (
+    "IfcDoor", "IfcDoorType", "IfcWindow", "IfcWindowType", "IfcWall", "IfcWallType", "IfcSlab",
+    "IfcStair", "IfcStairFlight", "IfcRailing", "IfcRoof", "IfcColumn", "IfcBeam", "IfcCovering",
+    "IfcSpace", "IfcBuildingStorey", "IfcBuildingElement", "IfcElement", "IfcProduct", "IfcRoot",
+)  # fmt: skip
+_SCHEMA_NAMES = ("IFC2X3", "IFC4", "IFC4X3_ADD2")
 
-# -- Property-set naming ------------------------------------------------------------------------------
+
+@lru_cache(maxsize=1)
+def _ifc_schema_attributes() -> frozenset[str]:
+    """Normalised names of every attribute the live IFC schemas declare on ``_SCHEMA_CLASSES``.
+
+    Source: ``ifcopenshell.ifcopenshell_wrapper``'s own compiled EXPRESS schema -- the same
+    definition ifcopenshell itself parses files against. Empty if ifcopenshell isn't importable.
+    """
+    try:
+        import ifcopenshell.ifcopenshell_wrapper as wrapper
+    except Exception:  # noqa: BLE001 - grading must never fail just because ifcopenshell isn't installed
+        return frozenset()
+
+    names: set[str] = set()
+    for schema_name in _SCHEMA_NAMES:
+        try:
+            schema = wrapper.schema_by_name(schema_name)
+        except Exception:  # noqa: BLE001 - a schema variant not built into this ifcopenshell
+            continue
+        for class_name in _SCHEMA_CLASSES:
+            try:
+                declaration = schema.declaration_by_name(class_name)
+            except Exception:  # noqa: BLE001 - class not defined in this schema version
+                continue
+            names.update(_key(attribute.name()) for attribute in declaration.all_attributes())
+    return frozenset(names)
+
+
+#: BIMGuard's own names for reading an explicit stored IFC relationship -- never geometry.
+#: Verified against ifcopenshell.util.element: get_container() reads IfcRelContainedInSpatialStructure
+#: (walking IfcRelAggregates for an indirect container); FillsVoids/VoidsElements are the inverse
+#: attributes of IfcRelFillsElement/IfcRelVoidsElement; get_type() reads IfcRelDefinesByType.
+_RELATIONSHIP_LOOKUPS: dict[str, str] = {
+    "storeyglobalid": "IfcRelContainedInSpatialStructure (the element's spatial container)",
+    "storeyname": "IfcRelContainedInSpatialStructure (the element's spatial container)",
+    "hostglobalid": "IfcRelVoidsElement (the wall/slab the opening this element fills belongs to)",
+    "hostifcclass": "IfcRelVoidsElement (the wall/slab the opening this element fills belongs to)",
+    "openingglobalid": "IfcRelFillsElement (the opening this element fills)",
+    "openingifcclass": "IfcRelFillsElement (the opening this element fills)",
+    "typeglobalid": "IfcRelDefinesByType (the element's type object)",
+    "placementmatrix": "IfcLocalPlacement (the element's own placement)",
+}
+
+# -- Source 2: bSDD (property-set membership) ---------------------------------------------------------
 
 #: Pseudo property sets the extractor and rule form use for things that are not property sets at all.
 _ATTRIBUTE_PSETS = frozenset(
     {"", "attributes", "attribute", "ifcattributes", "geometry", "relationships", "relationship", "quantities"}
 )
 
-# -- HIGH: standard attributes, geometry/quantities, relationships ----------------------------------
-
-_STANDARD_ATTRIBUTES = frozenset(
-    """globalid name description objecttype tag predefinedtype ifcclass class type elementtype longname
-    operationtype""".split()
-)
-_GEOMETRY_AND_QUANTITIES = frozenset(
-    """width height depth length area volume thickness perimeter elevation overallwidth overallheight
-    netarea grossarea netvolume grossvolume netwidth grosswidth netheight grossheight
-    placementmatrix placement boundingbox""".split()
-)
-#: Relationship-derived lookups such as StoreyGlobalId, HostIfcClass, OpeningGlobalId.
-_RELATIONSHIP = re.compile(
-    r"^(storey|host|opening|type|container|space)(globalid|name|ifcclass|id)$"
-    r"|^(storey|hostwall|hostelement)$"
-)
-
-# -- MEDIUM: standard property-set data, even when the property set itself isn't stated -------------
-
-_STANDARD_PSET_PROPERTIES = frozenset(
-    """firerating thermaltransmittance uvalue acousticrating glazingmaterial glazing isexternal
-    loadbearing combustible surfacespreadofflame securityrating handicapaccessible selfclosing
-    reference status material materialname""".split()
-)
-
-_REASONS = {
-    "standard_attribute": "A standard IFC attribute: BIMGuard reads and verifies it directly from the model.",
-    "geometry": "Geometry or a quantity: BIMGuard reads and verifies it directly from the model.",
-    "relationship": "An IFC relationship (host, storey, opening): BIMGuard reads and verifies it directly.",
-    "quantity": "A standard quantity set value: BIMGuard reads and verifies it directly from the model.",
-    "property_set": (
-        "Standard property-set data: reliable only if the property was authored and exported correctly "
-        "from the authoring tool."
-    ),
-    "custom": (
-        "A custom property set: authored per project rather than defined by IFC, so it may be missing "
-        "or named differently."
-    ),
-    "custom_pset_name": (
-        "Named like a standard property set but not in the buildingSMART dictionary, so it is treated "
-        "as a custom set that may be missing or named differently."
-    ),
-    "bsdd_defined": (
-        "Defined in the buildingSMART Data Dictionary but not a core IFC attribute, so it is only as "
-        "reliable as the model's authoring."
-    ),
-    "unrecognised": (
-        "Not recognised as a standard IFC attribute or property-set property, so BIMGuard can't rely "
-        "on it being present."
-    ),
-}
-
 
 @lru_cache(maxsize=1)
-def _standard_property_sets() -> frozenset[str]:
-    """Lower-cased names of the standard property sets in the local bSDD dictionary.
+def _property_set_members() -> dict[str, frozenset[str]]:
+    """Every bSDD property-set name mapped to the properties it actually contains.
 
-    Empty when the dictionary is unavailable; callers then fall back to the name prefix.
-    Cached for the life of the process -- the reference data is static.
+    A pset+property *pair* lookup, not two independent existence checks -- ``Pset_DoorCommon``
+    being real, and some property being real, does not mean that property is IN that set. This
+    is what catches an invented name like ``Qto_DoorBaseQuantities.QtoWidth``: the set is real,
+    ``QtoWidth`` is not one of its members (the real name is ``Width``). Empty when bSDD isn't loadable.
     """
     try:
         from app.services.bsdd_ontology_repository import get_bsdd_ontology_repository
 
-        return get_bsdd_ontology_repository().known_property_set_names()
+        return get_bsdd_ontology_repository().known_property_set_members()
     except Exception:  # noqa: BLE001 - grading must never fail just because bSDD isn't loadable
-        return frozenset()
+        return {}
 
 
 @lru_cache(maxsize=1)
@@ -171,51 +154,149 @@ def _bsdd_property_names() -> frozenset[str]:
         return frozenset()
 
 
+# -- Source 3: BIMGuard's own geometry engine -----------------------------------------------------
+
+@lru_cache(maxsize=1)
+def _geometry_computed_names() -> frozenset[str]:
+    """Normalised property names BIMGuard's geometry engine can compute (empty if the module can't be read).
+
+    Reads the key set of ``_GEOMETRY_PROPERTY_MAP`` directly from
+    ``app.modules.ifc_reader.ifc_geometry`` -- the actual last-resort fallback table the property
+    resolver (``app.modules.ifc_reader``, Pass 7) consults, not a separate guess at the same list.
+    Its keys are already normalised (lower-case, no separators).
+    """
+    try:
+        from app.modules.ifc_reader.ifc_geometry import _GEOMETRY_PROPERTY_MAP
+
+        return frozenset(_GEOMETRY_PROPERTY_MAP)
+    except Exception:  # noqa: BLE001 - grading must never fail just because that module can't be read
+        return frozenset()
+
+
+# -- Source 4: named directly in the project's reliability reference image ---------------------------
+
+#: (category, reason, pattern), checked only after nothing above resolved the name. Quotes the image's
+#: own five Low examples plus the pattern for a user-defined enum value -- not an inferred keyword list.
+_NAMED_LOW_CATEGORIES: tuple[tuple[str, str, "re.Pattern[str]"], ...] = (
+    (
+        "user_defined",
+        'Named as the project\'s "user-defined" example: its meaning is set per project, not by IFC.',
+        re.compile(r"userdefined"),
+    ),
+    (
+        "manufacturer",
+        'Named as the project\'s "manufacturer data" example: rarely filled in consistently.',
+        re.compile(r"manufacturer|modellabel|modelreference|articlenumber"),
+    ),
+    (
+        "derived",
+        'Named as the project\'s "clear opening dimensions" example: this is what the geometry-engine '
+        "clearance check computes, not a stored value.",
+        re.compile(r"clear(opening|width|height|depth|ance)"),
+    ),
+    (
+        "contextual",
+        'Named as the project\'s "escape compliance / smoke protection" example: not IFC data.',
+        re.compile(r"escapecompliance|smokeprotection|smokestop"),
+    ),
+)
+
+_REASONS = {
+    "ifc_class": "The element's own IFC entity type: this is what it is, not something that could be missing or wrong.",
+    "schema_attribute": (
+        "A direct IFC attribute -- defined by the IFC schema itself and read straight from the file, "
+        "never calculated."
+    ),
+    "quantity": (
+        "A standard IFC quantity (Qto_...): exported by the authoring tool as a stored value, not "
+        "computed by BIMGuard."
+    ),
+    "property_set": (
+        "A standard property set (buildingSMART Data Dictionary): true if found, because it was "
+        "authored, not guessed -- but many models don't export it."
+    ),
+    "bsdd_defined": (
+        "Defined in the buildingSMART Data Dictionary but not a core IFC attribute: true if found, "
+        "but only as complete as the model's authoring."
+    ),
+    "custom_pset_name": (
+        "Named like a standard property set but not in the buildingSMART dictionary, so it is treated "
+        "as a project-specific one that may be missing or hold anything."
+    ),
+    "unrecognised": (
+        "Not found in the IFC schema, the buildingSMART Dictionary, or BIMGuard's own geometry engine "
+        "-- there is no known source for this value."
+    ),
+}
+
+
+def _geometry_reason(name: str) -> str:
+    try:
+        from app.modules.ifc_reader.ifc_geometry import _GEOMETRY_PROPERTY_MAP
+
+        method = _GEOMETRY_PROPERTY_MAP.get(name, "")
+    except Exception:  # noqa: BLE001
+        method = ""
+    return (
+        "Not stored anywhere in the model: BIMGuard's geometry engine computes this from the mesh "
+        f"({method or 'a derived measurement'}) only when nothing authored is found -- a calculated "
+        "estimate, not a value read from the file, and it can be wrong even when it looks plausible."
+    )
+
+
 def assess_property(property_set: Optional[str], property_name: Optional[str]) -> Optional[Assessment]:
     """Grade a single ``(property set, property)`` pair, or ``None`` when no property is named.
 
-    bSDD is a *reference*, not a verdict: being defined there shows a property is a standard one,
-    not that real models fill it in reliably (``FireRating`` is defined in bSDD and still grades
-    medium). It only ever lifts a property that would otherwise be "unrecognised".
+    Checks the live IFC schema and bSDD, then BIMGuard's own geometry-computation table, in that
+    order -- the same order the property resolver itself tries a stored value before ever falling
+    back to a geometry estimate (see the module docstring for each source).
     """
     name = _key(property_name)
     if not name:
         return None
-    known_bsdd = _bsdd_property_names()
-    bsdd_defined = (name in known_bsdd) if known_bsdd else None
+    bsdd_defined = (name in _bsdd_property_names()) if _bsdd_property_names() else None
 
-    for category, reason, pattern in _LOW_BY_NAME:
-        if pattern.search(name):
-            return Assessment("low", category, reason, bsdd_defined)
+    if name == "ifcclass":
+        return Assessment("high", "ifc_class", _REASONS["ifc_class"], bsdd_defined)
+    if name in _RELATIONSHIP_LOOKUPS:
+        reason = f"Read from an explicit stored IFC relationship: {_RELATIONSHIP_LOOKUPS[name]}."
+        return Assessment("high", "relationship", reason, bsdd_defined)
+    if name in _ifc_schema_attributes():
+        return Assessment("high", "schema_attribute", _REASONS["schema_attribute"], bsdd_defined)
 
-    # Prefixes are read from the raw text: the normalised key has lost its underscores.
     raw_pset = (property_set or "").strip().lower()
     pset = _key(property_set)
     named_like_standard = raw_pset.startswith(("pset_", "qto_"))
     if pset and pset not in _ATTRIBUTE_PSETS:
-        known = _standard_property_sets()
-        # The dictionary is authoritative; the prefix alone is only a fallback for when it is missing.
-        is_standard_set = raw_pset in known if known else named_like_standard
-        if not is_standard_set:
-            reason = _REASONS["custom_pset_name"] if named_like_standard else _REASONS["custom"]
-            return Assessment("low", "custom", reason, bsdd_defined)
-    else:
-        is_standard_set = False
-    is_quantity_set = is_standard_set and raw_pset.startswith("qto_")
-    if is_quantity_set:
-        return Assessment("high", "quantity", _REASONS["quantity"], bsdd_defined)
-
-    if name in _STANDARD_ATTRIBUTES:
-        return Assessment("high", "standard_attribute", _REASONS["standard_attribute"], bsdd_defined)
-    if name in _GEOMETRY_AND_QUANTITIES:
-        return Assessment("high", "geometry", _REASONS["geometry"], bsdd_defined)
-    if _RELATIONSHIP.match(name):
-        return Assessment("high", "relationship", _REASONS["relationship"], bsdd_defined)
-    if is_standard_set or name in _STANDARD_PSET_PROPERTIES:
+        members_by_set = _property_set_members()
+        if members_by_set:
+            members = members_by_set.get(raw_pset)
+            if members is None:
+                reason = _REASONS["custom_pset_name"] if named_like_standard else "Not a standard or recognised property set."
+                return Assessment("low", "custom", reason, bsdd_defined)
+            if name not in members:
+                reason = (
+                    f"'{property_set}' is a real property set, but the buildingSMART Dictionary does "
+                    f"not list '{property_name}' as one of its properties -- this looks like an "
+                    "invented or mistyped name, not a value the model could ever carry."
+                )
+                return Assessment("low", "not_in_set", reason, False)
+        elif not named_like_standard:
+            return Assessment("low", "custom", "Not a standard or recognised property set.", bsdd_defined)
+        if raw_pset.startswith("qto_"):
+            return Assessment("high", "quantity", _REASONS["quantity"], bsdd_defined)
         return Assessment("medium", "property_set", _REASONS["property_set"], bsdd_defined)
 
     if bsdd_defined:
         return Assessment("medium", "bsdd_defined", _REASONS["bsdd_defined"], True)
+
+    if name in _geometry_computed_names():
+        return Assessment("low", "calculated", _geometry_reason(name), bsdd_defined)
+
+    for category, reason, pattern in _NAMED_LOW_CATEGORIES:
+        if pattern.search(name):
+            return Assessment("low", category, reason, bsdd_defined)
+
     return Assessment("low", "unrecognised", _REASONS["unrecognised"], bsdd_defined)
 
 
@@ -231,12 +312,10 @@ def _get(rule: Any, *names: str) -> Optional[str]:
 def assess_rule(rule: Any) -> Optional[Assessment]:
     """Grade a rule by the *least* reliable property it depends on.
 
-    Reads ``property_set``/``property_name`` (or the extractor's ``pset``/
-    ``property`` spellings) plus any other property the check compares against
-    (``compare_property``, ``value_min_property``, ``value_max_property``).
-    Returns ``None`` for a rule that names no property, e.g. an engine rule
-    with no IFC property to grade, so callers can show "not applicable"
-    instead of a made-up grade.
+    Reads ``property_set``/``property_name`` (or the extractor's ``pset``/``property`` spellings)
+    plus any other property the check compares against (``compare_property``, ``value_min_property``,
+    ``value_max_property``). Returns ``None`` for a rule that names no property, so callers can show
+    "not applicable" instead of a made-up grade.
     """
     pset = _get(rule, "property_set", "pset")
     primary_name = _get(rule, "property_name", "property")

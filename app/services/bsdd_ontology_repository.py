@@ -88,26 +88,36 @@ class BSDDOntologyRepository:
             return
         self._load_from_local_reference()
 
-    def known_property_set_names(self) -> frozenset[str]:
-        """Lower-cased name of every property set the local ontology knows.
+    def known_property_set_members(self) -> dict[str, frozenset[str]]:
+        """Every property set name the local ontology knows, mapped to the properties it actually contains.
 
-        Lets callers tell a genuine buildingSMART property set (``Pset_DoorCommon``)
-        from a project-specific one that merely borrows the ``Pset_`` prefix
-        (``Pset_Compliance``). Empty when the local reference data is unavailable.
+        Both the set name and each property name/code are normalised (lower-case, letters and digits
+        only). This is a set-*and*-property pairing, not two independent lookups -- ``Pset_DoorCommon``
+        containing ``FireRating`` does not mean every ``Pset_`` set contains it, and a project can name
+        a property that merely *sounds* real (``QtoWidth``) without it being a member of the quantity
+        set it's claimed to belong to. Empty when the local reference data is unavailable.
         """
         self._refresh_if_stale()
-        return frozenset(
-            str(edge["property_set"]).strip().lower()
-            for edges in self._edges_by_class.values()
-            for edge in edges
-            if edge.get("property_set")
-        )
+        members: dict[str, set[str]] = {}
+        for edges in self._edges_by_class.values():
+            for edge in edges:
+                pset = edge.get("property_set")
+                prop = self._properties_by_uri.get(edge.get("property_uri"))
+                if not pset or not prop:
+                    continue
+                bucket = members.setdefault(str(pset).strip().lower(), set())
+                for field in ("name", "code"):
+                    normalised = "".join(ch for ch in str(prop.get(field) or "").lower() if ch.isalnum())
+                    if normalised:
+                        bucket.add(normalised)
+        return {pset: frozenset(names) for pset, names in members.items()}
 
     def known_property_names(self) -> frozenset[str]:
         """Normalised (lower-case, letters and digits only) name and code of every defined property.
 
         Lets callers ask "does bSDD define a property called FireRating?" without caring about
-        spacing or case. Empty when the local reference data is unavailable.
+        spacing, case, or which property set(s) it belongs to. Empty when the local reference data
+        is unavailable.
         """
         self._refresh_if_stale()
         names: set[str] = set()
