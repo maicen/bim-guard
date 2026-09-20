@@ -32,6 +32,7 @@ def _fixed_dictionary(monkeypatch):
         ("", "IfcClass"),
         ("Attributes", "Name"),
         ("", "PredefinedType"),
+        ("", "OperationType"),
         ("", "StoreyGlobalId"),
         ("", "StoreyName"),
         ("", "PlacementMatrix"),

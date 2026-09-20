@@ -93,7 +93,8 @@ _ATTRIBUTE_PSETS = frozenset(
 # -- HIGH: standard attributes, geometry/quantities, relationships ----------------------------------
 
 _STANDARD_ATTRIBUTES = frozenset(
-    "globalid name description objecttype tag predefinedtype ifcclass class type elementtype longname".split()
+    """globalid name description objecttype tag predefinedtype ifcclass class type elementtype longname
+    operationtype""".split()
 )
 _GEOMETRY_AND_QUANTITIES = frozenset(
     """width height depth length area volume thickness perimeter elevation overallwidth overallheight
