@@ -90,6 +90,8 @@ class RuleDraftService:
                     "confidence": draft.confidence,
                     "extraction_method": draft.extraction_method,
                     "status": draft.status.value,
+                    # Carries e.g. the bSDD grounding note, so the label survives a reload.
+                    "review_notes": draft.review_notes,
                     "created_at": now_iso_utc(),
                 }
             )

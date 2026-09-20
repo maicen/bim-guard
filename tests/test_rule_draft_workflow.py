@@ -81,6 +81,16 @@ def test_save_drafts_persists_pending_review_with_ids():
     assert table.rows[0]["status"] == "pending_review"
 
 
+def test_save_drafts_keeps_the_grounding_note_so_the_bsdd_label_survives_a_reload():
+    service, table, _ = _service()
+    note = "bSDD grounding: corrected property to Pset_DoorCommon.FireRating (was fire rating)."
+
+    service.save_drafts([_draft().model_copy(update={"review_notes": note})])
+
+    assert table.rows[0]["review_notes"] == note
+    assert service.list_drafts(1)[0]["review_notes"] == note
+
+
 def test_list_drafts_filters_by_document_and_orders_newest_first():
     service, _, _ = _service()
     service.save_drafts([_draft(document_id=1), _draft(document_id=2), _draft(document_id=1)])
