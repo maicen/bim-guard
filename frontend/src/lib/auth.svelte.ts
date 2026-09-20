@@ -92,25 +92,60 @@ class AuthState {
       this.loading = false;
       this.#loadProfile();
     });
+
+    // The retry budget below is finite, so a backend that comes back later
+    // (a dev server restart, a redeploy) is picked up when the user returns
+    // to the tab instead of leaving the header without its Admin button.
+    window.addEventListener("focus", () => {
+      if (this.session && !this.profile) this.#loadProfile();
+    });
   }
 
+  /** Delays between automatic retries of a failed profile load; then it gives up until refocus. */
+  static readonly #PROFILE_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 15_000, 30_000];
+  #profileRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  #profileRetryCount = 0;
+
   async #loadProfile() {
+    if (this.#profileRetryTimer) clearTimeout(this.#profileRetryTimer);
+    this.#profileRetryTimer = null;
+
     if (!this.session) {
       this.profile = null;
+      this.#profileRetryCount = 0;
       setActiveOrgId(null);
       clearTenantCaches();
       return;
     }
+    const userId = this.session.user.id;
     try {
-      this.profile = await authApi.me(this.session.access_token);
+      const profile = await authApi.me(this.session.access_token);
+      // Signed out (or switched user) while the request was in flight.
+      if (this.session?.user.id !== userId) return;
+      this.profile = profile;
+      this.#profileRetryCount = 0;
       setActiveOrgId(this.activeOrganizationId);
       clearTenantCaches();
     } catch {
+      if (this.session?.user.id !== userId) return;
       // Non-fatal: the header falls back to showing the Supabase user's
-      // email, which is already on this.session.
-      this.profile = null;
-      setActiveOrgId(null);
+      // email, which is already on this.session. A profile we already have
+      // for this same user is kept rather than wiped -- it drives the Admin
+      // button and org switcher, which must not vanish because the backend
+      // blinked (e.g. a dev-server reload) during a token refresh.
+      if (this.profile?.id !== userId) {
+        this.profile = null;
+        setActiveOrgId(null);
+      }
+      this.#scheduleProfileRetry();
     }
+  }
+
+  #scheduleProfileRetry() {
+    const delay = AuthState.#PROFILE_RETRY_DELAYS_MS[this.#profileRetryCount];
+    if (delay === undefined) return;
+    this.#profileRetryCount += 1;
+    this.#profileRetryTimer = setTimeout(() => this.#loadProfile(), delay);
   }
 
   /** Merge fields into the caller's profile and refresh the cached copy. */
