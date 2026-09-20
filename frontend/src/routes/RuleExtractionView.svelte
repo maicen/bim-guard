@@ -309,9 +309,15 @@
   let llmModelsError = $state("");
   let usingShortlist = $state(false);
 
+  // Bumped per call so a slow response for a previous organization can't
+  // overwrite the list for the one now selected.
+  let llmModelsRequest = 0;
+
   async function loadLlmModels() {
     const activeOrg = authState.activeOrganization;
     if (!activeOrg) return;
+    const request = ++llmModelsRequest;
+    const isCurrent = () => request === llmModelsRequest;
     llmModelsLoading = true;
     llmModelsError = "";
     try {
@@ -319,6 +325,7 @@
         activeOrg.organization_id,
         RULE_EXTRACTION_TASK_KEY,
       );
+      if (!isCurrent()) return;
       if (shortlist.length > 0) {
         usingShortlist = true;
         llmModels = shortlist.map((a) => ({
@@ -339,27 +346,43 @@
 
       usingShortlist = false;
       const instances = await llmProvidersApi.list(activeOrg.organization_id);
+      if (!isCurrent()) return;
       const enabled = instances.filter((i) => i.is_enabled);
       const primary: LLMProviderInstance | undefined =
         enabled.find((i) => i.is_default) ?? enabled[0];
       if (!primary) {
         llmModels = [];
+        selectedModel = "";
         return;
       }
-      llmModels = await llmProvidersApi.models(activeOrg.organization_id, primary.id);
+      const models = await llmProvidersApi.models(activeOrg.organization_id, primary.id);
+      if (!isCurrent()) return;
+      llmModels = models;
       if (llmModels.length > 0 && !llmModels.some((m) => m.id === selectedModel)) {
         selectedModel = llmModels[0].id;
       }
     } catch (err: any) {
+      if (!isCurrent()) return;
       llmModelsError = err.message || "Failed to load models from the configured LLM provider.";
       llmModels = [];
+      selectedModel = "";
     } finally {
-      llmModelsLoading = false;
+      if (isCurrent()) llmModelsLoading = false;
     }
   }
 
+  // Load on first render *and* whenever the active organization changes or
+  // first resolves. A one-shot call in onMount ran before
+  // authState.activeOrganization was set on a fresh page load (leaving a
+  // misleading "No LLM provider configured" banner up), and went stale after
+  // an organization switch. untrack: loadLlmModels reads other state
+  // synchronously, which must not become effect dependencies.
+  $effect(() => {
+    const _orgId = authState.activeOrganizationId;
+    untrack(() => loadLlmModels());
+  });
+
   onMount(async () => {
-    loadLlmModels();
     try {
       documents = await documentsApi.list();
     } catch {
