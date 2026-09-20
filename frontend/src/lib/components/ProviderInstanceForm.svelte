@@ -80,6 +80,7 @@
       <input
         id="provider-instance-name"
         type="text"
+        autocomplete="off"
         required
         bind:value={name}
         placeholder="local, hosted-1, hosted-2..."
@@ -122,6 +123,7 @@
     <input
       id="provider-instance-url"
       type="text"
+      autocomplete="off"
       required={urlRequired}
       bind:value={url}
       placeholder={selectedKindInfo?.url_placeholder || "https://..."}

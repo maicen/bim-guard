@@ -24,12 +24,20 @@
   Masked API-key/secret field shared by every provider config form (Document
   Parsing and LLM Providers) so credential handling looks and behaves the
   same everywhere — a plain type="password" input with a show/hide toggle.
+
+  An API key is not a login: browsers otherwise offer to save it as a site
+  password and then autofill it into the next provider form, so an Anthropic key
+  can land in a Docling instance's key field. Chrome ignores autocomplete="off"
+  on password inputs, hence "new-password"; the data-* flags cover 1Password /
+  LastPass.
 -->
 <div class="relative">
   <input
     {id}
     type={revealed ? "text" : "password"}
-    autocomplete="off"
+    autocomplete="new-password"
+    data-1p-ignore
+    data-lpignore="true"
     {required}
     bind:value
     {placeholder}
