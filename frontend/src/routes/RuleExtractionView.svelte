@@ -40,6 +40,7 @@
   import SectionTree from "../lib/components/SectionTree.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import Button from "../lib/components/ui/Button.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
@@ -219,30 +220,99 @@
     }
   }
 
+  // Which bulk action is in flight (drives the loading buttons) and how far along it is.
+  let bulkAction: "accept" | "promote" | null = $state(null);
+  let bulkProgress = $state({ done: 0, total: 0 });
+
+  /** Run `worker` over `items`, `concurrency` at a time. `worker` must handle its own errors. */
+  async function runBulk<T>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T) => Promise<void>,
+  ): Promise<void> {
+    bulkProgress = { done: 0, total: items.length };
+    for (let i = 0; i < items.length; i += concurrency) {
+      await Promise.all(
+        items.slice(i, i + concurrency).map(async (item) => {
+          await worker(item);
+          bulkProgress.done += 1;
+        }),
+      );
+    }
+  }
+
   async function promoteSelectedDrafts(): Promise<void> {
+    if (bulkAction) return;
     const toPromote = draftTable.selectedRows.filter(
       (d) => d.status === "accepted" || d.status === "edited",
     );
     error = "";
-    for (const draft of toPromote) {
-      try {
-        await ruleExtractionApi.promoteDraft(draft.id!);
-      } catch (err: any) {
-        error = err.message || `Failed to promote "${draft.proposed_rule.rule_id}".`;
-      }
+    successMessage = "";
+    if (toPromote.length === 0) {
+      error = "None of the selected drafts are accepted or edited — accept them before promoting.";
+      return;
     }
-    const promotedIds = new Set(toPromote.map((d) => d.id));
+
+    bulkAction = "promote";
+    const promotedIds = new Set<number | undefined>();
+    let failed = 0;
+    let firstError = "";
+    try {
+      // One at a time: each promote inserts into the rule library.
+      await runBulk(toPromote, 1, async (draft) => {
+        try {
+          await ruleExtractionApi.promoteDraft(draft.id!);
+          promotedIds.add(draft.id);
+        } catch (err: any) {
+          failed += 1;
+          firstError ||= err.message || `Failed to promote "${draft.proposed_rule.rule_id}".`;
+        }
+      });
+    } finally {
+      bulkAction = null;
+    }
+
     draftRules = draftRules.filter((d) => !promotedIds.has(d.id));
     draftTable.clearSelection();
-    if (!error) {
-      successMessage = `Promoted ${toPromote.length} draft(s) into the compliance rule library.`;
+    if (promotedIds.size > 0) {
+      successMessage = `Promoted ${promotedIds.size} draft(s) into the compliance rule library.`;
+    }
+    if (failed > 0) {
+      error = `${failed} of ${toPromote.length} drafts could not be promoted: ${firstError}`;
     }
   }
 
   async function acceptSelectedDrafts(): Promise<void> {
+    if (bulkAction) return;
     const toAccept = draftTable.selectedRows.filter((d) => d.status === "pending_review");
-    for (const draft of toAccept) {
-      await reviewDraft(draft, "accepted");
+    error = "";
+    successMessage = "";
+    if (toAccept.length === 0) {
+      error = "None of the selected drafts are pending review.";
+      return;
+    }
+
+    bulkAction = "accept";
+    let accepted = 0;
+    let failed = 0;
+    let firstError = "";
+    try {
+      await runBulk(toAccept, 5, async (draft) => {
+        try {
+          await reviewDraft(draft, "accepted");
+          accepted += 1;
+        } catch (err: any) {
+          failed += 1;
+          firstError ||= err.message || `Failed to accept "${draft.proposed_rule.rule_id}".`;
+        }
+      });
+    } finally {
+      bulkAction = null;
+    }
+
+    if (accepted > 0) successMessage = `Accepted ${accepted} draft(s).`;
+    if (failed > 0) {
+      error = `${failed} of ${toAccept.length} drafts could not be accepted: ${firstError}`;
     }
   }
 
@@ -822,22 +892,36 @@
           onClearSelection={() => draftTable.clearSelection()}
         >
           {#snippet children()}
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               onclick={acceptSelectedDrafts}
-              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-600/30 px-3 py-1.5 font-semibold text-emerald-200 transition-all hover:bg-emerald-600/50"
+              loading={bulkAction === "accept"}
+              disabled={bulkAction !== null}
+              class="border-success-border bg-success-bg text-success hover:bg-success-bg hover:text-success"
             >
-              <Check class="h-3.5 w-3.5" />
-              <span>Accept</span>
-            </button>
-            <button
-              type="button"
+              {#if bulkAction !== "accept"}<Check class="h-3.5 w-3.5" />{/if}
+              <span>
+                {bulkAction === "accept"
+                  ? `Accepting ${bulkProgress.done}/${bulkProgress.total}…`
+                  : "Accept"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onclick={promoteSelectedDrafts}
-              class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-600/30 px-3 py-1.5 font-semibold text-blue-200 transition-all hover:bg-blue-600/50"
+              loading={bulkAction === "promote"}
+              disabled={bulkAction !== null}
+              class="border-info-border bg-info-bg text-info hover:bg-info-bg hover:text-info"
             >
-              <Upload class="h-3.5 w-3.5 rotate-180" />
-              <span>Promote to Library</span>
-            </button>
+              {#if bulkAction !== "promote"}<Upload class="h-3.5 w-3.5 rotate-180" />{/if}
+              <span>
+                {bulkAction === "promote"
+                  ? `Promoting ${bulkProgress.done}/${bulkProgress.total}…`
+                  : "Promote to Library"}
+              </span>
+            </Button>
           {/snippet}
         </BulkActionBar>
 
