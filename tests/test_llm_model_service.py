@@ -106,6 +106,55 @@ def test_anthropic_models_use_provider_headers(monkeypatch):
     assert models == [("anthropic/claude-test", "Claude Test")]
 
 
+def test_anthropic_failure_reports_the_providers_own_reason(monkeypatch):
+    def handler(request):
+        return httpx.Response(
+            400,
+            json={
+                "type": "error",
+                "error": {"type": "invalid_request_error", "message": "Your credit balance is too low."},
+            },
+        )
+
+    _install_transport(monkeypatch, handler)
+
+    try:
+        asyncio.run(LLMModelService().list_models("anthropic", api_key="anthropic-secret"))
+    except RuntimeError as exc:
+        assert str(exc) == "Anthropic model request failed with HTTP 400. Your credit balance is too low."
+    else:
+        raise AssertionError("expected the failed request to raise")
+
+
+def test_anthropic_failure_never_surfaces_a_message_that_echoes_the_key(monkeypatch):
+    def handler(request):
+        return httpx.Response(
+            400,
+            json={"type": "error", "error": {"type": "invalid_request_error", "message": "bad key anthropic-secret"}},
+        )
+
+    _install_transport(monkeypatch, handler)
+
+    try:
+        asyncio.run(LLMModelService().list_models("anthropic", api_key="anthropic-secret"))
+    except RuntimeError as exc:
+        assert "anthropic-secret" not in str(exc)
+        assert str(exc) == "Anthropic model request failed with HTTP 400."
+    else:
+        raise AssertionError("expected the failed request to raise")
+
+
+def test_anthropic_failure_with_a_non_json_body_keeps_the_status_only(monkeypatch):
+    _install_transport(monkeypatch, lambda request: httpx.Response(502, text="<html>Bad Gateway</html>"))
+
+    try:
+        asyncio.run(LLMModelService().list_models("anthropic", api_key="anthropic-secret"))
+    except RuntimeError as exc:
+        assert str(exc) == "Anthropic model request failed with HTTP 502."
+    else:
+        raise AssertionError("expected the failed request to raise")
+
+
 def test_openai_compatible_models_get_correct_litellm_prefix(monkeypatch):
     requests = []
 

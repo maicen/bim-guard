@@ -8,8 +8,30 @@ from app.modules.llm_providers.base import (
     LLMModelInfo,
     LLMProviderDriver,
     LLMProviderRegistry,
-    raise_for_provider_error,
 )
+
+
+def _anthropic_error_summary(response: httpx.Response, api_key: str) -> str:
+    """Describe a failed Anthropic request, including Anthropic's own reason.
+
+    The shared ``raise_for_provider_error`` reports only the status code, which
+    leaves a bare "HTTP 400" with no way to tell a billing problem from a bad
+    parameter. Anthropic's structured error body (``error.message``) is that
+    reason and does not echo credentials, so it is surfaced here -- unless it
+    ever contains the key, in which case only the status is reported.
+    """
+    summary = f"Anthropic model request failed with HTTP {response.status_code}."
+    try:
+        payload = response.json()
+    except ValueError:
+        return summary
+    error = payload.get("error") if isinstance(payload, dict) else None
+    message = error.get("message") if isinstance(error, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        return summary
+    if api_key and api_key in message:
+        return summary
+    return f"{summary} {message.strip()[:300]}"
 
 
 class AnthropicDriver(LLMProviderDriver):
@@ -33,7 +55,8 @@ class AnthropicDriver(LLMProviderDriver):
                 if after_id:
                     params["after_id"] = after_id
                 response = await client.get(f"{base}/models", params=params, headers=headers)
-                raise_for_provider_error(response, "Anthropic")
+                if response.is_error:
+                    raise RuntimeError(_anthropic_error_summary(response, api_key))
                 payload = response.json()
                 # Anthropic's /models endpoint publishes neither pricing nor
                 # context length, unlike OpenRouter's — see LLMModelInfo.
