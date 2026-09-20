@@ -716,11 +716,22 @@
       <button
         type="button"
         disabled={isExtracting || !selectedModel}
+        aria-busy={isExtracting}
         onclick={handleExtract}
-        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover {isExtracting
+          ? 'disabled:cursor-progress'
+          : 'disabled:opacity-50'}"
       >
-        <Sparkles class="h-4 w-4" />
-        <span>
+        {#if isExtracting}
+          <!-- Same spinner as LoadingState, on the accent button (border-current = the button's white text). -->
+          <span
+            class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+            aria-hidden="true"
+          ></span>
+        {:else}
+          <Sparkles class="h-4 w-4" />
+        {/if}
+        <span role="status">
           {#if !isExtracting}
             Extract Compliance Rules
           {:else if extractionProgress && extractionProgress.total > 0}
