@@ -1683,6 +1683,9 @@ export const ruleExtractionApi = {
    * (rule_extraction_drafts). `text`, when given, scopes extraction to a
    * caller-chosen subset of the document (e.g. picked sections) instead of
    * its full extracted text.
+    // Without the active organization the server can't find its saved LLM provider key.
+    const orgId = getActiveOrgId();
+    if (orgId) form.append("organization_id", String(orgId));
    */
   async extractDrafts(
     documentId: number,
