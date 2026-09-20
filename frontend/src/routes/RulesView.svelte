@@ -53,6 +53,7 @@
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import DropdownMenu from "../lib/components/DropdownMenu.svelte";
+  import ReliabilityBadge from "../lib/components/ReliabilityBadge.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import Badge from "../lib/components/Badge.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
@@ -274,6 +275,11 @@
   // `filterNeedsReview` also drive the folder tree, the category tabs and the
   // new-rule defaults, so they stay owned by the view and scope the row source
   // here rather than being duplicated into the table's own filter map.
+  const RELIABILITY_RANK = { low: 0, medium: 1, high: 2 } as const;
+  function reliabilityRank(reliability: Rule["reliability"]): number {
+    return reliability ? RELIABILITY_RANK[reliability.level] : -1;
+  }
+
   const table = createTableState<Rule, number>({
     rows: () =>
       rules.filter(
@@ -287,6 +293,10 @@
     getId: (r) => r.id,
     searchFields: (r) => [r.rule_id, r.description, r.property_name, r.compare_property],
     initialSort: { field: "rule_id", asc: true },
+    // Least reliable first when ascending; rules with no IFC property to grade sort before "low".
+    comparators: {
+      reliability: (a, b) => reliabilityRank(a.reliability) - reliabilityRank(b.reliability),
+    },
   });
 
   let isBulkDeleteModalOpen = $state(false);
@@ -1206,6 +1216,15 @@
                     >
                       Severity
                     </SortHeader>
+                    <SortHeader
+                      column="reliability"
+                      sortField={table.sortField}
+                      sortAsc={table.sortAsc}
+                      onSort={(f) => table.toggleSort(f)}
+                      customClass="px-4 py-3"
+                    >
+                      Reliability
+                    </SortHeader>
                     <th class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1395,6 +1414,9 @@
                       </td>
                       <td class="px-4 py-3">
                         <SeverityBadge severity={rule.severity} size="xs" />
+                      </td>
+                      <td class="px-4 py-3">
+                        <ReliabilityBadge reliability={rule.reliability} />
                       </td>
                       <td class="whitespace-nowrap px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-1">

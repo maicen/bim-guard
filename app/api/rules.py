@@ -45,6 +45,8 @@ from app.modules.contracts import (
     RuleFolderDeleteResponse,
     RuleFolderResponse,
     RuleFolderUpdateRequest,
+    RuleReliabilityRequest,
+    RuleReliabilityResponse,
     RuleResponse,
     RuleSeedResponse,
     RuleShaclShapeResponse,
@@ -52,6 +54,7 @@ from app.modules.contracts import (
     RuleSnapshotResponse,
     RuleSourceResponse,
     RuleUpdateRequest,
+    build_rule_reliability,
 )
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
@@ -1100,6 +1103,21 @@ def delete_rule(
     service.delete_rule(rule_id)
 
 
+@router.post(
+    "/assess-reliability",
+    response_model=RuleReliabilityResponse,
+    summary="Grade how reliably a rule can be checked against an IFC model",
+)
+def assess_rule_reliability(payload: RuleReliabilityRequest) -> RuleReliabilityResponse:
+    """Grade a rule from the IFC property it reads, before it is saved.
+
+    Lets the manual rule form show the same high/medium/low reliability that
+    extracted and saved rules carry. ``reliability`` is null until a property
+    name is given.
+    """
+    return RuleReliabilityResponse(reliability=build_rule_reliability(payload))
+
+
 @router.post("/extract", response_model=RuleExtractionResponse, summary="Extract rules from document text or file")
 async def extract_rules(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -1136,10 +1154,16 @@ async def extract_rules(
     result = await extraction_service.extract_rules_from_text(
         text, model=model, organization_id=organization_id
     )
+    # Each extracted rule is a plain dict here, so attach its reliability grade the same
+    # way saved rules and drafts carry one.
+    graded_rules = []
+    for rule in result.rules:
+        reliability = build_rule_reliability(rule)
+        graded_rules.append({**rule, "reliability": reliability.model_dump() if reliability else None})
     return RuleExtractionResponse(
-        rules=result.rules,
+        rules=graded_rules,
         warnings=result.warnings,
-        count=len(result.rules),
+        count=len(graded_rules),
     )
 
 

@@ -476,6 +476,29 @@ export interface GoogleDriveImportResponse {
 
 export type RulesetCategory = "Arch" | "Piping" | "seismic";
 
+/**
+ * How reliably a rule can be checked against a real IFC model, graded from the
+ * property it reads (mirrors `RuleReliability` in app/modules/contracts.py).
+ */
+export type RuleReliabilityLevel = "high" | "medium" | "low";
+
+export interface RuleReliability {
+  level: RuleReliabilityLevel;
+  /** Machine-readable basis, e.g. "standard_attribute", "custom", "derived". */
+  category: string;
+  /** Plain-language explanation shown to the user. */
+  reason: string;
+}
+
+/** The rule fields that decide reliability, for grading a rule before it is saved. */
+export interface RuleReliabilityRequest {
+  property_set?: string | null;
+  property_name?: string | null;
+  compare_property?: string | null;
+  value_min_property?: string | null;
+  value_max_property?: string | null;
+}
+
 export interface Rule extends Timestamps {
   id: number;
   rule_id?: string;
@@ -513,6 +536,8 @@ export interface Rule extends Timestamps {
   rase_applicability?: Record<string, unknown> | null;
   rase_selection?: Record<string, unknown> | null;
   rase_exception?: Record<string, unknown> | null;
+  /** Null when the rule names no IFC property to grade. */
+  reliability?: RuleReliability | null;
 }
 
 export interface RuleSourceResponse {
@@ -829,6 +854,8 @@ export interface ExtractedRule {
   severity: string;
   confidence?: string;
   selected?: boolean;
+  /** Graded by the server from the property above; null when no property is named. */
+  reliability?: RuleReliability | null;
 }
 
 export interface BoundingBox {
@@ -902,6 +929,8 @@ export interface RuleExtractionDraft {
   reviewed_at?: string | null;
   review_notes?: string | null;
   created_at?: string | null;
+  /** Reliability of `proposed_rule`; follows a reviewer's edits. Null when it names no property. */
+  reliability?: RuleReliability | null;
 }
 
 export interface RuleExtractionDraftListResponse {

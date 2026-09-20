@@ -105,6 +105,8 @@ import type {
   RuleDraftReviewRequest,
   RuleExtractionDraft,
   RuleExtractionDraftListResponse,
+  RuleReliability,
+  RuleReliabilityRequest,
   RuleExtractionProgressResponse,
   RulesetCategory,
   RuleSnapshot,
@@ -831,6 +833,17 @@ export const modelsApi = {
 };
 
 export const rulesApi = {
+  /** Grade how reliably a rule can be checked against an IFC model, before it is saved. */
+  async assessReliability(payload: RuleReliabilityRequest): Promise<RuleReliability | null> {
+    const res = await apiFetch(`${API_BASE}/rules/assess-reliability`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await handleResponse<{ reliability: RuleReliability | null }>(res);
+    return body.reliability ?? null;
+  },
+
   getCachedList(filters?: {
     mechanism?: string;
     ruleset_id?: string;
@@ -1670,6 +1683,9 @@ export const ruleExtractionApi = {
     if (file) form.append("file", file);
     if (rawText) form.append("raw_text", rawText);
     if (model) form.append("model", model);
+    // Without the active organization the server can't find its saved LLM provider key.
+    const orgId = getActiveOrgId();
+    if (orgId) form.append("organization_id", String(orgId));
 
     const res = await apiFetch(`${API_BASE}/rules/extract`, {
       method: "POST",
@@ -1683,9 +1699,6 @@ export const ruleExtractionApi = {
    * (rule_extraction_drafts). `text`, when given, scopes extraction to a
    * caller-chosen subset of the document (e.g. picked sections) instead of
    * its full extracted text.
-    // Without the active organization the server can't find its saved LLM provider key.
-    const orgId = getActiveOrgId();
-    if (orgId) form.append("organization_id", String(orgId));
    */
   async extractDrafts(
     documentId: number,

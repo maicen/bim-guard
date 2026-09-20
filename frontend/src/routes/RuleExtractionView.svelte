@@ -46,7 +46,9 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import LiveReliability from "../lib/components/LiveReliability.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import ReliabilityBadge from "../lib/components/ReliabilityBadge.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
@@ -858,6 +860,7 @@
                   <th class="px-3 py-3">Pset / Property</th>
                   <th class="px-3 py-3">Check</th>
                   <th class="px-3 py-3">Severity</th>
+                  <th class="px-3 py-3">Reliability</th>
                   <th class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -927,6 +930,9 @@
                           : "")}
                     </td>
                     <td class="px-3 py-3">{draft.proposed_rule.severity}</td>
+                    <td class="px-3 py-3">
+                      <ReliabilityBadge reliability={draft.reliability} />
+                    </td>
                     <td class="whitespace-nowrap px-3 py-3 text-right">
                       <div class="flex items-center justify-end gap-1">
                         {#if draft.status === "pending_review"}
@@ -1158,6 +1164,7 @@
                 >
                   Severity
                 </SortHeader>
+                <th class="px-3 py-3">Reliability</th>
                 <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -1220,6 +1227,13 @@
                       <option value="Medium">Medium</option>
                       <option value="Low">Low</option>
                     </select>
+                  </td>
+                  <td class="px-3 py-3">
+                    <LiveReliability
+                      propertySet={rule.property_set}
+                      propertyName={rule.property_name}
+                      initial={rule.reliability ?? null}
+                    />
                   </td>
                   <td class="whitespace-nowrap px-3 py-3 text-right">
                     <div class="flex items-center justify-end gap-1">

@@ -88,6 +88,21 @@ class BSDDOntologyRepository:
             return
         self._load_from_local_reference()
 
+    def known_property_set_names(self) -> frozenset[str]:
+        """Lower-cased name of every property set the local ontology knows.
+
+        Lets callers tell a genuine buildingSMART property set (``Pset_DoorCommon``)
+        from a project-specific one that merely borrows the ``Pset_`` prefix
+        (``Pset_Compliance``). Empty when the local reference data is unavailable.
+        """
+        self._refresh_if_stale()
+        return frozenset(
+            str(edge["property_set"]).strip().lower()
+            for edges in self._edges_by_class.values()
+            for edge in edges
+            if edge.get("property_set")
+        )
+
     def _class_item(self, uri: str) -> Optional[BSDDClassItem]:
         row = self._classes_by_uri.get(uri)
         if row is None:

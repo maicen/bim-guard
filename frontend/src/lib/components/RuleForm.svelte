@@ -6,6 +6,7 @@
   import type { IfcPropertySuggestion } from "../archDomains";
   import BsddAutocomplete from "./BsddAutocomplete.svelte";
   import BsddBadge from "./BsddBadge.svelte";
+  import LiveReliability from "./LiveReliability.svelte";
 
   interface Props {
     editingRule?: Rule | null;
@@ -399,6 +400,22 @@
         />
       </div>
     {/if}
+  </div>
+
+  <!-- How reliably this rule can be checked against a real IFC model, graded from the property above. -->
+  <div class="rounded-xl border border-border-default bg-surface-canvas/60 px-3.5 py-2.5">
+    <div class="mb-1.5 text-xs font-semibold uppercase tracking-wider text-fg-secondary">
+      Reliability
+    </div>
+    <LiveReliability
+      propertySet={formPropertySet}
+      propertyName={formPropertyName}
+      compareProperty={formCompareProperty}
+      valueMinProperty={formValueMinProperty}
+      valueMaxProperty={formValueMaxProperty}
+      showReason
+      fallback="Choose a property to see how reliably this rule can be checked."
+    />
   </div>
 
   <div class="grid grid-cols-2 gap-3">

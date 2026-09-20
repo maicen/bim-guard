@@ -5,7 +5,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from app.modules.rule_reliability import assess_rule
 
 
 class ElementDataContract(BaseModel):
@@ -915,6 +917,42 @@ class DocumentElementBboxesResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class RuleReliability(BaseModel):
+    """How reliably a rule can be checked against a real IFC model, and why.
+
+    Graded from the IFC property the rule reads (see ``app.modules.rule_reliability``),
+    not from the source document, so extracted and hand-written rules are treated alike.
+    """
+
+    level: Literal["high", "medium", "low"]
+    category: str = Field(description="Machine-readable basis, e.g. 'standard_attribute', 'custom', 'derived'")
+    reason: str = Field(description="Plain-language explanation shown to the user")
+
+
+def build_rule_reliability(rule: Any) -> Optional[RuleReliability]:
+    """Grade *rule* (a model or a dict), or ``None`` when it names no IFC property to grade."""
+    assessment = assess_rule(rule)
+    if assessment is None:
+        return None
+    return RuleReliability(level=assessment.level, category=assessment.category, reason=assessment.reason)
+
+
+class RuleReliabilityRequest(BaseModel):
+    """The rule fields that decide reliability, for grading a rule before it is saved."""
+
+    property_set: Optional[str] = None
+    property_name: Optional[str] = None
+    compare_property: Optional[str] = None
+    value_min_property: Optional[str] = None
+    value_max_property: Optional[str] = None
+
+
+class RuleReliabilityResponse(BaseModel):
+    """Result of grading a rule; ``reliability`` is null when no property is named yet."""
+
+    reliability: Optional[RuleReliability] = None
+
+
 class RuleCreateRequest(BaseModel):
     """Payload for creating or registering a rule."""
 
@@ -1045,6 +1083,12 @@ class RuleResponse(TimestampFields):
     rase_selection: Optional[dict] = None
     rase_exception: Optional[dict] = None
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def reliability(self) -> Optional[RuleReliability]:
+        """Reliability of this rule, or null when it names no IFC property."""
+        return build_rule_reliability(self)
+
 
 class RuleDraftStatus(str, Enum):
     """Review lifecycle state for a LlamaIndex-extracted rule candidate."""
@@ -1085,6 +1129,12 @@ class RuleExtractionDraft(BaseModel):
     reviewed_at: Optional[str] = None
     review_notes: Optional[str] = None
     created_at: Optional[str] = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def reliability(self) -> Optional[RuleReliability]:
+        """Reliability of the proposed rule; follows a reviewer's edits because it reads ``proposed_rule``."""
+        return build_rule_reliability(self.proposed_rule)
 
 
 class RuleExtractionDraftListResponse(BaseModel):
