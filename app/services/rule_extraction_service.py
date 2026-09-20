@@ -16,6 +16,7 @@ from app.services.bsdd_ontology_repository import (
     BSDDOntologyRepository,
     get_bsdd_ontology_repository,
 )
+from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
 from app.services.document_pages_service import DocumentPagesService
 
 #: Node-level LLM calls to run concurrently during draft extraction. Bounded
@@ -203,6 +204,7 @@ class RuleExtractionService:
         ingestor: LlamaIndexIngestor | None = None,
         bsdd_client: BSDDClient | None = None,
         ontology: BSDDOntologyRepository | None = None,
+        clause_grounding: ClauseGroundingIndex | None = None,
         generator: RuleDraftGenerator | None = None,
         draft_service: Any | None = None,
         pages_service: DocumentPagesService | None = None,
@@ -225,11 +227,21 @@ class RuleExtractionService:
                 ontology first and only falls back to the live `bsdd_client`
                 on a local miss, the same local-first-then-live pattern
                 BSDDOntologyRepository.get_class_cached already uses.
+            clause_grounding: Injectable ClauseGroundingIndex -- an optional
+                document-specific overlay on top of `ontology`: when the
+                clause being grounded matches an entry bim-guard-evaluation's
+                knowledge-graph pipeline promoted into
+                data/reference/clause_grounding/, its LLM-verified bSDD class
+                candidates are tried before the local ontology's plain
+                substring search. A no-op (falls straight through to
+                `ontology`) for any clause/document not covered by a
+                promoted index.
         """
         self._provider = provider or LlamaIndexRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
         self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
         self._ontology = ontology or get_bsdd_ontology_repository()
+        self._clause_grounding = clause_grounding or get_clause_grounding_index()
         self._generator = generator or LlamaIndexRuleGenerator()
         self._draft_service = draft_service
         self._pages_service = pages_service or DocumentPagesService()
@@ -268,6 +280,33 @@ class RuleExtractionService:
             logger.warning("bSDD grounding lookup failed property_name=%s error=%s", prop_name, exc)
             return []
 
+    def _kg_classes_grounded(self, clause_id: str | None) -> list[contracts.BSDDClassItem]:
+        """Resolve the clause's promoted knowledge-graph class candidates (if any) to full BSDDClassItems.
+
+        The clause grounding index only stores trusted URIs (see
+        ClauseGroundingIndex), not full bSDD records, so each is resolved
+        against the same local ontology `_search_classes_grounded` uses --
+        this never duplicates bSDD data. Resolved via `get_class_by_uri` so
+        the result carries a real `properties` list (with `property_set`),
+        the same as any other ontology-sourced BSDDClassItem, which is what
+        lets a KG-corrected class_name flow straight into
+        `_class_properties_grounded`'s exact-match search below with no
+        separate wiring needed there.
+        """
+        uris = self._clause_grounding.class_uris_for(clause_id)
+        if not uris:
+            return []
+        items: list[contracts.BSDDClassItem] = []
+        for uri in uris:
+            try:
+                item = self._ontology.get_class_by_uri(uri)
+            except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+                logger.warning("Clause grounding class lookup failed uri=%s error=%s", uri, exc)
+                continue
+            if item is not None:
+                items.append(item)
+        return items
+
     def _search_classes_grounded(self, class_name: str) -> list[contracts.BSDDClassItem]:
         """Local ontology first, live bSDD only on a local miss.
 
@@ -291,18 +330,32 @@ class RuleExtractionService:
             return []
 
     def _ground_target_class(
-        self, rule: contracts.RuleCreateRequest
+        self, rule: contracts.RuleCreateRequest, *, clause_id: str | None = None
     ) -> tuple[contracts.RuleCreateRequest, str | None]:
-        """Correct an extracted rule's target_ifc_class casing/spelling against bSDD.
+        """Correct an extracted rule's target_ifc_class against bSDD.
 
-        The LLM is prompted for a real IFC entity type (e.g. "IfcDoor") but
-        sometimes drifts on casing ("ifcdoor") or spelling. When bSDD's own
-        class search -- which includes the full normative IFC 4.3 entity
-        hierarchy, not just classification systems -- has a case-insensitive
-        exact code match, that canonical spelling replaces whatever the LLM
-        produced. Leaves the rule untouched when nothing resolves, for the
-        same reason _search_properties_grounded does: a miss is not itself
-        evidence the class is wrong, only that it could not be confirmed.
+        Two independent correction paths, tried in order:
+
+        1. Spelling/casing (unchanged, applies to every document): the LLM
+           is prompted for a real IFC entity type (e.g. "IfcDoor") but
+           sometimes drifts on casing ("ifcdoor") or spelling. When bSDD's
+           own class search has a case-insensitive exact code match, that
+           canonical spelling replaces whatever the LLM produced.
+
+        2. Knowledge-graph override (only when `clause_id` is covered by a
+           promoted grounding index, see ClauseGroundingIndex): this only
+           runs when path 1 found *no* exact match at all -- i.e. the LLM's
+           proposed class isn't a real, confirmable bSDD class/code, not
+           merely mis-cased. In that situation a clause-aware LLM judgment
+           (kg.correct_graph.py's verification pass, run once per document
+           in bim-guard-evaluation and promoted here) is a much stronger
+           signal than leaving an unconfirmed, possibly-invented class name
+           in place, so its top trusted candidate is applied instead.
+
+        Path 1 alone still leaves the rule untouched on a miss outside any
+        promoted index, for the reason _search_properties_grounded does: a
+        miss is not itself evidence the class is wrong, only that it could
+        not be confirmed by spelling alone.
         """
         class_name = (rule.target_ifc_class or "").strip()
         if not class_name:
@@ -310,12 +363,21 @@ class RuleExtractionService:
 
         matches = self._search_classes_grounded(class_name)
         match = next((m for m in matches if m.code.strip().lower() == class_name.lower()), None)
-        if match is None or match.code == class_name:
-            return rule, None
+        if match is not None:
+            if match.code == class_name:
+                return rule, None
+            corrected_rule = rule.model_copy(update={"target_ifc_class": match.code})
+            note = f"bSDD grounding: corrected target IFC class to {match.code} (was {class_name})."
+            return corrected_rule, note
 
-        corrected_rule = rule.model_copy(update={"target_ifc_class": match.code})
-        note = f"bSDD grounding: corrected target IFC class to {match.code} (was {class_name})."
-        return corrected_rule, note
+        kg_matches = self._kg_classes_grounded(clause_id)
+        top = kg_matches[0] if kg_matches else None
+        if top is not None and top.code.strip().lower() != class_name.lower():
+            corrected_rule = rule.model_copy(update={"target_ifc_class": top.code})
+            note = f'KG clause grounding: corrected target IFC class to {top.code} (was unconfirmed "{class_name}").'
+            return corrected_rule, note
+
+        return rule, None
 
     def _class_properties_grounded(self, class_name: str) -> list[contracts.BSDDPropertyItem]:
         """Property list -- each carrying a real property_set -- for one bSDD/IFC class.
@@ -326,6 +388,12 @@ class RuleExtractionService:
         docstring). Only a class's own property list, assembled from its
         class-property edges, does. This is the one place that list is
         available to a name search.
+
+        Takes only `class_name`, not `clause_id`: by the time this runs,
+        `class_name` is `_ground_target_class`'s own output for this rule
+        (see `_ground_property` below), so any knowledge-graph class
+        correction it already applied is already reflected here -- no
+        separate KG wiring needed in this function.
         """
         matches = self._search_classes_grounded(class_name)
         target = next((c for c in matches if c.code.strip().lower() == class_name.strip().lower()), None)
@@ -392,23 +460,59 @@ class RuleExtractionService:
         )
         return corrected_rule, note
 
+    def _kg_property_hint_note(self, clause_id: str | None, applied_property_name: str | None) -> str | None:
+        """Advisory note listing this clause's KG-trusted properties, when not already applied.
+
+        The clause grounding index's property candidates (unlike its class
+        candidates) never carry a property_set -- see
+        ClauseGroundingIndex.property_hints_for and
+        _class_properties_grounded's docstring for why that can't be fixed
+        by wiring alone -- so they can never be safely auto-applied the way
+        `_ground_property` applies a class-scoped match. Surfacing them as a
+        review note instead still gets the LLM-verified signal in front of
+        the human reviewer, who can confirm the right property_set by hand.
+        """
+        hints = self._clause_grounding.property_hints_for(clause_id)
+        if not hints:
+            return None
+        names = sorted({h["name"] for h in hints if h.get("name")})
+        if not names:
+            return None
+        applied_key = _normalize_property_key(applied_property_name) if applied_property_name else None
+        if applied_key is not None and applied_key in {_normalize_property_key(n) for n in names}:
+            return None  # already reflected in the applied correction -- nothing new to flag
+        listed = ", ".join(names[:3])
+        return f"KG clause grounding also flags as relevant: {listed} (property_set unconfirmed -- verify manually)."
+
     def _ground_draft_with_bsdd(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
         """Correct an extracted rule's target_ifc_class and property_set/property_name against bSDD.
 
         A note of each correction actually made is attached to
         review_notes so a reviewer can see why the draft changed; the draft
         is returned untouched (no review_notes) when nothing resolves.
+
+        When `draft.clause.clause_id` is covered by a promoted
+        knowledge-graph grounding index (data/reference/clause_grounding/,
+        see ClauseGroundingIndex), _ground_target_class also gets a chance
+        to use it as a same-document, clause-aware override on top of the
+        two args' pure spelling/substring corrections -- see
+        _ground_target_class's own docstring for exactly when that fires.
         """
         rule = draft.proposed_rule
+        clause_id = draft.clause.clause_id if draft.clause else None
         notes: list[str] = []
 
-        rule, class_note = self._ground_target_class(rule)
+        rule, class_note = self._ground_target_class(rule, clause_id=clause_id)
         if class_note:
             notes.append(class_note)
 
         rule, property_note = self._ground_property(rule)
         if property_note:
             notes.append(property_note)
+
+        hint_note = self._kg_property_hint_note(clause_id, rule.property_name)
+        if hint_note:
+            notes.append(hint_note)
 
         if not notes:
             return draft
@@ -535,12 +639,19 @@ class RuleExtractionService:
         async def process_node(node: contracts.DocumentNodeContract) -> list[contracts.RuleExtractionDraft]:
             async with semaphore:
                 try:
-                    node_drafts = await self._generator.generate_drafts_from_node(
-                        node,
-                        deontic=deontic_by_node.get(node.node_id),
-                        model=model,
+                    from app.services.llm_call_context import llm_call_context
+
+                    with llm_call_context(
+                        context="rule_extraction",
                         organization_id=organization_id,
-                    )
+                        metadata={"document_id": document_id},
+                    ):
+                        node_drafts = await self._generator.generate_drafts_from_node(
+                            node,
+                            deontic=deontic_by_node.get(node.node_id),
+                            model=model,
+                            organization_id=organization_id,
+                        )
                 except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                     logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)
                     failures.append(exc)

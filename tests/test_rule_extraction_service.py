@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 from app.modules.contracts import (
+    BSDDClassItem,
     BSDDPropertyItem,
     ClauseMetadata,
     DocumentNodeContract,
@@ -125,13 +126,20 @@ class FakeOntology:
         return self.matches
 
 
-def _draft(property_set: str | None, property_name: str | None) -> RuleExtractionDraft:
+def _draft(
+    property_set: str | None,
+    property_name: str | None,
+    *,
+    target_ifc_class: str = "IfcDoor",
+    clause_id: str | None = None,
+) -> RuleExtractionDraft:
     return RuleExtractionDraft(
         source_document_id=1,
+        clause=ClauseMetadata(clause_id=clause_id, source_document_id=1) if clause_id else None,
         proposed_rule=RuleCreateRequest(
             rule_id="REQ-1",
             description="Doors shall be wide enough",
-            target_ifc_class="IfcDoor",
+            target_ifc_class=target_ifc_class,
             property_set=property_set,
             property_name=property_name,
             severity="mandatory",
@@ -317,6 +325,170 @@ def test_bsdd_grounding_skips_when_no_property_name():
     grounded = service._ground_draft_with_bsdd(draft)
 
     assert grounded is draft
+
+
+class FakeClassOntology:
+    """Returns fixed search_classes/get_class_by_uri results, recording queries received."""
+
+    def __init__(
+        self, search_matches: list[BSDDClassItem] | None = None, by_uri: dict[str, BSDDClassItem] | None = None
+    ) -> None:
+        self.search_matches = search_matches or []
+        self.by_uri = by_uri or {}
+        self.search_queries: list[str] = []
+        self.uri_queries: list[str] = []
+
+    def search_classes(self, query: str, limit: int = 5):
+        self.search_queries.append(query)
+        return self.search_matches
+
+    def get_class_by_uri(self, uri: str):
+        self.uri_queries.append(uri)
+        return self.by_uri.get(uri)
+
+    def search_properties(self, query: str, limit: int = 8):
+        return []
+
+
+class FakeClauseGrounding:
+    """Returns fixed clause_id -> trusted class URIs / property hints, recording queries received."""
+
+    def __init__(
+        self, classes_by_clause: dict[str, list[str]] | None = None, properties_by_clause: dict[str, list[dict]] | None = None
+    ) -> None:
+        self.classes_by_clause = classes_by_clause or {}
+        self.properties_by_clause = properties_by_clause or {}
+        self.class_queries: list[str | None] = []
+        self.property_queries: list[str | None] = []
+
+    def class_uris_for(self, clause_id):
+        self.class_queries.append(clause_id)
+        return self.classes_by_clause.get(clause_id, []) if clause_id else []
+
+    def property_hints_for(self, clause_id):
+        self.property_queries.append(clause_id)
+        return self.properties_by_clause.get(clause_id, []) if clause_id else []
+
+
+def _class_item(uri: str, code: str, name: str = "") -> BSDDClassItem:
+    return BSDDClassItem(uri=uri, code=code, name=name or code, dictionary_uri="urn:dict/ifc/4.3")
+
+
+def test_kg_clause_grounding_corrects_an_unconfirmed_class_name():
+    """A clause covered by a promoted KG index can correct a class name spelling alone can't fix.
+
+    Unlike the plain substring path (which only ever corrects casing/spelling
+    of an already-real bSDD code), this fires when the LLM's proposed class
+    isn't a real bSDD class/code at all -- the local ontology genuinely has
+    no match -- but the clause is one bim-guard-evaluation's knowledge-graph
+    pipeline scored and an LLM verified as being about a specific bSDD class.
+    """
+    ontology = FakeClassOntology(
+        search_matches=[],  # local substring search finds nothing for "Building System"
+        by_uri={"urn:kg/1": _class_item("urn:kg/1", "IfcBuildingSystem", "Building System")},
+    )
+    clause_grounding = FakeClauseGrounding(classes_by_clause={"A-1.1.2.7": ["urn:kg/1"]})
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(
+        property_set=None, property_name=None, target_ifc_class="Building System", clause_id="A-1.1.2.7"
+    )
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == "IfcBuildingSystem"
+    assert "KG clause grounding" in (grounded.review_notes or "")
+    assert clause_grounding.class_queries == ["A-1.1.2.7"]
+
+
+def test_kg_clause_grounding_does_not_override_a_confirmed_spelling_match():
+    """When the plain substring path already resolves the class, the KG override never runs.
+
+    Ordering matters: an exact/near-exact bSDD code match is stronger
+    evidence than a clause-level KG judgment, so the conservative
+    spelling-only correction always wins when it applies at all.
+    """
+    ontology = FakeClassOntology(
+        search_matches=[_class_item("urn:local/1", "IfcDoor")],
+        by_uri={"urn:kg/1": _class_item("urn:kg/1", "IfcBuildingSystem")},
+    )
+    clause_grounding = FakeClauseGrounding(classes_by_clause={"A-1.1.2.7": ["urn:kg/1"]})
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(property_set=None, property_name=None, target_ifc_class="ifcdoor", clause_id="A-1.1.2.7")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == "IfcDoor"
+    assert "bSDD grounding" in (grounded.review_notes or "")
+    assert "KG clause grounding" not in (grounded.review_notes or "")
+
+
+def test_kg_clause_grounding_is_a_noop_outside_a_promoted_clause():
+    """A miss on a clause the loaded index doesn't cover behaves exactly as before (untouched)."""
+    ontology = FakeClassOntology(search_matches=[])
+    clause_grounding = FakeClauseGrounding(classes_by_clause={"A-1.1.2.7": ["urn:kg/1"]})
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(
+        property_set=None, property_name=None, target_ifc_class="Something Unconfirmed", clause_id="H999"
+    )
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded is draft
+
+
+def test_kg_clause_grounding_is_a_noop_without_a_clause_id():
+    """A draft with no clause metadata at all never touches the KG index (no crash, no correction)."""
+    ontology = FakeClassOntology(search_matches=[])
+    clause_grounding = FakeClauseGrounding(classes_by_clause={"A-1.1.2.7": ["urn:kg/1"]})
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(property_set=None, property_name=None, target_ifc_class="Something Unconfirmed")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded is draft
+    assert clause_grounding.class_queries == [None]
+
+
+def test_kg_property_hint_appended_when_not_already_applied():
+    """The clause's KG-trusted property names surface as an advisory note, never as an auto-correction."""
+    ontology = FakeClassOntology(search_matches=[_class_item("urn:local/1", "IfcDoor")])
+    clause_grounding = FakeClauseGrounding(
+        properties_by_clause={"A-1.1.2.7": [{"uri": "urn:p/1", "name": "Fire Protection Class", "score": 0.85}]}
+    )
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(property_set=None, property_name=None, target_ifc_class="ifcdoor", clause_id="A-1.1.2.7")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert "KG clause grounding also flags as relevant: Fire Protection Class" in (grounded.review_notes or "")
+    assert "property_set unconfirmed" in (grounded.review_notes or "")
+
+
+def test_kg_property_hint_skipped_when_already_reflected_in_applied_property():
+    """No redundant advisory note when the applied property already matches the KG's own hint."""
+    ontology = FakeClassOntology(search_matches=[_class_item("urn:local/1", "IfcDoor")])
+    bsdd = FakeBSDDClient([BSDDPropertyItem(uri="urn:x", name="FireRating", property_set="Pset_DoorCommon")])
+    clause_grounding = FakeClauseGrounding(
+        properties_by_clause={"A-1.1.2.7": [{"uri": "urn:p/1", "name": "FireRating", "score": 0.85}]}
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=bsdd, clause_grounding=clause_grounding)
+    draft = _draft(
+        property_set="Pset_Door", property_name="FireRating", target_ifc_class="ifcdoor", clause_id="A-1.1.2.7"
+    )
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert "KG clause grounding also flags" not in (grounded.review_notes or "")
 
 
 class FakeDraftsTable:
