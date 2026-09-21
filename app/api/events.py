@@ -147,9 +147,9 @@ def get_workflow_snapshot(
 ):
     """Return every engine's current stage and metrics as JSON.
 
-    Merged across run keys, so a seismic or graph run -- each of which tracks
-    under its own key so it cannot reset a corrosion run -- is reported here
-    rather than reading as an engine that never started.
+    Merged across run keys, so a graph run -- which tracks under its own key
+    so it cannot reset the default analysis run -- is reported here rather
+    than reading as an engine that never started.
     """
     response.headers["Cache-Control"] = "no-store"
     if project_id <= 0:

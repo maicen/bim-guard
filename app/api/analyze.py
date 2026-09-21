@@ -306,16 +306,15 @@ def _select_issues(
     verdicts. The notes are selected by the ``data_quality`` band instead,
     which is exactly how the page's severity dropdown behaves.
 
-    ``mechanisms`` is a case-insensitive prefix match on ``rule_id``, so ``GC``
-    and ``GC-001`` both select an engine's verdicts together with its ``.DATA``
-    notes; the token ``data_quality`` selects the notes on their own. Several
-    values union, so ``GC`` and ``data_quality`` together select both.
+    ``mechanisms`` is a case-insensitive prefix match on ``rule_id``, so
+    ``ARCH`` and ``ARCH-EGRESS-001`` both select an engine's verdicts together
+    with its ``.DATA`` notes; the token ``data_quality`` selects the notes on
+    their own. Several values union, so ``ARCH`` and ``data_quality`` together
+    select both.
 
-    Unlike :func:`_filter_issues_by_engine`, an unrecognised mechanism selects
-    nothing rather than falling back to everything. That function guards a run
-    selection, where narrowing to nothing would throw away work already done;
-    here the caller is filtering a view, and quietly widening it back to the
-    full run would misreport what was asked for.
+    An unrecognised mechanism selects nothing rather than falling back to
+    everything: the caller is filtering a view, and quietly widening it back
+    to the full run would misreport what was asked for.
     """
     selected = issues
 
@@ -399,8 +398,7 @@ def _paginate_result(
 ) -> tuple[dict, ResultPageContract]:
     """Return ``result`` with ``audit_issues`` narrowed to one page.
 
-    Applied to what ``run_analysis`` returned, in the same place
-    :func:`_filter_issues_by_engine` narrows and for the same reason: the cache
+    Applied to what ``run_analysis`` returned rather than inside it: the cache
     entry must hold the whole run its key describes, so nothing here reaches
     the cache.
 

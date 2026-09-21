@@ -173,9 +173,9 @@ def list_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
     response: Response,
     ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
-    mechanism: Optional[str] = Query(None, description="Filter by mechanism (e.g. GC-001, CODE)"),
+    mechanism: Optional[str] = Query(None, description="Filter by mechanism (e.g. CODE)"),
     ruleset_id: Optional[str] = Query(None, description="Filter by ruleset identifier"),
-    category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
+    category: Optional[str] = Query(None, description="Filter by domain category: Arch"),
     keyword: Optional[str] = Query(None, description="Keyword search query"),
     needs_review: Optional[int] = Query(None, description="Filter by review status (1 or 0)"),
     organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
@@ -226,7 +226,7 @@ def list_rule_folders(
     service: Annotated[RuleService, Depends(get_rules_service)],
     response: Response,
     ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
-    category: Optional[str] = Query(None, description="Filter by domain category: Arch, Piping, or seismic"),
+    category: Optional[str] = Query(None, description="Filter by domain category: Arch"),
     organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
 ) -> list[RuleFolderResponse]:
@@ -1225,7 +1225,7 @@ def seed_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> RuleSeedResponse:
-    """Seed corrosion mechanisms GC-001, CC-001, MC-001 into the rule library.
+    """Seed the architectural building-code rules into the rule library.
 
     Superadmin only: this reseeds the platform's built-in engine rulesets
     (shared by every organization), not a per-org content ruleset, so a

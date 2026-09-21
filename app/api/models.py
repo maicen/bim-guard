@@ -238,11 +238,11 @@ async def upload_models(
 ) -> ModelUploadResponse:
     """Validate the upload, then store and attach every model in the background.
 
-    The model at ``primary_index`` becomes the project's primary: the one a
-    corrosion run analyses, and the one ``projects.ifc_file_path`` keeps
+    The model at ``primary_index`` becomes the project's primary: the one an
+    analysis run analyses, and the one ``projects.ifc_file_path`` keeps
     pointing at so every reader that predates ``project_ifc_files`` still
-    resolves a model. The rest are attached alongside it, which is what lets a
-    seismic run see the whole building rather than one discipline of it.
+    resolves a model. The rest are attached alongside it for readers that
+    want the whole building rather than one discipline of it.
 
     Everything that can be checked from the request alone (file extensions,
     ``primary_index``, ``roles``, the ISO 19650 project code) still happens
