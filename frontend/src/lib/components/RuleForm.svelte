@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { SlidersHorizontal } from "lucide-svelte";
   import { rulesApi } from "../api";
+  import { ARCH_MECHANISM_OPTIONS } from "../analysisDomain";
   import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
   import type { IfcPropertySuggestion } from "../archDomains";
   import {
@@ -64,7 +65,6 @@
   // each rule; untrack states that the one-time read is deliberate.
   const seed = untrack(() => editingRule);
   const seedRulesetId = untrack(() => defaultRulesetId);
-  const seedCategory = untrack(() => defaultCategory);
   const seedLockedClass = untrack(() => lockedTargetIfcClass);
 
   const isEditing = !!seed;
@@ -76,9 +76,10 @@
   let formRulesetId = $state(seed?.ruleset_id || seedRulesetId);
   // Carried through from the edited rule; not user-editable in this form.
   const formCategory = seed?.rule_category || "property_check";
-  let formDomainCategory: RulesetCategory = $state(
-    (seed?.category as RulesetCategory) || seedCategory,
-  );
+  // Arch is the only category the DB accepts (`CHECK (category = 'Arch')` on
+  // `public.rules`), so this is carried through as a fixed value rather than
+  // a user choice.
+  const formDomainCategory: RulesetCategory = "Arch";
   let formTargetIfcClass = $state(seed?.target_ifc_class || seedLockedClass || "");
   let formPropertySet = $state(seed?.property_set || "Pset_Compliance");
   let formPropertyName = $state(seed?.property_name || "");
@@ -288,20 +289,14 @@
         />
       </div>
       <div>
-        <label
-          for="rule-domain-category"
-          class="mb-1 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
-          >Category *</label
+        <span class="mb-1 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
+          >Category</span
         >
-        <select
-          id="rule-domain-category"
-          bind:value={formDomainCategory}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
+        <div
+          class="flex w-full items-center rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary"
         >
-          <option value="Arch">Arch</option>
-          <option value="Piping">Piping</option>
-          <option value="seismic">Seismic</option>
-        </select>
+          {formDomainCategory}
+        </div>
       </div>
       <div>
         <label
@@ -314,11 +309,9 @@
           bind:value={formMechanism}
           class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
         >
-          <option value="CODE">CODE</option>
-          <option value="GC-001">GC-001</option>
-          <option value="CC-001">CC-001</option>
-          <option value="MC-001">MC-001</option>
-          <option value="SEISMIC">SEISMIC</option>
+          {#each ARCH_MECHANISM_OPTIONS as opt (opt.value)}
+            <option value={opt.value}>{opt.value}</option>
+          {/each}
         </select>
       </div>
     </div>

@@ -2,6 +2,7 @@
   import { Pencil } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
   import type { RuleFolder } from "../../types";
 
   interface Props {
@@ -56,18 +57,12 @@
 
   const categoryOptions: SelectOption[] = [
     { value: "__keep__", label: "— Keep current —" },
-    { value: "Arch", label: "Arch (Architectural)" },
-    { value: "Piping", label: "Piping (Corrosion)" },
-    { value: "seismic", label: "Seismic (Clearance)" },
+    ...ARCH_CATEGORY_OPTIONS,
   ];
 
   const mechanismOptions: SelectOption[] = [
     { value: "__keep__", label: "— Keep current —" },
-    { value: "CODE", label: "CODE (Building Code)" },
-    { value: "GC-001", label: "GC-001 (Galvanic)" },
-    { value: "CC-001", label: "CC-001 (Crevice)" },
-    { value: "MC-001", label: "MC-001 (Microbiological)" },
-    { value: "SEISMIC", label: "SEISMIC (Clearance)" },
+    ...ARCH_MECHANISM_OPTIONS,
   ];
 
   const severityOptions: SelectOption[] = [

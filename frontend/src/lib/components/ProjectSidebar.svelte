@@ -37,7 +37,7 @@
   // Views that all fall under the single "Compliance Audit" destination —
   // switching between them happens via the in-page domain tab strip
   // (AnalysisDomainTabs), not a separate sidebar entry per domain.
-  const AUDIT_VIEW_IDS = new Set(["arch", "piping", "seismic", "analyze"]);
+  const AUDIT_VIEW_IDS = new Set(["arch"]);
 
   function getNavHref(itemId: string): string {
     const params = new URLSearchParams();

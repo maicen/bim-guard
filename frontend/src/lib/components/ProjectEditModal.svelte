@@ -248,8 +248,6 @@
             class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
           >
             <option value="Arch">Arch</option>
-            <option value="Piping">Piping</option>
-            <option value="seismic">Seismic</option>
           </select>
         </div>
 

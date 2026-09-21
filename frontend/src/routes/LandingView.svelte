@@ -13,7 +13,7 @@
     {
       icon: ScanEye,
       title: "3D-native compliance",
-      body: "Every flagged clearance or corrosion risk (GC-001, CC-001, MC-001) is isolated directly in your IFC model — no separate report to cross-reference.",
+      body: "Every flagged compliance issue is isolated directly in your IFC model — no separate report to cross-reference.",
     },
     {
       icon: Workflow,
@@ -65,10 +65,9 @@
         Automated code compliance for the models you already have.
       </h1>
       <p class="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-fg-muted sm:text-base">
-        BIM Guard reads your IFC models directly, runs galvanic, crevice, and
-        microbiological corrosion checks alongside architectural code rules, and
-        routes every finding as a BCF issue your team can act on — without
-        leaving your model.
+        BIM Guard reads your IFC models directly, runs architectural code
+        compliance checks, and routes every finding as a BCF issue your team
+        can act on — without leaving your model.
       </p>
       <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
         <button

@@ -82,9 +82,8 @@
   }
 
   /**
-   * Navigate for a quick-action card. Compliance Audit opens the Architectural,
-   * Piping or Seismic tab matching the project's domain -- it used to hardcode
-   * "arch", so every project landed on the Architectural tab.
+   * Navigate for a quick-action card. Compliance Audit opens the Architectural
+   * tab matching the project's domain -- Arch is the only domain today.
    */
   async function openQuickAction(view: string) {
     if (view !== AUDIT_ACTION) {
@@ -107,7 +106,7 @@
       // own domain (see openQuickAction).
       view: AUDIT_ACTION,
       label: "Compliance Audit",
-      description: "Run architectural, piping or seismic checks.",
+      description: "Run architectural compliance checks.",
       icon: LayoutList,
       color: "emerald",
     },

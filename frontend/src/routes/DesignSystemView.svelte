@@ -595,7 +595,7 @@
             <Alert
               type="error"
               title="Critical Compliance Risk Detected"
-              message="Minimum pipe wall thickness threshold (3.2mm) violated on line P-102. Corrosion rate exceeds allowable tolerance."
+              message="Minimum egress clear width (810mm) violated at door D-102 on Level 3."
               dismissible
             />
             <Alert

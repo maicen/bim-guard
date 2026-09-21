@@ -2,6 +2,7 @@
   import { Folder, Pencil } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
   import type { RulesetCategory } from "../../types";
 
   interface Props {
@@ -54,19 +55,9 @@
     }
   });
 
-  const categoryOptions: SelectOption[] = [
-    { value: "Arch", label: "Arch (Architectural)" },
-    { value: "Piping", label: "Piping (Corrosion)" },
-    { value: "seismic", label: "Seismic (Clearance)" },
-  ];
+  const categoryOptions: SelectOption[] = ARCH_CATEGORY_OPTIONS;
 
-  const mechanismOptions: SelectOption[] = [
-    { value: "CODE", label: "CODE (Building Code)" },
-    { value: "GC-001", label: "GC-001 (Galvanic)" },
-    { value: "CC-001", label: "CC-001 (Crevice)" },
-    { value: "MC-001", label: "MC-001 (Microbiological)" },
-    { value: "SEISMIC", label: "SEISMIC (Clearance Detection)" },
-  ];
+  const mechanismOptions: SelectOption[] = ARCH_MECHANISM_OPTIONS;
 
   async function handleSave() {
     if (!formRulesetId.trim()) {
@@ -118,12 +109,12 @@
         type="text"
         bind:value={formRulesetId}
         disabled={isEditing}
-        placeholder="e.g. BUILDING-CODE-PART3 or GC-001"
+        placeholder="e.g. BUILDING-CODE-PART3 or CODE-2024-STAIRS"
         class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
       />
       {#if !isEditing}
         <p class="text-caption text-fg-muted">
-          Unique ID used to link member rules (e.g. CODE-2024-STAIRS, GC-001, SEISMIC-CLEARANCE).
+          Unique ID used to link member rules (e.g. CODE-2024-STAIRS, BUILDING-CODE-PART3).
         </p>
       {/if}
     </div>

@@ -253,12 +253,6 @@
   });
 
   let archCount = $derived(rules.filter((r) => (r.category || "").toLowerCase() === "arch").length);
-  let pipingCount = $derived(
-    rules.filter((r) => (r.category || "").toLowerCase() === "piping").length,
-  );
-  let seismicCount = $derived(
-    rules.filter((r) => (r.category || "").toLowerCase() === "seismic").length,
-  );
 
   let filteredFolders = $derived(
     folders.filter((f) => {
@@ -542,12 +536,7 @@
     folderRulesetId = "";
     folderDisplayName = "";
     folderDescription = "";
-    folderMechanismScope =
-      selectedCategory === "Piping"
-        ? "GC-001"
-        : selectedCategory === "seismic"
-          ? "SEISMIC"
-          : "CODE";
+    folderMechanismScope = "CODE";
     folderCategory = selectedCategory !== "all" ? selectedCategory : "Arch";
     isFolderModalOpen = true;
   }
@@ -666,7 +655,7 @@
       <div class="mb-1 text-xs font-bold uppercase tracking-widest text-fg-muted">Library</div>
       <h1 class="text-2xl font-bold tracking-tight text-fg-primary sm:text-3xl">Rules Catalog</h1>
       <p class="text-xs text-fg-muted sm:text-sm">
-        Engineering criteria for corrosion, seismic clearance, and architectural building codes.
+        Engineering criteria for architectural building codes.
       </p>
     </div>
 
@@ -844,7 +833,7 @@
   </Tabs.Root>
 
   {#if activeMainTab === "rules"}
-    <!-- Category Selector Tabs: Arch | Piping | Seismic -->
+    <!-- Category Selector Tabs: All Categories | Arch (Arch is the only category today) -->
     <Tabs.Root
       value={selectedCategory}
       onValueChange={(val) => {
@@ -869,22 +858,6 @@
           <span class="h-2 w-2 rounded-full bg-blue-400"></span>
           <span>Arch</span>
           <span class="ml-0.5 text-micro opacity-75">({archCount})</span>
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="Piping"
-          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-          <span>Piping</span>
-          <span class="ml-0.5 text-micro opacity-75">({pipingCount})</span>
-        </Tabs.Trigger>
-        <Tabs.Trigger
-          value="seismic"
-          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-          <span>Seismic</span>
-          <span class="ml-0.5 text-micro opacity-75">({seismicCount})</span>
         </Tabs.Trigger>
       </Tabs.List>
     </Tabs.Root>
@@ -1026,13 +999,9 @@
                     class="rounded px-1.5 py-0.5 font-mono text-nano font-medium {selectedFolderId ===
                     folder.ruleset_id
                       ? 'bg-white/20 text-white'
-                      : folder.category?.toLowerCase() === 'piping'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : folder.category?.toLowerCase() === 'seismic'
-                          ? 'bg-purple-500/20 text-purple-300'
-                          : 'bg-blue-500/20 text-blue-300'}"
+                      : 'bg-blue-500/20 text-blue-300'}"
                   >
-                    {folder.category?.toLowerCase() === 'seismic' ? 'Seismic' : (folder.category || 'Arch')}
+                    {folder.category || 'Arch'}
                   </span>
                 {/if}
 
@@ -1120,10 +1089,7 @@
           >
             <option value="all">All Mechanisms</option>
             <option value="CODE">Building Code</option>
-            <option value="GC-001">Galvanic (GC-001)</option>
-            <option value="CC-001">Crevice (CC-001)</option>
-            <option value="MC-001">Microbiological (MC-001)</option>
-            <option value="SEISMIC">Seismic Clearance</option>
+            <option value="IFC">IFC Geometry</option>
           </select>
 
           <label
@@ -1318,14 +1284,9 @@
                       </td>
                       <td class="px-4 py-3">
                         <span
-                          class="inline-block rounded px-2 py-0.5 font-mono text-micro font-semibold {rule.category?.toLowerCase() ===
-                          'piping'
-                            ? 'border border-amber-800/50 bg-amber-950/60 text-amber-300'
-                            : rule.category?.toLowerCase() === 'seismic'
-                              ? 'border border-purple-800/50 bg-purple-950/60 text-purple-300'
-                              : 'border border-blue-800/50 bg-blue-950/60 text-blue-300'}"
+                          class="inline-block rounded border border-info-border bg-info-bg px-2 py-0.5 font-mono text-micro font-semibold text-info"
                         >
-                          {rule.category?.toLowerCase() === 'seismic' ? 'Seismic' : (rule.category || "Arch")}
+                          {rule.category || "Arch"}
                         </span>
                       </td>
                       <td class="px-4 py-3">

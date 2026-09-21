@@ -12,9 +12,10 @@
     initialBcfArtifactId?: number | null;
     initialFileId?: number | null;
     /**
-     * Which analysis run the deep-linked element's finding came from
-     * ("corrosion", "seismic", "architecture"). Forwarded to the viewer so its
-     * export fallback asks for that run's BCF rather than always corrosion's.
+     * Which analysis run the deep-linked element's finding came from (an
+     * `/analyze/export?slug=` value; `architecture` is the only slug the
+     * backend runs today). Forwarded to the viewer so its export fallback
+     * asks for that run's BCF rather than always the legacy default's.
      */
     initialAnalysisSlug?: string | null;
   }

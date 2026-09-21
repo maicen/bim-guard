@@ -60,15 +60,12 @@
     },
     {
       step: 5,
-      title: "Run compliance analysis (ARCH & MEP)",
+      title: "Run compliance analysis (ARCH)",
       icon: Cpu,
       description:
-        "Execute multi-domain checks against the IFC geometry. Run architectural compliance for egress, daylight, and fire-separation rules from any loaded building-code ruleset, or MEP checks for galvanic (GC-001), crevice (CC-001), and MIC (MC-001) piping corrosion and seismic clearances.",
+        "Execute architectural compliance checks against the IFC geometry, for egress, daylight, and fire-separation rules from any loaded building-code ruleset.",
       result: "Result: Non-compliant elements are tagged with risk bands, scores, and mitigations.",
-      actions: [
-        { label: "Run ARCH Audit", view: "arch", primary: true },
-        { label: "Run MEP & Piping", view: "analyze", primary: false },
-      ],
+      actions: [{ label: "Run ARCH Audit", view: "arch", primary: true }],
     },
     {
       step: 6,

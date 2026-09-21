@@ -58,7 +58,7 @@
     <div>
       <p class="mx-auto max-w-xl text-xs text-fg-muted">
         Covers picking the phase to export per project, why Export Material Psets must stay
-        ticked for seismic mass checks, and how to include linked Revit files.
+        ticked for material-based checks, and how to include linked Revit files.
       </p>
     </div>
   </div>

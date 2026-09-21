@@ -237,8 +237,8 @@
       {@render lockHint("wizard-jurisdiction-lock", locks.country)}
     {:else}
       <p class="mt-1 text-caption text-fg-muted">
-        Required for Architectural compliance checks; optional for Piping corrosion analysis. The
-        building code is chosen on step 4, from the codes this jurisdiction publishes.
+        Required for Architectural compliance checks. The building code is chosen on step 4, from
+        the codes this jurisdiction publishes.
       </p>
     {/if}
   </div>

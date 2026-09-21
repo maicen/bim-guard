@@ -46,26 +46,6 @@
         },
       ],
     },
-    {
-      domain: "MEP & Piping",
-      items: [
-        {
-          element: "Material Specifications",
-          rules:
-            "Assign explicit material definitions (e.g. Copper, Galvanized Steel, PVC) to prevent galvanic coupling risks under GC-001.",
-        },
-        {
-          element: "Fluid Service & Insulation",
-          rules:
-            "Specify system fluid types and operating temperatures to accurately calculate microbiological corrosion (MC-001) susceptibility.",
-        },
-        {
-          element: "Seismic Clearance Volume",
-          rules:
-            "Model pipe runs with proper seismic hanger allowances and Blue Halo clearance volumes around equipment interfaces.",
-        },
-      ],
-    },
   ];
 </script>
 

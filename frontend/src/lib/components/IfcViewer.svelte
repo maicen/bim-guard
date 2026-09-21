@@ -22,10 +22,12 @@
     bcfArtifactId?: number | null;
     /**
      * Which analysis run produced the finding behind `elementGuid`, as an
-     * `/analyze/export?slug=` value ("corrosion", "seismic", "architecture").
-     * The export fallback in `focusElement` asks for that run's archive; a
-     * seismic element is not in the corrosion BCF and vice versa. Null keeps
-     * the historical behaviour (corrosion) for links that carry no slug.
+     * `/analyze/export?slug=` value. `architecture` is the only slug the
+     * backend runs today (`RUNNABLE_SLUGS` in `app/services/analysis_runner.py`);
+     * the endpoint's own default (`app/main.py`) is still the legacy
+     * `"corrosion"` value, kept here in sync rather than renamed since it is
+     * a backend-owned convention, not a frontend cosmetic default. Null keeps
+     * that historical fallback for links that carry no slug.
      */
     analysisSlug?: string | null;
     /**
@@ -153,15 +155,16 @@
       // The project's persisted artifact first: it is a stored file, so it
       // costs a download and nothing more. Only the architectural pipeline
       // writes one (ArchAnalysisService.run_analysis -> persist_bcf), so for
-      // a corrosion or seismic project this 404s and the export below is what
-      // actually answers. Exporting regenerates the archive from the cached
-      // run, which is why it is second rather than first.
+      // a project with no persisted artifact this 404s and the export below is
+      // what actually answers. Exporting regenerates the archive from the
+      // cached run, which is why it is second rather than first.
       //
       // The export is asked for THIS finding's run. /analyze/export re-runs (or
       // reads the cache of) exactly the slug it is given, so the slug used to be
-      // the whole bug: hardcoded "corrosion", every seismic, crevice or microbial
-      // deep link fetched an archive that does not contain its topic, and the
-      // viewer reported the element as missing from the model.
+      // the whole bug: hardcoded "corrosion", every non-corrosion domain's deep
+      // link (back when this app analysed more than Architecture) fetched an
+      // archive that did not contain its topic, and the viewer reported the
+      // element as missing from the model.
       //
       // The viewer owns the rest: it cuts the archive down to this element
       // before parsing any of it, then loads, selects and frames it, logging

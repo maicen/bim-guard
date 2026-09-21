@@ -403,8 +403,6 @@
         >
           <option value="all">All Domains</option>
           <option value="Arch">Arch</option>
-          <option value="Piping">Piping</option>
-          <option value="seismic">Seismic</option>
         </select>
       </div>
     </div>

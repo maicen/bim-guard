@@ -6,7 +6,28 @@
  * ('Architectural', 'Architecture'), and a project must open the view for
  * the domain it was actually created with.
  */
+import type { SelectOption } from "./components/ui/Select.svelte";
 import type { AnalysisDomain } from "./types";
+
+/**
+ * Rule-category options for the rule/ruleset-folder editors. Arch is the only
+ * category `public.rules`/`public.rule_folders` accept (`CHECK (category =
+ * 'Arch')`), so this is a single-entry list rather than a real choice — kept
+ * as one shared constant so it isn't hand-duplicated across RuleForm,
+ * RulesetFolderModal, RuleBulkEditModal and RulesetFolderBulkEditModal.
+ */
+export const ARCH_CATEGORY_OPTIONS: SelectOption[] = [
+  { value: "Arch", label: "Arch (Architectural)" },
+];
+
+/**
+ * Mechanism options for the same editors. GC-001/CC-001/MC-001/SEISMIC were
+ * the removed Piping/Seismic engines' mechanism scopes; CODE (building code)
+ * is the only mechanism Arch rules use today.
+ */
+export const ARCH_MECHANISM_OPTIONS: SelectOption[] = [
+  { value: "CODE", label: "CODE (Building Code)" },
+];
 
 const ALIASES: Record<AnalysisDomain, string[]> = {
   Arch: ["arch", "architectural", "architecture"],

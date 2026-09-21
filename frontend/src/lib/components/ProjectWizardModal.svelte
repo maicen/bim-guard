@@ -191,9 +191,7 @@
   );
   let buildingCodeRequired = $derived(analysisType === "Arch");
   // Named so the confirm step can say which analysis page the button opens.
-  let analysisDomainLabel = $derived(
-    analysisType === "Piping" ? "Piping" : analysisType === "seismic" ? "Seismic" : "Architectural",
-  );
+  let analysisDomainLabel = $derived("Architectural");
   let standardsForDomain = $derived(
     options.standards.filter(
       (s) => !s.applicable_to?.length || s.applicable_to.includes(analysisType),
@@ -996,8 +994,6 @@
                 class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
               >
                 <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
-                <option value="Piping">Piping — GC-001, CC-001, MC-001</option>
-                <option value="seismic">Seismic — Blue Halo Clearance Detection</option>
               </select>
               <p class="mt-1 text-caption text-fg-muted">
                 Determines which analysis page opens once the project is created.
@@ -1053,8 +1049,8 @@
                   </p>
                 {:else}
                   <p class="mt-1 text-caption text-fg-muted">
-                    Optional for {analysisType}: corrosion and clearance checks are judged against
-                    material and geometry rules, not a jurisdiction's code.
+                    Optional for {analysisType}: checks are judged against material and geometry
+                    rules, not a jurisdiction's code.
                   </p>
                 {/if}
               {/if}
