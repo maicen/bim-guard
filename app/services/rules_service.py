@@ -64,11 +64,11 @@ _RICH_COLUMNS = {
 # Columns that classify a rule within the broader multi-mechanism schema.
 # Added via required_columns so existing DBs migrate automatically.
 _META_COLUMNS = {
-    "mechanism": str,  # "CODE" | "GC-001" | "CC-001" | "MC-001" | "SEISMIC"
-    "ruleset_id": str,  # "BUILDING-CODE-PART9" | "BIMGUARD-GC-001" | …
+    "mechanism": str,  # "CODE" | "IFC"
+    "ruleset_id": str,  # "BUILDING-CODE-PART9" | …
     "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
     # | "scoring_model" | "mitigation" | "reference_config"
-    "category": str,  # "Arch" | "Piping" | "seismic"
+    "category": str,  # "Arch"
 }
 
 _FOLDER_COLUMNS = {
@@ -84,32 +84,19 @@ _FOLDER_COLUMNS = {
 
 # ── Valid controlled vocabulary ───────────────────────────────────────────────
 
-MECHANISMS = {"GC-001", "CC-001", "MC-001", "IFC", "CODE", "SEISMIC", "SB-001"}
-RULESET_CATEGORIES = {"Arch", "Piping", "seismic"}
+MECHANISMS = {"IFC", "CODE"}
+RULESET_CATEGORIES = {"Arch"}
 
 RULE_CATEGORIES = {
     "property_check",  # IFC element property assertion (building code)
     "scoring_model",  # Composite score formula + weights
     "threshold_band",  # Classification band with risk score
-    "material_property",  # Material-level data (galvanic potential, CCT, MIC susceptibility)
-    "reference_config",  # Named lookup entry (environment class, joint type, etc.)
+    "material_property",  # Material-level data
+    "reference_config",  # Named lookup entry (e.g. occupancy class, room type)
     "mitigation",  # Remediation action catalogue entry
 }
 
-THEMES = {"Architecture", "MEP"}
-
-_MEP_IFC_PREFIXES = (
-    "IfcFlow",
-    "IfcPipe",
-    "IfcDuct",
-    "IfcCable",
-    "IfcDistribution",
-    "IfcPump",
-    "IfcBoiler",
-    "IfcChiller",
-    "IfcUnitary",
-    "IfcSanitary",
-)
+THEMES = {"Architecture"}
 
 FOLDER_MECHANISM_SCOPES = {"", *MECHANISMS}
 _DEFAULT_CODE_MECHANISMS = {"", "IFC", "CODE"}
@@ -187,47 +174,12 @@ class RuleService:
 
     @staticmethod
     def normalize_category(category: str | None, default: str = "Arch") -> str:
-        """Normalize category to one of 'Arch', 'Piping', or 'seismic'."""
-        val = (category or "").strip().lower()
-        if val in ("arch", "architecture", "architectural", "building_code", "code"):
-            return "Arch"
-        if val in ("piping", "mep", "corrosion"):
-            return "Piping"
-        if val in ("seismic", "halo", "sb-001", "sb001"):
-            return "seismic"
+        """Normalize category to 'Arch', the only supported domain."""
         return default
 
     @classmethod
     def infer_category(cls, rule_or_folder: dict[str, Any]) -> str:
-        """Infer category (Arch, Piping, or seismic) for a rule or folder."""
-        explicit = rule_or_folder.get("category")
-        if explicit:
-            norm = cls.normalize_category(explicit, default="")
-            if norm:
-                return norm
-
-        mechanism = (
-            rule_or_folder.get("mechanism")
-            or rule_or_folder.get("mechanism_scope")
-            or ""
-        ).strip().upper()
-        if mechanism in {"GC-001", "CC-001", "MC-001"}:
-            return "Piping"
-        if mechanism in {"SB-001", "SEISMIC"}:
-            return "seismic"
-        if mechanism in {"CODE", "IFC", "OBC"}:
-            return "Arch"
-
-        ruleset_id = (rule_or_folder.get("ruleset_id") or "").strip().upper()
-        if any(k in ruleset_id for k in ("GC-001", "CC-001", "MC-001", "CORROSION")):
-            return "Piping"
-        if any(k in ruleset_id for k in ("SB-001", "SEISMIC", "HALO")):
-            return "seismic"
-
-        target = (rule_or_folder.get("target_ifc_class") or "").strip()
-        if target.startswith(_MEP_IFC_PREFIXES):
-            return "Piping"
-
+        """Infer category for a rule or folder. Always 'Arch'."""
         return "Arch"
 
     def _disable_folders_if_missing(self, exc: APIError) -> bool:
@@ -859,7 +811,7 @@ class RuleService:
 
     @cache_db_query(key_prefix="bimguard:rules:mechanism")
     def list_by_mechanism(self, mechanism: str) -> list[dict]:
-        """Return all rules for a corrosion or code-check mechanism."""
+        """Return all rules for a code-check mechanism."""
         return list(self._rules.rows_where("mechanism = ?", [mechanism]))
 
     def list_code_rules(self) -> list[dict]:
@@ -1168,7 +1120,7 @@ class RuleService:
 
 
     def list_by_category(self, category: str) -> list[dict]:
-        """Return all rules matching the provided domain category (Arch, Piping, or seismic)."""
+        """Return all rules matching the provided domain category (Arch)."""
         norm = self.normalize_category(category)
         return [
             r
@@ -1178,25 +1130,12 @@ class RuleService:
 
     @staticmethod
     def normalize_theme(theme: str | None) -> str:
-        """Normalize a user-selected theme to one of the supported values."""
-        value = (theme or "").strip().lower()
-        if value == "mep":
-            return "MEP"
+        """Normalize a user-selected theme to the only supported value."""
         return "Architecture"
 
     @classmethod
     def infer_theme(cls, rule: dict) -> str:
-        """Infer Architecture vs MEP for a rule from mechanism and IFC target hints."""
-        mechanism = (rule.get("mechanism") or "").strip().upper()
-        if mechanism in {"GC-001", "CC-001", "MC-001"}:
-            return "MEP"
-        if mechanism in {"CODE", "IFC"}:
-            return "Architecture"
-
-        target = (rule.get("target_ifc_class") or "").strip()
-        if target.startswith(_MEP_IFC_PREFIXES):
-            return "MEP"
-
+        """Infer the analysis theme for a rule. Always 'Architecture'."""
         return "Architecture"
 
     def list_by_theme(self, theme: str) -> list[dict]:

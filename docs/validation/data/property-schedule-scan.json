@@ -1,0 +1,433 @@
+{
+  "cases_total": 71,
+  "cases_resolved": 71,
+  "cases_not_resolved": 0,
+  "cases": [
+    {
+      "group": "Door",
+      "property": "OverallWidth",
+      "status": "PASS",
+      "actual": 900.0
+    },
+    {
+      "group": "Door",
+      "property": "OverallHeight",
+      "status": "PASS",
+      "actual": 2100.0
+    },
+    {
+      "group": "Door",
+      "property": "PredefinedType",
+      "status": "PASS",
+      "actual": "DOOR"
+    },
+    {
+      "group": "Door",
+      "property": "OperationType",
+      "status": "PASS",
+      "actual": "SINGLE_SWING_LEFT"
+    },
+    {
+      "group": "Door",
+      "property": "FireRating",
+      "status": "PASS",
+      "actual": "60min"
+    },
+    {
+      "group": "Door",
+      "property": "AcousticRating",
+      "status": "PASS",
+      "actual": "35dB"
+    },
+    {
+      "group": "Door",
+      "property": "ThermalTransmittance",
+      "status": "PASS",
+      "actual": 1.8
+    },
+    {
+      "group": "Door",
+      "property": "SecurityRating",
+      "status": "PASS",
+      "actual": "Grade 2"
+    },
+    {
+      "group": "Door",
+      "property": "SmokeStop",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door",
+      "property": "SelfClosing",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door",
+      "property": "Infiltration",
+      "status": "PASS",
+      "actual": 0.5
+    },
+    {
+      "group": "Door",
+      "property": "HandicapAccessible",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door",
+      "property": "NumberOfPanels",
+      "status": "PASS",
+      "actual": 1.0
+    },
+    {
+      "group": "Door",
+      "property": "IsExternal",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door",
+      "property": "FireExit",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door",
+      "property": "DoorClearOpeningWidth",
+      "status": "PASS",
+      "actual": 855.0
+    },
+    {
+      "group": "Door",
+      "property": "Volume",
+      "status": "PASS",
+      "actual": 85050000.0
+    },
+    {
+      "group": "Door",
+      "property": "FootprintArea",
+      "status": "PASS",
+      "actual": 40500.0
+    },
+    {
+      "group": "Door",
+      "property": "SurfaceArea",
+      "status": "PASS",
+      "actual": 3969000.0
+    },
+    {
+      "group": "Door",
+      "property": "FootprintPerimeter",
+      "status": "PASS",
+      "actual": 1890.0
+    },
+    {
+      "group": "Door",
+      "property": "SillHeight",
+      "status": "PASS",
+      "actual": 0.0
+    },
+    {
+      "group": "Door (alias)",
+      "property": "Width -> OverallWidth",
+      "status": "PASS",
+      "actual": 900.0
+    },
+    {
+      "group": "Door (alias)",
+      "property": "FireExit -> EmergencyExit",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Door (geometry fallback)",
+      "property": "Width",
+      "status": "PASS",
+      "actual": 900.0
+    },
+    {
+      "group": "Door (geometry fallback)",
+      "property": "Height",
+      "status": "PASS",
+      "actual": 2100.0
+    },
+    {
+      "group": "Door (geometry fallback)",
+      "property": "ClearWidth",
+      "status": "PASS",
+      "actual": 900.0
+    },
+    {
+      "group": "Door (geometry fallback)",
+      "property": "Slope",
+      "status": "PASS",
+      "actual": 66.8
+    },
+    {
+      "group": "Window",
+      "property": "OverallWidth",
+      "status": "PASS",
+      "actual": 1200.0
+    },
+    {
+      "group": "Window",
+      "property": "OverallHeight",
+      "status": "PASS",
+      "actual": 1200.0
+    },
+    {
+      "group": "Window",
+      "property": "PredefinedType",
+      "status": "PASS",
+      "actual": "WINDOW"
+    },
+    {
+      "group": "Window",
+      "property": "OperationType",
+      "status": "PASS",
+      "actual": "SLIDINGVERTICAL"
+    },
+    {
+      "group": "Window",
+      "property": "FireRating",
+      "status": "PASS",
+      "actual": "30min"
+    },
+    {
+      "group": "Window",
+      "property": "AcousticRating",
+      "status": "PASS",
+      "actual": "30dB"
+    },
+    {
+      "group": "Window",
+      "property": "ThermalTransmittance",
+      "status": "PASS",
+      "actual": 1.4
+    },
+    {
+      "group": "Window",
+      "property": "GlazingAreaFraction",
+      "status": "PASS",
+      "actual": 0.85
+    },
+    {
+      "group": "Window",
+      "property": "Infiltration",
+      "status": "PASS",
+      "actual": 0.3
+    },
+    {
+      "group": "Window",
+      "property": "SecurityRating",
+      "status": "PASS",
+      "actual": "Grade 1"
+    },
+    {
+      "group": "Window",
+      "property": "SmokeStop",
+      "status": "PASS",
+      "actual": false
+    },
+    {
+      "group": "Window",
+      "property": "IsExternal",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Window",
+      "property": "Volume",
+      "status": "PASS",
+      "actual": 144000000.0
+    },
+    {
+      "group": "Window",
+      "property": "FootprintArea",
+      "status": "PASS",
+      "actual": 120000.0
+    },
+    {
+      "group": "Window",
+      "property": "SurfaceArea",
+      "status": "PASS",
+      "actual": 3120000.0
+    },
+    {
+      "group": "Window",
+      "property": "FootprintPerimeter",
+      "status": "PASS",
+      "actual": 2600.0
+    },
+    {
+      "group": "Window",
+      "property": "SillHeight",
+      "status": "PASS",
+      "actual": 900.0
+    },
+    {
+      "group": "Window (geometry fallback)",
+      "property": "Width",
+      "status": "PASS",
+      "actual": 1200.0
+    },
+    {
+      "group": "Window (geometry fallback)",
+      "property": "Height",
+      "status": "PASS",
+      "actual": 1200.0
+    },
+    {
+      "group": "Window (geometry fallback)",
+      "property": "ClearWidth",
+      "status": "PASS",
+      "actual": 1200.0
+    },
+    {
+      "group": "Window (geometry fallback)",
+      "property": "Slope",
+      "status": "PASS",
+      "actual": 45.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "RiserHeight",
+      "status": "PASS",
+      "actual": 175.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "TreadLength",
+      "status": "PASS",
+      "actual": 280.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "NumberOfRiser",
+      "status": "PASS",
+      "actual": 4.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "NumberOfTreads",
+      "status": "PASS",
+      "actual": 3.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "NosingLength",
+      "status": "PASS",
+      "actual": 25.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "WaistThickness",
+      "status": "PASS",
+      "actual": 200.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "WalkingLineOffset",
+      "status": "PASS",
+      "actual": 300.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "HandicapAccessible",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "HasNonSkidSurface",
+      "status": "PASS",
+      "actual": true
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "RequiredHeadroom",
+      "status": "PASS",
+      "actual": 2100.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "MinRiserHeight",
+      "status": "PASS",
+      "actual": 175.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "MinClearStairWidth",
+      "status": "PASS",
+      "actual": 1120.0
+    },
+    {
+      "group": "Stair Flight (direct)",
+      "property": "StepFormulaMax",
+      "status": "PASS",
+      "actual": 350.0
+    },
+    {
+      "group": "Stair Flight (alias)",
+      "property": "TreadDepth -> TreadLength",
+      "status": "PASS",
+      "actual": 280.0
+    },
+    {
+      "group": "Space boundaries",
+      "property": "IFCSpatialAdjacency parses real IfcRelSpaceBoundary",
+      "status": "PASS",
+      "actual": 3
+    },
+    {
+      "group": "Space boundaries",
+      "property": "DaylightRatio (check_daylight_ratios)",
+      "status": "PASS",
+      "actual": "see console"
+    },
+    {
+      "group": "Space boundaries",
+      "property": "FireSeparation (check_fire_separation)",
+      "status": "PASS",
+      "actual": "see console"
+    },
+    {
+      "group": "Space boundaries",
+      "property": "GarageSeparation (check_garage_separation)",
+      "status": "PASS",
+      "actual": "see console"
+    },
+    {
+      "group": "Space boundaries",
+      "property": "ConnectedSpaces/ConnectedSpaceCount (check_door_space_connection)",
+      "status": "PASS",
+      "actual": "see console"
+    },
+    {
+      "group": "Space boundaries",
+      "property": "ConnectedSpaceCount (via extract_for_compliance)",
+      "status": "PASS",
+      "actual": 1
+    },
+    {
+      "group": "Space boundaries",
+      "property": "ExitCount (check_exit_count)",
+      "status": "PASS",
+      "actual": 1
+    },
+    {
+      "group": "Space boundaries",
+      "property": "EgressTravelDistance (check_egress_travel_distance)",
+      "status": "PASS",
+      "actual": "see console"
+    },
+    {
+      "group": "Space boundaries",
+      "property": "EgressWindowClearOpening (check_egress_window_openings)",
+      "status": "PASS",
+      "actual": "see console"
+    }
+  ]
+}

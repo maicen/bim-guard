@@ -1,4 +1,4 @@
-"""Tests verifying ruleset categorization across Arch, Piping, and seismic."""
+"""Tests verifying ruleset categorization now that Arch is the only domain."""
 
 from __future__ import annotations
 
@@ -11,28 +11,21 @@ client = TestClient(app)
 
 
 def test_category_normalization():
-    """Verify normalize_category maps various inputs to Arch, Piping, or seismic."""
+    """Verify normalize_category always resolves to 'Arch'."""
     assert RuleService.normalize_category("arch") == "Arch"
     assert RuleService.normalize_category("Architecture") == "Arch"
     assert RuleService.normalize_category("CODE") == "Arch"
-    assert RuleService.normalize_category("piping") == "Piping"
-    assert RuleService.normalize_category("MEP") == "Piping"
-    assert RuleService.normalize_category("corrosion") == "Piping"
-    assert RuleService.normalize_category("seismic") == "seismic"
-    assert RuleService.normalize_category("HALO") == "seismic"
-    assert RuleService.normalize_category("SB-001") == "seismic"
+    assert RuleService.normalize_category("piping") == "Arch"
+    assert RuleService.normalize_category("seismic") == "Arch"
+    assert RuleService.normalize_category(None) == "Arch"
 
 
 def test_category_inference():
-    """Verify infer_category correctly classifies rules and folders."""
-    assert RuleService.infer_category({"mechanism": "GC-001"}) == "Piping"
-    assert RuleService.infer_category({"ruleset_id": "BIMGUARD-CC-001"}) == "Piping"
-    assert RuleService.infer_category({"mechanism": "SEISMIC"}) == "seismic"
-    assert RuleService.infer_category({"ruleset_id": "BIMGUARD-SB-001"}) == "seismic"
+    """Verify infer_category always classifies as 'Arch'."""
     assert RuleService.infer_category({"mechanism": "CODE"}) == "Arch"
     assert RuleService.infer_category({"ruleset_id": "BUILDING-CODE-PART9"}) == "Arch"
-    assert RuleService.infer_category({"target_ifc_class": "IfcPipeSegment"}) == "Piping"
     assert RuleService.infer_category({"target_ifc_class": "IfcWall"}) == "Arch"
+    assert RuleService.infer_category({}) == "Arch"
 
 
 def test_api_list_folders_has_categories():
@@ -48,29 +41,24 @@ def test_api_list_folders_has_categories():
         assert f["category"] in RULESET_CATEGORIES
         found_categories.add(f["category"])
 
-    # Verify all three categories exist
-    assert "Arch" in found_categories
-    assert "Piping" in found_categories
-    assert "seismic" in found_categories
+    assert found_categories == {"Arch"}
 
 
 def test_api_list_folders_filter_by_category():
-    """Verify /api/rules/folders?category=... filters properly."""
-    for cat in ("Arch", "Piping", "seismic"):
-        response = client.get(f"/api/rules/folders?category={cat}")
-        assert response.status_code == 200
-        folders = response.json()
-        assert len(folders) > 0
-        for f in folders:
-            assert f["category"] == cat
+    """Verify /api/rules/folders?category=Arch filters properly."""
+    response = client.get("/api/rules/folders?category=Arch")
+    assert response.status_code == 200
+    folders = response.json()
+    assert len(folders) > 0
+    for f in folders:
+        assert f["category"] == "Arch"
 
 
 def test_api_list_rules_filter_by_category():
-    """Verify /api/rules?category=... filters properly."""
-    for cat in ("Arch", "Piping", "seismic"):
-        response = client.get(f"/api/rules?category={cat}")
-        assert response.status_code == 200
-        rules = response.json()
-        assert len(rules) > 0
-        for r in rules:
-            assert r.get("category") == cat
+    """Verify /api/rules?category=Arch filters properly."""
+    response = client.get("/api/rules?category=Arch")
+    assert response.status_code == 200
+    rules = response.json()
+    assert len(rules) > 0
+    for r in rules:
+        assert r.get("category") == "Arch"
