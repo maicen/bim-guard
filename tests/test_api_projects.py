@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
@@ -180,6 +181,7 @@ def test_update_project_classification_standard():
         svc.delete_project(created["id"])
 
 
+@pytest.mark.slow
 def test_bulk_update_projects():
     """Verify POST /api/projects/bulk-update updates multiple projects in batch."""
     from app.services.projects_service import ProjectsService
@@ -213,6 +215,7 @@ def test_bulk_update_projects():
         svc.delete_project(p2_id)
 
 
+@pytest.mark.slow
 def test_bulk_delete_projects():
     """Verify POST /api/projects/bulk-delete deletes multiple projects in batch."""
     from app.services.projects_service import ProjectsService
