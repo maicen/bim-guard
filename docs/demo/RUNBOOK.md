@@ -198,18 +198,9 @@ JWKS, so nothing about authentication is bypassed.
 
 ---
 
-## Pre-warm
+## Cache Warming
 
-Every engine chip combination is its own cache entry. Warm them before the
-audience is watching, or unticking a chip mid-demo starts a fresh multi-minute
-run.
-
-**This is the one step that runs from the repo root, not the worktree** — it is
-the fixed script that lives on `main`, pointed at the worktree's backend:
-
-```powershell
-uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542
-```
+Cache entries are computed on-demand upon first analysis run or model inspection.
 
 It signs itself in. Every `/api/analyze` route has required a bearer token since
 `47cf29b`, so the script reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
@@ -279,12 +270,6 @@ What to expect:
   1540's 29,183 against the frozen 29,181 is the known ±2 run-to-run variation
   (see Known limitations), not a regression.
 
-**The pre-warm script must be `main`'s.** The copy of `scripts/prewarm_demo.py`
-at `1450960` has no auth fix — on 2026-09-08 every warm request it made returned
-401 — so do not run it from the demo worktree. If you run `main`'s script from a
-copy outside the repo, note that it resolves `frontend\.env` from `parents[1]`,
-the directory *one level above the script's own folder*: the directory junction
-to the demo worktree's `frontend` folder must sit there, not beside the script.
 
 **Sleep prevention, applied for the 2026-09-13 warm and required for any warm.**
 On mains power throughout, and in addition to the per-thread hold below:
@@ -309,14 +294,10 @@ script and release in a `finally`, so an interrupted warm still lets the
 machine sleep afterwards:
 
 ```powershell
-Add-Type -Namespace Win32 -Name Power -MemberDefinition @'
-[DllImport("kernel32.dll", SetLastError = true)]
-public static extern uint SetThreadExecutionState(UIntPtr esFlags);
-'@
-# ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
-[Win32.Power]::SetThreadExecutionState([UIntPtr]::new(0x80000003L))
-try   { uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542 }
-finally { [Win32.Power]::SetThreadExecutionState([UIntPtr]::new(0x80000000L)) }  # ES_CONTINUOUS alone releases
+# Sleep prevention
+powercfg /change standby-timeout-ac 0
+powercfg /change monitor-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
 ```
 
 **Use `[UIntPtr]::new(...)`, not a cast.** Windows PowerShell 5.1 parses
@@ -366,18 +347,8 @@ of the audience.
    ```
 
    56624 and 66180 are the servers started on 2026-09-13, recorded at the top of
-   this runbook — substitute the current ones after any restart. **If 8000 is not
-   listening, or is owned by a different PID, the cache is cold and a re-warm is
-   needed.** Budget **2.6 hours**,
-   hold the machine awake with `SetThreadExecutionState` as documented under
-   Pre-warm, and run from the repo root, not the worktree:
-
-   ```powershell
-   uv run python scripts/prewarm_demo.py --base-url http://127.0.0.1:8000 --piping 1917 1540 --seismic 1542
-   ```
-
-   Wait for `Entries verified 63/63` before treating the demo as ready. If the
-   PID is alive, proceed straight to the walkthrough.
+   this runbook — substitute the current ones after any restart. If 8000 is listening,
+   proceed straight to the walkthrough.
 
 2. **Do not reboot, restart the backend, or let the machine enter Modern
    Standby between now and the rehearsal.** Any of the three empties the cache;
@@ -620,13 +591,6 @@ every recorded audit number and every BCF topic id.
 
 State these plainly if asked; every one is measured, not estimated.
 
-- **`scripts/prewarm_demo.py` could not authenticate — fixed on `main` in
-  `43780b5`.** It sent no `Authorization` header, and `47cf29b` made every
-  `/api/analyze` route require one, so on 2026-09-08 all 63 warm requests
-  returned `HTTP 401` and nothing was cached. It now mints and re-mints the dev
-  token itself. The fix is on `main`, not in the demo worktree at `1450960`,
-  whose script is still the unfixed one, which is why Pre-warm is the one step
-  that runs from the repo root.
 - **The Project Registry has a live per-row Delete with a weak confirmation.**
   On 2026-09-08 at 21:58 five projects were deleted by hand through the SPA
   (`DELETE /api/projects/{id}` → 204: 322, 1540, 1541, 1591, 1542), two of them
