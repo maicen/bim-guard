@@ -45,8 +45,8 @@ def rule_result(**overrides: Any) -> dict[str, Any]:
 
 def merged(rule: dict[str, Any]) -> dict[str, Any]:
     """Run one rule result through include_rule_results and return the audit result."""
-    service = AnalysisService(evaluator=lambda _: [])
-    audit = service.run([], run_id=RUN_ID)
+    service = AnalysisService()
+    audit: dict[str, Any] = {"issues": [], "bcf_topics": []}
     return service.include_rule_results(audit, [rule], run_id=RUN_ID)
 
 
