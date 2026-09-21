@@ -37,7 +37,6 @@ as historical reference, not as current capability.
 - `NotebookLM/master_prompt.md`
 - `MonsterUI/llms.txt.md` — reference docs for the MonsterUI component library used by the retired FastHTML frontend; kept for archive context only, not the current Svelte 5 SPA
 - `RESOURCES.md` — research bibliography for the original galvanic/crevice/microbiological corrosion rule engines; kept for archive context only, that domain has been removed
-- `expert_review_process.md` — describes the expert-review methodology used to validate the corrosion engine's risk scoring before it was removed; kept for archive context only
 - `scraped_standards/README.md` — retrieved standards, regenerable and excluded from version control
 
 ## Validation & Research (`validation/`)
@@ -83,7 +82,6 @@ plans, session summaries).
 - `thesis/`: The MAICEN M10 Final Thesis documents.
 - `submissions/`: Official revised submission docs.
 - `Presentation-2026-May/`: Thesis and client presentation decks/documents, point-in-time.
-- `_backup/`: Pre-revision thesis snapshots, kept only as a rollback point.
 - `patches/`: One-off patch files applied during thesis preparation.
 
 ## Archived or Legacy Context (`archive/`)
