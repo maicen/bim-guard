@@ -569,12 +569,12 @@ class RuleExtractionService:
         """Ingest document text into clause-annotated nodes with deontic statements.
 
         Does not report through the shared pipeline_tracker: that tracker is
-        keyed by project_id against a fixed corrosion-engine registry
-        (GC-001/CC-001/...), so binding it here under a document_id would
-        either collide with an in-flight corrosion run that happens to share
-        the same id, or raise on an engine code ("LLAMA-INGEST") the registry
-        does not know. Document ingestion has no engine-progress contract of
-        its own yet, so this stays plain (unstreamed) for now.
+        keyed by project_id against a fixed engine registry, so binding it
+        here under a document_id would either collide with an in-flight
+        analysis run that happens to share the same id, or raise on an engine
+        code ("LLAMA-INGEST") the registry does not know. Document ingestion
+        has no engine-progress contract of its own yet, so this stays plain
+        (unstreamed) for now.
         """
         pages = self._pages_service.get_pages(document_id)
         nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id, pages=pages)

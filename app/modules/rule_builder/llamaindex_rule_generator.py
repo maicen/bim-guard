@@ -45,8 +45,7 @@ For each rule found, fill in:
 - rule_id: a short identifier, e.g. the clause reference if present, else
   "REQ-AI-<short-slug>"
 - description: short plain-English rule description
-- mechanism: "CODE" unless the text is clearly about corrosion (GC-001,
-  CC-001, MC-001)
+- mechanism: "CODE"
 - target_ifc_class: the IFC entity type the rule applies to, e.g. "IfcDoor",
   "IfcSpace", "IfcStairFlight" — required for every rule, since it is what
   lets a rule be checked against a model and exported to IDS
