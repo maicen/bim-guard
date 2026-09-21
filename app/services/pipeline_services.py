@@ -9,7 +9,7 @@ version without mutating the original IFC source.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Protocol
@@ -30,6 +30,10 @@ class AuditIssue:
     description: str
     mitigation: str
     details: dict[str, Any]
+    #: ``{"standard", "clause", "reason"}`` records the BCF exporter renders as
+    #: its "Standards References" block. Empty when the finding has no source
+    #: to cite -- a visible gap rather than an invented reference.
+    citations: list[dict[str, str]] = field(default_factory=list)
 
 
 class AnalysisService:
@@ -107,9 +111,40 @@ class AnalysisService:
                 description=issue.description or "",
                 mitigation=issue.mitigation,
                 details=dict(issue.metadata),
+                # Path A rows carry no rule record, so the adapter emits none
+                # today; forwarding keeps whatever it does cite from being
+                # dropped here on the way to the exporter.
+                citations=[dict(citation) for citation in issue.citations],
             )
             for issue in mutable_issues
         )
+
+    @staticmethod
+    def _rule_citations(rule: dict[str, Any]) -> list[dict[str, str]]:
+        """Build the citation for a rule from the fields the rule itself stores.
+
+        ``standard`` is the rule's ruleset (or, failing that, its source
+        document), ``clause`` its ``reference`` and ``reason`` the ``source_text``
+        it was extracted from, with the page number when one is stored. A rule
+        with neither a reference nor a source text has nothing to cite and yields
+        no citation: an empty list is a visible gap, a guessed clause is a false
+        audit trail.
+        """
+        clause = str(rule.get("rule_ref") or "").strip()
+        source_text = " ".join(str(rule.get("source_text") or "").split())
+        if not clause and not source_text:
+            return []
+
+        standard = str(rule.get("ruleset_id") or "").strip()
+        if not standard and rule.get("source_document_id"):
+            standard = f"Source document #{rule['source_document_id']}"
+
+        reason = source_text
+        page = rule.get("source_page_number")
+        if page:
+            reason = f"{reason} (page {page})" if reason else f"Page {page}"
+
+        return [{"standard": standard, "clause": clause, "reason": reason}]
 
     @staticmethod
     def _to_bcf_topic(issue: AuditIssue) -> dict[str, Any]:
@@ -164,6 +199,7 @@ class AnalysisService:
                             "severity": severity,
                             "position_mm": failure.get("position_mm"),
                         },
+                        citations=self._rule_citations(rule),
                     )
                 )
 

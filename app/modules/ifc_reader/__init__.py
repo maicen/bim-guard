@@ -2037,6 +2037,14 @@ class IFCReader:
                     "rule_id": rule.get("id"),
                     "rule_ref": str(rule.get("reference") or ""),
                     "rule_desc": str(rule.get("description") or ""),
+                    # Provenance the rule stores about itself, carried through
+                    # so a finding can cite its source (see
+                    # AnalysisService._rule_citations). Absent on rules that
+                    # were authored by hand rather than extracted.
+                    "ruleset_id": rule.get("ruleset_id"),
+                    "source_text": rule.get("source_text"),
+                    "source_document_id": rule.get("source_document_id"),
+                    "source_page_number": rule.get("source_page_number"),
                     "target_ifc_class": target,
                     "property_name": prop_name,
                     "property_set": prop_set,
