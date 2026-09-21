@@ -99,10 +99,13 @@ def test_dashboard_only_trusts_selected_project_when_it_is_this_dashboards():
 
 
 def test_app_selects_the_audit_tab_from_the_route():
-    """/arch, /piping and /seismic select the matching tab in App.svelte."""
+    """Arch is the only tab, and a stale link snaps back to the project's own domain."""
     source = APP.read_text(encoding="utf-8")
     assert re.search(
-        r'activeView === "arch" \? "arch" : activeView === "seismic" \? "seismic" : "piping"',
+        r'let auditDomain: AnalysisDomainTab = "arch";',
         source,
-    ), "App.svelte no longer derives the audit tab from the route"
+    ), "App.svelte no longer fixes the audit tab to the sole Architectural domain"
+    assert "auditDomain !== projectAuditDomain" in source, (
+        "App.svelte no longer reconciles a stale route against the project's domain"
+    )
     assert "onNavigate={(view) => push(buildTargetUrl(view, targetProjectId!))}" in source

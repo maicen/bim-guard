@@ -17,7 +17,7 @@ drive every design decision here:
    on a sha256 of the source, so re-parses can be avoided with the existing
    mechanism rather than a second one.
 
-The element shape is :class:`~app.modules.ifc_reader.ifc_parser.ServiceElement`,
+The element shape is :class:`~app.modules.ifc_reader.ifc_parser.ParsedElement`,
 which already exists and is **not** redefined here — this module composes the
 Module 2 reader into the envelope the Phase 6+ sessions agreed on.
 """
@@ -31,7 +31,7 @@ from typing import Any, TypedDict
 
 from app.logging_config import get_logger
 from app.modules.ifc_reader.ifc_parser import (
-    ServiceElement,
+    ParsedElement,
     get_schema_compatibility_note,
     parse_ifc_model,
 )
@@ -39,7 +39,7 @@ from app.modules.ifc_reader.ifc_parser import (
 logger = get_logger(__name__)
 
 #: Materials the normaliser could not resolve. ``ifc_parser`` writes this
-#: sentinel into ``material_a`` when the IFC carries no usable material name.
+#: sentinel into ``material`` when the IFC carries no usable material name.
 UNKNOWN_MATERIAL = "Unknown"
 
 
@@ -59,7 +59,7 @@ class ParsedIFC(TypedDict):
     source_sha256: str
     schema: str
     schema_note: str | None
-    elements: list[ServiceElement]
+    elements: list[ParsedElement]
     element_count: int
     type_counts: dict[str, int]
     quality: ParsedIFCQuality
@@ -98,15 +98,15 @@ def _empty_result(source_ref: str, source_sha256: str, error: str) -> ParsedIFC:
 
 
 def _deduplicate_by_guid(
-    elements: list[ServiceElement],
-) -> tuple[list[ServiceElement], int]:
+    elements: list[ParsedElement],
+) -> tuple[list[ParsedElement], int]:
     """Collapse the repeats ``parse_ifc_model`` produces, keeping the first.
 
     ``parse_ifc_model`` calls ``model.by_type()`` once per entry in
     ``IFC_SERVICE_LABELS``, but IFC classes are a hierarchy: an
     ``IfcPipeSegment`` is also an ``IfcFlowSegment`` and an
     ``IfcDistributionElement``, so ``by_type`` returns it three times. One
-    physical element therefore arrives as three ``ServiceElement`` rows sharing
+    physical element therefore arrives as three ``ParsedElement`` rows sharing
     a GlobalId and differing only in ``ifc_type``.
 
     A GlobalId identifies exactly one entity in IFC, so repeats are always the
@@ -115,8 +115,8 @@ def _deduplicate_by_guid(
     to general, and ``parse_ifc_model`` iterates it in order.
 
     This is corrected here rather than in ``parse_ifc_model`` because that
-    function feeds the shipped corrosion pipeline, where changing the element
-    set changes published results. Fixing it there is a real repair with a real
+    function is shared with other callers, where changing the element set
+    changes their results too. Fixing it there is a real repair with a real
     blast radius and belongs to whoever owns that path; rule 1 only requires
     that *this* contract hands downstream a unique join key.
 
@@ -128,7 +128,7 @@ def _deduplicate_by_guid(
         many rows were dropped as repeats.
     """
     seen: set[str] = set()
-    unique: list[ServiceElement] = []
+    unique: list[ParsedElement] = []
     collapsed = 0
     for element in elements:
         guid = (element.guid or "").strip()
@@ -145,7 +145,7 @@ def _deduplicate_by_guid(
     return unique, collapsed
 
 
-def _quality_warnings(elements: list[ServiceElement]) -> list[str]:
+def _quality_warnings(elements: list[ParsedElement]) -> list[str]:
     """Report facts about the parse that a reviewer would want to act on.
 
     Deliberately limited to what can be observed from the elements themselves.
@@ -176,7 +176,7 @@ def _quality_warnings(elements: list[ServiceElement]) -> list[str]:
             "Findings against them will be ambiguous."
         )
 
-    unknown_material = sum(1 for e in elements if e.material_a == UNKNOWN_MATERIAL)
+    unknown_material = sum(1 for e in elements if e.material == UNKNOWN_MATERIAL)
     if unknown_material:
         warnings.append(
             f"{unknown_material} of {len(elements)} elements have an unidentified "
@@ -313,7 +313,7 @@ def parse_ifc_file(path: str | Path, *, source_ref: str = "") -> ParsedIFC:
     return parse_ifc_bytes(content, source_ref=ref)
 
 
-def elements_by_guid(parsed: ParsedIFC) -> dict[str, ServiceElement]:
+def elements_by_guid(parsed: ParsedIFC) -> dict[str, ParsedElement]:
     """Index a parse result by ``guid`` for downstream joins.
 
     Rule 1 makes ``guid`` the join key between elements and Issues, so this is
@@ -321,7 +321,7 @@ def elements_by_guid(parsed: ParsedIFC) -> dict[str, ServiceElement]:
     they are already reported in ``quality.warnings`` — and on a duplicate guid
     the first occurrence wins, matching the order the model returned.
     """
-    index: dict[str, ServiceElement] = {}
+    index: dict[str, ParsedElement] = {}
     for element in parsed["elements"]:
         guid = (element.guid or "").strip()
         if guid and guid not in index:

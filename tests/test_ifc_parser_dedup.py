@@ -5,13 +5,12 @@ THE BUG
     IFC classes are a hierarchy: an IfcPipeSegment is also an IfcFlowSegment
     and an IfcDistributionElement. ``parse_ifc_model`` calls ``model.by_type()``
     once per entry in ``IFC_SERVICE_LABELS``, so the same entity came back once
-    per matching class. A three-entity model produced eight ServiceElements
+    per matching class. A three-entity model produced eight ParsedElements
     sharing three GlobalIds.
 
-    Downstream that meant inflated ``ifc_element_count``, the corrosion engines
-    running repeatedly over one element, and duplicate issues raised against a
-    single GlobalId — which breaks the rule that guid is the join key
-    (data contracts §1).
+    Downstream that meant inflated ``ifc_element_count`` and duplicate issues
+    raised against a single GlobalId — which breaks the rule that guid is the
+    join key (data contracts §1).
 
 Models are synthesised in memory, so the entity count under test is the entity
 count asserted, and the suite needs neither the network nor ``data/cache``.

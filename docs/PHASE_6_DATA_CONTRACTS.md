@@ -91,27 +91,17 @@ standards and client documents into one list so a caller sees a single stream:
 ## 1. `ParsedIFC` — Session B output
 
 Session B (`phase-6b-parsing`) turns a stored IFC reference into structured
-elements. The element shape **already exists** as `ServiceElement` in
+elements. The element shape **already exists** as `ParsedElement` in
 `app/modules/ifc_reader/ifc_parser.py`:
 
 ```python
 @dataclass
-class ServiceElement:
+class ParsedElement:
     guid: str                      # IFC GlobalId — the join key for everything downstream
     name: str
     ifc_type: str                  # "IfcPipeSegment", "IfcValve", …
     description: str
-    material_a: str                # normalised via normalise_material_name()
-    material_b: Optional[str]      # second material at a bimetallic junction
-    location_tag: str
-    floor: str
-    system: str
-    joint_type: str                # "JT-001" … see IFC_TO_JOINT
-    anode_area_m2: float
-    cathode_area_m2: float
-    position: tuple                # (x, y, z) in metres
-    length_m: float
-    notes: str = ""
+    material: str = "Unknown"
 ```
 
 > **Contract:** Session B does **not** redefine this dataclass. Adding a field
@@ -125,7 +115,7 @@ class ServiceElement:
   "source_sha256":  str,            # hex digest — cache/lineage key
   "schema":         str,            # "IFC4", "IFC2X3", …
   "schema_note":    str | None,     # get_schema_compatibility_note(model)
-  "elements":       list[ServiceElement],
+  "elements":       list[ParsedElement],
   "element_count":  int,            # == len(elements); denormalised for summaries
   "type_counts":    dict[str, int], # ifc_type -> count
   "quality": {
@@ -202,7 +192,7 @@ mechanism-agnostic: every domain emits the same shape, differentiated by the
 ```python
 Issue(
     id="BGR-0007",                 # human-readable, allocated by IssueIdAllocator
-    element_id="<IFC GUID>",       # FK to ServiceElement.guid
+    element_id="<IFC GUID>",       # FK to ParsedElement.guid
     rule_id="GC-001.03",
     title="...",
     band=RiskBand.HIGH,
@@ -652,7 +642,7 @@ Before merging a Phase 6+ branch:
 
 - [ ] No new score → band comparison chain; `band_from_score` used
 - [ ] Band values lowercase outside the render call
-- [ ] Every `Issue.element_id` resolves to a `ServiceElement.guid`
+- [ ] Every `Issue.element_id` resolves to a `ParsedElement.guid`
 - [ ] Every `Issue` carries at least one citation
 - [ ] Failures surfaced as `*_error` values, not raised across the boundary
 - [ ] `AnalysisResult` keys added, none renamed or removed

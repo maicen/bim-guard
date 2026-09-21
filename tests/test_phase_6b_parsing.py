@@ -27,7 +27,7 @@ import hashlib
 
 import pytest
 
-from app.modules.ifc_reader.ifc_parser import ServiceElement
+from app.modules.ifc_reader.ifc_parser import ParsedElement
 from app.modules.phase_6.phase_6b_parsing import (
     ParsedIFC,
     elements_by_guid,
@@ -126,7 +126,7 @@ class TestEnvelopeShape:
 
     def test_elements_are_service_elements(self, parsed):
         assert parsed["elements"]
-        assert all(isinstance(e, ServiceElement) for e in parsed["elements"])
+        assert all(isinstance(e, ParsedElement) for e in parsed["elements"])
 
     def test_schema_is_reported(self, parsed):
         assert parsed["schema"].upper().startswith("IFC4")
@@ -287,7 +287,7 @@ class TestHierarchyDeduplication:
         """parse_ifc_model gained its own GlobalId guard, so nothing arrives twice.
 
         The envelope-level dedup below is kept as defence in depth — it protects
-        any other producer of ServiceElement rows — but on the Module 2 path it
+        any other producer of ParsedElement rows — but on the Module 2 path it
         now has nothing to do, and reporting a collapse that did not happen
         would be noise.
         """
@@ -345,7 +345,7 @@ class TestQualityWarnings:
         assert result["elements"][0].name.startswith("IfcPipeSegment_")
 
     def test_unidentified_material_is_flagged(self):
-        """Corrosion cannot be evaluated without a material — say so."""
+        """An element with no readable material is a data-quality fact — say so."""
         result = parse_ifc_bytes(build_ifc(specs=[("IfcPipeSegment", "P-01")]))
         assert any("unidentified material" in w for w in result["quality"]["warnings"])
 

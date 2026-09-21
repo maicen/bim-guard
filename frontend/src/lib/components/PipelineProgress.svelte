@@ -25,8 +25,8 @@
 
   const STAGES = [
     { num: 1, name: "Validation", desc: "Model ingestion & SHA-256 integrity" },
-    { num: 2, name: "IFC Parsing", desc: "GlobalId dedup & ServiceElement extraction" },
-    { num: 3, name: "Engine Execution", desc: "GC-001 / CC-001 / MC-001 / SB-001" },
+    { num: 2, name: "IFC Parsing", desc: "GlobalId dedup & element extraction" },
+    { num: 3, name: "Engine Execution", desc: "ARCH-EGRESS-001 / ARCH-SPATIAL-001" },
     { num: 4, name: "Risk Scoring", desc: "Score → Band normalisation & citations" },
     { num: 5, name: "Report Assembly", desc: "Data quality separation & issue assembly" },
     { num: 6, name: "Export", desc: "BCF 2.1 / CSV / JSON serialisation" },
