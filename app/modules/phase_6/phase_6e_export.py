@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
-from app.constants import NOTEBOOK_STANDARDS
+from app.constants import STANDARD_REFERENCES
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
 from app.modules.reporter.bcf_generator import (
@@ -571,7 +571,7 @@ def _canonical_standard_names() -> dict[str, str]:
     """Map a lower-cased standard name to its canonical form from constants.
 
     Citations spell a standard as the engine happened to write it — ``"EN ISO
-    15329"`` — while ``app.constants.NOTEBOOK_STANDARDS`` holds the normative
+    15329"`` — while ``app.constants.STANDARD_REFERENCES`` holds the normative
     form, ``"EN ISO 15329:2007"``. Preferring the catalogue's spelling means a
     document reference names the standard as the thesis cites it.
 
@@ -579,7 +579,7 @@ def _canonical_standard_names() -> dict[str, str]:
     still resolves. Built once; the catalogue is a module constant.
     """
     mapping: dict[str, str] = {}
-    for entry in NOTEBOOK_STANDARDS:
+    for entry in STANDARD_REFERENCES:
         name = str((entry or {}).get("name") or "").strip()
         if not name:
             continue
@@ -596,7 +596,7 @@ def _document_references(issue: Issue) -> list[dict]:
     standard produced the finding rather than just naming the document.
 
     ``referenced_document`` is left empty. It is a URL, and the repository
-    holds no URL or DOI for any of these standards -- ``NOTEBOOK_STANDARDS``
+    holds no URL or DOI for any of these standards -- ``STANDARD_REFERENCES``
     carries name, domain and description only. Emitting a plausible-looking
     link would be a fabricated citation, so the field is omitted and the gap
     recorded.

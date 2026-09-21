@@ -235,7 +235,7 @@ def _document_references_xml(issue: "BCFIssue", topic_guid: str) -> str:
 
     ``ReferencedDocument`` is a URL and is emitted only when the caller has a
     real one. The repository holds no URL or DOI for any of the standards in
-    ``app.constants.NOTEBOOK_STANDARDS``, so today every reference carries the
+    ``app.constants.STANDARD_REFERENCES``, so today every reference carries the
     ``Description`` alone: naming the standard and clause truthfully, rather
     than pointing at an invented link. ``isExternal`` follows suit — false
     when nothing external is referenced.

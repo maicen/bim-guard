@@ -12,7 +12,7 @@ from app.constants import (
     BUILDING_CODES,
     DOCUMENT_CATEGORIES,
     STANDARD_UPLOAD_EXTENSIONS,
-    get_standard,
+    get_standard_reference,
     normalize_analysis_type,
 )
 from app.logging_config import get_logger
@@ -661,7 +661,7 @@ class ProjectsService:
         """
         rows = list(self._standards.rows_where("project_id = ?", [project_id]))
         for row in rows:
-            meta = get_standard(row.get("standard_id") or "")
+            meta = get_standard_reference(row.get("standard_id") or "")
             if meta is not None:
                 row["name"] = meta["name"]
                 row["domain"] = meta["domain"]

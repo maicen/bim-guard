@@ -1,9 +1,4 @@
-"""Static reference data for BIM-Guard project setup and analysis routing.
-
-Generated from tools/NOTEBOOK_STANDARDS.py and the country list in
-docs/experimental/bimguard-frontend-prototype-v1.html. Edit those sources and
-regenerate rather than editing this module by hand.
-"""
+"""Static reference data for BIM-Guard project setup and analysis routing."""
 
 from typing import Any
 
@@ -44,9 +39,8 @@ def normalize_analysis_type(analysis_type: str, default: str = "Arch") -> str:
     return s
 
 #: Building codes offered by wizard step 3, keyed to the jurisdiction chosen in
-#: step 1. Hand-maintained, unlike the generated COUNTRIES and NOTEBOOK_STANDARDS
-#: lists in this module: a code belongs here once someone has confirmed it
-#: governs the jurisdiction it is listed under.
+#: step 1. A code belongs here once someone has confirmed it governs the
+#: jurisdiction it is listed under.
 #:
 #: ``jurisdictions`` empty means the code applies everywhere and is offered
 #: whatever the project's country -- that is how the ISO/IFC fallback reaches
@@ -403,8 +397,8 @@ STANDARD_DOMAINS: list[str] = [
     "Thermal & Environmental",
 ]
 
-#: Normative references from the thesis, offered in wizard step 5.
-NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
+#: Normative references offered in wizard step 5.
+STANDARD_REFERENCES: list[dict[str, Any]] = [
     {
         "id": "iso-19650",
         "name": "ISO 19650-1/2/3/6",
@@ -496,21 +490,21 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
 ]
 
 #: Fast lookup by standard id.
-STANDARDS_BY_ID: dict[str, dict[str, Any]] = {s["id"]: s for s in NOTEBOOK_STANDARDS}
+STANDARDS_BY_ID: dict[str, dict[str, Any]] = {s["id"]: s for s in STANDARD_REFERENCES}
 
 
-def get_standards_by_domain(domain: str) -> list[dict[str, Any]]:
+def get_standard_references_by_domain(domain: str) -> list[dict[str, Any]]:
     """Return the standards belonging to ``domain``, in declaration order."""
-    return [s for s in NOTEBOOK_STANDARDS if s["domain"] == domain]
+    return [s for s in STANDARD_REFERENCES if s["domain"] == domain]
 
 
-def get_standards_by_analysis_type(analysis_type: str) -> list[dict[str, Any]]:
+def get_standard_references_by_analysis_type(analysis_type: str) -> list[dict[str, Any]]:
     """Return the standards applicable to ``analysis_type``."""
     canon = normalize_analysis_type(analysis_type)
     aliases = _ANALYSIS_TYPE_ALIASES.get(canon, {analysis_type})
     return [
         s
-        for s in NOTEBOOK_STANDARDS
+        for s in STANDARD_REFERENCES
         if any(a in s.get("applicable_to", []) for a in aliases)
     ]
 
@@ -524,12 +518,12 @@ def get_all_domains() -> list[str]:
     return list(STANDARD_DOMAINS)
 
 
-def get_standard(standard_id: str) -> dict[str, Any] | None:
-    """Return one standard by id, or ``None`` if it is not a notebook standard."""
+def get_standard_reference(standard_id: str) -> dict[str, Any] | None:
+    """Return one normative standard by id, or ``None`` if it is not present."""
     return STANDARDS_BY_ID.get(standard_id)
 
 
-def group_standards_by_domain(analysis_type: str | None = None):
+def group_standard_references_by_domain(analysis_type: str | None = None):
     """Yield ``(domain, standards)`` pairs for rendering the grouped picker.
 
     Passing ``analysis_type`` narrows each group to the standards that apply to
@@ -541,7 +535,7 @@ def group_standards_by_domain(analysis_type: str | None = None):
         else None
     )
     for domain in STANDARD_DOMAINS:
-        items = get_standards_by_domain(domain)
+        items = get_standard_references_by_domain(domain)
         if aliases is not None:
             items = [
                 s

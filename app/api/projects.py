@@ -36,8 +36,8 @@ from app.constants import (
     COUNTRIES,
     DEFAULT_ANALYSIS_TYPE,
     DEFAULT_COUNTRY,
-    NOTEBOOK_STANDARDS,
     PROJECT_TYPES,
+    STANDARD_REFERENCES,
 )
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -329,7 +329,7 @@ def get_project_options(response: Response) -> ProjectOptionsResponse:
         countries=COUNTRIES,
         project_types=PROJECT_TYPES,
         analysis_types=ANALYSIS_TYPES,
-        standards=[StandardOption(**standard) for standard in NOTEBOOK_STANDARDS],
+        standards=[StandardOption(**standard) for standard in STANDARD_REFERENCES],
         building_codes=[BuildingCodeOption(**code) for code in BUILDING_CODES],
     )
 
