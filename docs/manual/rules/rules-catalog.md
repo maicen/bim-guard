@@ -4,9 +4,8 @@ The **Rules** view lists all compliance rules used during analysis, sourced from
 
 Rule families include:
 
-- **`BIMGUARD-GC-001`** — Galvanic corrosion
-- **`BIMGUARD-CC-001`** — Crevice corrosion
-- **`BIMGUARD-MC-001`** — Microbiological corrosion
+- **`ARCH-EGRESS-001`** — Means-of-egress compliance
+- **`ARCH-SPATIAL-001`** — Spatial/clearance compliance
 - ISO 19650 governance and CDE-state rules
 
 ## Working with rules

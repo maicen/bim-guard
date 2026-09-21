@@ -32,7 +32,7 @@ CONFIDENCE_CATEGORIES: list[dict] = [
         "label": "Derived (Geometry & Relationships)",
         "description": (
             "Computed from the model's real geometry or IFC relationships "
-            "(e.g. supports, seismic inputs, per-step stair geometry, door clear opening)."
+            "(e.g. supports, per-step stair geometry, door clear opening)."
         ),
         "rank": 2,
         "meter_level": 3,

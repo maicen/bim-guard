@@ -1,8 +1,7 @@
-"""Seismic supports: what holds a pipe up, how far apart, and how long the rods are.
+"""Structural supports: what holds a pipe up, how far apart, and how long the rods are.
 
-Drafted for the sway-brace spacing and hanger-rod length rules. Nothing here is
-wired into ``extract_for_compliance`` yet -- these are the helpers those rules
-will need, built and tested on their own first.
+Backs the brace-spacing and hanger-rod length rules, wired into
+``extract_for_compliance`` via ``_needs_support_context``/``support_context``.
 
 THREE QUESTIONS, THREE LAYERS
 
@@ -558,7 +557,7 @@ def is_support_class(element) -> bool:
 def classify_support(
     element, pipe_axis: Vec3 | None = None, geometry_extractor=None, unit_scale_mm: float = 1.0
 ) -> dict:
-    """Classify one element as a kind of seismic support.
+    """Classify one element as a kind of structural support.
 
     Returns ``{kind, declared, measured, evidence, is_support}``.
 

@@ -1,7 +1,7 @@
 """Managed ProcessPoolExecutor for CPU-parallel compliance and analysis workflows.
 
 Provides a shared, process-lifecycle-aware ProcessPoolExecutor to bypass the
-Python GIL for compute-heavy IFC parsing, corrosion evaluations, and 3D clash
+Python GIL for compute-heavy IFC parsing, compliance evaluations, and 3D clash
 detections without spawning ad-hoc processes per request.
 
 SELF-HEALING

@@ -1,6 +1,6 @@
 # BIM-Guard User Manual
 
-BIM-Guard analyzes IFC building models for corrosion risk and ISO 19650 / CDE compliance, and lets your team manage projects, documents, and compliance rules in one place.
+BIM-Guard analyzes IFC building models for architectural compliance and ISO 19650 / CDE governance, and lets your team manage projects, documents, and compliance rules in one place.
 
 This manual covers:
 

@@ -135,8 +135,8 @@
   let targetFileId: number | null = $state(null);
   let selectedProject: Project | null = $state(null);
   // The audit tab strip only ever shows the domain a project was actually
-  // created with (e.g. an "Arch" project never offers Piping/Seismic) --
-  // undefined (all domains shown) until the matching project has loaded.
+  // created with -- undefined (all domains shown) until the matching
+  // project has loaded.
   let projectAuditDomain: AnalysisDomainTab | undefined = $derived(
     selectedProject && selectedProject.id === targetProjectId
       ? (viewForAnalysisDomain(selectedProject.analysis_type) as AnalysisDomainTab)
@@ -291,7 +291,7 @@
     if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
     // Which analysis run owns the finding behind this link. The viewer needs it
     // to ask /analyze/export for the right archive; without it every deep link
-    // fetched the corrosion BCF, whatever engine raised the finding.
+    // fetched the wrong BCF, whatever engine raised the finding.
     if (analysisSlug) params.set("analysis_slug", analysisSlug);
     if (authState.activeOrganizationId) {
       params.set("org", String(authState.activeOrganizationId));

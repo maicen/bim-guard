@@ -8,9 +8,9 @@
 
   Usage:
 
-      <HoverCard side="top" align="start" title="GC-001" icon={Zap}>
-        {#snippet trigger()}<span class="font-mono">GC-001</span>{/snippet}
-        Galvanic corrosion between dissimilar metals.
+      <HoverCard side="top" align="start" title="ARCH-EGRESS-001" icon={Zap}>
+        {#snippet trigger()}<span class="font-mono">ARCH-EGRESS-001</span>{/snippet}
+        Door clear width below the minimum egress requirement.
       </HoverCard>
 
   The `trigger` snippet is what the user points at; the default snippet is

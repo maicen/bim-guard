@@ -397,7 +397,7 @@ _DEFAULT_CAMERA = (0.0, 0.0, 5.0, 0.0, 0.0, 0.0)
 def _has_real_camera(issue: "BCFIssue") -> bool:
     """Report whether the caller supplied real camera coordinates.
 
-    ``phase_6e_export`` supplies none, because no finding records the
+    ``analysis_result_exporter`` supplies none, because no finding records the
     element's position or bounding box. Until a finding's mechanism surfaces
     the geometry, a camera here would be invented.
     """
@@ -629,7 +629,7 @@ def generate_bcf(issues: list[BCFIssue], filename: str = "BIMGUARD_AI_Issues.bcf
             f"""<?xml version="1.0" encoding="UTF-8"?>
 <ProjectExtension xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Project ProjectId="{project_guid}">
-    <Name>BIMGUARD AI — Corrosion Compliance Report</Name>
+    <Name>BIMGUARD AI — Compliance Report</Name>
   </Project>
   <ExtensionSchema>extensions.xsd</ExtensionSchema>
 </ProjectExtension>""",

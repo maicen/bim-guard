@@ -9,6 +9,4 @@
 ## Contents in this Directory
 
 - `data/`: Local fixtures and sample asset registers used for standalone compliance engine demonstrations and tests.
-- `BIMGUARD AI Validation Dataset — Verified Downloadable IFC Models.md`: Registry of verified IFC models.
-- `BIMGUARD AI — Dual Repository Pre-Submission Audit.md`: Pre-submission architecture audit and cross-repository gap analysis.
-- Methodology notes and research domain briefs (`Seismic Bracing Clearance Volumes...`, `baseline-main-corrosion.md`).
+- `bcf21-guid-typing-validation.md`: BCF 2.1 GUID-typing validation notes.

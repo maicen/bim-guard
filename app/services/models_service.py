@@ -648,7 +648,7 @@ class ModelsService:
         Resolves through ``get_primary`` rather than through
         ``projects.ifc_file_path`` directly. The two agree -- every writer here
         mirrors the primary onto that column -- but reading the child table
-        makes "the corrosion engines assess the primary model" a fact about the
+        makes "an analysis assesses the primary model" a fact about the
         code rather than an invariant a reader has to know about.
         """
         primary = self.get_primary(project_id)

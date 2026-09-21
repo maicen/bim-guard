@@ -20,7 +20,7 @@ After signing in you land on the main dashboard, with navigation to:
 
 - **Projects** — your IFC building projects.
 - **Documents** — uploaded PDFs and extracted text linked to a project.
-- **Rules** — the compliance rules catalog (galvanic corrosion, crevice corrosion, microbiological corrosion, ISO 19650 governance, etc.).
+- **Rules** — the compliance rules catalog (egress, spatial, and ISO 19650 governance rules).
 - **Reports & BCF Topics** — analysis findings and issue tracking.
 - **Revit Sync** — synchronization status with Revit-originated models.
 

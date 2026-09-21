@@ -18,19 +18,19 @@ WHY THIS EXISTS
 HOW THE STATUS IS DERIVED
 
     * ``running`` -- any touched engine, under any run key, is still running.
-      Checked across every run so a graph pass that starts after the corrosion
-      engines finish keeps the project reading as busy.
+      Checked across every run so a graph pass that starts after the main
+      analysis finishes keeps the project reading as busy.
     * Otherwise the verdict comes from the engines of the *active* run (the
-      payload's ``run_key``, the run that reported last), so a corrosion run
-      that finished ten minutes ago -- still inside the tracker's TTL -- cannot
-      colour the verdict on a seismic run that just ended:
+      payload's ``run_key``, the run that reported last), so a run that
+      finished ten minutes ago -- still inside the tracker's TTL -- cannot
+      colour the verdict on a run that just ended:
       ``failed`` if any of them failed, ``complete`` if every one completed.
     * ``idle`` -- nothing has been tracked for this project.
 
     Untouched engines carry their declared status (``pending``,
     ``not_implemented``) and no ``run_key``; they are not part of any run and
-    never hold a verdict back. Otherwise the uninstrumented MM-001 / XM-001
-    cells would leave every corrosion run ``running`` forever.
+    never hold a verdict back. Otherwise an uninstrumented cell would leave
+    every run ``running`` forever.
 """
 
 from __future__ import annotations

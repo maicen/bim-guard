@@ -1,9 +1,9 @@
 """BIMGUARD AI — Topology & Graph Compute Engine.
 
 Implements the RuleEvaluator protocol for theme-agnostic structural graph
-checks that sit underneath every discipline (Architecture, Piping, Seismic)
-rather than inside one of them -- see ``app.modules.ifc_reader.ifc_graph`` for
-the NetworkX relationship graph this evaluates records from.
+checks that sit underneath the model as a whole rather than inside one
+discipline -- see ``app.modules.ifc_reader.ifc_graph`` for the NetworkX
+relationship graph this evaluates records from.
 
 Engines:
 1. GraphTopologyEngine (GRAPH-TOPOLOGY-001):

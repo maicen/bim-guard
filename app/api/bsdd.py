@@ -36,7 +36,7 @@ def list_dictionaries(
     client: Annotated[BSDDClient, Depends(get_bsdd_client)],
     curated_only: bool = Query(
         default=False,
-        description="Filter to only curated BIM-Guard compliance, regulatory, and corrosion dictionaries",
+        description="Filter to only curated BIM-Guard compliance and regulatory dictionaries",
     ),
 ) -> list[BSDDDictionaryItem]:
     """Return the catalog of bSDD dictionaries (IFC, ACCORD, RIR, Uniclass, OmniClass, ...).
