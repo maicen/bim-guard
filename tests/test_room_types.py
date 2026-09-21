@@ -249,3 +249,29 @@ def test_scope_keys_are_the_documented_four():
         "room_type_none_of",
         "room_name_any_of",
     }
+
+
+class TestFrontendStaysInSync:
+    """The rule editor offers the vocabulary as quick picks; keep both lists one."""
+
+    @staticmethod
+    def _ts() -> str:
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "roomTypes.ts"
+        return path.read_text(encoding="utf-8")
+
+    def test_quick_picks_match_the_backend_vocabulary(self):
+        import re
+
+        block = re.search(r"ROOM_TYPE_SUGGESTIONS = \[(.*?)\] as const", self._ts(), re.S)
+        assert block, "ROOM_TYPE_SUGGESTIONS not found in roomTypes.ts"
+        suggestions = re.findall(r'"([a-z_]+)"', block.group(1))
+        assert sorted(suggestions) == sorted(ROOM_TYPES)
+
+    def test_the_editor_writes_the_key_the_comparator_reads(self):
+        import re
+
+        key = re.search(r'ROOM_SCOPE_KEY = "([a-z_]+)"', self._ts())
+        assert key, "ROOM_SCOPE_KEY not found in roomTypes.ts"
+        assert key.group(1) in ROOM_SCOPE_KEYS

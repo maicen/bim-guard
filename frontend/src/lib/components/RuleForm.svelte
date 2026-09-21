@@ -4,6 +4,16 @@
   import { rulesApi } from "../api";
   import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
   import type { IfcPropertySuggestion } from "../archDomains";
+  import {
+    ROOM_TYPE_SUGGESTIONS,
+    buildScope,
+    otherScopeKeys,
+    parseRoomLabels,
+    roomLabelsFromScope,
+    toggleRoomLabel,
+  } from "../roomTypes";
+  import Button from "./ui/Button.svelte";
+  import Input from "./ui/Input.svelte";
   import BsddAutocomplete from "./BsddAutocomplete.svelte";
   import BsddBadge from "./BsddBadge.svelte";
   import LiveReliability from "./LiveReliability.svelte";
@@ -74,6 +84,14 @@
   let formPropertyName = $state(seed?.property_name || "");
   let formOperator = $state(seed?.operator || "==");
   let formCheckValue = $state(seed?.check_value || "");
+
+  // Optional room scope. The text is whatever the user types -- their own room
+  // names -- so it is never rewritten; only the room key of the rule's scope is
+  // touched on save, and any other scope condition the rule already has is kept.
+  const seedScope = seed?.applies_when ?? null;
+  const keptScopeKeys = otherScopeKeys(seedScope);
+  let formRoomTypes = $state(roomLabelsFromScope(seedScope).join(", "));
+  let pickedRoomTypes = $derived(parseRoomLabels(formRoomTypes).map((l) => l.toLowerCase()));
 
   // The compliance engine always scales a length property's real IFC value to
   // millimetres before comparing (ifc_reader._resolve_element_property,
@@ -192,6 +210,10 @@
         severity: formSeverity,
         needs_review: formNeedsReview,
       };
+
+      // Nothing is sent for a rule that had no scope and was given no room type.
+      const scope = buildScope(seedScope, parseRoomLabels(formRoomTypes));
+      if (scope !== undefined) payload.applies_when = scope;
 
       const saved =
         isEditing && seed
@@ -324,6 +346,41 @@
         onSelect={handleTargetClassPick}
         class="font-mono"
       />
+    {/if}
+  </div>
+
+  <div>
+    <label
+      for="rule-room-type"
+      class="mb-1 block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
+      >Room type
+      <span class="font-normal normal-case tracking-normal text-fg-muted">(optional)</span></label
+    >
+    <Input
+      id="rule-room-type"
+      bind:value={formRoomTypes}
+      placeholder="e.g. bedroom, kitchen, or any room name from your model"
+    />
+    <div class="mt-1.5 flex flex-wrap gap-1">
+      {#each ROOM_TYPE_SUGGESTIONS as roomType (roomType)}
+        <Button
+          size="xs"
+          variant={pickedRoomTypes.includes(roomType) ? "primary" : "outline"}
+          aria-pressed={pickedRoomTypes.includes(roomType)}
+          onclick={() => (formRoomTypes = toggleRoomLabel(formRoomTypes, roomType))}
+          >{roomType}</Button
+        >
+      {/each}
+    </div>
+    <p class="mt-1 text-caption text-fg-muted">
+      Leave empty to check the element wherever it is. Type a room name exactly as your model
+      spells it, or pick a common type, which also matches its usual synonyms. Separate several
+      with commas.
+    </p>
+    {#if keptScopeKeys.length}
+      <p class="mt-1 text-caption text-fg-muted">
+        This rule also has other scope conditions ({keptScopeKeys.join(", ")}); they are kept.
+      </p>
     {/if}
   </div>
 

@@ -2140,6 +2140,11 @@ class IFCReader:
                         # makes the first. The link source and note ride along
                         # so an UNDETERMINED predicate can say why.
                         "connected_rooms": room.get("rooms") or None,
+                        # Unique per room, unlike the name: two rooms called
+                        # "BADROOM 1" differ here. Ids are the IFC GlobalIds;
+                        # labels are "name [#short id]" for display.
+                        "connected_room_ids": room.get("room_guids") or None,
+                        "connected_room_labels": room.get("room_labels") or None,
                         "connected_room_types": room.get("room_types") or None,
                         "room_link_source": room.get("link_source"),
                         "room_link_note": room.get("link_note"),

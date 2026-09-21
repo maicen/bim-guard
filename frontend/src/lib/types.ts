@@ -540,6 +540,9 @@ export interface Rule extends Timestamps {
   rase_exception?: Record<string, unknown> | null;
   /** Null when the rule names no IFC property to grade. */
   reliability?: RuleReliability | null;
+  /** Scope predicate narrowing which elements the rule governs, e.g.
+   * {"room_type_any_of": ["bedroom"]}; null when the rule has none. */
+  applies_when?: Record<string, unknown> | null;
 }
 
 export interface RuleSourceResponse {
@@ -981,6 +984,11 @@ export interface RuleElementResult {
    * `space` above is only direct IfcSpace containment, which most exporters
    * never write for a door or wall. */
   connected_rooms?: string[] | null;
+  /** IFC GlobalIds of those rooms, in the same order. Unique per room, unlike the name. */
+  connected_room_ids?: string[] | null;
+  /** Each room as "name [#id]": the name exactly as the model spells it, then the end of
+   * its GlobalId, so two rooms called the same thing can be told apart. */
+  connected_room_labels?: string[] | null;
   /** How the rooms were linked: self / boundary / containment / host_wall /
    * geometric_bbox / none. See app/modules/ifc_reader/ifc_rooms.py. */
   room_link_source?: string | null;

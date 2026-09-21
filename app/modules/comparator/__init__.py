@@ -839,6 +839,8 @@ class ComplianceComparator:
             # rooms (None otherwise) -- `space` above is only direct IfcSpace
             # containment, which most exporters never write for a door or wall.
             "connected_rooms": el.get("connected_rooms"),
+            "connected_room_ids": el.get("connected_room_ids"),
+            "connected_room_labels": el.get("connected_room_labels"),
             "room_link_source": el.get("room_link_source"),
             # Why the element was checked although its scope could not be
             # decided (an untyped room, an unresolved link). None when the
@@ -874,6 +876,8 @@ class ComplianceComparator:
             "storey": el.get("storey") or "—",
             "space": el.get("space") or "—",
             "connected_rooms": el.get("connected_rooms"),
+            "connected_room_ids": el.get("connected_room_ids"),
+            "connected_room_labels": el.get("connected_room_labels"),
             "room_link_source": el.get("room_link_source"),
             "scope_undetermined": scope_notes or None,
             "actual": actual,

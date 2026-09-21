@@ -5,6 +5,7 @@
   import ConfidenceMeter from "./ConfidenceMeter.svelte";
   import { UNKNOWN_PROPERTY_CONFIDENCE } from "../propertyConfidence";
   import type { RuleElementResult } from "../types";
+  import { splitRoomLabel } from "../roomTypes";
 
   interface Props {
     elements: RuleElementResult[];
@@ -64,7 +65,9 @@
             (el.element_name || "").toLowerCase().includes(q) ||
             (el.storey || "").toLowerCase().includes(q) ||
             (el.space || "").toLowerCase().includes(q) ||
-            (el.guid || "").toLowerCase().includes(q)
+            (el.guid || "").toLowerCase().includes(q) ||
+            (el.connected_room_labels || []).some((r) => r.toLowerCase().includes(q)) ||
+            (el.connected_room_ids || []).some((r) => r.toLowerCase().includes(q))
           );
         })
       : elements,
@@ -89,6 +92,7 @@
   );
 
   let paged = $derived(sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+  let showsRoomIds = $derived(elements.some((el) => el.connected_room_labels?.length));
 
   function onSort(col: string) {
     if (sortField === col) {
@@ -113,7 +117,7 @@
     <input
       type="text"
       bind:value={search}
-      placeholder="Filter by element, floor, room, or GUID…"
+      placeholder="Filter by element, floor, room, room ID, or GUID…"
       class="w-full bg-transparent text-xs text-fg-secondary placeholder:text-fg-muted focus:outline-hidden"
     />
   </div>
@@ -158,6 +162,13 @@
               {#if el.space && el.space !== "—"}
                 <span class="block text-xs text-fg-muted">{el.space}</span>
               {/if}
+              {#each el.connected_room_labels ?? [] as label (label)}
+                {@const room = splitRoomLabel(label)}
+                <span class="block text-xs text-fg-muted"
+                  >{room.name}
+                  {#if room.id}<span class="font-mono text-nano text-fg-muted">{room.id}</span>{/if}</span
+                >
+              {/each}
             </td>
             <td class="px-3 py-2"
               ><span class="font-mono text-xs text-fg-muted">{(el.guid || "").slice(0, 14)}</span></td
@@ -191,6 +202,12 @@
       </tbody>
     </table>
   </div>
+  {#if showsRoomIds}
+    <p class="border-t border-border-subtle px-3.5 py-1.5 text-micro text-fg-muted">
+      A room's <span class="font-mono">[#id]</span> is the end of its IFC GlobalId. It tells rooms with
+      the same name apart, so you can find the exact room in your model.
+    </p>
+  {/if}
   <TablePagination
     {currentPage}
     {pageSize}

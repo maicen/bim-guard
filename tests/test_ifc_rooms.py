@@ -45,6 +45,7 @@ from app.modules.ifc_reader.ifc_rooms import (  # noqa: E402
     RoomIndex,
     room_context,
     room_derived_value,
+    unique_short_ids,
 )
 from app.modules.ifc_reader.ifc_spatial import (  # noqa: E402
     BOUNDARY_SOURCE_GEOMETRIC,
@@ -664,13 +665,15 @@ class TestTypoWarnings:
         messages = typo_index.warning_messages()
         assert len(messages) == 2
         first = messages[0]  # most rooms first
-        assert "'BADROOM 1' (2 rooms)" in first
+        assert "'BADROOM 1' (2 rooms: #" in first  # small groups list each room's id
         assert "misspelling of 'bedroom'" in first
         assert "Suggested name: 'BEDROOM 1'" in first
         assert "left as written" in first
 
     def test_a_single_room_is_not_pluralised(self, typo_index):
-        assert "'BADROOM 2' looks like" in typo_index.warning_messages()[1]
+        message = typo_index.warning_messages()[1]
+        assert "'BADROOM 2' [#" in message  # a lone room is identified by its id
+        assert "rooms" not in message.split("looks like")[0]
 
     def test_a_model_with_no_typos_has_no_warnings(self, model):
         assert RoomIndex(model).warning_messages() == []
@@ -718,7 +721,7 @@ class TestWarningsReachTheUser:
     def test_the_model_level_warnings_join_the_ifc_quality_warnings(self, typo_path):
         reader = IFCReader(typo_path)
         joined = " ".join(reader.quality_warnings)
-        assert "'BADROOM 1' (2 rooms)" in joined
+        assert "'BADROOM 1' (2 rooms: #" in joined
         assert "Suggested name: 'BEDROOM 1'" in joined
 
     def test_a_rule_naming_a_room_the_model_lacks_carries_the_explanation(self, typo_path):
@@ -760,3 +763,106 @@ class TestWarningsReachTheUser:
         for other in ("door_a", "door_b", "door_c"):
             assert by_name[other]["status"] == "NOT_APPLICABLE"  # decided by name, no guessing
         assert result["scope_warnings"] == []  # the model has a WAITING room
+
+
+# ── Unique room ids: telling identically-named rooms apart ────────────────────
+
+
+class TestUniqueShortIds:
+    """Two flats each have a "BADROOM 1"; a finding must say WHICH one."""
+
+    def test_ids_are_the_tail_of_the_guid_and_at_least_four_characters(self):
+        ids = unique_short_ids(["0OirwS9nPC0Q_Xf_oVuY8A", "2DPVKuGSTB8ghY4kRhSoJ5"])
+        assert ids == {"0OirwS9nPC0Q_Xf_oVuY8A": "uY8A", "2DPVKuGSTB8ghY4kRhSoJ5": "SoJ5"}
+
+    def test_ids_are_unique_even_when_the_tails_collide(self):
+        # Same last four characters: the id grows until they differ.
+        ids = unique_short_ids(["aaaaAAAA1234", "bbbbBBBB1234", "cccccccc9999"])
+        assert len(set(ids.values())) == 3
+        assert len({len(v) for v in ids.values()}) == 1  # one uniform length
+
+    def test_a_single_room_still_gets_the_minimum_length(self):
+        assert unique_short_ids(["0OirwS9nPC0Q_Xf_oVuY8A"]) == {"0OirwS9nPC0Q_Xf_oVuY8A": "uY8A"}
+
+    def test_no_rooms_no_ids(self):
+        assert unique_short_ids([]) == {}
+
+    def test_every_room_in_a_model_gets_a_distinct_id(self, typo_index):
+        ids = [r.short_id for r in typo_index.all()]
+        assert all(ids)
+        assert len(set(ids)) == len(ids)
+
+    def test_two_rooms_with_the_same_name_are_told_apart(self, typo_index):
+        twins = [r for r in typo_index.all() if r.name == "BADROOM 1"]
+        assert len(twins) == 2
+        assert twins[0].label != twins[1].label
+        assert twins[0].short_id != twins[1].short_id
+
+    def test_the_label_keeps_the_name_exactly_as_written(self, typo_index):
+        for room in typo_index.all():
+            assert room.label == f"{room.name} [#{room.short_id}]"
+            assert room.label.startswith(room.name)
+
+    def test_the_short_id_is_the_end_of_the_real_guid(self, typo_index):
+        for room in typo_index.all():
+            assert room.guid.endswith(room.short_id)
+
+
+class TestRoomIdsReachTheFindings:
+    def test_a_finding_lists_each_connected_room_with_its_id(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-ID.01"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        by_name = _by_name(result)
+
+        labels_a = by_name["door_a"]["connected_room_labels"]
+        labels_b = by_name["door_b"]["connected_room_labels"]
+        # door_a and door_b each open onto a room called "BADROOM 1" -- the
+        # labels differ, so the two findings do not read as the same room.
+        assert any(lbl.startswith("BADROOM 1 [#") for lbl in labels_a)
+        assert any(lbl.startswith("BADROOM 1 [#") for lbl in labels_b)
+        assert labels_a != labels_b
+
+    def test_the_full_ids_are_the_ifc_guids_of_those_rooms(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-ID.02"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        entry = _by_name(result)["door_a"]
+
+        model = ifcopenshell.open(str(typo_path))
+        real_guids = {s.GlobalId for s in model.by_type("IfcSpace")}
+        assert entry["connected_room_ids"]
+        assert set(entry["connected_room_ids"]) <= real_guids
+        # names and ids line up one to one
+        assert len(entry["connected_room_ids"]) == len(entry["connected_rooms"])
+
+    def test_names_used_for_matching_stay_plain(self, typo_path):
+        # The label is for display. Matching still runs on the bare name, so an
+        # id can never make a rule match (or miss) a room.
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-ID.03", "applies_when": {"room_name_any_of": ["#"]}}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        assert all(e["status"] == "NOT_APPLICABLE" for e in result["all_elements"])
+        assert not any("[#" in name for e in extraction[0]["elements"] for name in e["connected_rooms"])
+
+    def test_the_typo_warning_on_an_element_names_the_room_by_id(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-ID.04"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        door = next(e for e in extraction[0]["elements"] if e["name"] == "door_c")
+        (warning,) = [w for w in door["data_quality_warnings"] if "BADROOM 2" in w]
+        guid = door["connected_room_ids"][door["connected_rooms"].index("BADROOM 2")]
+        assert f"[#{guid[-4:]}" in warning
+
+    def test_a_room_target_carries_its_own_label(self, typo_path):
+        rule = {
+            "reference": "ROOM-ID.05",
+            "description": "Every room has a door",
+            "target_ifc_class": "IfcSpace",
+            "property_name": "DoorCount",
+            "operator": ">=",
+            "check_value": 1,
+        }
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        labels = [e["connected_room_labels"][0] for e in result["all_elements"]]
+        assert len(labels) == len(set(labels)) == 5  # five rooms, five distinct labels

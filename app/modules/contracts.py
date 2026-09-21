@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.modules.rule_reliability import assess_rule
 
@@ -1042,6 +1043,13 @@ class RuleUpdateRequest(BaseModel):
     severity: Optional[str] = None
     needs_review: Optional[int] = None
     category: Optional[str] = None
+    applies_when: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Replaces the rule's whole scope predicate when supplied ({} clears "
+            "it); omit to leave the scope unchanged. See RuleCreateRequest."
+        ),
+    )
     rase_requirement: Optional[str] = None
     rase_applicability: Optional[dict] = None
     rase_selection: Optional[dict] = None
@@ -1092,10 +1100,28 @@ class RuleResponse(TimestampFields):
     confidence: Optional[str] = None
     extraction_method: Optional[str] = None
     needs_review: Optional[int] = 0
+    applies_when: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Scope predicate narrowing which elements the rule governs, e.g. "
+            "{'room_type_any_of': ['bedroom']}; null when the rule has none."
+        ),
+    )
     rase_requirement: Optional[str] = None
     rase_applicability: Optional[dict] = None
     rase_selection: Optional[dict] = None
     rase_exception: Optional[dict] = None
+
+    @field_validator("applies_when", mode="before")
+    @classmethod
+    def _decode_applies_when(cls, value: Any) -> Any:
+        """Decode the JSON object string a rules row stores; an empty scope is null."""
+        if isinstance(value, str):
+            try:
+                value = json.loads(value) if value.strip() else None
+            except ValueError:
+                return None
+        return value or None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

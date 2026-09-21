@@ -160,10 +160,20 @@ class RoomInfo:
     #: Set when the name looks like a misspelling of a known room word. The name
     #: itself is never changed; this is a proposal for the user.
     suggestion: NameSuggestion | None = None
+    #: Short identifier, unique within the model, so two rooms that share a name
+    #: ("BADROOM 1" in every flat) can be told apart in a finding. It is the tail
+    #: of the room's IFC GlobalId -- the random end of it, and the model's own
+    #: permanent identifier, so the user can find that exact room in their tool.
+    short_id: str = ""
 
     @property
     def is_classified(self) -> bool:
         return UNKNOWN_ROOM_TYPE not in self.types
+
+    @property
+    def label(self) -> str:
+        """The name as written, then the unique short id: ``BADROOM 1 [#Xy9k]``."""
+        return f"{self.name} [#{self.short_id}]" if self.short_id else self.name
 
 
 def _space_text_candidates(space) -> list[tuple[str, str | None]]:
@@ -220,17 +230,46 @@ def _display_name(space) -> str:
     )
 
 
+#: Fewest GlobalId characters shown as a room's short id.
+_MIN_SHORT_ID = 4
+
+
+def unique_short_ids(guids: list[str]) -> dict[str, str]:
+    """Map each guid to a short id that is unique across ``guids``.
+
+    Uses the tail of the GlobalId (the random end) at the shortest length, of at
+    least ``_MIN_SHORT_ID``, at which no two differ only by what was cut off. One
+    length is used for every room so the ids read uniformly.
+    """
+    distinct = sorted(set(guids))
+    if not distinct:
+        return {}
+    longest = max(len(g) for g in distinct)
+    length = _MIN_SHORT_ID
+    while length < longest and len({g[-length:] for g in distinct}) < len(distinct):
+        length += 1
+    return {g: g[-length:] for g in distinct}
+
+
 def _rooms(count: int) -> str:
     return f"{count} room" if count == 1 else f"{count} rooms"
 
 
+#: A group of identically-named rooms up to this size lists each room's short id
+#: in the warning; a larger group (a repeated flat) is counted, not listed.
+_MAX_LISTED_IDS = 5
+
+
 def _typo_message(group: dict) -> str:
     """Return the warning text for one group of identically-named rooms."""
-    subject = (
-        f"Room name '{group['room_name']}'"
-        if group["count"] == 1
-        else f"Room name '{group['room_name']}' ({_rooms(group['count'])})"
-    )
+    ids = [f"#{i}" for i in group.get("short_ids") or [] if i]
+    name = group["room_name"]
+    if group["count"] == 1:
+        subject = f"Room name '{name}'" + (f" [{ids[0]}]" if ids else "")
+    elif ids and group["count"] <= _MAX_LISTED_IDS:
+        subject = f"Room name '{name}' ({_rooms(group['count'])}: {', '.join(ids)})"
+    else:
+        subject = f"Room name '{name}' ({_rooms(group['count'])})"
     return (
         f"{subject} looks like a misspelling of '{group['suggestion']}'. "
         f"Suggested name: '{group['suggested_name']}'. "
@@ -249,6 +288,9 @@ class RoomIndex:
             spaces = ifc_file.by_type("IfcSpace") if ifc_file is not None else []
         except Exception:
             spaces = []
+        short_ids = unique_short_ids(
+            [g for g in (getattr(sp, "GlobalId", None) for sp in spaces) if g]
+        )
         for space in spaces:
             guid = getattr(space, "GlobalId", None)
             if not guid:
@@ -264,6 +306,7 @@ class RoomIndex:
                 suggestion=(
                     suggest_name_correction(name) if UNKNOWN_ROOM_TYPE in types else None
                 ),
+                short_id=short_ids.get(guid, ""),
             )
             self._entities[guid] = space
 
@@ -308,9 +351,11 @@ class RoomIndex:
                     "room_type": suggestion.room_type,
                     "suggested_name": suggestion.suggested_name,
                     "count": 0,
+                    "short_ids": [],
                 },
             )
             group["count"] += 1
+            group["short_ids"].append(room.short_id)
         return sorted(groups.values(), key=lambda g: (-g["count"], g["room_name"]))
 
     def warning_messages(self) -> list[str]:
@@ -629,6 +674,7 @@ def _group_of(room: RoomInfo) -> dict:
         "room_name": room.name,
         "suggestion": suggestion.keyword,
         "suggested_name": suggestion.suggested_name,
+        "short_ids": [room.short_id],
     }
 
 
@@ -649,6 +695,7 @@ def room_context(element, linker: ElementRoomLinker, include_counts: bool = Fals
         "link_note": links.note,
         "rooms": None,
         "room_guids": None,
+        "room_labels": None,
         "room_types": None,
         "space_counts": None,
         "name_warnings": [],
@@ -664,6 +711,7 @@ def room_context(element, linker: ElementRoomLinker, include_counts: bool = Fals
                     types.append(room_type)
         context["rooms"] = [r.name for r in links.rooms]
         context["room_guids"] = [r.guid for r in links.rooms]
+        context["room_labels"] = [r.label for r in links.rooms]
         context["room_types"] = types
     if include_counts:
         try:

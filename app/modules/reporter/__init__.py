@@ -303,7 +303,14 @@ class ComplianceReporter:
                 # and walls; the connected rooms say where the element is.
                 room_label = failure.get("space")
                 if room_label in (None, "", "—"):
-                    room_label = ", ".join(failure.get("connected_rooms") or []) or "—"
+                    room_label = (
+                        ", ".join(
+                            failure.get("connected_room_labels")
+                            or failure.get("connected_rooms")
+                            or []
+                        )
+                        or "—"
+                    )
                 pos = failure.get("position_mm")
                 pos_kwargs = (
                     {

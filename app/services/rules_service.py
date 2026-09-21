@@ -591,6 +591,9 @@ class RuleService:
         rase_applicability: dict | None = None,
         rase_selection: dict | None = None,
         rase_exception: dict | None = None,
+        # Scope predicate. None leaves the stored scope untouched; a dict
+        # replaces it wholesale, so {} clears it.
+        applies_when: dict | None = None,
     ):
         """Update editable fields for an existing rule."""
         existing = self.get_rule(rule_id)
@@ -634,6 +637,8 @@ class RuleService:
         }
         if category:
             updates["category"] = self.normalize_category(category)
+        if applies_when is not None:
+            updates["applies_when"] = json.dumps(applies_when)
 
         self._rules.update(
             updates=updates,
