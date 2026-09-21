@@ -17,10 +17,9 @@ from datetime import UTC, date, datetime, timedelta
 from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 
 # severity -> (BCF priority, BCF status, days until due)
-# Matches the Critical/Major/Normal/Minor + Active/Open/Info vocabulary the
-# corrosion-engine BCF path already uses (bcf_generator.issues_from_results),
-# so exported issues read consistently regardless of which BIMGuard check
-# produced them.
+# Matches the Critical/Major/Normal/Minor + Active/Open/Info vocabulary
+# bcf_generator.py uses generally, so exported issues read consistently
+# regardless of which BIMGuard check produced them.
 _SEVERITY_TO_BCF = {
     "mandatory": ("Critical", "Active", 14),
     "recommended": ("Major", "Open", 30),
@@ -294,8 +293,8 @@ class ComplianceReporter:
             for failure in rule.get("failures", []):
                 element_name = failure.get("element_name") or "Component"
                 # Camera and target share the element's centroid — same
-                # convention as the corrosion-engine BCF path
-                # (bcf_generator.issues_from_results); _viewpoint_xml then
+                # convention the BCF exporter uses generally; _viewpoint_xml
+                # then
                 # offsets the camera from it so the view doesn't sit
                 # exactly inside the element. None (no geometry resolved)
                 # falls back to the dataclass's own origin default.

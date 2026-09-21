@@ -27,7 +27,6 @@ from app.modules.reporter.bcf_generator import (  # noqa: E402
     bcf_topic_guid,
     generate_bcf,
     is_ifc_guid,
-    issues_from_results,
 )
 
 SCHEMA_DIR = Path(__file__).parent / "schemas" / "bcf21"
@@ -138,38 +137,6 @@ def test_every_topic_in_a_multi_issue_archive_validates(markup_schema, visinfo_s
                 continue
             errors = _errors(schema, z.read(name).decode("utf-8"))
             assert not errors, f"{name} schema violations:\n  " + "\n  ".join(errors)
-
-
-def test_bcf_from_engine_results_validates(markup_schema):
-    """Validate the real production path: engine results → issues → archive."""
-    results = [
-        {
-            "overall_band": "HIGH",
-            "name": "CHW Supply Pipe",
-            "guid": "2O2Fr$t4X7Zf8NOew3FLOH",
-            "description": "Pipework",
-            "floor": "B1 Plant Room",
-            "material_a": "SS_316_passive",
-            "material_b": "Galvanized_steel",
-            "environment": "interior_conditioned",
-            "galvanic_score": 0.69,
-            "crevice_score": 0.5375,
-            "overall_score": 0.69,
-            "galvanic_band": "HIGH",
-            "crevice_band": "MEDIUM",
-            "dominant_mechanism": "galvanic",
-            "action": "BLOCK",
-            "mitigation": "PTFE isolation sleeve",
-            "position": (1.0, 2.0, 3.0),
-        }
-    ]
-    issues = issues_from_results(results)
-    assert issues, "a HIGH-band result must produce a BCF topic"
-
-    bcf_bytes = generate_bcf(issues)
-    for name in _entries(bcf_bytes, "markup.bcf"):
-        errors = _errors(markup_schema, _read(bcf_bytes, name))
-        assert not errors, f"{name} schema violations:\n  " + "\n  ".join(errors)
 
 
 # --------------------------------------------------------------------------
@@ -348,16 +315,6 @@ def test_valid_ifc_component_guid_is_kept():
     root = ET.fromstring(_read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
     guids = {c.get("IfcGuid") for c in root.iter("Component")}
     assert guids == {"2O2Fr$t4X7Zf8NOew3FLOH"}
-
-
-def test_engine_result_without_guid_still_validates(visinfo_schema):
-    """issues_from_results used to invent a random UUID as the IfcGuid."""
-    issues = issues_from_results([{"overall_band": "HIGH", "name": "Riser"}])
-    assert issues[0].component_guid == ""
-
-    bcf_bytes = generate_bcf(issues)
-    errors = _errors(visinfo_schema, _read(bcf_bytes, _entries(bcf_bytes, "viewpoint.bcfv")[0]))
-    assert not errors, "viewpoint.bcfv schema violations:\n  " + "\n  ".join(errors)
 
 
 def test_non_uuid_issue_id_maps_to_a_stable_topic_guid_and_folder(markup_schema):

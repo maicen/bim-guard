@@ -165,8 +165,8 @@ class ReportArtifactService:
             if description
         ]
 
-        # Camera/target share the element's centroid — same convention as
-        # the corrosion-engine BCF path (bcf_generator.issues_from_results).
+        # Camera/target share the element's centroid — same convention
+        # the BCF exporter uses generally.
         # position_mm comes from Module 2 (world mm); the viewer's fragments
         # scene works in metres, so convert here. None (geometry unresolved
         # for this element) leaves the BCFIssue's own origin default, which
