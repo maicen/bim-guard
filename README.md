@@ -40,38 +40,18 @@ international building codes:
 > clearance). Both were removed from the backend and the database now enforces
 > Architecture-only rule categories (`supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`).
 
-## The Agentic RAG Methodology
+## Standards Ingestion
 
-To eliminate AI hallucination and ensure strict engineering accuracy, this project
-utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
+To reduce hallucination risk and anchor the rule engine to traceable sources, this project ingests external standards via a documented retrieval workflow:
 
-1.  **Retrieval (`scripts/fetch_standards.py`):** An LLM-native web scraping script powered by the Firecrawl API dynamically retrieves open-access government building codes and manufacturer material specifications, converting them into clean Markdown.
-2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into a targeted Markdown export for NotebookLM.
-3.  **Generation (Gemini Notebooks):** The compiled workspace is fed into a Google Gemini Notebook (NotebookLM) workspace. The AI reasoning engine evaluates the Python codebase strictly against the ingested facts (and uploaded proprietary, IP-protected PDFs) to identify gaps in the compliance algorithms.
+1. **Retrieval (`scripts/fetch_standards.py`):** Uses the Firecrawl API to pull open-access standards and manufacturer specs into clean Markdown under `docs/scraped_standards/`.
+2. **Rule grounding:** The extracted standards are reviewed and, where appropriate, imported into the project’s rule catalog and audit workflows rather than treated as static compile artifacts.
 
 ### Pipeline Components
 
-*   `app/engines/` — Core Python kernels for architectural egress and daylight analysis (`ARCH-EGRESS-001`, `ARCH-SPATIAL-001`).
-*   `scripts/` — The AI data ingestion and Markdown compilation pipeline.
-*   `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
-
-### Regenerating the AI Workspace
-
-To pull a new open-access standard and recompile the AI workspace:
-
-```bash
-# 1. Search and extract an online standard via Firecrawl
-python scripts/fetch_standards.py "MBIE building code accessibility clearances" mbie_accessibility --corrosion --search
-
-# 2. Compile the updated codebase and standards for NotebookLM
-python scripts/compile_for_notebooklm.py
-```
-
-> **Note:** `scripts/fetch_standards.py` and `scripts/compile_for_notebooklm.py`
-> still route content through the retired `--seismic` / `--corrosion` category
-> flags (an Architecture-only `--arch` option has not been added yet); the
-> `--corrosion` flag above is used only because it is currently the one that
-> runs, not because the scraped content is corrosion-related.
+* `app/engines/` — Core Python kernels for architectural egress and daylight analysis (`ARCH-EGRESS-001`, `ARCH-SPATIAL-001`).
+* `scripts/` — Standards retrieval and normalization utilities for the rule pipeline.
+* `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
 
 ## Stack
 

@@ -37,7 +37,7 @@ If you're mid-task and notice legacy-domain code nearby that's out of scope for 
 
 The repository root is strictly reserved for primary configuration files (`pyproject.toml`, `uv.lock`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `DESIGN.md`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `main.py`, `.gitignore`, `run_server.*`, etc.), plus community/meta files (`TODO.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`), the `static/` asset dir, tooling state (`skills-lock.json`, `.sesskey`), and agent-tool config dirs (`.agents`, `.Jules`, `.copilot`).
 
-Rule corpus documents (e.g. `bimguard_*_rules.md`) are generated output, not root config — they belong in `docs/` (see `scripts/compile_for_notebooklm.py`), never at the repo root.
+Generated corpora or export artifacts belong under `docs/` or a generated-data directory, never at the repository root.
 
 All newly generated files (code, tests, scripts, fixtures, data manifests, reports, documentation, temporary files) **MUST ALWAYS** be placed in the appropriate subfolder:
 

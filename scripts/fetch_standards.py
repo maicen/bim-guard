@@ -1,4 +1,4 @@
-"""Scrape a standards page into Markdown for the NotebookLM corpora.
+"""Scrape a standards page into Markdown for the local standards corpus.
 
 Fetches content through Firecrawl and writes it into ``docs/scraped_standards/``
 with a provenance header. Two modes:
@@ -12,10 +12,9 @@ with a provenance header. Two modes:
   hosted converter for a local one while keeping the same output contract.
   ``--section`` narrows the extraction to one numbered section.
 
-The ``--seismic`` / ``--corrosion`` flag decides which NotebookLM workspace the
-file belongs to; because ``compile_for_notebooklm.py`` routes purely on the
-repository-relative path, the category keyword is baked into the saved filename
-so the compiler picks it up without further wiring.
+The ``--seismic`` / ``--corrosion`` flag tags the saved file for the relevant
+standards category; the filename includes the category keyword so the local
+corpus remains organized without a separate compile step.
 
 Usage::
 
@@ -40,8 +39,7 @@ from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-#: Where scraped Markdown lands. Kept in sync with the ``docs/scraped_standards``
-#: routing rules in ``compile_for_notebooklm.py``.
+#: Where scraped Markdown lands for the project's standards corpus.
 OUTPUT_DIR = REPO_ROOT / "docs" / "scraped_standards"
 
 SEISMIC = "seismic"
@@ -136,8 +134,7 @@ def resolve_output_path(name: str, category: str, force: bool) -> Path:
     """Map the requested output name onto a safe, correctly routed file path.
 
     The category keyword is prefixed onto the stem unless it is already
-    present, so ``compile_for_notebooklm.py`` routes the file to the intended
-    NotebookLM workspace.
+    present so the local standards corpus stays clearly grouped by topic.
     """
     stem = name[:-3] if name.lower().endswith(".md") else name
     if not stem or stem.startswith(".") or ".." in stem or not SAFE_STEM.match(stem):
