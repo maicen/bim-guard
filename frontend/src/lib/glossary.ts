@@ -2,7 +2,7 @@
  * Domain glossary for hover-card previews.
  *
  * The UI is dense with codes that are meaningful to a BIM information manager
- * and opaque to everyone else — `S3`, `P01.01`, `SHARED`, `XM-001`. Each entry
+ * and opaque to everyone else — `S3`, `P01.01`, `SHARED`, `ARCH-EGRESS-001`. Each entry
  * gives the short expansion shown as a card heading plus a one-or-two sentence
  * explanation, so the code can stay compact in tables while the meaning stays
  * one hover away.
@@ -203,46 +203,6 @@ export function describeRevision(code: string | null | undefined): GlossaryEntry
  * cannot drift apart in what they claim to check.
  */
 export const MECHANISMS: Record<string, GlossaryEntry> = {
-  "GC-001": {
-    label: "Galvanic corrosion",
-    description:
-      "Scores dissimilar-metal couples from the driving voltage between them, the anode-to-cathode area ratio, and how aggressive the surrounding environment is.",
-    reference:
-      "Governed by NASA-STD-6012 · IMOA Design Manual · ruleset BIMGUARD-GC-001 (thresholds authored, not quoted from these standards)",
-  },
-  "CC-001": {
-    label: "Crevice corrosion",
-    description:
-      "Scores crevice risk where stagnant electrolyte collects, from the alloy's critical crevice temperature, the operating temperature, the environment and joint geometry. Today only the alloy is read from the model: every joint is scored as an unknown, tight gap, every pipe is assumed to run at 20 °C, and most spaces fall into one default environment class.",
-    reference:
-      "Governed by EN ISO 15329 · ASTM G48-B · ruleset BIMGUARD-CC-001 (thresholds authored, not quoted from these standards)",
-  },
-  "MC-001": {
-    label: "Microbially influenced corrosion",
-    description:
-      "Scores biofilm risk in water systems from flow velocity, operating temperature and dead-leg length — the same conditions that drive Legionella control.",
-    reference:
-      "Governed by CIBSE TM13 · HSE HSG274 · ruleset BIMGUARD-MC-001 (thresholds authored, not quoted from these standards)",
-  },
-  "MM-001": {
-    label: "Material–media compatibility",
-    description:
-      "Scores whether a pipe material can safely carry the medium inside it, adjusted for environment severity and operating temperature. Unmapped pairings raise a data-quality finding rather than a silent pass.",
-    reference: "ruleset BIMGUARD-MM-001",
-  },
-  "XM-001": {
-    label: "Cross-material contamination",
-    description:
-      "Scores galvanic couples formed where dissimilar materials meet at a joint or share an electrolyte loop, and names which side sacrifices.",
-    reference: "ruleset BIMGUARD-XM-001 (shares the GC-001 galvanic series)",
-  },
-  "SB-001": {
-    label: "Seismic bracing clearance",
-    description:
-      "Blue Halo kernel. Checks that services keep the required clearance envelope for seismic movement and bracing.",
-    reference:
-      "ruleset BIMGUARD-SB-001 · authored screening calibration, not code values · FEMA E-74 (4th ed., December 2012) where sourced",
-  },
   CODE: {
     label: "Code compliance rule",
     description:
@@ -274,7 +234,7 @@ export function describeMechanism(code: string | null | undefined): GlossaryEntr
   if (!key) return null;
   if (MECHANISMS[key]) return MECHANISMS[key];
   if (MECHANISMS[`${key}-001`]) return MECHANISMS[`${key}-001`];
-  // Findings carry sub-rule references such as "SB-001.01".
+  // Findings carry sub-rule references such as "ARCH-EGRESS-001.01".
   const base = key.split(".")[0];
   return MECHANISMS[base] || null;
 }

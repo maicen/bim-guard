@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { LayoutList, Cpu, Compass } from "lucide-svelte";
+  import { LayoutList } from "lucide-svelte";
 
-  export type AnalysisDomainTab = "arch" | "piping" | "seismic";
+  export type AnalysisDomainTab = "arch";
 
   interface Props {
     active: AnalysisDomainTab;
     onSelect: (domain: AnalysisDomainTab) => void;
-    /** Restrict the strip to a project's own domain, e.g. an "Arch" project only ever shows "Architectural". Omit to show all three. */
+    /** Restrict the strip to a project's own domain. Arch is the only domain today. */
     allowedDomains?: AnalysisDomainTab[];
   }
 
@@ -14,8 +14,6 @@
 
   const ALL_TABS: { id: AnalysisDomainTab; label: string; icon: typeof LayoutList }[] = [
     { id: "arch", label: "Architectural", icon: LayoutList },
-    { id: "piping", label: "Piping", icon: Cpu },
-    { id: "seismic", label: "Seismic", icon: Compass },
   ];
 
   let TABS = $derived(
@@ -24,10 +22,8 @@
 </script>
 
 <!--
-  A single "Compliance Audit" sidebar destination now covers all three
-  domains — this tab strip is how you switch between them without going
-  back to the sidebar, mirroring the Compliance/ISO toggle already used
-  inside the Architectural view itself.
+  A single "Compliance Audit" sidebar destination covers the Architectural
+  domain -- the only one BIM-Guard analyses today.
 -->
 <div
   class="flex w-fit shrink-0 items-center gap-1 rounded-xl border border-border-interactive bg-surface-overlay p-1"
@@ -42,11 +38,7 @@
       onclick={() => onSelect(tab.id)}
       class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors {active ===
       tab.id
-        ? tab.id === 'piping'
-          ? 'bg-amber-600 text-white shadow-xs'
-          : tab.id === 'seismic'
-            ? 'bg-purple-600 text-white shadow-xs'
-            : 'bg-blue-600 text-white shadow-xs'
+        ? 'bg-blue-600 text-white shadow-xs'
         : 'text-fg-muted hover:text-white'}"
     >
       <tab.icon class="h-3.5 w-3.5" />

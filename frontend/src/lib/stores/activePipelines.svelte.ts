@@ -90,8 +90,8 @@ export const pipelineTracker = new PipelineTrackerStore();
 /**
  * Engine statuses that mean the engine actually started. A `pending` engine
  * carries no `progress_percent` at all, so counting it dragged the average
- * down by a constant: a finished corrosion run (GC-001 + CC-001 at 100)
- * averaged against three idle engines reported 40% and stopped there.
+ * down by a constant: a finished run at 100 averaged against idle engines
+ * reported less than 100% and stopped there.
  */
 const STARTED = new Set(["running", "complete", "failed"]);
 
@@ -99,12 +99,12 @@ const STARTED = new Set(["running", "complete", "failed"]);
  * Average progress across the engines of the run currently reporting, 0-100.
  *
  * Scoped two ways, because a project can have more than one analysis tracked
- * at once — the backend keys trackers by project *and* run, so a seismic run
- * and a corrosion run on one project are both in the payload:
+ * at once — the backend keys trackers by project *and* run, so a graph run
+ * and the default architecture run on one project are both in the payload:
  *
  *   - to engines that have started, so idle engines do not cap the bar; and
- *   - to `status.run_key`, the run that reported most recently, so a seismic
- *     run does not read as 83% because a corrosion run finished ten minutes
+ *   - to `status.run_key`, the run that reported most recently, so a graph
+ *     run does not read as 83% because the default run finished ten minutes
  *     ago and is still inside the tracker's TTL.
  *
  * An engine with no `run_key` is treated as part of the active run, so a
