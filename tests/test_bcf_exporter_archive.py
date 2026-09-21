@@ -41,40 +41,39 @@ def bcf_schemas():
     )
 
 
-def galvanic_issue() -> Issue:
-    """Build a GC-001 copper / carbon steel couple implicating three elements."""
+def clash_issue() -> Issue:
+    """Build an architectural clash finding implicating three elements."""
     return Issue(
         id="BGR-0001",
         element_id="0FQ6pMwzXBJucYaRTqfuw2",
-        rule_id="GC-001.02",
-        title="Copper / carbon steel galvanic couple",
+        rule_id="ARCH-EGRESS-001.02",
+        title="Door clearance clash",
         band=RiskBand.CRITICAL,
         score=0.91,
-        mechanism="GC-001 galvanic",
-        mitigation="Install dielectric isolation gasket.",
-        assignee_role="Mechanical Engineer",
+        mechanism="ARCH-EGRESS-001",
+        mitigation="Adjust door swing clear radius.",
+        assignee_role="Architectural Designer",
         metadata={
-            "anode_guid": "1AbcDEF2GhIjKlMnOpQrSt",
-            "cathode_guid": "2XyZ98WvUtSrQpOnMlKjIh",
-            "voltage_v": 0.78,
+            "clashing_element_id": "1AbcDEF2GhIjKlMnOpQrSt",
+            "counterpart_guid": "2XyZ98WvUtSrQpOnMlKjIh",
             "suitability_code": "S2",
             "cde_state": "SHARED",
         },
-        citations=[{"standard": "ISO 9223", "clause": "Table 3"}],
+        citations=[{"standard": "NBC 2020", "clause": "9.9.6.1"}],
     )
 
 
-def crevice_issue() -> Issue:
-    """Build a CC-001 finding carrying one related element via the generic list key."""
+def spatial_issue() -> Issue:
+    """Build a finding carrying one related element via the generic list key."""
     return Issue(
         id="BGR-0002",
         element_id="3MnOpQrStUvWxYz01AbCdE",
-        rule_id="CC-001.07",
-        title="Crevice at flange joint",
+        rule_id="ARCH-SPATIAL-001.01",
+        title="Daylight opening shortfall",
         band=RiskBand.HIGH,
         score=0.68,
-        mechanism="CC-001 crevice",
-        metadata={"related_element_ids": ["4EfGhIjKlMnOpQrStUvWxY"], "joint_type": "JT-004"},
+        mechanism="ARCH-SPATIAL-001",
+        metadata={"related_element_ids": ["4EfGhIjKlMnOpQrStUvWxY"], "space_type": "office"},
     )
 
 
@@ -82,7 +81,7 @@ def crevice_issue() -> Issue:
 def archive(tmp_path) -> zipfile.ZipFile:
     """Write an archive containing both sample findings and open it."""
     path = BCFExporter(export_dir=tmp_path).export(
-        [galvanic_issue(), crevice_issue()], "findings"
+        [clash_issue(), spatial_issue()], "findings"
     )
     with zipfile.ZipFile(path) as zf:
         yield zf
@@ -92,26 +91,26 @@ class TestElementCollection:
     """``collect_elements`` resolves every implicated IFC GUID."""
 
     def test_primary_element_comes_first(self):
-        elements = BCFExporter.collect_elements(galvanic_issue())
+        elements = BCFExporter.collect_elements(clash_issue())
         assert elements[0] == ElementRef("0FQ6pMwzXBJucYaRTqfuw2", "primary")
 
-    def test_anode_and_cathode_are_resolved_with_roles(self):
-        roles = {e.ifc_guid: e.role for e in BCFExporter.collect_elements(galvanic_issue())}
-        assert roles["1AbcDEF2GhIjKlMnOpQrSt"] == "anode"
-        assert roles["2XyZ98WvUtSrQpOnMlKjIh"] == "cathode"
+    def test_clash_and_counterpart_are_resolved_with_roles(self):
+        roles = {e.ifc_guid: e.role for e in BCFExporter.collect_elements(clash_issue())}
+        assert roles["1AbcDEF2GhIjKlMnOpQrSt"] == "clashing element"
+        assert roles["2XyZ98WvUtSrQpOnMlKjIh"] == "counterpart"
 
     def test_list_valued_key_is_expanded(self):
-        guids = [e.ifc_guid for e in BCFExporter.collect_elements(crevice_issue())]
+        guids = [e.ifc_guid for e in BCFExporter.collect_elements(spatial_issue())]
         assert guids == ["3MnOpQrStUvWxYz01AbCdE", "4EfGhIjKlMnOpQrStUvWxY"]
 
     def test_duplicate_guids_are_collapsed(self):
-        issue = galvanic_issue()
-        issue.metadata["anode_guid"] = issue.element_id
+        issue = clash_issue()
+        issue.metadata["clashing_element_id"] = issue.element_id
         guids = [e.ifc_guid for e in BCFExporter.collect_elements(issue)]
         assert len(guids) == len(set(guids))
 
     def test_issue_without_metadata_yields_only_primary(self):
-        issue = crevice_issue()
+        issue = spatial_issue()
         issue.metadata = {}
         assert len(BCFExporter.collect_elements(issue)) == 1
 
@@ -209,7 +208,7 @@ class TestMarkup:
 
     def test_description_lists_related_elements(self, archive):
         description = self._topic(archive, "BGR-0001").find("Description").text
-        assert "1AbcDEF2GhIjKlMnOpQrSt (anode)" in description
+        assert "1AbcDEF2GhIjKlMnOpQrSt (clashing element)" in description
 
     def test_markup_links_its_viewpoint_and_snapshot(self, archive):
         root = ET.fromstring(archive.read(f"{T1}/markup.bcf").decode())
@@ -219,7 +218,7 @@ class TestMarkup:
 
     def test_citations_reach_the_comment_body(self, archive):
         root = ET.fromstring(archive.read(f"{T1}/markup.bcf").decode())
-        assert "ISO 9223" in root.find("./Comment/Comment").text
+        assert "NBC 2020" in root.find("./Comment/Comment").text
 
 
 class TestOutputRouting:
@@ -229,22 +228,22 @@ class TestOutputRouting:
         assert DEFAULT_EXPORT_DIR.as_posix().endswith("docs/bcf_exports")
 
     def test_bcfzip_suffix_is_appended(self, tmp_path):
-        assert BCFExporter(export_dir=tmp_path).export([crevice_issue()], "review").name == (
+        assert BCFExporter(export_dir=tmp_path).export([spatial_issue()], "review").name == (
             "review.bcfzip"
         )
 
     def test_generated_name_is_used_when_omitted(self, tmp_path):
-        path = BCFExporter(export_dir=tmp_path).export([crevice_issue()])
+        path = BCFExporter(export_dir=tmp_path).export([spatial_issue()])
         assert path.name.startswith("bimguard_findings_")
         assert path.suffix == ".bcfzip"
 
     def test_export_dir_is_created_on_demand(self, tmp_path):
         target = tmp_path / "nested" / "dir"
-        assert BCFExporter(export_dir=target).export([crevice_issue()], "x").exists()
+        assert BCFExporter(export_dir=target).export([spatial_issue()], "x").exists()
 
     def test_generate_bcf_zip_writes_a_real_archive(self, tmp_path):
         out = tmp_path / "legacy.bcfzip"
-        BCFExporter().generate_bcf_zip([crevice_issue()], str(out))
+        BCFExporter().generate_bcf_zip([spatial_issue()], str(out))
         assert zipfile.is_zipfile(out)
 
     def test_empty_issue_list_still_yields_a_valid_archive(self, tmp_path):
@@ -285,12 +284,12 @@ class TestSchemaConformance:
         return checked
 
     def test_sample_findings_validate(self, tmp_path, bcf_schemas):
-        path = BCFExporter(export_dir=tmp_path).export([galvanic_issue(), crevice_issue()], "ok")
+        path = BCFExporter(export_dir=tmp_path).export([clash_issue(), spatial_issue()], "ok")
         assert self._assert_archive_valid(path, bcf_schemas) == 4
 
     def test_project_code_is_not_written_as_ifcproject(self, tmp_path, bcf_schemas):
         """A project code like ``ZIG-001`` is not an IfcProject GlobalId."""
-        issue = galvanic_issue()
+        issue = clash_issue()
         issue.metadata["project_code"] = "ZIG-001"
         path = BCFExporter(export_dir=tmp_path).export([issue], "code")
         self._assert_archive_valid(path, bcf_schemas)
@@ -299,7 +298,7 @@ class TestSchemaConformance:
         assert root.find("./Header/File").get("IfcProject") is None
 
     def test_real_ifcproject_guid_is_written(self, tmp_path, bcf_schemas):
-        issue = galvanic_issue()
+        issue = clash_issue()
         issue.metadata["project_code"] = "0YvctVUKr0kugbFTf53O9L"
         path = BCFExporter(export_dir=tmp_path).export([issue], "guid")
         self._assert_archive_valid(path, bcf_schemas)
@@ -309,7 +308,7 @@ class TestSchemaConformance:
 
     @pytest.mark.parametrize("bad_id", ["", "7A0E74E1-3CC3-46E8-B94E-516D2A12AD47", "COMP-001"])
     def test_non_ifc_element_ids_never_become_ifcguid(self, tmp_path, bcf_schemas, bad_id):
-        issue = crevice_issue()
+        issue = spatial_issue()
         issue.element_id = bad_id
         issue.metadata["related_element_ids"] = [bad_id, "4EfGhIjKlMnOpQrStUvWxY"]
         path = BCFExporter(export_dir=tmp_path).export([issue], "bad")

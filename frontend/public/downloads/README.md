@@ -77,22 +77,14 @@ to default to. Exporting the wrong phase won't error or show `MISSING_DATA`
 — it just silently audits a different set of elements than the one you
 meant to check.
 
-## Material Property Sets: needed for seismic mass, not for material ID
+## Material Property Sets
 
-**Property Sets → Export material property sets** must stay ticked. It's
-easy to assume this only affects the corrosion engines' material matching
-(galvanic couples, crevice risk) — it doesn't. That matching reads the
-element's material *name*, which Revit exports via `IfcRelAssociatesMaterial`
-regardless of this checkbox.
-
-What this checkbox actually controls is the material's **density**
-(`Pset_MaterialCommon` / `IfcMaterialProperties.MassDensity`). The seismic
-engine's mass check uses an element's own `NetMass`/`Weight`/`NominalMass`
-quantity when present, and falls back to **Volume × Density** when it isn't
-— and density only exists in the IFC file if this checkbox was on at export
-time. Turning it off doesn't just skip an unused extra; it removes the data
-that fallback needs, and elements without an explicit mass quantity will
-show `MISSING_DATA` on seismic weight checks instead of a computed value.
+**Property Sets → Export material property sets** should stay ticked. This
+checkbox controls exporting material properties such as material **density**
+(`Pset_MaterialCommon` / `IfcMaterialProperties.MassDensity`) and fire rating
+attributes associated via `IfcRelAssociatesMaterial`. Leaving this enabled
+ensures architectural evaluations and mass/specification checks have access to
+complete material definitions.
 
 ## Linked Revit files are NOT exported by default
 

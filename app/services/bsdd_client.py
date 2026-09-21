@@ -209,13 +209,13 @@ FALLBACK_CLASSES: dict[str, dict[str, Any]] = {
                 "description": "Nominal diameter of the pipe segment.",
             },
             {
-                "uri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/prop/CorrosionAllowance",
-                "name": "CorrosionAllowance",
+                "uri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/prop/WallThickness",
+                "name": "WallThickness",
                 "property_set": "Pset_PipeSegmentCommon",
                 "data_type": "IfcLengthMeasure",
                 "units": "mm",
                 "allowed_values": [],
-                "description": "Corrosion allowance thickness.",
+                "description": "Wall thickness.",
             },
             {
                 "uri": "https://identifier.buildingsmart.org/uri/buildingsmart/ifc-4.3/prop/Material",

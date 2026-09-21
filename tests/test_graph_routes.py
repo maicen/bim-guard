@@ -134,14 +134,14 @@ def test_get_issue_proof_uses_the_real_stored_issue_not_a_dummy():
     from app.modules.comparator.issue_schema import Issue, RiskBand
 
     real_issue = Issue(
-        id="GC-001-WALL-GUID-1",
+        id="ARCH-001-WALL-GUID-1",
         element_id="WALL-GUID-1",
-        rule_id="GC-001",
-        title="Galvanic corrosion risk between dissimilar metals",
+        rule_id="ARCH-001",
+        title="Party wall fire rating shortfall",
         band=RiskBand.HIGH,
         score=0.82,
-        mechanism="GC-001",
-        mitigation="Insert a dielectric isolator between the two metals.",
+        mechanism="ARCH-001",
+        mitigation="Upgrade party wall to 45-minute fire-resistance assembly.",
     )
 
     client = TestClient(app)
@@ -154,11 +154,11 @@ def test_get_issue_proof_uses_the_real_stored_issue_not_a_dummy():
 
     try:
         with patch("app.services.analysis_runner.run_analysis", side_effect=fake_run_analysis):
-            res = client.get("/api/graph/202/proof/GC-001-WALL-GUID-1")
+            res = client.get("/api/graph/202/proof/ARCH-001-WALL-GUID-1")
             assert res.status_code == 200
             data = res.json()
-            assert data["issue_id"] == "GC-001-WALL-GUID-1"
-            assert data["rule_id"] == "GC-001"
+            assert data["issue_id"] == "ARCH-001-WALL-GUID-1"
+            assert data["rule_id"] == "ARCH-001"
             assert data["element_id"] == "WALL-GUID-1"
             # Not the old hardcoded dummy's fixed values
             assert data["element_id"] != "2O2Fr$t4X7Zf8NOew3FL9r"

@@ -145,9 +145,9 @@ def test_new_project_has_zero_ruleset_bindings(ruleset_access: RulesetAccessServ
 def test_project_cannot_bind_a_ruleset_its_org_was_not_granted(
     ruleset_access: RulesetAccessService,
 ) -> None:
-    ruleset_access.set_org_grants(10, ["BIMGUARD-GC-001"])
+    ruleset_access.set_org_grants(10, ["BUILDING-CODE-PART9"])
     with pytest.raises(ValueError):
-        ruleset_access.set_project_bindings(1, ["BIMGUARD-CC-001"], organization_id=10)
+        ruleset_access.set_project_bindings(1, ["BUILDING-CODE-PART9-EXT"], organization_id=10)
     # The rejected request left no partial binding behind.
     assert ruleset_access.list_project_bindings(1) == []
 
@@ -155,21 +155,21 @@ def test_project_cannot_bind_a_ruleset_its_org_was_not_granted(
 def test_project_can_bind_a_ruleset_its_org_was_granted(
     ruleset_access: RulesetAccessService,
 ) -> None:
-    ruleset_access.set_org_grants(10, ["BIMGUARD-GC-001", "BIMGUARD-CC-001"])
-    ruleset_access.set_project_bindings(1, ["BIMGUARD-GC-001"], organization_id=10)
+    ruleset_access.set_org_grants(10, ["BUILDING-CODE-PART9", "BUILDING-CODE-PART9-EXT"])
+    ruleset_access.set_project_bindings(1, ["BUILDING-CODE-PART9"], organization_id=10)
 
-    assert ruleset_access.list_project_bindings(1) == ["BIMGUARD-GC-001"]
-    assert ruleset_access.project_can_use_ruleset(1, "BIMGUARD-GC-001") is True
-    assert ruleset_access.project_can_use_ruleset(1, "BIMGUARD-CC-001") is False
+    assert ruleset_access.list_project_bindings(1) == ["BUILDING-CODE-PART9"]
+    assert ruleset_access.project_can_use_ruleset(1, "BUILDING-CODE-PART9") is True
+    assert ruleset_access.project_can_use_ruleset(1, "BUILDING-CODE-PART9-EXT") is False
 
 
 def test_narrowing_org_grants_does_not_retroactively_unbind_a_project(
     ruleset_access: RulesetAccessService,
 ) -> None:
-    ruleset_access.set_org_grants(10, ["BIMGUARD-GC-001"])
-    ruleset_access.set_project_bindings(1, ["BIMGUARD-GC-001"], organization_id=10)
+    ruleset_access.set_org_grants(10, ["BUILDING-CODE-PART9"])
+    ruleset_access.set_project_bindings(1, ["BUILDING-CODE-PART9"], organization_id=10)
     ruleset_access.set_org_grants(10, [])
-    assert ruleset_access.list_project_bindings(1) == ["BIMGUARD-GC-001"]
+    assert ruleset_access.list_project_bindings(1) == ["BUILDING-CODE-PART9"]
 
 
 def test_arch_analysis_rejects_a_ruleset_not_bound_to_the_project(
@@ -183,7 +183,7 @@ def test_arch_analysis_rejects_a_ruleset_not_bound_to_the_project(
         ruleset_access_service=ruleset_access,
     )
     with pytest.raises(ValueError, match="not assigned to this project"):
-        service.run_analysis(project_id=1, rule_folder="BIMGUARD-GC-001")
+        service.run_analysis(project_id=1, rule_folder="BUILDING-CODE-PART9")
 
 
 def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> None:
@@ -196,8 +196,8 @@ def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> Non
         organization_ruleset_grants_repo=FakeTable(),
         project_ruleset_bindings_repo=FakeTable(),
     )
-    ruleset_access.set_org_grants(10, ["BIMGUARD-GC-001"])
-    ruleset_access.set_project_bindings(1, ["BIMGUARD-GC-001"], organization_id=10)
+    ruleset_access.set_org_grants(10, ["BUILDING-CODE-PART9"])
+    ruleset_access.set_project_bindings(1, ["BUILDING-CODE-PART9"], organization_id=10)
 
     service = ArchAnalysisService(
         projects_service=object(),
@@ -215,7 +215,7 @@ def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> Non
         staticmethod(lambda **kwargs: {"error": "stopped before real orchestration"}),
     )
     with pytest.raises(ValueError, match="stopped before real orchestration"):
-        service.run_analysis(project_id=1, rule_folder="BIMGUARD-GC-001")
+        service.run_analysis(project_id=1, rule_folder="BUILDING-CODE-PART9")
 
 
 # ---------------------------------------------------------------------------

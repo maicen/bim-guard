@@ -370,7 +370,7 @@ def test_doclang_asset_manager_extracts_and_offloads_base64():
     b64_str = base64.b64encode(png_bytes).decode("ascii")
 
     xml_with_image = f"""<doclang>
-  <heading level="1">Corrosion Details</heading>
+  <heading level="1">Building Code Details</heading>
   <p>Diagram below:</p>
   <image src="data:image/png;base64,{b64_str}" />
 </doclang>"""

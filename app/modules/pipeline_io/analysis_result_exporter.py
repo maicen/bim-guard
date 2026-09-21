@@ -221,10 +221,7 @@ def _engine_code(issue: Issue) -> str:
     """Return the engine id that raised ``issue``, e.g. ``"GR-001"``.
 
     Read from ``rule_id`` rather than ``metadata["mechanism_code"]`` because
-    only ``rule_id`` is populated on every finding: XM-001's 510 verdicts and
-    the MM-001/XM-001 data-quality notes carry no ``mechanism_code``, while
-    every finding — verdict or note, corrosion or seismic — has a ``rule_id``
-    of the form ``"<ENGINE>.<rule>"``.
+    every finding has a ``rule_id`` of the form ``"<ENGINE>.<rule>"``.
 
     Returns an empty string if ``rule_id`` is missing or unshaped, so callers
     fall back to a generic author rather than inventing an engine.
@@ -271,9 +268,8 @@ def _topic_type(issue: Issue) -> str:
     * ``Clash`` — a geometric interference.
     * ``Issue`` — a compliance verdict against a scored element.
 
-    Emitting ``Issue`` for all three, as this did before, made 2,937 seismic
-    clashes and every data-quality note indistinguishable from a verdict in
-    any tool that filters on topic type.
+    Emitting ``Issue`` for all three makes geometric clashes and data-quality
+    notes indistinguishable from a verdict in any tool that filters on topic type.
     """
     if _is_data_quality(issue):
         return "Warning"
@@ -322,10 +318,7 @@ def _title(issue: Issue, sequence: int) -> str:
     engine, then storey, with a stable per-archive sequence — where before the
     titles began with free prose and sorted into no useful order.
 
-    The seismic title also names both elements. It previously read "Seismic
-    bracing clearance clash on 19FnYm9E": one element, and its GUID truncated
-    to eight characters, so the topic did not say what clashed with what.
-
+    Titles begin with a standardized domain and sequence prefix.
     Falls back to the engine's own title unchanged when the finding carries no
     recognisable engine, rather than emitting a malformed prefix.
     """
@@ -343,13 +336,10 @@ def _title(issue: Issue, sequence: int) -> str:
     return f"{prefix} {issue.title}"
 
 
-#: Metadata keys naming another element the finding implicates: the other side
-#: of a seismic clash, and both poles of an XM-001 couple. Selected and
-#: coloured in the viewpoint alongside the subject.
+#: Metadata keys naming another element the finding implicates:
+#: selected and coloured in the viewpoint alongside the subject.
 _PARTNER_KEYS: tuple[str, ...] = (
     "clashing_element_id",
-    "anode_id",
-    "cathode_id",
 )
 
 
@@ -579,11 +569,10 @@ def _document_references(issue: Issue) -> list[dict]:
 def _source_files(issue: Issue, model_dates: dict[str, str], fallback: list[dict]) -> list[dict]:
     """Return the ``Header/File`` entries naming the model(s) behind ``issue``.
 
-    Seismic findings record which model each side of the clash came from, in
+    Findings record which model each side of a clash came from, in
     ``metadata["source_model"]`` and ``metadata["clashing_source_model"]``, so
-    a cross-model clash names both files — on project 1542 that is 886 of
-    2,937 findings. Corrosion findings carry no per-finding model, so they take
-    the project's attached model(s) as supplied by the caller.
+    a cross-model clash names both files. Other findings carry no per-finding model,
+    so they take the project's attached model(s) as supplied by the caller.
 
     Args:
         issue: The finding being exported.
@@ -624,7 +613,7 @@ def _bcf_issue(
     Args:
         model_dates: ``{filename: upload timestamp}`` for the project.
         fallback_files: ``Header/File`` entries for findings that name no model
-            of their own — every corrosion finding.
+            of their own.
         sequence: This finding's position in the export, for the title's
             ``{seq:04d}`` segment. Stable because ``sort_issues`` is.
     """

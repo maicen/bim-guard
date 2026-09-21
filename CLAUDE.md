@@ -44,7 +44,7 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
 - **`app/`** — Backend application code:
   - `app/api/` — FastAPI routers (`analyze`, `bcf_routes`, `cde_integration`, `dashboard`, `documents`, `events`, `naming_config`, `projects`, `repositories`, `rules`, `settings`), dependency injection, and SSE streaming
   - `app/modules/contracts.py` — Pydantic request/response schemas
-  - `app/engines/` — Pure Python computation and compliance engines (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, ARCH-*, etc.)
+  - `app/engines/` — Pure Python computation and compliance engines (ARCH-EGRESS-001, ARCH-SPATIAL-001, etc.)
   - `app/services/` — Business logic, persistence, and pipeline runner services
   - `app/modules/` — Orchestration and parsing modules
 - **`frontend/`** — Svelte 5 frontend client:
@@ -326,7 +326,7 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 - **Strict Contracts**: Every endpoint must accept and return strict Pydantic schemas defined in `app/modules/contracts.py`. Never return raw dicts or unvalidated payloads.
 - **Dependency Injection**: Use FastAPI `Depends(...)` with providers from `app/api/dependencies.py` to obtain service instances. This applies one layer down too: domain services must receive their own collaborators (other services, engines, repositories) via constructor injection, wired once in `app/bootstrap.py`'s `ApplicationContainer` and exposed through `app/api/dependencies.py` — never instantiate another service or engine inline inside business logic (see `ModelsService.__init__` in `app/services/models_service.py` for the established shape: keyword-only args, each optional and defaulting to a real instance when omitted).
 - **Error Handling**: Raise standard `fastapi.HTTPException` with appropriate status codes (400, 404, 409, 500) and clear detail messages.
-- **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`. `PipelineTracker`'s store is keyed by `(project_id, run_key)`, `run_key` defaulting to `"default"` — the corrosion pipeline's run, unchanged for every pre-existing call site. A second, genuinely concurrent analysis path for the same project (the graph engine's `GRAPH-001`, or a future Architecture/Seismic pass) must pass its own `run_key` to `tracking(project_id, run_key=...)`/`tracker_for(...)`/`snapshot(...)`, or its `reset=True` will discard the default run's in-flight progress for the same project id.
+- **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`. `PipelineTracker`'s store is keyed by `(project_id, run_key)`, `run_key` defaulting to `"default"`. A second, genuinely concurrent analysis path for the same project (such as the graph engine's `GRAPH-001`) must pass its own `run_key` to `tracking(project_id, run_key=...)`/`tracker_for(...)`/`snapshot(...)`, or its `reset=True` will discard the default run's in-flight progress for the same project id.
 
 ### Database & Rule Management
 
@@ -359,11 +359,9 @@ To reconcile drift, never delete history rows or rewrite applied SQL. Rename the
 
 #### Database-Driven Analysis Engine Architecture
 
-All compliance and corrosion analysis workflows are strictly database-driven:
+All compliance analysis workflows are strictly database-driven:
 
-- **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, material tables, flow velocity/dead-leg intervals, zone-to-environment mappings, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
-- **Corrosion Engine Catalogs**: `app/services/corrosion_rule_catalog.py` translates DB rules into engine lookups for `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, and `BIMGUARD-MC-001`.
-- **Live Catalog Reloading**: In-memory engine catalogs are refreshed via `reload_all_catalogs()` (calling `bimguard_*_engine.reload_rules()`) at the start of each analysis run, allowing DB rule edits to take effect immediately without server restarts.
+- **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, egress distances, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
 - **Targeted Ruleset Execution**: Selecting a `rule_folder` queries rules directly from the DB via `RuleService().list_by_ruleset(rule_folder)` so custom or extracted rulesets execute immediately against the model.
 
 ## Coding Guidelines

@@ -10,32 +10,32 @@ def test_filter_exportable_rules_only_keeps_property_checks_with_required_fields
     rows = [
         {
             "rule_category": "property_check",
-            "target_ifc_class": "IfcPipeSegment",
-            "property_set": "Pset_PipeSegmentCommon",
-            "property_name": "CorrosionAllowance",
+            "target_ifc_class": "IfcWall",
+            "property_set": "Pset_WallCommon",
+            "property_name": "FireRating",
             "operator": ">=",
-            "check_value": 3,
-            "unit": "mm",
+            "check_value": 45,
+            "unit": "min",
             "rule_type": "numeric_comparison",
         },
         {
             "rule_category": "scoring_model",
-            "target_ifc_class": "IfcPipeSegment",
-            "property_set": "Pset_PipeSegmentCommon",
-            "property_name": "CorrosionAllowance",
+            "target_ifc_class": "IfcWall",
+            "property_set": "Pset_WallCommon",
+            "property_name": "FireRating",
             "operator": ">=",
-            "check_value": 3,
-            "unit": "mm",
+            "check_value": 45,
+            "unit": "min",
             "rule_type": "scoring_model",
         },
         {
             "rule_category": "property_check",
             "target_ifc_class": "",
-            "property_set": "Pset_PipeSegmentCommon",
-            "property_name": "CorrosionAllowance",
+            "property_set": "Pset_WallCommon",
+            "property_name": "FireRating",
             "operator": ">=",
-            "check_value": 3,
-            "unit": "mm",
+            "check_value": 45,
+            "unit": "min",
             "rule_type": "numeric_comparison",
         },
     ]
@@ -43,7 +43,7 @@ def test_filter_exportable_rules_only_keeps_property_checks_with_required_fields
     exported = filter_exportable_rules(rows)
 
     assert len(exported) == 1
-    assert exported[0]["target_ifc_class"] == "IfcPipeSegment"
+    assert exported[0]["target_ifc_class"] == "IfcWall"
     assert exported[0]["rule_category"] == "property_check"
 
 
@@ -51,17 +51,17 @@ def test_build_ids_document_bundles_exportable_checks_into_valid_xml():
     rows = [
         {
             "reference": "A1",
-            "description": "Corrosion allowance shall be at least 3 mm.",
+            "description": "Party wall fire rating shall be at least 45 min.",
             "rule_category": "property_check",
-            "target_ifc_class": "IfcPipeSegment",
-            "property_set": "Pset_PipeSegmentCommon",
-            "property_name": "CorrosionAllowance",
+            "target_ifc_class": "IfcWall",
+            "property_set": "Pset_WallCommon",
+            "property_name": "FireRating",
             "operator": ">=",
-            "check_value": 3,
-            "unit": "mm",
+            "check_value": 45,
+            "unit": "min",
             "rule_type": "numeric_comparison",
             "severity": "mandatory",
-            "source_text": "Corrosion allowance shall be at least 3 mm.",
+            "source_text": "Party wall fire rating shall be at least 45 min.",
         }
     ]
 
@@ -72,9 +72,9 @@ def test_build_ids_document_bundles_exportable_checks_into_valid_xml():
     # (<ids xmlns="...">) rather than a bound "ids:" prefix; both are
     # equally valid per XML namespaces, so assert on the namespace URI.
     assert "http://standards.buildingsmart.org/IDS" in xml
-    assert "IfcPipeSegment" in xml
-    assert "CorrosionAllowance" in xml
-    assert "Pset_PipeSegmentCommon" in xml
+    assert "IfcWall" in xml
+    assert "FireRating" in xml
+    assert "Pset_WallCommon" in xml
     assert "IFC4" in xml
 
 

@@ -1,7 +1,7 @@
 {
-  "name": "BIM Guard — OpenBIM Compliance & Corrosion Physics",
+  "name": "BIM Guard — OpenBIM Compliance & CDE Coordination",
   "short_name": "BIM Guard",
-  "description": "Automated OpenBIM code compliance, 3D clearance auditing, corrosion physics, and ISO 19650 CDE coordination for IFC models.",
+  "description": "Automated OpenBIM architectural code compliance, 3D clearance auditing, and ISO 19650 CDE coordination for IFC models.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

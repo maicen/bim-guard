@@ -25,14 +25,14 @@ def test_bcf_list_and_get_projects():
 def test_bcf_topics_crud_and_iso19650_metadata():
     proj_id = "0"
     create_payload = {
-        "title": "Severe Galvanic Risk between Cu and Zn",
+        "title": "Critical Egress Travel Distance Violation",
         "topic_type": "Issue",
         "topic_status": "Open",
         "priority": "Critical",
-        "description": "Galvanic corrosion detected between copper riser and zinc fitting.",
-        "assigned_to": "Lead MEP Engineer",
+        "description": "Maximum travel distance exceeded from habitable room to exit.",
+        "assigned_to": "Lead Architect",
         "due_date": "2026-10-01",
-        "labels": ["Corrosion", "Galvanic", "HighRisk"],
+        "labels": ["Compliance", "Egress", "HighRisk"],
         "component_guids": ["2O2Fr$t4X7Zf8NOew3FL01", "2O2Fr$t4X7Zf8NOew3FL02"],
         "suitability_code": "S2",
         "revision_code": "P01.02",

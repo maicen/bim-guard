@@ -23,7 +23,7 @@ RESULTS_URL = f"/api/analyze/results/{PROJECT_ID}/architecture"
 
 #: Engine codes the synthetic run spreads its findings across, cycled so that
 #: band, engine and score vary independently of each other.
-ENGINES = ("GC-001", "CC-001", "MC-001")
+ENGINES = ("ARCH-EGRESS-001", "ARCH-SPATIAL-001", "GRAPH-TOPOLOGY-001")
 
 BANDS = (RiskBand.CRITICAL, RiskBand.HIGH, RiskBand.MEDIUM, RiskBand.LOW)
 
@@ -193,15 +193,15 @@ class TestFilters:
         assert all(i["mechanism"] != "data_quality" for i in body["audit_issues"])
 
     def test_mechanism_selects_an_engine_and_its_data_quality_notes(self, client):
-        body = client.get(f"{RESULTS_URL}?mechanism=GC-001").json()
+        body = client.get(f"{RESULTS_URL}?mechanism=ARCH-EGRESS-001").json()
         rule_ids = [i["rule_id"] for i in body["audit_issues"]]
         assert rule_ids
-        assert all(r.startswith("GC-001") for r in rule_ids)
-        assert "GC-001.DATA" in rule_ids
+        assert all(r.startswith("ARCH-EGRESS-001") for r in rule_ids)
+        assert "ARCH-EGRESS-001.DATA" in rule_ids
 
     def test_mechanism_accepts_a_bare_prefix(self, client):
-        by_prefix = client.get(f"{RESULTS_URL}?mechanism=GC").json()
-        by_code = client.get(f"{RESULTS_URL}?mechanism=GC-001").json()
+        by_prefix = client.get(f"{RESULTS_URL}?mechanism=ARCH-EGRESS").json()
+        by_code = client.get(f"{RESULTS_URL}?mechanism=ARCH-EGRESS-001").json()
         assert by_prefix["page"]["total_matching"] == by_code["page"]["total_matching"]
 
     def test_an_unknown_mechanism_selects_nothing_rather_than_everything(self, client):
@@ -215,11 +215,11 @@ class TestFilters:
         assert body["page"]["total_matching"] == VERDICT_COUNT
 
     def test_filters_combine(self, client):
-        body = client.get(f"{RESULTS_URL}?band=critical&mechanism=GC-001").json()
+        body = client.get(f"{RESULTS_URL}?band=critical&mechanism=ARCH-EGRESS-001").json()
         assert body["audit_issues"]
         for issue in body["audit_issues"]:
             assert issue["band"] == "critical"
-            assert issue["rule_id"].startswith("GC-001")
+            assert issue["rule_id"].startswith("ARCH-EGRESS-001")
 
 
 class TestDataQualitySelectors:
@@ -252,10 +252,10 @@ class TestDataQualitySelectors:
         )
 
     def test_mechanism_unions_an_engine_with_the_notes(self, client):
-        body = client.get(f"{RESULTS_URL}?mechanism=GC&mechanism=data_quality").json()
+        body = client.get(f"{RESULTS_URL}?mechanism=ARCH-EGRESS&mechanism=data_quality").json()
         rule_ids = {i["rule_id"] for i in body["audit_issues"]}
-        assert any(r.startswith("GC-001") for r in rule_ids)
-        assert "CC-001.DATA" in rule_ids
+        assert any(r.startswith("ARCH-EGRESS-001") for r in rule_ids)
+        assert "ARCH-SPATIAL-001.DATA" in rule_ids
 
 
 class TestSearch:

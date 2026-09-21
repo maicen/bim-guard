@@ -394,7 +394,7 @@ class EngineRun:
         """Whether this engine has reported anything at all.
 
         Not simply ``current_stage is not None``: a run that fails before
-        entering a stage -- a seismic run whose clearance config is missing,
+        entering a stage -- an analysis run whose config is missing,
         say -- has no stage and is still very much a report. Reading it as
         untouched discarded the failure and reported ``pending``, which is the
         one thing the status contract promises to distinguish.
@@ -460,8 +460,7 @@ class EngineRun:
 #: without comparing clocks. ``time.monotonic`` cannot answer it: its
 #: resolution is ~15ms on Windows, so two runs started in the same request tie,
 #: and a tie resolved by insertion order names the *older* run as the active
-#: one -- which is exactly the case that matters, a seismic run starting while
-#: a just-finished corrosion run is still inside the TTL.
+#: one.
 _SEQUENCE = itertools.count()
 
 
@@ -555,13 +554,12 @@ TTL_SECONDS: float = 900.0
 
 
 #: Store key: a project id plus which concurrent run owns the tracker.
-#: ``"default"`` is the corrosion pipeline's run (the only caller before
-#: per-run keys existed, so it keeps every existing call site's behaviour
-#: unchanged); a second theme run for the same project -- e.g. the graph
-#: engine, or a future Architecture/Seismic pass -- uses its own key so it
-#: gets its own tracker instead of resetting the corrosion run's progress via
-#: ``tracking(project_id, reset=True)``. See the module docstring's warning in
-#: CLAUDE.md about wrapping a second concurrent analysis path without this.
+#: ``"default"`` is the primary pipeline's run (keeping existing call site
+#: behaviour unchanged); a second theme run for the same project -- e.g. the
+#: graph engine -- uses its own key so it gets its own tracker instead of
+#: resetting the primary run's progress via ``tracking(project_id, reset=True)``.
+#: See the module docstring's warning about wrapping a second concurrent
+#: analysis path without this.
 _TrackerKey = tuple[int, str]
 
 
@@ -647,7 +645,7 @@ TRACKERS = _TrackerStore()
 def tracker_for(project_id: int, run_key: str = DEFAULT_RUN_KEY) -> PipelineTracker:
     """Return (creating if needed) the tracker for ``(project_id, run_key)``.
 
-    ``run_key`` defaults to ``"default"``, the corrosion pipeline's run, so
+    ``run_key`` defaults to ``"default"``, the primary pipeline's run, so
     every pre-existing call site is unaffected. Pass a distinct ``run_key``
     (e.g. ``"graph"``) to track a second, genuinely concurrent analysis path
     for the same project without resetting the default run's progress.
@@ -675,15 +673,15 @@ def merged_snapshot(project_id: int) -> dict[str, Any]:
 
     WHY THE REPORTING ROUTES NEED THIS
 
-        Per-run keys stopped a second analysis theme from resetting the
-        corrosion run's progress, but nothing taught the reporting side about
+        Per-run keys stopped a second analysis pass from resetting the
+        primary run's progress, but nothing taught the reporting side about
         them: ``GET /api/workflow/{id}`` and every SSE ``status`` frame called
         :func:`snapshot` with the default key, so a run under any other key was
         tracked correctly and then reported as though it had never started.
         That is what left a run showing a frozen zero while its engine
         worked -- the tracking was missing on one side and unreadable on the
         other. Merging here fixes the reading half for GRAPH-001 and other
-        non-default run keys, because they had the same cause.
+        engines.
 
     HOW ENGINES ARE RESOLVED
 
@@ -758,7 +756,7 @@ def tracking(
             the same project *run* is a new run, and inheriting the previous
             run's counters would report an element count that never happened.
         run_key: Which concurrent run owns this tracker. Defaults to
-            ``"default"``, the corrosion pipeline's run. A second, genuinely
+            ``"default"``, the primary pipeline's run. A second, genuinely
             concurrent analysis path for the same project (e.g. the graph
             engine) must pass a distinct ``run_key`` -- otherwise its
             ``reset=True`` would discard the default run's in-flight progress

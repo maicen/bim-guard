@@ -89,13 +89,7 @@ class TestHeaders:
             "content-disposition"
         ]
         assert f"project-{PROJECT_WITH_MODEL}" in disposition
-        assert "corrosion" in disposition
-
-    def test_seismic_filename_differs(self, client):
-        disposition = client.get(
-            f"/download/csv/{PROJECT_WITH_MODEL}?slug=seismic"
-        ).headers["content-disposition"]
-        assert "seismic" in disposition
+        assert "architecture" in disposition
 
     def test_content_length_matches_the_body(self, client):
         response = client.get(f"/download/csv/{PROJECT_WITH_MODEL}")
@@ -109,15 +103,15 @@ class TestHeaders:
 
 
 class TestSlugSelection:
-    def test_defaults_to_corrosion(self, client):
+    def test_defaults_to_architecture(self, client):
         disposition = client.get(f"/download/csv/{PROJECT_WITH_MODEL}").headers[
             "content-disposition"
         ]
-        assert "corrosion" in disposition
+        assert "architecture" in disposition
 
-    def test_seismic_is_selectable(self, client):
+    def test_architecture_is_selectable(self, client):
         assert (
-            client.get(f"/download/csv/{PROJECT_WITH_MODEL}?slug=seismic").status_code
+            client.get(f"/download/csv/{PROJECT_WITH_MODEL}?slug=architecture").status_code
             == 200
         )
 
@@ -128,7 +122,7 @@ class TestSlugSelection:
 
     def test_refusal_names_the_valid_slugs(self, client):
         response = client.get(f"/download/csv/{PROJECT_WITH_MODEL}?slug=nonsense")
-        assert "corrosion" in response.text and "seismic" in response.text
+        assert "architecture" in response.text
 
 
 class TestFailures:
@@ -168,10 +162,6 @@ class TestCaching:
             client.get(f"/download/{fmt}/{PROJECT_WITH_MODEL}")
         assert ANALYSIS_CACHE.stats()["misses"] == 1
 
-    def test_different_analyses_are_cached_separately(self, client):
-        client.get(f"/download/csv/{PROJECT_WITH_MODEL}")
-        client.get(f"/download/csv/{PROJECT_WITH_MODEL}?slug=seismic")
-        assert ANALYSIS_CACHE.stats()["entries"] == 2
 
     def test_content_is_identical_cached_and_uncached(self, client):
         first = client.get(f"/download/csv/{PROJECT_WITH_MODEL}").content

@@ -27,7 +27,7 @@ frontend/
 │   │   ├── DocumentsView.svelte      # Document ingestion, PDF parsing, text extraction
 │   │   ├── RulesView.svelte          # Rule library, folder management, rule authoring
 │   │   ├── RuleExtractionView.svelte # LLM rule extraction workflow
-│   │   ├── AnalyzeView.svelte        # Multi-engine compliance & corrosion analysis
+│   │   ├── AnalyzeView.svelte        # Multi-engine compliance analysis
 │   │   ├── ArchAnalyzeView.svelte    # Architectural code compliance analysis
 │   │   ├── ViewerView.svelte         # Fullscreen OpenBIM 3D viewer & clash inspection
 │   │   ├── ReportsView.svelte        # BCF reports, PDF/Excel export downloads

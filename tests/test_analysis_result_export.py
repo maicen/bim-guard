@@ -1004,15 +1004,16 @@ class TestBCFRelatedTopicsAndPartners:
         assert viewpoint.count("<Color Color=") == 2
         assert f'<Color Color="{PARTNER_COLOUR}">' in viewpoint
 
-    def test_xm_couple_selects_both_poles(self):
+    def test_clash_couple_selects_both_elements(self):
         finding = issue(
-            id="XM-0001",
-            metadata={"anode_id": "GUID-ANODE", "cathode_id": "GUID-CATHODE"},
+            id="CLASH-0001",
+            element_id="GUID-ELEMENT-A",
+            metadata={"clashing_element_id": "GUID-ELEMENT-B"},
         )
-        finding.rule_id = "XM-001.01"
-        viewpoint = _viewpoint_for({"audit_issues": [finding]}, "XM-0001")
-        assert "<AuthoringToolId>GUID-ANODE</AuthoringToolId>" in viewpoint
-        assert "<AuthoringToolId>GUID-CATHODE</AuthoringToolId>" in viewpoint
+        finding.rule_id = "CLASH-001.01"
+        viewpoint = _viewpoint_for({"audit_issues": [finding]}, "CLASH-0001")
+        assert "<AuthoringToolId>GUID-ELEMENT-A</AuthoringToolId>" in viewpoint
+        assert "<AuthoringToolId>GUID-ELEMENT-B</AuthoringToolId>" in viewpoint
 
     def test_topics_about_the_same_element_are_linked(self):
         """GC, CC and MC each raise a topic on one element; each links the others."""

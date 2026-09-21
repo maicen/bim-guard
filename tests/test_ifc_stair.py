@@ -1,7 +1,6 @@
 """Per-riser/tread/landing/handrail geometry analysis (``ifc_stair.py``).
 
-Two layers, matching the module's own split and ``test_ifc_seismic.py``'s
-precedent:
+Two layers, matching the module's own split:
 
 * The classes up to ``TestAgainstModel`` need no IFC file. They exercise the
   pure numpy algorithms directly against hand-built point clouds -- this is

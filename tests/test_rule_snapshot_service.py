@@ -78,9 +78,9 @@ def test_create_snapshot_invalid_source_mode_falls_back_to_manual():
 
 
 def test_create_snapshot_uses_folder_category_when_available():
-    service, _, _ = _service(folder={"category": "Piping"})
+    service, _, _ = _service(folder={"category": "Arch"})
     snap = service.create_snapshot(ruleset_id="FOLDER-A")
-    assert snap["category"] == "Piping"
+    assert snap["category"] == "Arch"
 
 
 def test_list_get_delete_round_trip():

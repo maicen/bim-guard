@@ -10,15 +10,15 @@ from app.modules.comparator.ids_verification import run_ids_loin_verification
 def test_build_ids_document_with_tolerances_and_cardinality():
     rows = [
         {
-            "reference": "PIPE-CORROSION-01",
-            "description": "Corrosion allowance minimum thickness",
+            "reference": "WALL-FIRE-01",
+            "description": "Wall minimum fire resistance rating",
             "rule_category": "property_check",
-            "target_ifc_class": "IfcPipeSegment",
-            "property_set": "Pset_PipeSegmentCommon",
-            "property_name": "CorrosionAllowance",
+            "target_ifc_class": "IfcWall",
+            "property_set": "Pset_WallCommon",
+            "property_name": "FireRating",
             "operator": ">=",
-            "check_value": 3.0,
-            "tolerance": 0.2,
+            "check_value": 45.0,
+            "tolerance": 0.0,
             "cardinality": "required",
             "data_type": "IFCLENGTHMEASURE",
         }
@@ -33,8 +33,8 @@ def test_build_ids_document_with_tolerances_and_cardinality():
     # exporter) — ifctester.ids, a spec-correct implementation, has no way
     # to serialize it, so it is intentionally no longer present in the XML.
     assert 'cardinality="required"' in xml
-    assert "Pset_PipeSegmentCommon" in xml
-    assert "CorrosionAllowance" in xml
+    assert "Pset_WallCommon" in xml
+    assert "FireRating" in xml
 
 
 def test_import_ids_ruleset_with_facets_and_tolerances():

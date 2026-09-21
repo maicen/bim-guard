@@ -5,7 +5,7 @@
 BIM-Guard uses a modern, decoupled architecture:
 1. **Primary Backend API**: **FastAPI API Gateway** (`app/api/`) mounted at `/api`, providing RESTful endpoints, typed Pydantic data contracts (`app/modules/contracts.py`), and real-time Server-Sent Events (SSE) tracking (`/api/events/{project_id}`).
 2. **Primary Frontend Client**: **Decoupled SPA Frontend** (`frontend/`) built with **Svelte 5**, Vite, TypeScript, and Tailwind CSS. All UI features, views, and components are implemented here and served in production as a high-performance SPA.
-3. **Compute Kernels & Engines**: Compliance and corrosion physics engines (`app/engines/`, `app/modules/`, `app/services/`) remain framework-agnostic Python libraries driven dynamically by database-stored rules.
+3. **Compute Kernels & Engines**: Architectural compliance engines (`app/engines/`, `app/modules/`, `app/services/`) remain framework-agnostic Python libraries driven dynamically by database-stored rules.
 
 ## Essential commands
 
@@ -90,8 +90,8 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
   - `src/lib/types.ts` — TypeScript types mirroring Pydantic contracts
   - `src/lib/components/` — Svelte 5 components (IfcViewer, modals, tables, stats)
   - `src/routes/` — Svelte 5 views (Dashboard, Projects, Analyze, Arch, Rules, Documents, Viewer, etc.)
-- `app/engines/` — Pure Python corrosion engines (GC-001, CC-001, MC-001)
-- `app/services/` — Persistence, storage, corrosion rule catalog, and pipeline services
+- `app/engines/` — Pure Python architectural compliance engines (ARCH-EGRESS-001, ARCH-SPATIAL-001)
+- `app/services/` — Persistence, storage, rule services, and pipeline services
 - `app/modules/` — Multi-stage compliance orchestrator and evaluators
 - `app/main.py` — Application bootstrap, router registration, and static SPA serving
 - `supabase/migrations/` — Database schema migrations tracked in-repo
@@ -120,7 +120,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
 - **Architecture Direction**: Target all user-facing features to the Svelte 5 frontend (`frontend/`) and FastAPI backend (`app/api/`).
 - **Contract Parity**: When modifying API endpoints in `app/api/**`, always update or create strict Pydantic schemas in `app/modules/contracts.py` and synchronize TypeScript interfaces in `frontend/src/lib/types.ts`.
 - **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.
-- **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService` and `corrosion_rule_catalog.py`.
+- **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService`.
 - **Real-Time Streaming**: Use Server-Sent Events (`/api/events/{project_id}`) for pipeline progress; avoid polling loops.
 - **Default validation rule**: Skip slow tests by default; only run them when the task is explicitly about slow pipeline/engine behavior or when there is no reliable fast-path validation. Routine verification should use `uv run pytest tests/ -m 'not slow'`.
 - **Root Directory Protection**: NEVER create or place new files (code, tests, reports, data, JSON manifests, scratch files) in the repository root. Always use the appropriate subdirectories (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`, `supabase/migrations/`).

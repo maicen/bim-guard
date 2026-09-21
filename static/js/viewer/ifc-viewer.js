@@ -92,7 +92,7 @@ let mountCount = 0;
 
 // ─── Viewpoint.go() patch — installed ONCE per module, not per mount ────────
 //
-// The BCF viewpoints the corrosion engine generates carry the failing
+// The BCF viewpoints the compliance engines generate carry the failing
 // element's GUID in their selection (see bcf_generator._viewpoint_xml), but
 // Viewpoint.go() only moves the camera and applies visibility — it never
 // colors the linked component. Patching go() means every way a viewpoint can

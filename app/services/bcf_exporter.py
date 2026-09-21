@@ -74,16 +74,12 @@ MARKUP_NS = "http://www.buildingsmart-tech.org/bcf/2.1/markup"
 RELATED_GUID_KEYS: tuple[str, ...] = (
     "related_element_ids",
     "related_element_guids",
-    "anode_guid",
-    "cathode_guid",
     "clashing_element_id",
     "counterpart_guid",
 )
 
 #: Human labels for the roles the above keys imply, used in the topic body.
 GUID_KEY_ROLES: dict[str, str] = {
-    "anode_guid": "anode",
-    "cathode_guid": "cathode",
     "clashing_element_id": "clashing element",
     "counterpart_guid": "counterpart",
 }
@@ -108,8 +104,8 @@ class ElementRef:
     """One IFC element implicated in a finding.
 
     Attributes:
-        ifc_guid: The IFC ``GlobalId`` of the element.
-        role: What the element contributes to the finding, e.g. ``"anode"``.
+        ifc_guid: IFC compressed 22-character GUID.
+        role: What the element contributes to the finding, e.g. ``"counterpart"``.
             ``"primary"`` marks the element the issue is filed against.
     """
 

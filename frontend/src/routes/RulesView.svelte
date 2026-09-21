@@ -674,10 +674,10 @@
         type="button"
         onclick={handleSeedRules}
         class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        title="Seed engine rulesets: GC-001, CC-001, MC-001"
+        title="Seed default architectural code rulesets"
       >
         <Database class="h-3.5 w-3.5 text-emerald-400" />
-        <span>Seed Engines</span>
+        <span>Seed Rules</span>
       </button>
 
       {#if activeMainTab === "rules"}

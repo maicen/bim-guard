@@ -182,7 +182,7 @@ def test_rules_service_caching_and_invalidation():
         rule_type="numeric_comparison",
         description="Cache rule test",
         target_ifc_class="IfcWall",
-        mechanism="GC-001",
+        mechanism="CODE",
         ruleset_id="TEST-CACHE-RULESET",
     )
     rule_id = rule["id"]

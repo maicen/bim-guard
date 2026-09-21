@@ -61,12 +61,12 @@ def _synthetic_analysis_result_for_export_tests():
             Issue(
                 id=f"BGR-CRIT-{i}",
                 element_id=_element_guid("3Kf7q8XzR1pPcrit", i),
-                rule_id="GC-001.01",
+                rule_id="CODE.01",
                 title=f"Critical finding {i+1}",
                 band=RiskBand.CRITICAL,
                 score=0.95,
-                mechanism="GC-001",
-                metadata={"ifc_type": "IfcPipingElement", "system": "plumbing"},
+                mechanism="CODE",
+                metadata={"ifc_type": "IfcWall", "system": "fire_safety"},
             )
         )
 
@@ -76,12 +76,12 @@ def _synthetic_analysis_result_for_export_tests():
             Issue(
                 id=f"BGR-HIGH-{i}",
                 element_id=_element_guid("3Kf7q8XzR1pPhigh", i),
-                rule_id="CC-001.02",
+                rule_id="ARCH-EGRESS-001.02",
                 title=f"High finding {i+1}",
                 band=RiskBand.HIGH,
                 score=0.75,
-                mechanism="CC-001",
-                metadata={"ifc_type": "IfcPipingElement", "system": "crevice"},
+                mechanism="ARCH-EGRESS-001",
+                metadata={"ifc_type": "IfcDoor", "system": "circulation"},
             )
         )
 
@@ -91,12 +91,12 @@ def _synthetic_analysis_result_for_export_tests():
             Issue(
                 id=f"BGR-MED-{i}",
                 element_id=_element_guid("3Kf7q8XzR1pPmedm", i),
-                rule_id="GC-001.03",
+                rule_id="CODE.03",
                 title=f"Medium finding {i+1}",
                 band=RiskBand.MEDIUM,
                 score=0.5,
-                mechanism="GC-001",
-                metadata={"ifc_type": "IfcPipingElement", "system": "galvanic"},
+                mechanism="CODE",
+                metadata={"ifc_type": "IfcSpace", "system": "spatial"},
             )
         )
 
@@ -106,12 +106,12 @@ def _synthetic_analysis_result_for_export_tests():
             Issue(
                 id=f"BGR-LOW-{i}",
                 element_id=_element_guid("3Kf7q8XzR1pPlow_", i),
-                rule_id="CC-001.04",
+                rule_id="ARCH-SPATIAL-001.04",
                 title=f"Low finding {i+1}",
                 band=RiskBand.LOW,
                 score=0.2,
-                mechanism="CC-001",
-                metadata={"ifc_type": "IfcPipingElement", "system": "crevice"},
+                mechanism="ARCH-SPATIAL-001",
+                metadata={"ifc_type": "IfcWindow", "system": "daylight"},
             )
         )
 

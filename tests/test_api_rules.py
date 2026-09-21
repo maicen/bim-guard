@@ -301,16 +301,16 @@ def test_folders_bulk_operations():
             "/api/rules/folders/bulk-update",
             json={
                 "ruleset_ids": [f1_id, f2_id],
-                "category": "seismic",
-                "mechanism_scope": "SEISMIC",
+                "category": "Arch",
+                "mechanism_scope": "EGRESS",
             },
         )
         assert bulk_up_res.status_code == 200
         assert bulk_up_res.json()["success_count"] == 2
 
         f1_data = client.get(f"/api/rules/folders/{f1_id}").json()
-        assert f1_data["category"] == "seismic"
-        assert f1_data["mechanism_scope"] == "SEISMIC"
+        assert f1_data["category"] == "Arch"
+        assert f1_data["mechanism_scope"] == "EGRESS"
     finally:
         # Bulk delete
         bulk_del_res = client.post(

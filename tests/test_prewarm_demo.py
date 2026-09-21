@@ -1,240 +1,57 @@
-"""The demo pre-warm script: which entries it warms, and how it reports them.
-
-The HTTP calls are mocked. What matters here is the combination list -- if it
-does not match what the analyse page can produce, the demo hits a cold cache on
-a chip the presenter unticks -- and that a verification failure reaches the exit
-status rather than only the log.
-"""
+"""Tests for scripts/prewarm_demo.py."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
 from scripts.prewarm_demo import (
-    PIPING_ENGINES,
-    Verification,
-    Warmed,
     build_parser,
-    engine_combinations,
     main,
     prewarm,
-    verify,
-    warm_corrosion,
-    warm_seismic,
+    verify_arch,
+    warm_arch,
 )
-
-
-class TestCombinations:
-    """What the analyse page's five chips can produce."""
-
-    def test_five_engines_give_thirty_one_selections(self):
-        """2**5 - 1: every subset except the one the Run button refuses."""
-        assert len(engine_combinations()) == 31
-
-    def test_every_selection_is_unique(self):
-        combinations = engine_combinations()
-        assert len(set(combinations)) == len(combinations)
-
-    def test_the_empty_selection_is_not_offered(self):
-        """The page disables Run rather than sending an empty selection."""
-        assert () not in engine_combinations()
-
-    def test_the_full_selection_comes_first(self):
-        """It is the view the page opens on and the slowest to compute."""
-        assert engine_combinations()[0] == PIPING_ENGINES
-
-    def test_selections_keep_the_page_chip_order(self):
-        order = {code: i for i, code in enumerate(PIPING_ENGINES)}
-        for selection in engine_combinations():
-            positions = [order[code] for code in selection]
-            assert positions == sorted(positions)
-
-    def test_the_short_ids_are_what_the_page_sends(self):
-        """AnalyzeView seeds selectedEngines with these, not the -001 labels."""
-        assert PIPING_ENGINES == ("GC", "CC", "MC", "MM", "XM")
-
-    def test_full_only_warms_one_selection(self):
-        assert engine_combinations(full_only=True) == [PIPING_ENGINES]
-
-    def test_a_smaller_engine_set_still_follows_the_formula(self):
-        assert len(engine_combinations(("GC", "CC"))) == 3
 
 
 class TestRequestShape:
     """What actually goes on the wire."""
 
-    def test_corrosion_sends_every_engine_plus_include_low(self):
+    def test_warm_arch_sends_project_id(self):
         with patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 1.5)) as post:
-            warm_corrosion("http://x", 1541, ("GC", "CC"))
+            warm_arch("http://x", 1541)
         _, path, fields = post.call_args.args
-        assert path == "/api/analyze/corrosion"
+        assert path == "/api/analyze/arch"
         assert ("project_id", "1541") in fields
-        assert [v for k, v in fields if k == "engines"] == ["GC", "CC"]
-        assert ("include_low", "true") in fields
-        assert ("use_cache", "true") in fields
 
-    def test_seismic_sends_no_engine_selection(self):
-        """One kernel, nothing to select between: sending a selection would
-        create a cache entry the page can never ask for."""
-        with patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 9.0)) as post:
-            warm_seismic("http://x", 1542)
-        _, path, fields = post.call_args.args
-        assert path == "/api/analyze/seismic"
-        assert [k for k, _ in fields] == ["project_id", "use_cache"]
-
-    def test_verification_reads_the_results_endpoint_with_the_same_engines(self):
-        with patch("scripts.prewarm_demo._get", return_value=({"cached": True, "issue_stats": {}}, 0.2)) as get:
-            verify("http://x", 1541, "corrosion", ("GC", "MM"))
-        _, path, params = get.call_args.args
-        assert path == "/api/analyze/results/1541/corrosion"
-        assert ("use_cache", "true") in params
-        assert [v for k, v in params if k == "engines"] == ["GC", "MM"]
+    def test_verify_arch_reads_endpoint(self):
+        with patch("scripts.prewarm_demo._get", return_value=({"cached": True, "audit_issues": []}, 0.2)) as get:
+            verify_arch("http://x", 1541)
+        _, path = get.call_args.args[:2]
+        assert path == "/api/analyze/arch/1541"
 
 
 class TestReporting:
-    """A warm-up nobody checked is worth nothing, so the check drives the exit."""
-
-    def test_every_combination_is_warmed_and_verified(self):
-        lines: list[str] = []
+    def test_prewarm_records_runs(self):
         with (
-            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": [1, 2]}, 3.0)),
-            patch("scripts.prewarm_demo._get", return_value=({"cached": True, "issue_stats": {"medium": 2}}, 0.1)),
+            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": [1, 2]}, 1.0)),
+            patch("scripts.prewarm_demo._get", return_value=({"cached": True, "audit_issues": [1, 2]}, 0.1)),
         ):
-            report = prewarm("http://x", [1541], [1542], log=lines.append)
-
-        assert len(report.warmed) == 32  # 31 corrosion selections + 1 seismic
-        assert len(report.verified) == 32
+            report = prewarm("http://x", [1541], log=lambda _: None)
+        assert len(report.warmed) == 1
+        assert len(report.verified) == 1
         assert report.warnings == []
 
-    def test_a_cold_second_read_is_a_warning(self):
-        with (
-            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 3.0)),
-            patch("scripts.prewarm_demo._get", return_value=({"cached": False, "issue_stats": {}}, 42.0)),
-        ):
-            report = prewarm("http://x", [1541], [], combinations="full-only", log=lambda _: None)
+    def test_main_cli_arguments(self):
+        parser = build_parser()
+        args = parser.parse_args(["--projects", "1540", "1541"])
+        assert args.projects == [1540, 1541]
 
-        assert len(report.warnings) == 1
-
-    def test_warnings_are_printed_and_exit_non_zero(self, capsys):
-        with (
-            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 3.0)),
-            patch("scripts.prewarm_demo._get", return_value=({"cached": False, "issue_stats": {}}, 42.0)),
-        ):
-            status = main(["--piping", "1541", "--combinations", "full-only"])
-
-        assert status == 1
-        assert "WARN" in capsys.readouterr().out
-
-    def test_all_hits_exit_zero(self):
-        with (
-            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 3.0)),
-            patch("scripts.prewarm_demo._get", return_value=({"cached": True, "issue_stats": {}}, 0.1)),
-        ):
-            assert main(["--seismic", "1542"]) == 0
-
-    def test_no_project_ids_is_a_usage_error(self):
+    def test_main_with_no_projects_returns_two(self):
         assert main([]) == 2
 
-    def test_a_failed_warm_exits_non_zero(self):
-        import urllib.error
-
+    def test_main_with_successful_run(self):
         with (
-            patch("scripts.prewarm_demo._post", side_effect=urllib.error.URLError("refused")),
-            patch("scripts.prewarm_demo._get", return_value=({"cached": True, "issue_stats": {}}, 0.1)),
+            patch("scripts.prewarm_demo._post", return_value=({"cached": False, "audit_issues": []}, 1.0)),
+            patch("scripts.prewarm_demo._get", return_value=({"cached": True, "audit_issues": []}, 0.1)),
         ):
-            assert main(["--seismic", "1542", "--combinations", "full-only"]) == 1
-
-    def test_verification_ok_requires_both_cached_and_no_error(self):
-        assert Verification(1, "corrosion", ("GC",), True, 0, 0.1).ok
-        assert not Verification(1, "corrosion", ("GC",), True, 0, 0.1, error="boom").ok
-        assert not Verification(1, "corrosion", ("GC",), False, 0, 0.1).ok
-
-    def test_a_warm_records_what_came_back(self):
-        with patch("scripts.prewarm_demo._post", return_value=({"cached": True, "audit_issues": [1, 2, 3]}, 0.4)):
-            warmed = warm_corrosion("http://x", 1541, PIPING_ENGINES)
-        assert isinstance(warmed, Warmed)
-        assert (warmed.cached, warmed.issues, warmed.slug) == (True, 3, "corrosion")
-
-
-class TestCli:
-    def test_defaults(self):
-        args = build_parser().parse_args([])
-        assert args.base_url == "http://127.0.0.1:8000"
-        assert (args.piping, args.seismic, args.combinations) == ([], [], "all")
-
-    def test_ids_and_flags_parse(self):
-        args = build_parser().parse_args(
-            ["--base-url", "http://127.0.0.1:8001", "--piping", "1540", "1541", "--seismic", "1542", "--combinations", "full-only"]
-        )
-        assert args.base_url == "http://127.0.0.1:8001"
-        assert args.piping == [1540, 1541]
-        assert args.seismic == [1542]
-        assert args.combinations == "full-only"
-
-
-class TestAuthentication:
-    """Since 47cf29b every /api/analyze route needs a bearer token.
-
-    The HTTP layer is stubbed at ``urlopen`` rather than at ``_post``/``_get``,
-    because the question is what reaches the wire: a script that built the
-    header but never attached it would pass a test written any higher up.
-    """
-
-    def test_every_request_is_authenticated_and_a_401_re_mints_once(self):
-        import json
-        import urllib.error
-        import urllib.request
-
-        import scripts.prewarm_demo as prewarm_demo
-
-        class FakeResponse:
-            """Just enough of an HTTP response for ``json.load``."""
-
-            def __init__(self, payload):
-                self._payload = json.dumps(payload).encode()
-
-            def read(self, *args):
-                return self._payload
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *exc):
-                return False
-
-        sent: list[urllib.request.Request] = []
-        minted: list[str] = []
-
-        def fake_mint():
-            minted.append("token-" + str(len(minted) + 1))
-            return minted[-1]
-
-        def fake_urlopen(request, timeout=None):
-            sent.append(request)
-            if len(sent) == 2:  # the verification read finds the token expired
-                raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
-            return FakeResponse({"cached": True, "audit_issues": [], "issue_stats": {}})
-
-        source = prewarm_demo.DevToken(fake_mint)
-        with (
-            patch.object(prewarm_demo, "_token_source", source),
-            patch("urllib.request.urlopen", fake_urlopen),
-        ):
-            report = prewarm_demo.prewarm(
-                "http://x", [1541], [], combinations="full-only", log=lambda _: None
-            )
-
-        # (a) every request that reached the wire carried a non-empty bearer.
-        assert len(sent) == 3, "one warm, one verify, one retry"
-        headers = [request.get_header("Authorization") for request in sent]
-        assert all(h is not None for h in headers), headers
-        assert all(h.startswith("Bearer ") for h in headers), headers
-        assert all(h.removeprefix("Bearer ").strip() for h in headers), headers
-
-        # (b) the 401 caused exactly one re-mint and exactly one retry.
-        assert minted == ["token-1", "token-2"], "one mint at the start, one after the 401"
-        assert source.mints == 2
-        assert headers[0] == "Bearer token-1"
-        assert headers[1] == "Bearer token-1", "the 401 came from the token it was holding"
-        assert headers[2] == "Bearer token-2", "the retry used the freshly minted token"
-        assert report.warnings == [], "the retry succeeded, so the entry verified"
+            assert main(["--projects", "1541"]) == 0

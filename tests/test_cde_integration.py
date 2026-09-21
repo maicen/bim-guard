@@ -133,8 +133,8 @@ def test_gate1_promote_blocked_by_persisted_critical_issues(cde_test_project):
             {
                 "guid": "issue-1",
                 "element_guid": "elem-1",
-                "rule_id": "GC-001.01",
-                "title": "Dissimilar metal coupling",
+                "rule_id": "ARCH-EGRESS-001.01",
+                "title": "Egress travel distance violation",
                 "priority": "critical",
             }
         ],

@@ -18,7 +18,7 @@ from app.services.analysis_cache import AnalysisCache, CacheKey
 
 def key(
     project_id: int = 1,
-    slug: str = "corrosion",
+    slug: str = "architecture",
     digest: str = "a" * 64,
     engines: tuple[str, ...] = (),
 ) -> CacheKey:
@@ -64,8 +64,8 @@ class TestKeyIdentity:
         assert cache.get(key(project_id=2)) is None
 
     def test_different_analyses_do_not_share(self, cache):
-        cache.put(key(slug="corrosion"), result(1))
-        assert cache.get(key(slug="seismic")) is None
+        cache.put(key(slug="architecture"), result(1))
+        assert cache.get(key(slug="graph")) is None
 
     def test_a_changed_model_cannot_hit_a_stale_entry(self, cache):
         """The reason the digest is in the key at all.
@@ -127,11 +127,11 @@ class TestExpiry:
 
 class TestInvalidation:
     def test_invalidate_drops_every_entry_for_the_project(self, cache):
-        cache.put(key(project_id=1, slug="corrosion"), result())
-        cache.put(key(project_id=1, slug="seismic"), result())
+        cache.put(key(project_id=1, slug="architecture"), result())
+        cache.put(key(project_id=1, slug="graph"), result())
         assert cache.invalidate_project(1) == 2
-        assert cache.get(key(project_id=1, slug="corrosion")) is None
-        assert cache.get(key(project_id=1, slug="seismic")) is None
+        assert cache.get(key(project_id=1, slug="architecture")) is None
+        assert cache.get(key(project_id=1, slug="graph")) is None
 
     def test_invalidate_leaves_other_projects_alone(self, cache):
         cache.put(key(project_id=1), result())

@@ -72,7 +72,7 @@ class BIMGuard_App:
         Run the full analysis pipeline for a project:
         1. Load project + documents from DB
         2. Load and parse the IFC file once (or use synthetic demo data)
-        3. Run corrosion compliance checks
+        3. Run architectural compliance checks
         4. Return a unified result dict consumed by the analyze route
 
         ``enable_shacl`` (default False) opts into an additional, independent
@@ -701,9 +701,9 @@ class BIMGuard_App:
         persistence step, and the engine, rather than the independent graph
         builds ``_run_shacl_compliance`` and this used to each do. Wraps its
         own ``tracking(project_id, run_key="graph")`` context -- separate from
-        the corrosion pipeline's ``"default"`` run key -- so GRAPH-001 can
+        the default pipeline's ``"default"`` run key -- so GRAPH-001 can
         report real progress via the existing pipeline tracker without
-        resetting an in-flight corrosion run for the same project (see
+        resetting an in-flight analysis run for the same project (see
         CLAUDE.md's `PipelineTracker` per-run-key note).
 
         Returns ``(graph_summary, graph_engine_issues, graph_engine_error)``.

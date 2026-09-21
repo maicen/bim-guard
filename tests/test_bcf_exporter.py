@@ -28,19 +28,19 @@ class TestBCFExporter:
         return Issue(
             id=issue_id,
             element_id=element_id,
-            rule_id="CC-001.03",
-            title="SS316 flange crevice corrosion risk",
-            description="Crevice corrosion mechanism detected",
+            rule_id="ARCH-EGRESS-001.03",
+            title="Corridor minimum clear width violation",
+            description="Egress path width below minimum requirement",
             band=band,
             score=score,
-            mechanism="CC-001 crevice corrosion",
-            mitigation="Apply gasket material",
-            assignee_role="Mechanical Engineer",
+            mechanism="ARCH-EGRESS-001",
+            mitigation="Widen corridor opening",
+            assignee_role="Architectural Designer",
             status="open",
             created_at=datetime.now().isoformat() + "Z",
             updated_at=datetime.now().isoformat() + "Z",
-            metadata={"joint_type": "JT-001", "pren": 42.5},
-            citations=[{"standard": "NACE SP0169-2013", "clause": "Table 1"}],
+            metadata={"space_type": "corridor", "clear_width_mm": 900.0},
+            citations=[{"standard": "NBC 2020", "clause": "9.9.3.3"}],
         )
 
     def test_bcf_exporter_initialization(self):
@@ -53,7 +53,7 @@ class TestBCFExporter:
         issue = self.create_test_issue()
         xml_string = exporter.generate_bcf_markup_xml([issue])
         assert "BGR-0001" in xml_string
-        assert "SS316" in xml_string
+        assert "ARCH-EGRESS-001" in xml_string
         print("✓ Single issue")
 
     def test_multiple_issues(self):
@@ -80,15 +80,15 @@ class TestBCFExporter:
         exporter = BCFExporter()
         issue = self.create_test_issue()
         xml_string = exporter.generate_bcf_markup_xml([issue])
-        assert "joint_type" in xml_string
-        assert "JT-001" in xml_string
+        assert "space_type" in xml_string
+        assert "corridor" in xml_string
         print("✓ Metadata")
 
     def test_citations(self):
         exporter = BCFExporter()
         issue = self.create_test_issue()
         xml_string = exporter.generate_bcf_markup_xml([issue])
-        assert "NACE" in xml_string
+        assert "NBC 2020" in xml_string
         print("✓ Citations")
 
     def test_namespace(self):

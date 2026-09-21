@@ -1,19 +1,5 @@
 """Tests for attaching several IFC models to one project, and reading them back.
 
-Three properties, and the third is the reason the first two exist:
-
-1. **The upload records every model.** ``POST /api/projects/{id}/models`` stores
-   each file, writes a ``project_ifc_files`` row for it, and points
-   ``projects.ifc_file_path`` at the one marked primary so every reader that
-   predates the child table still resolves a model.
-2. **A corrosion run reads the primary and nothing else.** Galvanic and crevice
-   assessment is a question about a pipe run; a second discipline's copy of that
-   run would double every finding rather than add one.
-3. **A seismic run reads all of them.** A clearance envelope is a question about
-   a building. The brace is in the mechanical model and the beam it must clear
-   is in the structural one, so a single-model run reports silence about exactly
-   the clashes a coordinator federates models to find.
-
 NO LIVE DATABASE. Repositories are in-memory and storage is a dict, so what is
 asserted is the code's behaviour rather than a fixture's contents.
 
@@ -28,20 +14,20 @@ from typing import Any
 import pytest
 from starlette.testclient import TestClient
 
-# TODO: Temporarily disabled per user request pending multi-file IFC upload test suite updates
-pytestmark = pytest.mark.skip(reason="TODO: temporarily disabled for now")
-
 import app.services.analysis_runner as runner
 from app.api.dependencies import (
+    get_ifc_pipeline_service,
     get_membership_service,
     get_models_service,
-    get_ifc_pipeline_service,
     get_projects_service,
 )
 from app.main import app
 from app.modules.pipeline_io.file_upload import FileUploadService
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
+
+# TODO: Temporarily disabled per user request pending multi-file IFC upload test suite updates
+pytestmark = pytest.mark.skip(reason="TODO: temporarily disabled for now")
 
 #: The fake project below needs an organization_id for app.api.projects'
 #: get_authorized_project check to pass; FakeMemberships below says the test
@@ -491,21 +477,21 @@ def test_download_from_an_unknown_project_is_404(client: TestClient) -> None:
     assert "404" in response.json()["detail"]
 
 
-# ── 2. corrosion reads the primary only ──────────────────────────────────────
+# ── 2. Primary model resolution ──────────────────────────────────────────────
 
 
-def test_corrosion_reads_the_primary_model(client: TestClient, service: ModelsService) -> None:
-    """model_bytes hands the corrosion engines one model: the primary."""
+def test_model_bytes_reads_the_primary_model(client: TestClient, service: ModelsService) -> None:
+    """model_bytes hands analysis one model: the primary."""
     upload(client, primary_index="0")
     content, error = runner.model_bytes(7)
     assert error is None
     assert content == PIPING_MODEL
 
 
-def test_corrosion_follows_a_change_of_primary(
+def test_model_bytes_follows_a_change_of_primary(
     client: TestClient, service: ModelsService
 ) -> None:
-    """Promoting another model changes which one the engines assess."""
+    """Promoting another model changes which one is assessed as primary."""
     upload(client, primary_index="0")
     target = next(f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc")
     service.set_primary(7, target["id"])
@@ -515,7 +501,7 @@ def test_corrosion_follows_a_change_of_primary(
     assert content == STRUCTURAL_MODEL
 
 
-def test_corrosion_never_sees_the_other_models(client: TestClient) -> None:
+def test_model_bytes_never_sees_the_other_models(client: TestClient) -> None:
     """The secondary models are not concatenated into the primary's bytes."""
     upload(client)
     content, _ = runner.model_bytes(7)
@@ -524,100 +510,21 @@ def test_corrosion_never_sees_the_other_models(client: TestClient) -> None:
     assert SPF["wall"] not in content
 
 
-# ── 3. seismic reads every model ─────────────────────────────────────────────
+# ── 3. Federated multi-model loading ─────────────────────────────────────────
 
 
-def test_seismic_loads_every_attached_model(client: TestClient) -> None:
-    """model_bytes_all returns all three, primary first."""
+def test_model_bytes_all_loads_every_attached_model(client: TestClient) -> None:
+    """model_bytes_all returns all attached models, primary first."""
     upload(client, primary_index="0")
     models, error = runner.model_bytes_all(7)
     assert error is None
     assert [name for name, _ in models] == ["PRJ-ORG-VS-L1-M3-P-0001.ifc", "PRJ-ORG-VS-L1-M3-S-0001.ifc", "PRJ-ORG-VS-L1-M3-A-0001.ifc"]
 
 
-def test_seismic_sees_elements_from_all_disciplines(client: TestClient, monkeypatch) -> None:
-    """Every model's elements reach the kernel, not just the primary's."""
-    upload(client)
-    seen: list[tuple[str, bytes]] = []
-
-    def capture(content, *, extra_models=(), **kwargs):
-        seen.append(("primary", content))
-        seen.extend(extra_models)
-        return {
-            "audit_issues": [],
-            "issue_stats": {},
-            "cost_impact": None,
-            "compliance_error": None,
-            "compliance_is_demo": False,
-        }
-
-    monkeypatch.setattr(runner, "run_seismic_analysis", capture)
-    runner.run_analysis("seismic", 7, use_cache=False)
-
-    federated = b"".join(content for _, content in seen)
-    assert SPF["pipe"] in federated
-    assert SPF["beam"] in federated
-    assert SPF["wall"] in federated
-
-
-def test_the_kernel_assesses_elements_from_every_model(client: TestClient) -> None:
-    """The real kernel reports on the secondary models' elements too.
-
-    Two braced elements sit in the primary and three more in the mechanical
-    model. These fixtures carry no geometry, so each braced element yields one
-    data_quality Issue -- which makes the Issue count a direct measure of how
-    many models the kernel actually opened.
-    """
-    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
-
-    upload(client)
-    models, error = runner.model_bytes_all(7)
-    assert error is None
-
-    single = run_seismic_analysis(models[0][1])
-    federated = run_seismic_analysis(
-        models[0][1], extra_models=[*models[1:], ("PRJ-ORG-VS-L1-M3-M-0001.ifc", MECHANICAL_MODEL)]
-    )
-
-    assert single["compliance_error"] is None
-    assert federated["compliance_error"] is None
-    assert len(single["audit_issues"]) == 2
-    assert len(federated["audit_issues"]) == 5
-
-
-def test_findings_name_the_model_they_came_from(client: TestClient) -> None:
-    """A federated finding is only actionable if it says which file to open."""
-    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
-
-    upload(client)
-    models, _ = runner.model_bytes_all(7)
-    result = run_seismic_analysis(
-        models[0][1], extra_models=[("PRJ-ORG-VS-L1-M3-M-0001.ifc", MECHANICAL_MODEL)]
-    )
-
-    sources = {issue.metadata.get("source_model") for issue in result["audit_issues"]}
-    assert sources == {"primary model", "PRJ-ORG-VS-L1-M3-M-0001.ifc"}
-
-
-def test_one_element_federated_twice_is_assessed_once(client: TestClient) -> None:
-    """The same GlobalId in two models is one element, not two.
-
-    A linked reference federated twice would otherwise be given an envelope in
-    each model and clash with itself, reporting a clearance failure nobody can
-    fix.
-    """
-    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
-
-    doubled = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-C-0001.ifc", PIPING_MODEL)])
-    alone = run_seismic_analysis(PIPING_MODEL)
-
-    assert len(doubled["audit_issues"]) == len(alone["audit_issues"]) == 2
-
-
 def test_a_model_that_cannot_be_fetched_fails_the_run(
     client: TestClient, service: ModelsService, projects_service: ProjectsService
 ) -> None:
-    """A partial federation would report clearance where it stopped looking."""
+    """A partial federation returns an error naming the missing model."""
     upload(client)
     secondary = next(
         f for f in service.list_models(7) if f["file_name"] == "PRJ-ORG-VS-L1-M3-S-0001.ifc"
@@ -629,10 +536,10 @@ def test_a_model_that_cannot_be_fetched_fails_the_run(
     assert "PRJ-ORG-VS-L1-M3-S-0001.ifc" in error
 
 
-def test_seismic_cache_key_covers_every_model(
+def test_federated_cache_key_covers_every_model(
     client: TestClient, service: ModelsService, projects_service: ProjectsService
 ) -> None:
-    """Attaching a model must miss the entry the primary alone produced."""
+    """Attaching a model changes the federated sha256 digest."""
     from app.services.analysis_cache import ANALYSIS_CACHE
 
     ANALYSIS_CACHE.clear()
@@ -647,75 +554,3 @@ def test_seismic_cache_key_covers_every_model(
 
     assert runner._federated_sha256(before) != runner._federated_sha256(after)
 
-
-# ── merging one geometry set out of several models ───────────────────────────
-
-
-def stub_geometries(monkeypatch, per_model: list[tuple[list, list]]) -> None:
-    """Return a prepared ``(geometries, failures)`` for each model in turn.
-
-    The merge is the unit under test here, not ifcopenshell's geometry
-    extraction: what matters is which element wins when two models disagree
-    about the same GlobalId, and that is decided in run_seismic_analysis.
-    """
-    from app.modules.pipeline_io import phase_6d_seismic
-
-    calls = iter(per_model)
-    monkeypatch.setattr(
-        phase_6d_seismic, "_geometries", lambda model, scale: next(calls, ([], []))
-    )
-
-
-def box(element_id: str):
-    """Return an ElementGeometry for a braced element: a 1m cube at the origin."""
-    from app.modules.blue_halo.halo_volume_generator import (
-        BoundingBox,
-        ElementGeometry,
-        Point3D,
-    )
-
-    return ElementGeometry(
-        element_id=element_id,
-        ifc_class="IfcPipeSegment",
-        bbox_mm=BoundingBox(Point3D(0.0, 0.0, 0.0), Point3D(1000.0, 1000.0, 1000.0)),
-    )
-
-
-def test_an_element_one_model_can_read_is_not_reported_unreadable(monkeypatch) -> None:
-    """A placeholder in one discipline does not condemn another's real geometry.
-
-    Federating a model that carries an element as a stub, alongside one that
-    models it properly, is the normal case. Reporting it unassessed would be a
-    finding about the federation rather than about the building.
-    """
-    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
-
-    stub_geometries(
-        monkeypatch,
-        [
-            ([], [("SHARED-1", "IfcPipeSegment", "no readable geometry")]),
-            ([box("SHARED-1")], []),
-        ],
-    )
-
-    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-S-0001.ifc", STRUCTURAL_MODEL)])
-
-    assert result["audit_issues"] == []
-
-
-def test_an_element_no_model_can_read_is_reported_once(monkeypatch) -> None:
-    """Unreadable everywhere is one finding, not one per model that tried."""
-    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
-
-    stub_geometries(
-        monkeypatch,
-        [
-            ([], [("SHARED-1", "IfcPipeSegment", "no readable geometry")]),
-            ([], [("SHARED-1", "IfcPipeSegment", "no readable geometry")]),
-        ],
-    )
-
-    result = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-S-0001.ifc", STRUCTURAL_MODEL)])
-
-    assert len(result["audit_issues"]) == 1
-    assert result["audit_issues"][0].element_id == "SHARED-1"

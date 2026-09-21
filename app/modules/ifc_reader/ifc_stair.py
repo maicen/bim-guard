@@ -12,9 +12,8 @@ tread, the NARROWEST point along the run. None of that is recoverable from a
 bounding box, because a flight's bounding box is just its overall envelope --
 it has already thrown away exactly the step-by-step detail these checks need.
 
-This module fills that gap in two layers, the same split ``ifc_seismic.py``
-uses and for the same reason -- the arithmetic that could produce a wrong
-verdict should be provable without an IFC file:
+This module fills that gap in two layers -- the arithmetic that could
+produce a wrong verdict should be provable without an IFC file:
 
   1. Pure numpy algorithms (``cluster_step_bands``, ``derive_flight_steps``,
      ``min_clear_width_by_band``, ...) that operate on plain point arrays and
@@ -28,8 +27,8 @@ verdict should be provable without an IFC file:
 flight/landing/railing, and caches the results by GlobalId so
 ``ifc_reader.IFCReader`` can expose them as ordinary derived properties
 (``MinRiserHeight``, ``MaxTreadDepthDifference``, ``HandrailMinHeight``, ...)
-through the same Pass-0 resolver shortcut ``ifc_seismic``/``ifc_supports``
-already use -- see ``_STAIR_DERIVED_PROPERTIES`` in ``ifc_reader/__init__.py``.
+through the Pass-0 resolver shortcut -- see ``_STAIR_DERIVED_PROPERTIES`` in
+``ifc_reader/__init__.py``.
 
 A THIRD, engine-level pass (``IFCStairEngine._link_elements``, not part of
 either layer above, since it works ACROSS elements rather than on one
@@ -524,8 +523,7 @@ def analyze_stair_flight(
     Returns a dict (never raises); ``warnings`` names anything that could
     not be determined. Every numeric field is None, not 0 or a guess, when
     the geometry did not support it -- callers must treat None as
-    Undetermined, matching this codebase's tri-state convention elsewhere
-    (``ifc_seismic``, ``ifc_supports``).
+    Undetermined, matching this codebase's tri-state convention elsewhere.
     """
     result: dict[str, Any] = {
         "guid": getattr(flight, "GlobalId", None),

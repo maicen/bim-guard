@@ -10,25 +10,23 @@ def test_build_issue_proof_graph_from_dataclass():
     issue = make_issue(
         id="BGR-0042",
         element_id="3Kf7q8XzR1pP2mN4gV8xQ",
-        rule_id="GC-001.03",
-        title="Galvanic dissimilar metal coupling",
-        mechanism="GC-001 galvanic",
+        rule_id="ARCH-EGRESS-001.03",
+        title="Egress travel distance exceeded",
+        mechanism="ARCH-EGRESS-001",
         band=RiskBand.CRITICAL,
         score=0.89,
         metadata={
-            "anode_material": "GalvanisedSteel",
-            "cathode_material": "SS316",
-            "voltage_v": 0.74,
-            "area_ratio": 0.02,
+            "travel_distance_m": 32.5,
+            "max_allowed_m": 25.0,
         },
         citations=[
             {
-                "standard": "NASA-STD-6012",
-                "clause": "Table 2",
-                "reason": "voltage gap exceeds harsh environment threshold",
+                "standard": "NBC 2020",
+                "clause": "9.9.10.1",
+                "reason": "travel distance exceeds allowable exit threshold",
             }
         ],
-        mitigation="Insert dielectric insulator between dissimilar metals.",
+        mitigation="Re-route corridor or add exit door.",
     )
 
     proof_dict = build_issue_proof_graph(issue)
@@ -36,7 +34,7 @@ def test_build_issue_proof_graph_from_dataclass():
     # Validate against strict Pydantic contract
     contract = IssueProofGraphContract(**proof_dict)
     assert contract.issue_id == "BGR-0042"
-    assert contract.rule_id == "GC-001.03"
+    assert contract.rule_id == "ARCH-EGRESS-001.03"
     assert contract.element_id == "3Kf7q8XzR1pP2mN4gV8xQ"
 
     # Verify node structure

@@ -23,7 +23,7 @@ def test_bsdd_get_class_and_properties():
 
     prop_names = {p.name for p in pipe_class.properties}
     assert "NominalDiameter" in prop_names
-    assert "CorrosionAllowance" in prop_names
+    assert "WallThickness" in prop_names
     assert "Material" in prop_names
 
     material_prop = next(p for p in pipe_class.properties if p.name == "Material")
@@ -44,7 +44,7 @@ def test_bsdd_validate_element_semantics_compliant():
         "GlobalId": "2O2Fr$t4X7Zf8NOew3FLOH",
         "element_type": "IfcPipeSegment",
         "NominalDiameter": 100.0,
-        "CorrosionAllowance": 3.0,
+        "WallThickness": 3.0,
         "Material": "Stainless Steel 316",
         "PressureRating": "PN16",
     }
@@ -60,7 +60,7 @@ def test_bsdd_validate_element_semantics_invalid_material_enumeration():
         "GlobalId": "2O2Fr$t4X7Zf8NOew3FLOH",
         "element_type": "IfcPipeSegment",
         "NominalDiameter": 100.0,
-        "CorrosionAllowance": 3.0,
+        "WallThickness": 3.0,
         "Material": "Unobtanium_Super_Alloy_999",  # Invalid material enumeration
         "PressureRating": "PN16",
     }

@@ -134,8 +134,7 @@ class TestScopeGating:
         assert any("not supported" in n for n in result["undetermined_predicates"])
 
     def test_flexible_coupling_is_unsupported(self):
-        # No reader resolves FlexibleCouplingWithin now that the seismic
-        # bracing IFC reader is gone, so this predicate key falls back to
+        # No reader resolves FlexibleCouplingWithin, so this predicate key falls back to
         # "not supported" like any other key nothing in the model answers.
         pipe = _element("pipe-a", 10.0)
         scope = {"flexible_coupling_within_mm": 300.0}

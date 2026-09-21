@@ -168,7 +168,7 @@ def test_run_graph_intelligence_reports_progress_under_its_own_run_key(monkeypat
     assert graph_snapshot["engines"]["GRAPH-001"]["status"] == "complete"
 
     # The default run_key for the same project is untouched -- a concurrent
-    # corrosion run for project 999 would not see this reset its progress.
+    # primary run for project 999 would not see this reset its progress.
     default_snapshot = pt.snapshot(999)
     assert default_snapshot["engines"]["GRAPH-001"] == {"status": "pending"}
 
