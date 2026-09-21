@@ -58,7 +58,6 @@ app/modules/
 │   ├── ifc_egress.py               — means-of-egress path analysis
 │   ├── ifc_spatial.py              — daylight/spatial boundary checks
 │   ├── ifc_stair.py                — stair geometry extraction
-│   ├── ifc_supports.py             — support/bracing element extraction
 │   ├── ifc_penetrations.py         — penetration/fire-separation extraction
 │   ├── ifc_rooms.py                — room/space extraction and classification
 │   └── ifc_quality/                — score labeling, GUID/property validation, and

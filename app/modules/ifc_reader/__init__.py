@@ -93,12 +93,6 @@ except ImportError:
     _PENETRATIONS_AVAILABLE = False
 
 try:
-    from .ifc_supports import build_support_index, support_context
-    _SUPPORTS_AVAILABLE = True
-except ImportError:
-    _SUPPORTS_AVAILABLE = False
-
-try:
     from .ifc_stair import IFCStairEngine, stair_context
     _STAIR_AVAILABLE = True
 except ImportError:
@@ -270,19 +264,6 @@ _IFC_TYPE_MAP = {
 }
 
 
-#: Property name (lower-cased, separators stripped) -> where it lives in
-#: ``ifc_supports.support_context``. ``kind`` selects one of the per-kind
-#: spacing series; ``field`` names the value inside it.
-#:
-#: Every entry reports the LARGEST gap, because a spacing limit is a maximum
-#: and it is the worst gap on the run that has to satisfy it.
-_SUPPORT_DERIVED_PROPERTIES = {
-    "lateralbracespacing": ("lateral_spacing", "max_gap_mm"),
-    "longitudinalbracespacing": ("longitudinal_spacing", "max_gap_mm"),
-    "hangerspacing": ("hanger_spacing", "max_gap_mm"),
-    "supportspacing": ("support_spacing", "max_gap_mm"),
-    "hangerrodlength": ("rod_lengths", "max"),
-}
 
 #: Per-riser/tread/handrail/guard geometry produced by ifc_stair's mesh
 #: decomposition, never a Pset key: a Pset carries at most ONE nominal value
@@ -1213,7 +1194,6 @@ class IFCReader:
         material_info: dict | None = None,
         door_space_connection: dict | None = None,
         penetration: dict | None = None,
-        support: dict | None = None,
         stair: dict | None = None,
         room: dict | None = None,
         unit_scale_mm: float = 1.0,
@@ -1307,14 +1287,6 @@ class IFCReader:
             value, detail = room_derived_value(prop_key_name, room)
             if value is not None:
                 return value, "derived:rooms", detail
-        elif prop_key_name in _SUPPORT_DERIVED_PROPERTIES:
-            # Support spacings and rod lengths: relationships plus geometry,
-            # resolved by ifc_supports, never a Pset key. Falls through to the
-            # Pset passes when the traversal produced nothing, so a model that
-            # authors e.g. HangerSpacing as a real property still has it read.
-            value, detail = self._support_derived_value(prop_key_name, support)
-            if value is not None:
-                return value, "geometry:supports", detail
         elif prop_key_name in _STAIR_DERIVED_PROPERTIES:
             # Per-riser/tread/handrail/guard geometry: no Pset stores these,
             # since a Pset carries only one nominal value for a whole flight
@@ -1589,12 +1561,8 @@ class IFCReader:
         # re-examined by every rule targeting IfcPipeSegment, and the traversal
         # reads geometry.
         _penetration_cache: dict[int, dict] = {}
-        # Same pattern for supports: the candidate scan and the per-element
-        # traversal are both worth caching across rules.
-        _support_index: list | None = None
-        _support_cache: dict[int, dict] = {}
+
         # Stair geometry: unlike the two traversals above, IFCStairEngine
-        # is already built once in load_ifc_file() (self.stair_engine), so
         # there is no index to lazily construct here -- only the per-element
         # context lookup is worth caching across rules targeting the same
         # flight/landing/railing.
@@ -1647,11 +1615,6 @@ class IFCReader:
             if needs_penetration and _interference_index is None:
                 _interference_index = build_interference_index(self.ifc_file)
 
-            needs_support = _SUPPORTS_AVAILABLE and self._needs_support_context(
-                prop_name, scope_predicate, resolved_exceptions
-            )
-            if needs_support and _support_index is None:
-                _support_index = build_support_index(self.ifc_file)
 
             needs_stair = _STAIR_AVAILABLE and self.stair_engine is not None and self._needs_stair_context(
                 prop_name, scope_predicate, resolved_exceptions
@@ -1782,26 +1745,6 @@ class IFCReader:
                             penetration = {}
                         _penetration_cache[pen_id] = penetration
 
-                # Supports holding this element: hangers, braces, and the
-                # spacings between them. Cached per element like the
-                # penetration traversal above, and for the same reason.
-                support = {}
-                if needs_support:
-                    sup_id = el.id()
-                    if sup_id in _support_cache:
-                        support = _support_cache[sup_id]
-                    else:
-                        try:
-                            support = support_context(
-                                el,
-                                geometry_extractor=self.geometry_extractor,
-                                unit_scale_mm=_unit_scale_mm,
-                                support_index=_support_index,
-                            )
-                        except Exception as exc:
-                            logger.debug("Support context failed for %s: %s", el, exc)
-                            support = {}
-                        _support_cache[sup_id] = support
 
                 # Per-riser/tread/handrail/guard geometry, already analysed
                 # once for the whole model in load_ifc_file() -- only the
@@ -1847,7 +1790,6 @@ class IFCReader:
                     material_info=mat_info,
                     door_space_connection=door_space,
                     penetration=penetration,
-                    support=support,
                     stair=stair,
                     room=room,
                     unit_scale_mm=_unit_scale_mm,
@@ -1893,7 +1835,6 @@ class IFCReader:
                             scope_prop,
                             spatial=spatial,
                             penetration=penetration,
-                            support=support,
                             stair=stair,
                             unit_scale_mm=_unit_scale_mm,
                         )
@@ -2012,16 +1953,6 @@ class IFCReader:
                         "connected_room_types": room.get("room_types") or None,
                         "room_link_source": room.get("link_source"),
                         "room_link_note": room.get("link_note"),
-                        # Supports holding this element. Empty for rules that
-                        # ask about neither a spacing nor a rod.
-                        "support_count": support.get("support_count"),
-                        "supports": support.get("supports"),
-                        "lateral_spacing": support.get("lateral_spacing"),
-                        "longitudinal_spacing": support.get("longitudinal_spacing"),
-                        "hanger_spacing": support.get("hanger_spacing"),
-                        "support_spacing": support.get("support_spacing"),
-                        "rod_lengths": support.get("rod_lengths"),
-                        "is_suspended": support.get("is_suspended"),
                     }
                 )
 
@@ -2860,41 +2791,6 @@ class IFCReader:
     #: case- and separator-insensitively against a rule's ``property_name``.
     _PENETRATION_PROPERTIES = frozenset({"annularclearance"})
 
-    #: Property names produced by the support traversal (``ifc_supports``),
-    #: matched the same way. Each is a distinct measurement:
-    #:
-    #:   LateralBraceSpacing       largest gap between consecutive lateral braces
-    #:   LongitudinalBraceSpacing  largest gap between consecutive longitudinal braces
-    #:   HangerSpacing             largest gap between consecutive hangers
-    #:   SupportSpacing            largest gap between consecutive supports of ANY kind
-    #:   HangerRodLength           the LONGEST rod carrying this run
-    #:
-    #: There is deliberately no bare ``Spacing``. A rule limiting lateral brace
-    #: spacing, evaluated against a series that also contains hangers, passes
-    #: whenever the hangers are close together -- a run with hangers every 2 m
-    #: and no braces at all would satisfy a 6.1 m brace limit. The ambiguity
-    #: cannot be resolved safely by this side, so the rule has to say which
-    #: spacing it means.
-    _SUPPORT_PROPERTIES = frozenset(
-        {
-            "lateralbracespacing",
-            "longitudinalbracespacing",
-            "hangerspacing",
-            "supportspacing",
-            "hangerrodlength",
-        }
-    )
-
-    #: Predicate keys answered by the support traversal.
-    _SUPPORT_PREDICATE_KEYS = frozenset(
-        {
-            "hanger_rod_length_below_mm",
-            "hanger_rod_length_mm",
-            "lateral_brace_spacing_mm",
-            "longitudinal_brace_spacing_mm",
-            "support_count_min",
-        }
-    )
 
     #: Property names produced by the stair geometry engine (``ifc_stair``),
     #: matched the same way. v1 gates on property name only -- unlike the
@@ -2935,63 +2831,6 @@ class IFCReader:
                 return True
         return False
 
-    @staticmethod
-    def _support_derived_value(prop_lower_name: str, support: dict | None):
-        """Return (value, detail) for a support-derived property, or (None, {}).
-
-        None means the traversal could not answer -- no supports of that kind,
-        or fewer than two so there is no gap between them. It is never 0.0: a
-        run with one brace has no spacing, which a maximum-spacing rule must
-        see as missing data rather than as the tightest possible result.
-        """
-        source, field = _SUPPORT_DERIVED_PROPERTIES[prop_lower_name]
-        context = support or {}
-
-        if source == "rod_lengths":
-            lengths = [
-                r.get("length_mm")
-                for r in context.get("rod_lengths") or []
-                if r.get("length_mm") is not None
-            ]
-            if not lengths:
-                return None, {}
-            # The longest rod governs: an exemption for "rods shorter than
-            # 150 mm" is only satisfied when every rod clears it.
-            return round(max(lengths), 4), {
-                "unit": "mm",
-                "rod_count": len(lengths),
-                "shortest_rod_mm": round(min(lengths), 4),
-            }
-
-        series = context.get(source) or {}
-        value = series.get(field)
-        if value is None:
-            return None, {}
-        return value, {
-            "unit": "mm",
-            "support_count": series.get("count"),
-            "gaps_mm": series.get("gaps_mm"),
-            "start_offset_mm": series.get("start_offset_mm"),
-            "end_offset_mm": series.get("end_offset_mm"),
-        }
-
-    @classmethod
-    def _needs_support_context(
-        cls, prop_name: str, scope: dict, exceptions: list[dict]
-    ) -> bool:
-        """Whether this rule needs the support traversal for its elements.
-
-        Gated exactly like the penetration traversal, and for the same reason:
-        it walks relationships and reads geometry per element, so it must not
-        run for the rules that never ask about a hanger or a brace.
-        """
-        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
-        if normalized in cls._SUPPORT_PROPERTIES:
-            return True
-        for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
-            if cls._SUPPORT_PREDICATE_KEYS & set(predicate or {}):
-                return True
-        return False
 
     @staticmethod
     def _stair_derived_value(prop_key_name: str, stair: dict | None):
@@ -3025,7 +2864,7 @@ class IFCReader:
     ) -> bool:
         """Whether this rule needs the stair geometry engine for its elements.
 
-        Gated like the three traversals above -- ``IFCStairEngine`` meshes
+        Gated like the other traversals -- ``IFCStairEngine`` meshes
         and decomposes every flight/landing/railing once per model up front
         (not per rule), but a rule that never asks for a stair-derived
         property must not pay even that lookup cost.
