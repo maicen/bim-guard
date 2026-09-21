@@ -40,18 +40,17 @@ international building codes:
 > clearance). Both were removed from the backend and the database now enforces
 > Architecture-only rule categories (`supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`).
 
-## Standards Ingestion
+## Standards Ingestion & Document Processing
 
-To reduce hallucination risk and anchor the rule engine to traceable sources, this project ingests external standards via a documented retrieval workflow:
+To reduce hallucination risk and anchor the rule engine to traceable sources, this project ingests architectural regulatory documents and building codes via Docling and PDF extraction pipelines:
 
-1. **Retrieval (`scripts/fetch_standards.py`):** Uses the Firecrawl API to pull open-access standards and manufacturer specs into clean Markdown under `docs/scraped_standards/`.
-2. **Rule grounding:** The extracted standards are reviewed and, where appropriate, imported into the project’s rule catalog and audit workflows rather than treated as static compile artifacts.
+1. **Document Intake:** PDF standards and building codes are parsed via self-hosted Docling (`DOCLING_LOCAL_URL`) with structured layout analysis.
+2. **Rule Grounding & LLM Extraction:** Extracted standards are reviewed, grounded against traceable clauses, and imported into the project's rule catalog (`rules`) and audit workflows.
 
 ### Pipeline Components
 
 * `app/engines/` — Core Python kernels for architectural egress and daylight analysis (`ARCH-EGRESS-001`, `ARCH-SPATIAL-001`).
-* `scripts/` — Standards retrieval and normalization utilities for the rule pipeline.
-* `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
+* `scripts/` — Database migration, bSDD ontology crawling, and dev utilities.
 
 ## Stack
 

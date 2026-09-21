@@ -31,13 +31,8 @@ as historical reference, not as current capability.
 
 - `../frontend/README.md`
 - `deployment_orbstack_cloudflare.md` — OrbStack Docker + Cloudflare Tunnel deployment guide
-- `NotebookLM/README.md`
-- `NotebookLM/setup_guide.md`
-- `NotebookLM/sources.md`
-- `NotebookLM/master_prompt.md`
 - `MonsterUI/llms.txt.md` — reference docs for the MonsterUI component library used by the retired FastHTML frontend; kept for archive context only, not the current Svelte 5 SPA
 - `RESOURCES.md` — research bibliography for the original galvanic/crevice/microbiological corrosion rule engines; kept for archive context only, that domain has been removed
-- `scraped_standards/README.md` — retrieved standards, regenerable and excluded from version control
 
 ## Validation & Research (`validation/`)
 

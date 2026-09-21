@@ -63,8 +63,7 @@
   /**
    * The initViewer() argument contract this component speaks, checked against
    * what the loaded bundle exports. Must match VIEWER_MOUNTS_API in
-   * static/js/viewer/viewer-mounts.js; scripts/dev/viewer_contract_check.mjs
-   * holds the two together.
+   * static/js/viewer/viewer-mounts.js.
    */
   const VIEWER_MOUNTS_API_EXPECTED = 2;
 
