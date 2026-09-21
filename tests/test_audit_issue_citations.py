@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 
 from app.modules.comparator import ComplianceComparator
-from app.modules.comparator.issue_schema import Issue, RiskBand
+from app.modules.comparator.issue_schema import Issue
 from app.modules.reporter.bcf_generator import bcf_topic_guid
 from app.services.analysis_runner import as_issue
 from app.services.bcf_exporter import BCFExporter
@@ -49,8 +49,8 @@ def rule_result(**overrides: Any) -> dict[str, Any]:
 
 def merged_issues(*rules: dict[str, Any]) -> list[dict[str, Any]]:
     """Run rule results through include_rule_results and return the issue dicts."""
-    service = AnalysisService(evaluator=lambda _: [])
-    audit = service.run([], run_id=RUN_ID)
+    service = AnalysisService()
+    audit: dict[str, Any] = {"issues": [], "bcf_topics": []}
     return service.include_rule_results(audit, list(rules), run_id=RUN_ID)["issues"]
 
 
@@ -159,48 +159,6 @@ class TestCitationOmittedWithoutASource:
         assert issue["rule_id"] == "DB-RULE"
         assert issue["band"] == "high"
         assert issue["description"] == "Width below 860 mm"
-
-
-class TestBuildIssuesPassThrough:
-    """Path A findings keep whatever citations the adapter produced."""
-
-    ROW = {
-        "guid": "AUDIT-001",
-        "name": "Pipe",
-        "galvanic_band": "HIGH",
-        "galvanic_score": 0.75,
-        "dominant_mechanism": "galvanic",
-        "mitigation": "Add isolation",
-        "action": "Resolve before issue",
-    }
-
-    def test_path_a_findings_carry_an_empty_list_today(self):
-        result = AnalysisService(evaluator=lambda _: [self.ROW]).run([], run_id=RUN_ID)
-
-        assert result["issues"][0]["citations"] == []
-
-    def test_citations_on_the_adapted_issue_are_forwarded(self, monkeypatch):
-        cited = Issue(
-            id="GC-0001",
-            element_id="AUDIT-001",
-            rule_id="GC-001.01",
-            title="GC-001 on Pipe",
-            band=RiskBand.HIGH,
-            score=0.75,
-            mechanism="GC-001 high",
-            mitigation="Add isolation",
-            citations=[{"standard": "STD-A", "clause": "4.2", "reason": "Because."}],
-        )
-        monkeypatch.setattr(
-            "app.modules.comparator.issue_adapter.issues_from_path_a",
-            lambda *args, **kwargs: [cited],
-        )
-
-        result = AnalysisService(evaluator=lambda _: [self.ROW]).run([], run_id=RUN_ID)
-
-        assert result["issues"][0]["citations"] == [
-            {"standard": "STD-A", "clause": "4.2", "reason": "Because."}
-        ]
 
 
 class TestBcfStandardsReferences:
