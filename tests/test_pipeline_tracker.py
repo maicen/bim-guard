@@ -300,3 +300,95 @@ def test_endpoint_rejects_a_non_positive_project_id(client, project_id: int):
 
     assert response.status_code == 400
     assert "error" in response.json()
+
+
+# ---------------------------------------------------------------------------
+# Dynamic Engine Registration & Explicit Progress Callback
+# ---------------------------------------------------------------------------
+
+
+def test_register_and_unregister_engine_dynamically():
+    code = "CUSTOM-TEST-001"
+    try:
+        spec = pt.register_engine(code, label="Custom Extraction Engine", run_key="custom")
+        assert spec.code == code
+        assert code in pt.ENGINES
+        assert code in pt.ENGINE_CODES
+        assert pt.RUN_KEY_BY_ENGINE[code] == "custom"
+
+        with pt.tracking(999, run_key="custom") as tracker:
+            tracker.run(code).stage(Stage.ENGINE_EXECUTION, clauses_total=10)
+
+        snapshot = pt.snapshot(999, run_key="custom")
+        assert snapshot["engines"][code]["status"] == "running"
+        assert snapshot["engines"][code]["engine_name"] == "Custom Extraction Engine"
+        assert snapshot["engines"][code]["metrics"]["clauses_total"] == 10
+    finally:
+        pt.unregister_engine(code)
+
+    assert code not in pt.ENGINES
+    assert code not in pt.ENGINE_CODES
+
+
+def test_auto_register_via_emit_and_tracker_run():
+    code = "AUTO-TASK-001"
+    with pt.tracking(777):
+        pt.emit(code, Stage.VALIDATION, auto_register=True, items=5)
+        pt.increment(code, auto_register=True, processed=2)
+
+    snapshot = pt.snapshot(777)
+    assert code in snapshot["engines"]
+    assert snapshot["engines"][code]["status"] == "running"
+    assert snapshot["engines"][code]["metrics"]["items"] == 5
+    assert snapshot["engines"][code]["metrics"]["processed"] == 2
+
+
+def test_pipeline_progress_callback_explicit_protocol():
+    callback = pt.create_progress_callback(
+        project_id=888,
+        code="DOC-EXTRACT-001",
+        label="Document Clause Extractor",
+        run_key="extraction",
+        total_stages=3,
+    )
+
+    callback.stage(1, name="Text Parsing", chunks=12)
+    callback.set_progress(35, items_completed=4)
+    callback.increment(items_completed=1)
+
+    snap = pt.merged_snapshot(888)
+    assert "DOC-EXTRACT-001" in snap["engines"]
+    eng = snap["engines"]["DOC-EXTRACT-001"]
+    assert eng["status"] == "running"
+    assert eng["stage_name"] == "Text Parsing"
+    assert eng["total_stages"] == 3
+    assert eng["progress_percent"] == 35
+    assert eng["metrics"]["chunks"] == 12
+    assert eng["metrics"]["items_completed"] == 5
+
+    callback.complete(final_clauses=5)
+    snap_after = pt.merged_snapshot(888)
+    assert snap_after["engines"]["DOC-EXTRACT-001"]["status"] == "complete"
+    assert snap_after["engines"]["DOC-EXTRACT-001"]["progress_percent"] == 100
+    assert snap_after["engines"]["DOC-EXTRACT-001"]["metrics"]["final_clauses"] == 5
+
+
+def test_pipeline_progress_callback_callable_adapter():
+    callback = pt.create_progress_callback(
+        project_id=666,
+        code="MODEL-ATTACH-001",
+        label="IFC Model Attach",
+    )
+
+    # Use as standard callable adapter
+    callback(Stage.IFC_PARSING, progress_percent=33, models_total=3)
+    snap = pt.snapshot(666)
+    assert snap["engines"]["MODEL-ATTACH-001"]["current_stage"] == 2
+    assert snap["engines"]["MODEL-ATTACH-001"]["progress_percent"] == 33
+
+    # Mark failed via callable
+    callback(error="Network timeout parsing IFC")
+    snap_failed = pt.snapshot(666)
+    assert snap_failed["engines"]["MODEL-ATTACH-001"]["status"] == "failed"
+    assert snap_failed["engines"]["MODEL-ATTACH-001"]["error"] == "Network timeout parsing IFC"
+

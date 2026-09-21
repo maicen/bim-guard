@@ -151,11 +151,13 @@ class EngineSpec:
         code: Ruleset code, e.g. ``"GRAPH-001"``. The key in the API payload.
         label: Human name, for logs and for clients that want more than a code.
         declared_status: What the engine reports before anything tracks it.
+        total_stages: Number of stages in this engine run (defaults to TOTAL_STAGES = 6).
     """
 
     code: str
     label: str
     declared_status: Status
+    total_stages: int = TOTAL_STAGES
 
 
 #: Every engine the endpoint reports, in payload order.
@@ -230,6 +232,44 @@ RUN_KEY_BY_ENGINE: dict[str, str] = {
 }
 
 
+def register_engine_spec(spec: EngineSpec, run_key: str = DEFAULT_RUN_KEY) -> None:
+    """Register an engine specification dynamically in the global registry."""
+    global ENGINE_SPECS, ENGINES, ENGINE_CODES
+    if spec.code not in ENGINES:
+        ENGINE_SPECS = (*ENGINE_SPECS, spec)
+        ENGINES = {s.code: s for s in ENGINE_SPECS}
+        ENGINE_CODES = tuple(s.code for s in ENGINE_SPECS)
+    RUN_KEY_BY_ENGINE[spec.code] = run_key
+
+
+def register_engine(
+    code: str,
+    label: str | None = None,
+    declared_status: Status = Status.PENDING,
+    run_key: str = DEFAULT_RUN_KEY,
+    total_stages: int = TOTAL_STAGES,
+) -> EngineSpec:
+    """Dynamically register an engine by code and label."""
+    spec = EngineSpec(
+        code=code,
+        label=label or code.replace("_", " ").replace("-", " ").title(),
+        declared_status=declared_status,
+        total_stages=total_stages,
+    )
+    register_engine_spec(spec, run_key=run_key)
+    return spec
+
+
+def unregister_engine(code: str) -> None:
+    """Remove an engine from the global registry if present."""
+    global ENGINE_SPECS, ENGINES, ENGINE_CODES
+    if code in ENGINES:
+        ENGINE_SPECS = tuple(s for s in ENGINE_SPECS if s.code != code)
+        ENGINES = {s.code: s for s in ENGINE_SPECS}
+        ENGINE_CODES = tuple(s.code for s in ENGINE_SPECS)
+    RUN_KEY_BY_ENGINE.pop(code, None)
+
+
 # ---------------------------------------------------------------------------
 # Per-engine state
 # ---------------------------------------------------------------------------
@@ -272,17 +312,22 @@ class EngineRun:
     label: str
     lock: threading.RLock
     status: Status = Status.PENDING
-    current_stage: Optional[Stage] = None
+    current_stage: Optional[Stage | int] = None
+    total_stages: int = TOTAL_STAGES
     metrics: dict[str, Any] = field(default_factory=dict)
     stages: list[StageRecord] = field(default_factory=list)
     error: Optional[str] = None
     started_at: Optional[float] = None
     finished_at: Optional[float] = None
     stage_started_at: Optional[float] = None
+    custom_stage_name: Optional[str] = None
+    progress_override: Optional[int] = None
 
     # -- mutation ----------------------------------------------------------
 
-    def stage(self, stage: Stage, **metrics: Any) -> "EngineRun":
+    def stage(
+        self, stage: Stage | int, name: Optional[str] = None, **metrics: Any
+    ) -> "EngineRun":
         """Enter ``stage``, closing the previous one and merging ``metrics``.
 
         Re-entering the stage already current is deliberately a no-op for the
@@ -298,15 +343,36 @@ class EngineRun:
             now = time.monotonic()
             if self.started_at is None:
                 self.started_at = now
-            if self.current_stage is not stage:
+            stage_int = int(stage)
+            stage_label = (
+                name
+                or (stage.label if isinstance(stage, Stage) else STAGE_NAMES.get(stage, f"Stage {stage_int}"))
+            )
+            if self.current_stage is not stage and self.current_stage != stage_int:
                 self._close_stage(now)
                 self.current_stage = stage
+                self.custom_stage_name = stage_label
                 self.stage_started_at = now
-                self.stages.append(StageRecord(stage=int(stage), name=stage.label))
+                self.stages.append(StageRecord(stage=stage_int, name=stage_label))
             if self.status is not Status.RUNNING:
                 self.status = Status.RUNNING
                 self.finished_at = None
                 self.error = None
+            self._merge(metrics)
+            return self
+
+    def stage_custom(
+        self, stage_number: int, name: Optional[str] = None, **metrics: Any
+    ) -> "EngineRun":
+        """Enter a custom numbered stage with an optional display name."""
+        return self.stage(stage_number, name=name, **metrics)
+
+    def set_progress_percent(self, percent: int, **metrics: Any) -> "EngineRun":
+        """Directly override progress percentage (0-100), merging metrics."""
+        with self.lock:
+            self.progress_override = max(0, min(100, int(percent)))
+            if self.status is not Status.RUNNING and self.status is not Status.COMPLETE:
+                self.status = Status.RUNNING
             self._merge(metrics)
             return self
 
@@ -377,7 +443,7 @@ class EngineRun:
             return round(end - self.started_at, 3)
 
     def progress_percent(self) -> int:
-        """Whole-percent progress through the six stages.
+        """Whole-percent progress through the stages.
 
         A completed run reports 100 even if it never entered Export, because a
         run that finished is finished -- an engine with nothing to export would
@@ -386,9 +452,11 @@ class EngineRun:
         with self.lock:
             if self.status is Status.COMPLETE:
                 return 100
+            if self.progress_override is not None:
+                return self.progress_override
             if self.current_stage is None:
                 return 0
-            return round(int(self.current_stage) * 100 / TOTAL_STAGES)
+            return round(int(self.current_stage) * 100 / max(1, self.total_stages))
 
     def touched(self) -> bool:
         """Whether this engine has reported anything at all.
@@ -411,15 +479,22 @@ class EngineRun:
         """
         with self.lock:
             if not self.touched():
-                return {"status": ENGINES[self.code].declared_status.value}
+                spec = ENGINES.get(self.code)
+                status_val = spec.declared_status.value if spec else self.status.value
+                return {"status": status_val}
 
             stage = self.current_stage or Stage.VALIDATION
+            stage_int = int(stage)
+            stage_name = (
+                self.custom_stage_name
+                or (stage.label if isinstance(stage, Stage) else STAGE_NAMES.get(stage, f"Stage {stage_int}"))
+            )
             payload: dict[str, Any] = {
                 "status": self.status.value,
                 "engine_name": self.label,
-                "current_stage": int(stage),
-                "total_stages": TOTAL_STAGES,
-                "stage_name": stage.label,
+                "current_stage": stage_int,
+                "total_stages": self.total_stages,
+                "stage_name": stage_name,
                 "progress_percent": self.progress_percent(),
                 "metrics": {
                     **self.metrics,
@@ -478,29 +553,63 @@ class PipelineTracker:
         self.run_key = run_key
         self._lock = threading.RLock()
         self._runs: dict[str, EngineRun] = {
-            spec.code: EngineRun(code=spec.code, label=spec.label, lock=self._lock)
+            spec.code: EngineRun(
+                code=spec.code,
+                label=spec.label,
+                lock=self._lock,
+                status=spec.declared_status,
+                total_stages=getattr(spec, "total_stages", TOTAL_STAGES),
+            )
             for spec in ENGINE_SPECS
         }
         self.created_at = time.monotonic()
         self.updated_at = self.created_at
         self.updated_seq = next(_SEQUENCE)
 
-    def run(self, code: str) -> EngineRun:
+    def all_codes(self) -> list[str]:
+        """Return all engine codes currently tracked in this tracker instance."""
+        with self._lock:
+            return list(self._runs.keys())
+
+    def run(self, code: str, *, auto_register: bool = False) -> EngineRun:
         """Return the :class:`EngineRun` for ``code``, counting it as activity.
 
+        If ``auto_register`` is True or ``code`` was registered in ``ENGINES``,
+        the run is created dynamically if not already present.
+
         Raises:
-            KeyError: If ``code`` is not a registered engine. Loudly, because a
-                typo'd code would otherwise create a run nothing ever reports.
+            KeyError: If ``code`` is not registered and ``auto_register`` is False.
         """
         with self._lock:
             self.updated_at = time.monotonic()
             self.updated_seq = next(_SEQUENCE)
-            try:
+            if code in self._runs:
                 return self._runs[code]
-            except KeyError:
-                raise KeyError(
-                    f"Unknown engine {code!r}; expected one of {', '.join(ENGINE_CODES)}"
-                ) from None
+            if code in ENGINES:
+                spec = ENGINES[code]
+                run = EngineRun(
+                    code=spec.code,
+                    label=spec.label,
+                    lock=self._lock,
+                    status=spec.declared_status,
+                    total_stages=getattr(spec, "total_stages", TOTAL_STAGES),
+                )
+                self._runs[code] = run
+                return run
+            if auto_register:
+                label = code.replace("_", " ").replace("-", " ").title()
+                run = EngineRun(
+                    code=code,
+                    label=label,
+                    lock=self._lock,
+                    status=Status.PENDING,
+                    total_stages=TOTAL_STAGES,
+                )
+                self._runs[code] = run
+                return run
+            raise KeyError(
+                f"Unknown engine {code!r}; expected one of {', '.join(ENGINE_CODES)}"
+            )
 
     def peek(self, code: str) -> EngineRun:
         """Return ``code``'s run without counting as activity.
@@ -516,12 +625,22 @@ class PipelineTracker:
             KeyError: If ``code`` is not a registered engine.
         """
         with self._lock:
-            try:
+            if code in self._runs:
                 return self._runs[code]
-            except KeyError:
-                raise KeyError(
-                    f"Unknown engine {code!r}; expected one of {', '.join(ENGINE_CODES)}"
-                ) from None
+            if code in ENGINES:
+                spec = ENGINES[code]
+                run = EngineRun(
+                    code=spec.code,
+                    label=spec.label,
+                    lock=self._lock,
+                    status=spec.declared_status,
+                    total_stages=getattr(spec, "total_stages", TOTAL_STAGES),
+                )
+                self._runs[code] = run
+                return run
+            raise KeyError(
+                f"Unknown engine {code!r}; expected one of {', '.join(ENGINE_CODES)}"
+            )
 
     def touched(self) -> bool:
         """Whether any engine on this project has reported anything yet."""
@@ -704,8 +823,16 @@ def merged_snapshot(project_id: int) -> dict[str, Any]:
     trackers = TRACKERS.for_project(project_id)
     by_key = {tracker.run_key: tracker for tracker in trackers}
 
+    # Include all statically configured engine codes, plus any dynamically
+    # registered codes tracked in this project's active runs.
+    all_codes = list(ENGINE_CODES)
+    for tracker in trackers:
+        for code in tracker.all_codes():
+            if code not in all_codes:
+                all_codes.append(code)
+
     engines: dict[str, dict[str, Any]] = {}
-    for code in ENGINE_CODES:
+    for code in all_codes:
         owner = by_key.get(RUN_KEY_BY_ENGINE.get(code, DEFAULT_RUN_KEY))
         source = owner if owner is not None and owner.peek(code).touched() else None
         if source is None:
@@ -713,7 +840,9 @@ def merged_snapshot(project_id: int) -> dict[str, Any]:
             # fallback picks the freshest report of this engine.
             source = next((t for t in trackers if t.peek(code).touched()), None)
         if source is None:
-            engines[code] = {"status": ENGINES[code].declared_status.value}
+            decl = ENGINES.get(code)
+            status_val = decl.declared_status.value if decl else Status.PENDING.value
+            engines[code] = {"status": status_val}
             continue
         engines[code] = {**source.peek(code).snapshot(), "run_key": source.run_key}
 
@@ -775,7 +904,14 @@ def tracking(
         _ACTIVE.reset(token)
 
 
-def emit(code: str, stage: Optional[Stage] = None, **metrics: Any) -> None:
+def emit(
+    code: str,
+    stage: Optional[Stage | int] = None,
+    *,
+    auto_register: bool = False,
+    progress_percent: Optional[int] = None,
+    **metrics: Any,
+) -> None:
     """Report a stage transition and/or metrics for ``code``.
 
     **A no-op when no tracker is bound**, which is what lets the engines carry
@@ -785,48 +921,62 @@ def emit(code: str, stage: Optional[Stage] = None, **metrics: Any) -> None:
     Args:
         code: Ruleset code, e.g. ``"GRAPH-001"``.
         stage: Stage being entered, or ``None`` to record metrics only.
+        auto_register: If True, auto-register unknown engine codes.
+        progress_percent: Optional explicit percentage override (0-100).
         **metrics: Metric values to merge; ``None`` values are ignored.
     """
     tracker = _ACTIVE.get()
     if tracker is None:
         return
-    run = tracker.run(code)
+    run = tracker.run(code, auto_register=auto_register)
     if stage is not None:
-        run.stage(stage, **metrics)
+        if isinstance(stage, Stage):
+            run.stage(stage, **metrics)
+            stage_val = stage.value
+            stage_name = stage.label
+        else:
+            run.stage_custom(stage, **metrics)
+            stage_val = int(stage)
+            stage_name = STAGE_NAMES.get(stage_val, f"Stage {stage_val}")
+        if progress_percent is not None:
+            run.set_progress_percent(progress_percent)
         emit_event(
             event_type="stage_transition",
             source_module=code,
             project_id=tracker.project_id,
             payload={
-                "stage": stage.value,
-                "stage_name": stage.label,
+                "stage": stage_val,
+                "stage_name": stage_name,
                 "metrics": metrics,
             },
         )
-    elif metrics:
-        run.record(**metrics)
+    elif metrics or progress_percent is not None:
+        if progress_percent is not None:
+            run.set_progress_percent(progress_percent)
+        if metrics:
+            run.record(**metrics)
         emit_event(
             event_type="metric_increment",
             source_module=code,
             project_id=tracker.project_id,
-            payload={"metrics": metrics},
+            payload={"metrics": metrics, "progress_percent": progress_percent},
         )
 
 
-def increment(code: str, **counters: int) -> None:
+def increment(code: str, *, auto_register: bool = False, **counters: int) -> None:
     """Add to ``code``'s counter metrics. A no-op when nothing is bound."""
     tracker = _ACTIVE.get()
     if tracker is None:
         return
-    tracker.run(code).increment(**counters)
+    tracker.run(code, auto_register=auto_register).increment(**counters)
 
 
-def complete(code: str, **metrics: Any) -> None:
+def complete(code: str, *, auto_register: bool = False, **metrics: Any) -> None:
     """Mark ``code`` finished. A no-op when nothing is bound."""
     tracker = _ACTIVE.get()
     if tracker is None:
         return
-    tracker.run(code).complete(**metrics)
+    tracker.run(code, auto_register=auto_register).complete(**metrics)
     emit_event(
         event_type="engine_complete",
         source_module=code,
@@ -835,17 +985,172 @@ def complete(code: str, **metrics: Any) -> None:
     )
 
 
-def fail(code: str, reason: str) -> None:
+def fail(code: str, reason: str, *, auto_register: bool = False) -> None:
     """Mark ``code`` failed. A no-op when nothing is bound."""
     tracker = _ACTIVE.get()
     if tracker is None:
         return
-    tracker.run(code).fail(reason)
+    tracker.run(code, auto_register=auto_register).fail(reason)
     emit_event(
         event_type="engine_failed",
         source_module=code,
         project_id=tracker.project_id,
         payload={"status": "failed", "reason": reason},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Explicit Progress Callback Protocol & Adapter
+# ---------------------------------------------------------------------------
+
+
+class PipelineProgressCallback:
+    """Explicit, thread-safe progress reporter bound to a specific project and engine.
+
+    Enables decoupled compute kernels, services, and background workers to report
+    progress without relying on ambient `contextvars`.
+    """
+
+    def __init__(
+        self,
+        project_id: int,
+        code: str,
+        *,
+        run_key: str = DEFAULT_RUN_KEY,
+        label: str | None = None,
+        total_stages: int = TOTAL_STAGES,
+        auto_register: bool = True,
+    ) -> None:
+        self.project_id = project_id
+        self.code = code
+        self.run_key = run_key
+        self.total_stages = total_stages
+        if auto_register and code not in ENGINES:
+            register_engine(code, label=label, run_key=run_key, total_stages=total_stages)
+
+    def _get_run(self, tracker: PipelineTracker) -> EngineRun:
+        run = tracker.run(self.code, auto_register=True)
+        if self.total_stages != TOTAL_STAGES:
+            run.total_stages = self.total_stages
+        return run
+
+    def stage(self, stage: Stage | int, name: Optional[str] = None, **metrics: Any) -> None:
+        """Record stage transition and optional metrics."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        if isinstance(stage, Stage):
+            run.stage(stage, **metrics)
+            stage_val = stage.value
+            stage_name = stage.label
+        else:
+            run.stage_custom(stage, name=name, **metrics)
+            stage_val = int(stage)
+            stage_name = name or STAGE_NAMES.get(stage_val, f"Stage {stage_val}")
+        emit_event(
+            event_type="stage_transition",
+            source_module=self.code,
+            project_id=self.project_id,
+            payload={
+                "stage": stage_val,
+                "stage_name": stage_name,
+                "metrics": metrics,
+            },
+        )
+
+    def record(self, **metrics: Any) -> None:
+        """Merge metric key-values."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        run.record(**metrics)
+        emit_event(
+            event_type="metric_increment",
+            source_module=self.code,
+            project_id=self.project_id,
+            payload={"metrics": metrics},
+        )
+
+    def increment(self, **counters: int) -> None:
+        """Increment integer counters atomically."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        run.increment(**counters)
+
+    def complete(self, **metrics: Any) -> None:
+        """Mark engine execution complete."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        run.complete(**metrics)
+        emit_event(
+            event_type="engine_complete",
+            source_module=self.code,
+            project_id=self.project_id,
+            payload={"status": "complete", "metrics": metrics},
+        )
+
+    def fail(self, reason: str) -> None:
+        """Mark engine execution failed with a reason."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        run.fail(reason)
+        emit_event(
+            event_type="engine_failed",
+            source_module=self.code,
+            project_id=self.project_id,
+            payload={"status": "failed", "reason": reason},
+        )
+
+    def set_progress(self, percent: int, **metrics: Any) -> None:
+        """Directly set progress percentage (0-100) and optional metrics."""
+        tracker = tracker_for(self.project_id, self.run_key)
+        run = self._get_run(tracker)
+        run.set_progress_percent(percent, **metrics)
+        emit_event(
+            event_type="progress_update",
+            source_module=self.code,
+            project_id=self.project_id,
+            payload={"progress_percent": percent, "metrics": metrics},
+        )
+
+    def __call__(
+        self,
+        stage: Stage | int | None = None,
+        *,
+        progress_percent: int | None = None,
+        error: str | None = None,
+        complete: bool = False,
+        **metrics: Any,
+    ) -> None:
+        """Unified callable adapter protocol for clean dependency injection."""
+        if error is not None:
+            self.fail(error)
+        elif complete:
+            self.complete(**metrics)
+        else:
+            if stage is not None:
+                self.stage(stage, **metrics)
+            elif metrics:
+                self.record(**metrics)
+            if progress_percent is not None:
+                self.set_progress(progress_percent)
+
+
+def create_progress_callback(
+    project_id: int,
+    code: str,
+    *,
+    run_key: str = DEFAULT_RUN_KEY,
+    label: str | None = None,
+    total_stages: int = TOTAL_STAGES,
+    auto_register: bool = True,
+) -> PipelineProgressCallback:
+    """Create an explicit PipelineProgressCallback for a project and engine."""
+    return PipelineProgressCallback(
+        project_id=project_id,
+        code=code,
+        run_key=run_key,
+        label=label,
+        total_stages=total_stages,
+        auto_register=auto_register,
     )
 
 
