@@ -76,9 +76,8 @@ endpoint:
 
 - **Persistence Access**: Exclusively via `PersistenceService.get_table(...)` in `app/services/persistence.py`.
 - **Rule Management**: Exclusively via `RuleService` in `app/services/rules_service.py`.
-- **Dynamic Rule Catalogs**: Lookups and scoring models for corrosion engines are loaded via `app/services/corrosion_rule_catalog.py`.
-- **Zero Hardcoded Cutoffs**: All scoring weights, risk band thresholds, material tables, and velocity intervals must be read dynamically from the database.
-- **Live Catalog Reloading**: Call `reload_all_catalogs()` at the start of analysis runs so that database rule edits take effect immediately without server restarts.
+- **Dynamic Rule Catalogs**: Rule lookups for the architectural engines are loaded via `RuleService` (`app/services/rules_service.py`) and routed to engines through `RuleEngineRegistry` (`app/modules/comparator/engine_registry.py`). `app/services/corrosion_rule_catalog.py` no longer exists -- it was removed with the Piping/Corrosion domain (`supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`).
+- **Zero Hardcoded Cutoffs**: All scoring weights, risk band thresholds, and other rule thresholds must be read dynamically from the database.
 - **File Uploads**: Save through `ObjectStorage.save_upload(...)` in `app/services/object_storage.py` using Supabase Storage. Local disk under `data/cache/supabase-storage` is a disposable cache only.
 
 ---

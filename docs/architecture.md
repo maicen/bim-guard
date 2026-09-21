@@ -17,7 +17,7 @@
 This document describes how the BIMGUARD AI application is architected across its decoupled layers:
 1. **Backend API Gateway (FastAPI)**: Serves typed REST endpoints and real-time Server-Sent Events (SSE) from `/api` with strict Pydantic request/response validation (`app/modules/contracts.py`).
 2. **Frontend Client (Svelte 5 SPA)**: Reactive client under `frontend/` powered by Vite, TypeScript, and Tailwind CSS, communicating exclusively with `/api`.
-3. **Compute Kernels & Pipelines**: Framework-agnostic Python compliance and physics engines (corrosion GC-001/CC-001/MC-001, architectural egress & spatial daylighting) and orchestrator (`app/engines/`, `app/modules/`, `app/services/`) driven dynamically by database-stored rules.
+3. **Compute Kernels & Pipelines**: Framework-agnostic Python compliance engines (architectural egress & spatial daylighting) and orchestrator (`app/engines/`, `app/modules/`, `app/services/`) driven dynamically by database-stored rules.
 4. **Data & Storage Layer**: Supabase Postgres for relational state and Supabase Object Storage for IFC models, extracted documents, and generated BCF issue archives.
 
 ## 2. Architecture Overview
@@ -51,7 +51,7 @@ This document describes how the BIMGUARD AI application is architected across it
 │                                                             │
 │  - ProjectsService          - DocumentService               │
 │  - RuleService & Seeder     - ObjectStorage (Supabase)      │
-│  - CorrosionRuleCatalog     - PipelineTracker (SSE events)  │
+│  - EngineRegistry            - PipelineTracker (SSE events) │
 │  - ModelLineageRepository   - AnalysisRunner                │
 └──────────────┬──────────────────────────────┬───────────────┘
                │                              │
@@ -59,13 +59,12 @@ This document describes how the BIMGUARD AI application is architected across it
 ┌──────────────────────────────┐┌─────────────────────────────┐
 │  Compute Engines & Modules   ││  Database & Object Storage  │
 │                              ││                             │
-│ - GC-001 Galvanic Engine     ││ - Supabase Postgres         │
-│ - CC-001 Crevice Engine      ││   (projects, rules, audit)  │
-│ - MC-001 Microbiological     ││ - Supabase Storage          │
-│ - ARCH-EGRESS-001 Egress     ││   (models, reports, BCF)    │
-│ - ARCH-SPATIAL-001 Daylight  ││ - SQLite / Fastlite Cache   │
+│ - ARCH-EGRESS-001 Egress     ││ - Supabase Postgres         │
+│ - ARCH-SPATIAL-001 Daylight  ││   (projects, rules, audit)  │
+│ - CODE-SHACL (Shacl engine)  ││ - Supabase Storage          │
+│ - GRAPH-TOPOLOGY-001         ││   (models, reports, BCF)    │
+│   (orphan-element graph)     ││ - SQLite / Fastlite Cache   │
 │ - Phase 6 Orchestrator       ││                             │
-│ - Blue Halo Material Graph   ││                             │
 └──────────────────────────────┘└─────────────────────────────┘
 ```
 
@@ -80,7 +79,7 @@ This document describes how the BIMGUARD AI application is architected across it
 | **Frontend Styling** | **Tailwind CSS** | Design tokens, responsive components, dark theme |
 | **3D Viewport** | **ThatOpenCompany / Web-IFC** | Client-side IFC geometry parsing and 3D rendering |
 | **Database & Storage** | **Supabase (Postgres & Storage)** | Primary persistence for projects, documents, and rules; S3-compatible object storage |
-| **Compute Engines** | **Pure Python** | `bimguard_galvanic_engine`, `bimguard_crevice_engine`, `bimguard_mic_engine`, `bimguard_arch_engine`, `orchestrator` |
+| **Compute Engines** | **Pure Python** | `bimguard_arch_engine` (`EgressAnalysisEngine`, `SpatialDaylightEngine`), `bimguard_shacl_engine`, `bimguard_graph_engine`, `orchestrator` |
 | **Rule System** | **Database-Driven Catalog** | Rules, thresholds, scoring weights, and mitigations loaded dynamically via `RuleService`; zero rule content is hardcoded in Python |
 | **Rule Extraction** | **LlamaIndex (LLM-only)** | `LlamaIndexRuleGenerator` — typed Pydantic program producing schema-validated rule drafts from any ingested document, gated by an approve/reject review workflow |
 | **Agentic Orchestration** | **LangGraph** | `app/digital_inspector/` — a ReAct-style agent coordinating IFC queries, bSDD lookups, and validation engines; separate from the general-purpose `app/agent/` coding assistant |
@@ -117,7 +116,7 @@ bim-guard/
 │   ├── main.py          # App bootstrap, FastAPI API Gateway, and SPA static mount
 │   ├── services/        # Persistence, runner, tracker, and extraction services
 │   ├── modules/         # Compliance pipeline stages & Pydantic data contracts
-│   ├── engines/         # Corrosion & architectural physics engines (GC-001, CC-001, MC-001, ARCH)
+│   ├── engines/         # Architectural compliance engines (ARCH-EGRESS-001, ARCH-SPATIAL-001, CODE-SHACL, GRAPH-TOPOLOGY-001)
 │   ├── digital_inspector/ # LangGraph Digital Inspector agent (IFC/bSDD/validation tool calls)
 │   ├── agent/           # General-purpose OpenRouter coding assistant (separate from the above)
 │   ├── environment.py   # Environment variable loader
@@ -158,20 +157,20 @@ bim-guard/
 
 ## 6. Evaluator Contracts & Dependency Inversion
 
-BIM-Guard enforces strict Dependency Inversion across engines, repositories, and services for both MEP/corrosion and architectural domains:
+BIM-Guard enforces strict Dependency Inversion across engines, repositories, and services for the architectural domain:
 
 ### 6.1 Direct RuleEvaluator Protocol Implementation
-- Both MEP physics engines (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`) and architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine`) implement the `RuleEvaluator` protocol directly rather than relying on legacy `CallableRuleEvaluator` wrappers.
+- The architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine`, `ShaclComplianceEngine`, `GraphTopologyEngine`) implement the `RuleEvaluator` protocol directly rather than relying on legacy `CallableRuleEvaluator` wrappers.
 - Evaluators consume typed `RuleEvaluationRequest` (or coerced elements) and return structured `RuleEvaluationResult` models defined in `app/modules/contracts.py`.
 - Results support dictionary-style mapping semantics for full backwards compatibility while providing strictly typed attribute access (`band`, `score`, `details`, `element_id`, `status`).
+- **History:** the `RuleEvaluator` protocol itself was adopted while BIM-Guard still ran separate MEP/corrosion physics engines (galvanic, crevice, microbiological) alongside the architectural ones, precisely so both families of engine — very different internal math, identical external contract — could be registered and run interchangeably. Those corrosion engines have since been removed (see `supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`); the protocol they motivated remains the current pattern for every engine below.
 
 ### 6.2 Evaluator Scope Boundary: Custom Python vs. buildingSMART IDS
 - **Custom Python Evaluators**: Strictly limited to evaluations that declarative buildingSMART Information Delivery Specification (IDS) cannot express:
-  - Multiphysics calculations (galvanic voltage gaps, anodic/cathodic area ratios, PREN adequacy).
-  - Joint crevice geometries and critical crevice temperatures (CCT). (CC-001 as implemented does not yet receive joint type, operating temperature or most environment classes from the pipeline; see [`defects/CC-001-scoring-inputs-inert.md`](defects/CC-001-scoring-inputs-inert.md).)
-  - Microbiological growth kinetics, flow velocity classes, and topological dead-leg length-to-diameter ratios.
   - NetworkX topological space-connectivity graph traversal (habitable space to exterior exit shortest paths via `IfcRelSpaceBoundary`).
   - Spatial boundary daylight calculations (window glazing area vs. room floor area).
+  - SHACL shape validation over the BOT relationship graph (`ShaclComplianceEngine`, rule type `CODE-SHACL`).
+  - Orphan/disconnected element detection over the model's spatial, connection, and material relationship graph (`GraphTopologyEngine`, rule type `GRAPH-TOPOLOGY-001`).
   - Spatial, topological, and geometric proximity calculations.
 - **Database Rules & IDS Validation**: Standard alphanumeric assertions, property set existence, data types, unit checks, and scalar property thresholds are executed via database-driven rules and IDS schemas.
 - **Database-Driven Rule Thresholds**: Engineering cutoffs are never hardcoded in Python engines. Egress travel limits (`CODE 9.9.10.1`), exit counts (`CODE 9.9.4.1`), daylight ratios (`CODE 9.7.2.3`), and fire separation ratings (`CODE 9.10.9.14`) are dynamically read from `RuleService` (`BUILDING-CODE-PART9`).
@@ -243,11 +242,14 @@ below.
   RuleExtractionService, run_analysis, RUNNABLE_SLUGS` --
   `app/services/__init__.py` re-exports these; anything else under
   `app/services/` is internal and carries no compatibility guarantee.
-- `from app.engines import GalvanicCorrosionEngine, CreviceCorrosionEngine,
-  MICEngine, EgressAnalysisEngine, SpatialDaylightEngine` (plus each
-  engine's `GCElement`/`GCResult`-style element/result dataclasses and
-  `assess_*_risk` functions) -- pure-Python compute kernels with no HTTP or
-  database dependency; `app/engines/__init__.py` re-exports these.
+- `from app.engines import EgressAnalysisEngine, SpatialDaylightEngine` --
+  pure-Python compute kernels with no HTTP or database dependency;
+  `app/engines/__init__.py` re-exports these. (`ShaclComplianceEngine` and
+  `GraphTopologyEngine` are also `RuleEvaluator` implementations under
+  `app/engines/`, but are not yet re-exported from `__init__.py` and so are
+  not part of this stable surface -- import them from their own modules,
+  `app.engines.bimguard_shacl_engine` / `app.engines.bimguard_graph_engine`,
+  with no compatibility guarantee.)
 
 **Contract:** a name appearing in one of the two `__all__` lists above is the
 supported programmatic surface and follows the same versioning/deprecation

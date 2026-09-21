@@ -13,7 +13,6 @@ These files should be treated as current sources of truth.
 - `../DESIGN.md`
 - `../.github/instructions/project-specific.instructions.md`
 - `architecture.md`
-- `piping_schema_spec.md`
 - `BIMGUARD_DATA_ARCHITECTURE.md`
 - `CONVENTIONS.md`
 - `HERMES_CONTEXT.md` — AI research brief, retained as historical evidence; unverified, do not cite
@@ -22,9 +21,11 @@ These files should be treated as current sources of truth.
 
 ## Client-Facing Q&A (`client-qa/`)
 
-Twenty client-facing Q&A documents written against the shipped implementation
-(not a roadmap) — see `client-qa/README.md` for the full index, grouped by
-domain (Piping, Seismic, Architecture, Workflow).
+Twenty client-facing Q&A documents grouped by domain (Piping, Seismic,
+Architecture, Workflow) — see `client-qa/README.md` for the full index. The
+app is now Architecture-only; the Piping and Seismic entries document
+functionality that has since been removed from the backend and are retained
+as historical reference, not as current capability.
 
 ## Operational Guides
 
@@ -58,8 +59,9 @@ Navisworks ISO 19650 findings, an early static frontend prototype).
 
 ## Benchmarks (`benchmarks/`)
 
-Performance benchmark results and summaries for the Blue Halo (seismic)
-pipeline.
+Performance benchmark results and summaries. (Note: no files currently exist
+under `docs/benchmarks/` — this section is a placeholder for when benchmark
+output is next generated for the current Architecture engines.)
 
 ## Sample Exports (`bcf_exports/`)
 

@@ -24,11 +24,21 @@ BIM-Guard is an ISO 19650-compliant OpenBIM compliance platform built on a moder
 
 BIMGUARD AI is an Automated Code Compliance Checking (ACCC) platform that bridges
 OpenBIM standards (IFC, BCF, IDS) with large language models. Its compliance
-engines and data ingestion pipeline evaluate structural and material integrity
-against international building codes through two primary modules:
+engines and data ingestion pipeline evaluate the architectural domain against
+international building codes:
 
-*   **SB-001 (Seismic):** Evaluates nonstructural component clearance volumes and clash detection against seismic bracing guidance (FEMA E-74, and ASCE/SEI 7-10 §13.6 as cited by it). Its dimensional thresholds are BIMGUARD screening calibration except where marked sourced, not code values (`data/rulesets/sb001_seismic_clearance.json`).
-*   **GC-001, CC-001, MC-001, MM-001, XM-001 (Piping & Corrosion):** Evaluate galvanic, crevice, microbiological, material-media and cross-material corrosion risk, citing the standards that govern each mechanism (e.g., NASA-STD-6012, EN ISO 15329, HSE HSG274). The thresholds are a calibration authored for each ruleset, not values quoted from those standards (`docs/planning/corrosion_provenance_2026-09-13.md`).
+*   **ARCH-EGRESS-001:** NetworkX topological graph traversal (habitable space to
+    exterior exit shortest paths via `IfcRelSpaceBoundary`) checking means-of-egress
+    travel distance and exit-count thresholds read from `RuleService` (e.g.
+    `BUILDING-CODE-PART9`).
+*   **ARCH-SPATIAL-001:** Spatial boundary daylight checks (window glazing area vs.
+    room floor area) against database-driven daylight ratio thresholds.
+
+> **History:** BIM-Guard previously also shipped a Piping/Corrosion domain
+> (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media,
+> XM-001 cross-material) and a Seismic domain (SB-001 "Blue Halo" nonstructural
+> clearance). Both were removed from the backend and the database now enforces
+> Architecture-only rule categories (`supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`).
 
 ## The Agentic RAG Methodology
 
@@ -36,13 +46,12 @@ To eliminate AI hallucination and ensure strict engineering accuracy, this proje
 utilizes a "Walled Garden" Retrieval-Augmented Generation (RAG) architecture:
 
 1.  **Retrieval (`scripts/fetch_standards.py`):** An LLM-native web scraping script powered by the Firecrawl API dynamically retrieves open-access government building codes and manufacturer material specifications, converting them into clean Markdown.
-2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into targeted, domain-isolated Markdown exports (`docs/bimguard_seismic_rules.md` and `docs/bimguard_corrosion_rules.md`).
-3.  **Generation (Gemini Notebooks):** The compiled domains are fed into isolated Google Gemini Notebook (NotebookLM) workspaces. The AI reasoning engine evaluates the Python codebase strictly against the ingested facts (and uploaded proprietary, IP-protected PDFs) to identify gaps in the compliance algorithms.
+2.  **Augmentation (`scripts/compile_for_notebooklm.py`):** A custom compilation pipeline packages the OpenBIM Python logic (`IfcOpenShell`), static JSON rule packs, and scraped standards into a targeted Markdown export for NotebookLM.
+3.  **Generation (Gemini Notebooks):** The compiled workspace is fed into a Google Gemini Notebook (NotebookLM) workspace. The AI reasoning engine evaluates the Python codebase strictly against the ingested facts (and uploaded proprietary, IP-protected PDFs) to identify gaps in the compliance algorithms.
 
 ### Pipeline Components
 
-*   `app/engines/` — Core Python kernels for galvanic, crevice, and seismic clearance analysis.
-*   `data/rulesets/` — Static JSON configurations defining fallback rules for material mismatch (MM-001), cross-material (XM-001) interactions, and the SB-001 seismic clearance config (`sb001_seismic_clearance.json`: authored screening calibration with per-threshold provenance, not code values).
+*   `app/engines/` — Core Python kernels for architectural egress and daylight analysis (`ARCH-EGRESS-001`, `ARCH-SPATIAL-001`).
 *   `scripts/` — The AI data ingestion and Markdown compilation pipeline.
 *   `docs/scraped_standards/` — Retrieved standards, regenerable and excluded from version control.
 
@@ -52,11 +61,17 @@ To pull a new open-access standard and recompile the AI workspace:
 
 ```bash
 # 1. Search and extract an online standard via Firecrawl
-python scripts/fetch_standards.py "MBIE B2 durability for metal components" mbie_durability --corrosion --search
+python scripts/fetch_standards.py "MBIE building code accessibility clearances" mbie_accessibility --corrosion --search
 
 # 2. Compile the updated codebase and standards for NotebookLM
 python scripts/compile_for_notebooklm.py
 ```
+
+> **Note:** `scripts/fetch_standards.py` and `scripts/compile_for_notebooklm.py`
+> still route content through the retired `--seismic` / `--corrosion` category
+> flags (an Architecture-only `--arch` option has not been added yet); the
+> `--corrosion` flag above is used only because it is currently the one that
+> runs, not because the scraped content is corrosion-related.
 
 ## Stack
 
@@ -75,7 +90,7 @@ bim-guard/
 │   ├── main.py          # App bootstrap, FastAPI API Gateway, and SPA static mount
 │   ├── services/        # Persistence, runner, tracker, and extraction services
 │   ├── modules/         # Compliance pipeline stages & Pydantic contracts
-│   └── engines/         # Corrosion physics engines (GC-001, CC-001, MC-001)
+│   └── engines/         # Architectural compliance engines (ARCH-EGRESS-001, ARCH-SPATIAL-001)
 ├── frontend/            # Standalone Vite + Svelte 5 Single-Page App (SPA)
 │   ├── src/
 │   │   ├── lib/         # Typed API client, SSE subscriber, Svelte 5 components
@@ -238,7 +253,7 @@ The primary modern client runs on `http://localhost:5173`:
 - **Documents**: Document management and text extraction
 - **Rule Library**: Rule and folder catalog management
 - **Rule Extraction**: AI-assisted rule extraction from documents
-- **Audit / Analyze**: Multi-engine MEP corrosion & architectural compliance
+- **Audit / Analyze**: Architectural compliance analysis (egress, daylight)
 - **3D Viewer**: Interactive OpenBIM viewport and BCF clash inspection
 - **Reports**: BCF issue export, Excel/PDF compliance reports
 
@@ -247,7 +262,7 @@ The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/
 - `/api/projects` — Project CRUD, model file uploads, IFC metadata
 - `/api/documents` — Document upload, PDF text extraction, ETag caching
 - `/api/rules` — Rule folders, rulesets, and custom rule CRUD
-- `/api/analyze` — Compliance and corrosion analysis execution
+- `/api/analyze` — Architectural compliance analysis execution
 - `/api/events/{project_id}` — Real-time Server-Sent Events (SSE) progress streaming
 - `/api/cde` — buildingSMART openCDE Foundation & Documents REST APIs
 - `/api/bcf/v2.1` — buildingSMART BCF REST API v2.1/v3.0 (topics, viewpoints, comments, snapshots)
