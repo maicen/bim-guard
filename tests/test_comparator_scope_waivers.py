@@ -133,28 +133,16 @@ class TestScopeGating:
         assert result["status"] == "FAIL"
         assert any("not supported" in n for n in result["undetermined_predicates"])
 
-    def test_flexible_coupling_is_evaluated_not_unsupported(self):
-        # ifc_seismic resolves this one now. It is still UNDETERMINED for an
-        # element that carries no value -- which is the safe direction -- but
-        # for the different and more informative reason that the model did not
-        # answer, rather than that nothing could ask.
+    def test_flexible_coupling_is_unsupported(self):
+        # No reader resolves FlexibleCouplingWithin now that the seismic
+        # bracing IFC reader is gone, so this predicate key falls back to
+        # "not supported" like any other key nothing in the model answers.
         pipe = _element("pipe-a", 10.0)
         scope = {"flexible_coupling_within_mm": 300.0}
         result = _evaluate(_rule([pipe], applies_when=scope))
         assert result["status"] == "FAIL"
         notes = result["undetermined_predicates"]
-        assert any("FlexibleCouplingWithin" in n for n in notes)
-        assert not any("not supported" in n for n in notes)
-
-    def test_flexible_coupling_within_limit_is_in_scope(self):
-        # "within 300 mm" is INCLUSIVE, unlike the exclusive "_below_mm"
-        # ceilings: a coupling at exactly 300 satisfies the standard's wording.
-        at_limit = _element("pipe-at", 10.0, scope_values={"FlexibleCouplingWithin": 300.0})
-        beyond = _element("pipe-far", 10.0, scope_values={"FlexibleCouplingWithin": 300.1})
-        scope = {"flexible_coupling_within_mm": 300.0}
-        result = _evaluate(_rule([at_limit, beyond], applies_when=scope))
-        assert result["fail_count"] == 1
-        assert result["not_applicable_count"] == 1
+        assert any("not supported" in n for n in notes)
 
 
 class TestWaiverGating:
