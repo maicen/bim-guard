@@ -1,6 +1,6 @@
 /**
  * Tracks in-flight analysis pipelines independent of whichever view is
- * currently on screen. Without this, navigating away from AnalyzeView /
+ * currently on screen. Without this, navigating away from
  * ArchAnalyzeView / WorkflowView mid-run drops all visibility into whether
  * the run finished or failed — the SSE subscription lived only inside the
  * view that started it. `pipelineTracker` keeps one subscription alive per

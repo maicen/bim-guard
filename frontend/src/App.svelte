@@ -28,7 +28,6 @@
   import RulesView from "./routes/RulesView.svelte";
   import ManualRuleEditorView from "./routes/ManualRuleEditorView.svelte";
   import ArchAnalyzeView from "./routes/ArchAnalyzeView.svelte";
-  import AnalyzeView from "./routes/AnalyzeView.svelte";
   import WorkflowView from "./routes/WorkflowView.svelte";
   import ReportsView from "./routes/ReportsView.svelte";
   import UserManualView from "./routes/UserManualView.svelte";
@@ -61,10 +60,8 @@
   // shareable links work. "/" maps to the dashboard; every other view's id
   // (e.g. "rules", "manual-rule-editor") is used verbatim as its path.
   let activeView = $derived(router.location === "/" ? "dashboard" : router.location.slice(1));
-  // "analyze" is a legacy alias for "piping"; both render AnalyzeView.
-  let auditDomain: AnalysisDomainTab = $derived(
-    activeView === "arch" ? "arch" : activeView === "seismic" ? "seismic" : "piping",
-  );
+  // Arch is the only analysis domain today (see AnalysisDomainTabs.svelte).
+  let auditDomain: AnalysisDomainTab = "arch";
   let queryParams = $derived(new URLSearchParams(router.querystring || ""));
   // Rule Extraction Studio, opened in a new tab from the "Run Compliance Audit"
   // wizard with ?doc_id=...&from=quick-test so it pre-selects that document
@@ -104,10 +101,7 @@
   // project's domain instead of running an engine that doesn't apply to it.
   $effect(() => {
     if (
-      (activeView === "arch" ||
-        activeView === "piping" ||
-        activeView === "seismic" ||
-        activeView === "analyze") &&
+      activeView === "arch" &&
       projectAuditDomain &&
       auditDomain !== projectAuditDomain &&
       targetProjectId
@@ -230,7 +224,7 @@
   }
 
   // Synchronize targetProjectId <-> URL query parameters and localStorage.
-  // In project-scoped views (Viewer, Arch, Piping, Seismic, Reports, Workflow),
+  // In project-scoped views (Viewer, Arch, Reports, Workflow),
   // ensure the project persists in the URL query string.
   //
   // The targetProjectId reads/writes below are wrapped in untrack() so this
@@ -365,10 +359,8 @@
     }
   }
 
-  // Routes to the audit view matching the project's own domain rather than
-  // always landing on Piping — a project created as Arch or Seismic used to
-  // open in AnalyzeView regardless, where it wouldn't even appear in the
-  // project picker (AnalyzeView only lists Piping/Seismic projects).
+  // Routes to the audit view matching the project's own domain. Arch is the
+  // only analysis domain today (see viewForAnalysisDomain).
   function handleSelectProjectForAudit(projectId: number, analysisType?: string | null) {
     push(buildTargetUrl(viewForAnalysisDomain(analysisType), projectId));
   }
@@ -384,9 +376,6 @@
 
   // The wizard closes itself once the project is saved; this puts the new
   // project on screen in the analysis view for the domain it was created with.
-  // Routed through viewForAnalysisDomain rather than compared inline: the
-  // wizard sends the canonical 'Arch' / 'Piping' / 'seismic', and matching only
-  // the legacy spellings sent every Arch project to the piping view.
   function handleProjectCreated(project: Project) {
     selectedProject = project;
     push(buildTargetUrl(viewForAnalysisDomain(project.analysis_type), project.id));
@@ -396,16 +385,7 @@
   // different project from the Dashboard's registry while on one of these
   // re-runs that same view against the new project; from anywhere else it
   // just updates the context so the next project-scoped view you open has it.
-  const PROJECT_SCOPED_VIEWS = new Set([
-    "arch",
-    "piping",
-    "seismic",
-    "analyze",
-    "reports",
-    "viewer",
-    "workflow",
-    "models",
-  ]);
+  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "viewer", "workflow", "models"]);
 
   // Whether the app shell is in "project view" (project-scoped sidebar,
   // navbar, and dashboard) vs. "organization view". Driven by project_id
@@ -632,30 +612,16 @@
           <RulesView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
         {:else if activeView === "manual-rule-editor"}
           <ManualRuleEditorView onBack={() => push("/rules")} />
-        {:else if activeView === "arch" || activeView === "piping" || activeView === "seismic" || activeView === "analyze"}
-          <!-- One "Compliance Audit" destination covers all three domains; the
-             tab strip is how you switch between them without a trip back to
-             the sidebar. "analyze" is a legacy alias for "piping". -->
+        {:else if activeView === "arch"}
+          <!-- "Compliance Audit" destination for the Arch domain -- the only
+             one BIM-Guard analyses today (see AnalysisDomainTabs.svelte). -->
           <div class="space-y-5">
             <AnalysisDomainTabs
               active={auditDomain}
               onSelect={handleSelectAuditDomain}
               allowedDomains={projectAuditDomain ? [projectAuditDomain] : undefined}
             />
-            {#if activeView === "arch"}
-              <ArchAnalyzeView initialProjectId={targetProjectId} />
-            {:else}
-              <!-- Keyed so moving between PIPING and SEISMIC remounts the view:
-                 both routes share AnalyzeView, and without this the previous
-                 route's results and filters survive the switch. -->
-              {#key activeView}
-                <AnalyzeView
-                  activeCategory={activeView === "seismic" ? "seismic" : "Piping"}
-                  initialProjectId={targetProjectId}
-                  onSelectProjectForViewer={handleSelectProjectForViewer}
-                />
-              {/key}
-            {/if}
+            <ArchAnalyzeView initialProjectId={targetProjectId} />
           </div>
         {:else if activeView === "workflow"}
           <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
