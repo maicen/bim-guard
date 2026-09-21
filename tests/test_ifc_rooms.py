@@ -573,3 +573,190 @@ class TestNoRegression:
         # Every door is 700 mm and nothing scoped any of them out.
         assert result["fail_count"] == len(extraction["elements"])
         assert result["not_applicable_count"] == 0
+
+
+# ── Room names: kept as written, typos reported, any name accepted ────────────
+
+
+def _build_typo_house() -> ifcopenshell.file:
+    """Build a house whose rooms carry misspelt and custom names, as authored.
+
+    Two rooms are both called "BADROOM 1" (a repeated flat), one "BADROOM 2",
+    one is the perfectly ordinary but unlisted "WAITING", one a plain "Kitchen".
+    """
+    model = ifcopenshell.file(schema="IFC4")
+    project = run("root.create_entity", model, ifc_class="IfcProject", name="Typos")
+    run("unit.assign_unit", model)
+    site = run("root.create_entity", model, ifc_class="IfcSite", name="Site")
+    building = run("root.create_entity", model, ifc_class="IfcBuilding", name="Building")
+    storey = run("root.create_entity", model, ifc_class="IfcBuildingStorey", name="L01")
+    run("aggregate.assign_object", model, products=[site], relating_object=project)
+    run("aggregate.assign_object", model, products=[building], relating_object=site)
+    run("aggregate.assign_object", model, products=[storey], relating_object=building)
+
+    def space(long_name: str):
+        entity = run("root.create_entity", model, ifc_class="IfcSpace", name=long_name)
+        entity.LongName = long_name
+        run("aggregate.assign_object", model, products=[entity], relating_object=storey)
+        return entity
+
+    bad1_a, bad1_b, bad2 = space("BADROOM 1"), space("BADROOM 1"), space("BADROOM 2")
+    waiting, kitchen = space("WAITING"), space("Kitchen")
+
+    doors = []
+    for door_name, room in [
+        ("door_a", bad1_a),
+        ("door_b", bad1_b),
+        ("door_c", bad2),
+        ("door_w", waiting),
+    ]:
+        door = run("root.create_entity", model, ifc_class="IfcDoor", name=door_name)
+        pset = run("pset.add_pset", model, product=door, name="Pset_Test")
+        run("pset.edit_pset", model, pset=pset, properties={"WidthMM": 700})
+        doors.append(door)
+        _boundary(model, room, door)
+        _boundary(model, kitchen, door)
+    run("spatial.assign_container", model, products=doors, relating_structure=storey)
+    return model
+
+
+@pytest.fixture(scope="module")
+def typo_path(tmp_path_factory) -> Path:
+    path = tmp_path_factory.mktemp("typos") / "typos.ifc"
+    _build_typo_house().write(str(path))
+    return path
+
+
+@pytest.fixture(scope="module")
+def typo_index(typo_path):
+    return RoomIndex(ifcopenshell.open(str(typo_path)))
+
+
+class TestRoomNamesAreKeptAsWritten:
+    def test_names_come_through_verbatim(self, typo_index):
+        assert sorted(r.name for r in typo_index.all()) == [
+            "BADROOM 1",
+            "BADROOM 1",
+            "BADROOM 2",
+            "Kitchen",
+            "WAITING",
+        ]
+
+    def test_a_misspelling_is_not_read_as_the_type_it_resembles(self, typo_index):
+        typos = [r for r in typo_index.all() if r.name.startswith("BADROOM")]
+        assert all(r.types == (UNKNOWN_ROOM_TYPE,) for r in typos)
+
+    def test_any_name_is_accepted_without_complaint(self, typo_index):
+        waiting = next(r for r in typo_index.all() if r.name == "WAITING")
+        assert waiting.suggestion is None  # a real name, nothing to correct
+        assert waiting.name == "WAITING"
+
+
+class TestTypoWarnings:
+    def test_identical_names_are_reported_once_with_their_count(self, typo_index):
+        groups = {g["room_name"]: g for g in typo_index.typo_groups()}
+        assert set(groups) == {"BADROOM 1", "BADROOM 2"}
+        assert groups["BADROOM 1"]["count"] == 2
+        assert groups["BADROOM 1"]["suggested_name"] == "BEDROOM 1"
+        assert groups["BADROOM 2"]["suggested_name"] == "BEDROOM 2"
+
+    def test_the_message_names_the_typo_the_fix_and_that_nothing_was_changed(self, typo_index):
+        messages = typo_index.warning_messages()
+        assert len(messages) == 2
+        first = messages[0]  # most rooms first
+        assert "'BADROOM 1' (2 rooms)" in first
+        assert "misspelling of 'bedroom'" in first
+        assert "Suggested name: 'BEDROOM 1'" in first
+        assert "left as written" in first
+
+    def test_a_single_room_is_not_pluralised(self, typo_index):
+        assert "'BADROOM 2' looks like" in typo_index.warning_messages()[1]
+
+    def test_a_model_with_no_typos_has_no_warnings(self, model):
+        assert RoomIndex(model).warning_messages() == []
+
+
+class TestRuleScopeMissWarnings:
+    def test_a_type_the_model_only_has_misspelt_points_at_the_misspellings(self, typo_index):
+        (message,) = typo_index.scope_miss_warnings({"room_type_any_of": ["bedroom"]})
+        assert "no room in this model matches" in message
+        assert "look like misspellings of 'bedroom'" in message
+        assert "'BADROOM 1' (2 rooms) -> 'BEDROOM 1'" in message
+        assert "'BADROOM 2' (1 room) -> 'BEDROOM 2'" in message
+
+    def test_a_mistyped_rule_label_offers_did_you_mean(self, typo_index):
+        (message,) = typo_index.scope_miss_warnings({"room_type_any_of": ["bedrom"]})
+        assert "Did you mean: 'bedroom'" in message
+        assert "Room types found in this model: kitchen." in message
+        assert "'WAITING'" in message  # what the model does have
+
+    def test_a_mistyped_room_name_offers_the_models_own_spelling(self, typo_index):
+        (message,) = typo_index.scope_miss_warnings({"room_name_any_of": ["waitng"]})
+        assert "'WAITING'" in message
+
+    def test_a_label_the_model_has_produces_no_warning(self, typo_index):
+        assert typo_index.scope_miss_warnings({"room_type_any_of": ["kitchen"]}) == []
+        # ...including a custom one, matched by name.
+        assert typo_index.scope_miss_warnings({"room_type_any_of": ["waiting"]}) == []
+        assert typo_index.scope_miss_warnings({"room_name_any_of": ["BADROOM"]}) == []
+
+    def test_none_of_is_satisfied_by_an_absent_room_so_it_never_warns(self, typo_index):
+        assert typo_index.scope_miss_warnings({"room_type_none_of": ["sauna"]}) == []
+
+    def test_each_missing_label_is_reported_separately(self, typo_index):
+        messages = typo_index.scope_miss_warnings({"room_type_any_of": ["bedroom", "sauna"]})
+        assert len(messages) == 2
+
+    def test_no_scope_no_warnings(self, typo_index):
+        assert typo_index.scope_miss_warnings({}) == []
+        assert typo_index.scope_miss_warnings(None) == []
+
+
+class TestWarningsReachTheUser:
+    """Through the reader: model level, per rule, and per element."""
+
+    def test_the_model_level_warnings_join_the_ifc_quality_warnings(self, typo_path):
+        reader = IFCReader(typo_path)
+        joined = " ".join(reader.quality_warnings)
+        assert "'BADROOM 1' (2 rooms)" in joined
+        assert "Suggested name: 'BEDROOM 1'" in joined
+
+    def test_a_rule_naming_a_room_the_model_lacks_carries_the_explanation(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-T.01"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        assert len(result["scope_warnings"]) == 1
+        assert "misspellings of 'bedroom'" in result["scope_warnings"][0]
+
+    def test_each_element_flags_the_typo_in_its_own_rooms(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-T.02"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        door = next(e for e in extraction[0]["elements"] if e["name"] == "door_c")
+        assert any("'BADROOM 2'" in w and "BEDROOM 2" in w for w in door["data_quality_warnings"])
+        # The room is shown exactly as the model spells it.
+        assert "BADROOM 2" in door["connected_rooms"]
+
+    def test_a_typo_room_stays_in_scope_rather_than_being_dropped(self, typo_path):
+        rule = {**BEDROOM_DOOR_RULE, "reference": "ROOM-T.03"}
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        by_name = _by_name(result)
+        for door in ("door_a", "door_b", "door_c"):
+            assert by_name[door]["status"] == "FAIL"
+            assert by_name[door]["scope_undetermined"]
+
+    def test_a_rule_can_name_any_room_the_model_carries(self, typo_path):
+        rule = {
+            **BEDROOM_DOOR_RULE,
+            "reference": "ROOM-T.04",
+            "description": "Doors to the waiting room are at least 800 mm wide",
+            "applies_when": {"room_type_any_of": ["waiting"]},
+        }
+        extraction = IFCReader(typo_path).extract_for_compliance([rule])
+        result = ComplianceComparator().validate_metadata(extraction)[0]
+        by_name = _by_name(result)
+
+        assert by_name["door_w"]["status"] == "FAIL"  # measured: it IS the waiting room's door
+        for other in ("door_a", "door_b", "door_c"):
+            assert by_name[other]["status"] == "NOT_APPLICABLE"  # decided by name, no guessing
+        assert result["scope_warnings"] == []  # the model has a WAITING room

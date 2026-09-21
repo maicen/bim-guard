@@ -1021,6 +1021,9 @@ export interface RuleComplianceResult {
   missing_count?: number;
   total_count?: number;
   all_elements?: RuleElementResult[];
+  /** Notes about the rule's own room scope, e.g. a room it names that the model
+   * does not have, with suggested fixes for likely misspellings. */
+  scope_warnings?: string[];
 }
 
 export interface BuildingSummary {

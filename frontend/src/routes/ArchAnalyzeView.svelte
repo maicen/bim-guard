@@ -28,6 +28,7 @@
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
   import type {
@@ -1417,6 +1418,13 @@
                         >
                           Checks
                           <BsddBadge kind="property" value={rule.property_name} class="font-mono text-fg-secondary" />
+                        </div>
+                      {/if}
+                      {#if rule.scope_warnings?.length}
+                        <div class="space-y-1.5 border-t border-border-subtle px-3.5 py-2">
+                          {#each rule.scope_warnings as warning (warning)}
+                            <Alert type="warning" message={warning} />
+                          {/each}
                         </div>
                       {/if}
                       <ElementResultsTable

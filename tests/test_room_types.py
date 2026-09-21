@@ -11,9 +11,13 @@ import pytest
 
 from app.modules.room_types import (
     ROOM_SCOPE_KEYS,
+    ROOM_TYPES,
     UNKNOWN_ROOM_TYPE,
     classify_room,
     classify_room_text,
+    closest_room_types,
+    name_mentions,
+    suggest_name_correction,
 )
 
 
@@ -40,8 +44,10 @@ class TestSingleNames:
     def test_dotted_abbreviation(self):
         assert classify_room_text("W.C.") == ["toilet"]
 
-    def test_misspelling_seen_in_the_reference_model(self):
-        assert classify_room_text("BADROOM 2") == ["bedroom"]
+    def test_a_misspelling_is_not_silently_read_as_the_room_it_resembles(self):
+        # The model's wording is the author's. A near-miss is reported (see
+        # TestNameCorrectionSuggestions), not quietly reinterpreted.
+        assert classify_room_text("BADROOM 2") == []
 
     def test_plural(self):
         assert classify_room_text("Bedrooms") == ["bedroom"]
@@ -141,6 +147,99 @@ class TestCustomVocabulary:
         assert classify_room_text("Sauna", {"wellness": ["sauna", "steam room"]}) == ["wellness"]
         # ...and the default vocabulary is not consulted when one is supplied.
         assert classify_room_text("Bedroom", {"wellness": ["sauna"]}) == []
+
+
+class TestNameCorrectionSuggestions:
+    """Report a name the vocabulary cannot read as a possible typo.
+
+    It is reported with a proposed fix; the name itself is never changed.
+    """
+
+    def test_a_misspelt_room_word_gets_a_suggestion(self):
+        suggestion = suggest_name_correction("BADROOM 1")
+        assert suggestion is not None
+        assert suggestion.found == "BADROOM"
+        assert suggestion.keyword == "bedroom"
+        assert suggestion.room_type == "bedroom"
+        assert suggestion.suggested_name == "BEDROOM 1"
+
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("Badroom 2", "Bedroom 2"),
+            ("KITCHN", "KITCHEN"),
+            ("Livng Room", "Living Room"),
+            ("Bathrom 1", "Bathroom 1"),
+            ("Dinning Room", "Dining Room"),
+            ("Hallwya", "Hallway"),
+            ("Toilt", "Toilet"),
+        ],
+    )
+    def test_only_the_misspelt_word_changes_and_its_case_is_kept(self, name, expected):
+        assert suggest_name_correction(name).suggested_name == expected
+
+    def test_a_typed_plural_stays_plural(self):
+        assert suggest_name_correction("Badrooms").suggested_name == "Bedrooms"
+
+    def test_the_rest_of_the_name_is_left_exactly_as_written(self):
+        suggestion = suggest_name_correction("L2 - Badroom (north) #3")
+        assert suggestion.suggested_name == "L2 - Bedroom (north) #3"
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Bedroom 1",  # understood already
+            "Nook",  # a real name, nothing resembles it
+            "WAITING",
+            "RECEPTION",
+            "JAN. CL.",
+            "OPT. EXAM / OFF.",
+            "Studio",
+            "LAB",  # too short to judge
+            "104",
+            "",
+            None,
+        ],
+    )
+    def test_names_that_are_merely_unfamiliar_get_no_suggestion(self, name):
+        assert suggest_name_correction(name) is None
+
+    def test_the_suggestion_does_not_alter_classification(self):
+        assert classify_room_text("BADROOM 1") == []
+
+    def test_a_custom_vocabulary_is_used_for_suggestions_too(self):
+        suggestion = suggest_name_correction("Saunna", {"wellness": ["sauna"]})
+        assert suggestion.suggested_name == "Sauna"
+        assert suggestion.room_type == "wellness"
+
+    def test_did_you_mean_for_a_mistyped_rule_label(self):
+        assert closest_room_types("bedrom") == ["bedroom"]
+        assert closest_room_types("kichen") == ["kitchen"]
+        assert closest_room_types("sauna") == []
+
+
+class TestOpenToAnyRoomName:
+    """The vocabulary is a convenience, not a limit."""
+
+    def test_a_label_outside_the_vocabulary_matches_a_room_by_name(self):
+        assert "waiting" not in ROOM_TYPES
+        assert name_mentions("CENTRAL WAITING", "waiting")
+        assert name_mentions("Waiting / Activity Area", "waiting")
+
+    def test_matching_is_by_whole_word_not_substring(self):
+        assert not name_mentions("Table Room", "lab")
+        assert name_mentions("Dental Lab", "lab")
+
+    def test_multi_word_labels_and_plurals(self):
+        assert name_mentions("PROVIDER CUBICLES", "provider cubicle")
+        assert name_mentions("Staff Lounges", "staff lounge")
+
+    def test_case_and_punctuation_are_ignored(self):
+        assert name_mentions("OPT. EXAM / OFF.", "exam")
+
+    @pytest.mark.parametrize("phrase", ["", None, "  "])
+    def test_an_empty_label_matches_nothing(self, phrase):
+        assert not name_mentions("Kitchen", phrase)
 
 
 def test_scope_keys_are_the_documented_four():

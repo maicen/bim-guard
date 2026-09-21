@@ -22,7 +22,12 @@ PARTIAL rather than an asserted FAIL.
 import re
 
 from app.modules.property_confidence import classify_property_confidence
-from app.modules.room_types import ROOM_SCOPE_KEYS, UNKNOWN_ROOM_TYPE
+from app.modules.room_types import (
+    ROOM_SCOPE_KEYS,
+    ROOM_TYPES,
+    UNKNOWN_ROOM_TYPE,
+    name_mentions,
+)
 
 # Case-insensitive string forms a rule's check_value might use for a boolean
 # IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
@@ -183,11 +188,17 @@ class ComplianceComparator:
         Returns:
             list[dict] with status, counts, and per-element failures
         """
-        return [
-            self._evaluate_rule(item)
-            for item in extraction_results
-            if not self._is_waiver_only(item.get("operator"))
-        ]
+        results = []
+        for item in extraction_results:
+            if self._is_waiver_only(item.get("operator")):
+                continue
+            result = self._evaluate_rule(item)
+            # Notes about the rule's own scope (e.g. a room it names that the
+            # model does not have). Set here so every path -- including a rule
+            # that matched no elements at all -- carries them.
+            result["scope_warnings"] = list(item.get("scope_warnings") or [])
+            results.append(result)
+        return results
 
     @staticmethod
     def _is_waiver_only(operator) -> bool:
@@ -540,23 +551,38 @@ class ComplianceComparator:
         types = el.get("connected_room_types")
         if types is None:
             return UNDETERMINED, f"{key}: {reason}"
+        # A label in the vocabulary is a synonym-aware type. Any other label a
+        # rule names is matched against the room names literally, so a model
+        # may call its rooms anything and a rule may ask for any of them.
+        vocabulary = wanted_cf & ROOM_TYPES
+        custom = wanted_cf - vocabulary
+        names = el.get("connected_rooms")
+        if custom and names is None:
+            return UNDETERMINED, f"{key}: room names not resolved on element"
+        custom_hits = {w for w in custom if any(name_mentions(n, w) for n in names or [])}
+
         present = {str(t).strip().casefold() for t in types}
         has_unknown = UNKNOWN_ROOM_TYPE in present
         known = present - {UNKNOWN_ROOM_TYPE}
+        # Only a VOCABULARY type can hide in an untyped room; a custom label is
+        # tested against the name itself, which is always known.
         untyped = f"{key}: a connected room could not be typed"
+        could_hide = has_unknown and bool(vocabulary)
 
         if key == "room_type_any_of":
-            if known & wanted_cf:
+            if known & vocabulary or custom_hits:
                 return MATCH, ""
-            return (UNDETERMINED, untyped) if has_unknown else (NO_MATCH, "")
+            return (UNDETERMINED, untyped) if could_hide else (NO_MATCH, "")
         if key == "room_type_all_of":
-            if wanted_cf <= known:
+            if custom - custom_hits:
+                return NO_MATCH, ""
+            if vocabulary <= known:
                 return MATCH, ""
-            return (UNDETERMINED, untyped) if has_unknown else (NO_MATCH, "")
+            return (UNDETERMINED, untyped) if could_hide else (NO_MATCH, "")
         # room_type_none_of
-        if known & wanted_cf:
+        if known & vocabulary or custom_hits:
             return NO_MATCH, ""
-        return (UNDETERMINED, untyped) if has_unknown else (MATCH, "")
+        return (UNDETERMINED, untyped) if could_hide else (MATCH, "")
 
     @classmethod
     def _evaluate_predicate(cls, predicate: dict, el: dict) -> tuple[str, list[str]]:

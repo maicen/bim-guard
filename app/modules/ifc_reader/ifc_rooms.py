@@ -32,10 +32,19 @@ comparator does the comparing.
 
 from __future__ import annotations
 
+import difflib
 import logging
 from dataclasses import dataclass
 
-from app.modules.room_types import UNKNOWN_ROOM_TYPE, classify_room
+from app.modules.room_types import (
+    ROOM_TYPES,
+    UNKNOWN_ROOM_TYPE,
+    NameSuggestion,
+    classify_room,
+    closest_room_types,
+    name_mentions,
+    suggest_name_correction,
+)
 
 from .ifc_spatial import (
     BOUNDARY_SOURCE_GEOMETRIC,
@@ -148,6 +157,9 @@ class RoomInfo:
     types: tuple[str, ...]
     type_source: str | None
     storey: str | None
+    #: Set when the name looks like a misspelling of a known room word. The name
+    #: itself is never changed; this is a proposal for the user.
+    suggestion: NameSuggestion | None = None
 
     @property
     def is_classified(self) -> bool:
@@ -208,6 +220,25 @@ def _display_name(space) -> str:
     )
 
 
+def _rooms(count: int) -> str:
+    return f"{count} room" if count == 1 else f"{count} rooms"
+
+
+def _typo_message(group: dict) -> str:
+    """Return the warning text for one group of identically-named rooms."""
+    subject = (
+        f"Room name '{group['room_name']}'"
+        if group["count"] == 1
+        else f"Room name '{group['room_name']}' ({_rooms(group['count'])})"
+    )
+    return (
+        f"{subject} looks like a misspelling of '{group['suggestion']}'. "
+        f"Suggested name: '{group['suggested_name']}'. "
+        "The name has been left as written, so until it is changed the room is "
+        "treated as a room of unknown type."
+    )
+
+
 class RoomIndex:
     """Every ``IfcSpace`` in a model, identified and typed once."""
 
@@ -223,12 +254,16 @@ class RoomIndex:
             if not guid:
                 continue
             types, source = classify_room(_space_text_candidates(space))
+            name = str(_display_name(space))
             self._rooms[guid] = RoomInfo(
                 guid=guid,
-                name=str(_display_name(space)),
+                name=name,
                 types=tuple(types),
                 type_source=source,
                 storey=_storey_of(space),
+                suggestion=(
+                    suggest_name_correction(name) if UNKNOWN_ROOM_TYPE in types else None
+                ),
             )
             self._entities[guid] = space
 
@@ -246,6 +281,105 @@ class RoomIndex:
 
     def all(self) -> list[RoomInfo]:
         return list(self._rooms.values())
+
+    # ── Naming warnings ───────────────────────────────────────────────────────
+    #
+    # Room names are whatever the model's author typed and are never altered.
+    # When one looks like a misspelling of a known room word the engine cannot
+    # type the room, and rather than guess it says so and proposes a fix.
+
+    def typo_groups(self) -> list[dict]:
+        """Group the suspected misspellings by name, most rooms first.
+
+        A model with 32 identical flats has 32 rooms called "BADROOM 1"; one
+        warning that says so is worth more than 32 copies of it.
+        """
+        groups: dict[tuple[str, str], dict] = {}
+        for room in self._rooms.values():
+            suggestion = room.suggestion
+            if suggestion is None:
+                continue
+            group = groups.setdefault(
+                (room.name, suggestion.keyword),
+                {
+                    "room_name": room.name,
+                    "found": suggestion.found,
+                    "suggestion": suggestion.keyword,
+                    "room_type": suggestion.room_type,
+                    "suggested_name": suggestion.suggested_name,
+                    "count": 0,
+                },
+            )
+            group["count"] += 1
+        return sorted(groups.values(), key=lambda g: (-g["count"], g["room_name"]))
+
+    def warning_messages(self) -> list[str]:
+        """One human-readable warning per distinct suspected misspelling."""
+        return [_typo_message(g) for g in self.typo_groups()]
+
+    def scope_miss_warnings(self, predicate: dict | None) -> list[str]:
+        """Explain each room a rule's scope names that no room in the model matches.
+
+        Only the predicates that need a room to exist are checked
+        (``room_type_any_of`` / ``room_type_all_of`` / ``room_name_any_of``);
+        ``room_type_none_of`` is satisfied by an absent room. Each message says
+        what was looked for, what the model has instead, and -- where the
+        model's spelling or the rule's looks like a typo -- what to change.
+        """
+        messages: list[str] = []
+        for key in ("room_type_any_of", "room_type_all_of", "room_name_any_of"):
+            wanted = (predicate or {}).get(key)
+            if wanted is None:
+                continue
+            for label in wanted if isinstance(wanted, list) else [wanted]:
+                label = str(label).strip()
+                if label and not self._matches_a_room(key, label):
+                    messages.append(self._explain_miss(key, label))
+        return messages
+
+    def _matches_a_room(self, key: str, label: str) -> bool:
+        cf = label.casefold()
+        if key == "room_name_any_of":
+            return any(cf in room.name.casefold() for room in self._rooms.values())
+        if cf in ROOM_TYPES:
+            return any(cf in room.types for room in self._rooms.values())
+        return any(name_mentions(room.name, label) for room in self._rooms.values())
+
+    def _explain_miss(self, key: str, label: str) -> str:
+        cf = label.casefold()
+        parts = [f"Rule scope {key} names '{label}', but no room in this model matches it."]
+
+        # The model's rooms may be spelt wrongly ("BADROOM" for "bedroom").
+        likely = [g for g in self.typo_groups() if cf in (g["room_type"], g["suggestion"])]
+        if likely:
+            shown = "; ".join(
+                f"'{g['room_name']}' ({_rooms(g['count'])}) -> '{g['suggested_name']}'"
+                for g in likely[:4]
+            )
+            parts.append(f"Room names that look like misspellings of '{label}': {shown}.")
+
+        # ...or the rule's own label may be.
+        if not likely and cf not in ROOM_TYPES:
+            near = [f"'{t}'" for t in closest_room_types(label)]
+            # Compared without regard to case, but reported as the model spells it.
+            by_folded = {room.name.casefold(): room.name for room in self._rooms.values()}
+            near += [
+                f"'{by_folded[n]}'"
+                for n in difflib.get_close_matches(cf, sorted(by_folded), n=3, cutoff=0.6)
+            ]
+            if near:
+                parts.append(f"Did you mean: {', '.join(near)}?")
+
+        if not likely:
+            typed = sorted({t for r in self._rooms.values() for t in r.types} - {UNKNOWN_ROOM_TYPE})
+            if typed:
+                parts.append(f"Room types found in this model: {', '.join(typed)}.")
+            unnamed = sorted({r.name for r in self._rooms.values() if not r.is_classified})
+            if unnamed:
+                sample = ", ".join(f"'{n}'" for n in unnamed[:6])
+                more = f" and {len(unnamed) - 6} more" if len(unnamed) > 6 else ""
+                parts.append(f"Rooms with names not matched to a type: {sample}{more}.")
+        return " ".join(parts)
 
 
 # ── Element -> rooms ──────────────────────────────────────────────────────────
@@ -489,6 +623,15 @@ class ElementRoomLinker:
 # ── Reader-facing context ─────────────────────────────────────────────────────
 
 
+def _group_of(room: RoomInfo) -> dict:
+    suggestion = room.suggestion
+    return {
+        "room_name": room.name,
+        "suggestion": suggestion.keyword,
+        "suggested_name": suggestion.suggested_name,
+    }
+
+
 def room_context(element, linker: ElementRoomLinker, include_counts: bool = False) -> dict:
     """Room facts for one element, in the shape the reader threads through.
 
@@ -508,8 +651,12 @@ def room_context(element, linker: ElementRoomLinker, include_counts: bool = Fals
         "room_guids": None,
         "room_types": None,
         "space_counts": None,
+        "name_warnings": [],
     }
     if links.usable:
+        context["name_warnings"] = [
+            _typo_message({**_group_of(room), "count": 1}) for room in links.rooms if room.suggestion
+        ]
         types: list[str] = []
         for room in links.rooms:
             for room_type in room.types:

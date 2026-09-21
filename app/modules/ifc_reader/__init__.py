@@ -518,6 +518,10 @@ class IFCReader:
                 self.ifc_file,
                 geometry_extractor=self.geometry_extractor,
             )
+            # Room names are left exactly as the model's author wrote them; a
+            # name that looks like a misspelling is reported, with a suggested
+            # fix, instead of being quietly reinterpreted.
+            self.quality_warnings.extend(self.room_linker.rooms.warning_messages())
         if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
             self.egress_graph = IFCEgressGraph(
                 self.spatial_adjacency, geometry_extractor=self.geometry_extractor
@@ -1763,6 +1767,24 @@ class IFCReader:
                 prop_name, scope_predicate, resolved_exceptions
             )
             wants_space_counts = needs_room and self._needs_space_counts(prop_name)
+
+            # A scope that names a room the model does not have is worth saying
+            # so once per rule: it usually means a typo, in the model or in the
+            # rule, and the suggestions say which.
+            scope_warnings: list[str] = []
+            if needs_room:
+                for predicate in [scope_predicate] + [
+                    e.get("predicate") or {} for e in resolved_exceptions
+                ]:
+                    for message in self.room_linker.rooms.scope_miss_warnings(predicate):
+                        if message not in scope_warnings:
+                            scope_warnings.append(message)
+                for message in scope_warnings:
+                    logger.warning(
+                        "Room scope rule=%s: %s",
+                        rule.get("reference") or rule.get("id") or "unknown",
+                        message,
+                    )
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
                 rule_index,
@@ -2047,6 +2069,7 @@ class IFCReader:
                 fallback_warning = self._class_fallback_warning(el, target)
                 if fallback_warning:
                     data_quality_warnings.insert(0, fallback_warning)
+                data_quality_warnings.extend(room.get("name_warnings") or [])
 
                 element_results.append(
                     {
@@ -2198,6 +2221,9 @@ class IFCReader:
                     # predicates they stand for, so Module 4 needs no database.
                     "applies_when": scope_predicate,
                     "exceptions": resolved_exceptions,
+                    # Notes about the rule's own room scope (a room it names that
+                    # the model does not have), for the user to act on.
+                    "scope_warnings": scope_warnings,
                     "elements": element_results,
                 }
             )

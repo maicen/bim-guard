@@ -132,6 +132,81 @@ class TestRoomNameAnyOf:
         assert _predicate("room_name_any_of", ["primary"], door) == NO_MATCH
 
 
+class TestLabelsOutsideTheVocabulary:
+    """A model may call its rooms anything, and a rule may ask for any of them.
+
+    A label in the vocabulary is a synonym-aware type; any other label is
+    matched against the room names literally. Names are always known, so unlike
+    an untyped room they settle the question either way.
+    """
+
+    def test_a_custom_label_matches_a_room_by_its_own_name(self):
+        door = _door("d", 700, ["unknown"], rooms=["CENTRAL WAITING", "CORRIDOR"])
+        assert _predicate("room_type_any_of", ["waiting"], door) == MATCH
+
+    def test_a_custom_label_that_names_no_connected_room_is_a_definite_no(self):
+        # "unknown" rooms cannot hide a custom label: the name is right there.
+        door = _door("d", 700, ["unknown"], rooms=["JAN. CL.", "CORRIDOR"])
+        assert _predicate("room_type_any_of", ["waiting"], door) == NO_MATCH
+
+    def test_custom_labels_match_whole_words_only(self):
+        door = _door("d", 700, ["unknown"], rooms=["Table Room"])
+        assert _predicate("room_type_any_of", ["lab"], door) == NO_MATCH
+
+    def test_vocabulary_and_custom_labels_can_be_mixed(self):
+        door = _door("d", 700, ["corridor"], rooms=["Hallway", "Dental Lab"])
+        assert _predicate("room_type_any_of", ["bedroom", "lab"], door) == MATCH
+
+    def test_a_vocabulary_type_can_still_hide_in_an_untyped_room(self):
+        door = _door("d", 700, ["unknown"], rooms=["BADROOM 1"])
+        assert _predicate("room_type_any_of", ["bedroom"], door) == UNDETERMINED
+        # ...but a custom label is settled by the name.
+        assert _predicate("room_type_any_of", ["sauna"], door) == NO_MATCH
+
+    def test_all_of_needs_every_custom_label_present(self):
+        door = _door("d", 700, ["unknown"], rooms=["Dental Lab"])
+        assert _predicate("room_type_all_of", ["lab", "waiting"], door) == NO_MATCH
+        both = _door("d", 700, ["unknown"], rooms=["Dental Lab", "Waiting"])
+        assert _predicate("room_type_all_of", ["lab", "waiting"], both) == MATCH
+
+    def test_none_of_a_custom_label(self):
+        door = _door("d", 700, ["unknown"], rooms=["Dental Lab"])
+        assert _predicate("room_type_none_of", ["lab"], door) == NO_MATCH
+        assert _predicate("room_type_none_of", ["waiting"], door) == MATCH
+
+    def test_a_custom_label_needs_the_names_to_be_resolved(self):
+        door = _door("d", 700, ["corridor"], rooms=None)
+        assert _predicate("room_type_any_of", ["waiting"], door) == UNDETERMINED
+
+    def test_names_are_never_altered_on_the_way_through(self):
+        # The finding shows the room exactly as the model spells it.
+        door = _door("d", 700, ["unknown"], rooms=["BADROOM 1"])
+        result = ComplianceComparator().validate_metadata(
+            [_rule([door], {"room_type_any_of": ["bedroom"]})]
+        )[0]
+        assert result["all_elements"][0]["connected_rooms"] == ["BADROOM 1"]
+
+
+class TestScopeWarningsPassThrough:
+    def test_a_rules_scope_warnings_reach_its_result(self):
+        result = ComplianceComparator().validate_metadata(
+            [_rule([_door("d", 700, ["kitchen"])], {"room_type_any_of": ["bedroom"]},
+                   scope_warnings=["no room matches 'bedroom'"])]
+        )[0]
+        assert result["scope_warnings"] == ["no room matches 'bedroom'"]
+
+    def test_they_reach_the_result_even_when_no_element_matched(self):
+        result = ComplianceComparator().validate_metadata(
+            [_rule([], {"room_type_any_of": ["bedroom"]}, scope_warnings=["note"])]
+        )[0]
+        assert result["status"] == "NO_ELEMENTS"
+        assert result["scope_warnings"] == ["note"]
+
+    def test_a_rule_without_any_has_an_empty_list(self):
+        result = ComplianceComparator().validate_metadata([_rule([_door("d", 700, ["kitchen"])], {})])[0]
+        assert result["scope_warnings"] == []
+
+
 class TestUnresolvedLinks:
     """No links is not the same claim as "touches no room"."""
 
