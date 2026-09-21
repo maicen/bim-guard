@@ -152,7 +152,10 @@ class AnalysisService:
 
         ``ruleset_id`` is added, and named in the description, only when the
         finding's rule stored one: a hand-authored rule with no ruleset gets no
-        line rather than a blank one.
+        line rather than a blank one. ``mitigation`` and ``citations`` are
+        added the same way -- only when the finding has them -- so the
+        persisted report carries the same recommended fix and source clause as
+        the export archive instead of a generic placeholder.
         """
         description = f"{issue.description}\n\nElementGUID: {issue.element_id}"
         ruleset_id = str(issue.details.get("ruleset_id") or "").strip()
@@ -171,6 +174,10 @@ class AnalysisService:
         }
         if ruleset_id:
             topic["ruleset_id"] = ruleset_id
+        if issue.mitigation:
+            topic["mitigation"] = issue.mitigation
+        if issue.citations:
+            topic["citations"] = [dict(citation) for citation in issue.citations]
         return topic
 
     def include_rule_results(

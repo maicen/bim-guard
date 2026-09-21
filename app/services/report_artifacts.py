@@ -14,6 +14,9 @@ from app.utils import now_iso_utc
 
 logger = get_logger(__name__)
 
+#: Recommended fix written for a finding whose topic payload carries none.
+DEFAULT_MITIGATION = "Review and resolve the compliance finding."
+
 _REPORT_ARTIFACT_SCHEMA = {
     "id": int,
     "project_id": int,
@@ -152,6 +155,16 @@ class ReportArtifactService:
         if ruleset_id:
             labels.append(f"Ruleset:{ruleset_id}")
 
+        mitigation = str(topic.get("mitigation") or "").strip() or DEFAULT_MITIGATION
+        document_references = [
+            {"description": description}
+            for description in (
+                ReportArtifactService._citation_description(citation)
+                for citation in topic.get("citations") or []
+            )
+            if description
+        ]
+
         # Camera/target share the element's centroid — same convention as
         # the corrosion-engine BCF path (bcf_generator.issues_from_results).
         # position_mm comes from Module 2 (world mm); the viewer's fragments
@@ -184,6 +197,25 @@ class ReportArtifactService:
             risk_band=raw_priority.upper(),
             mechanism=rule_id,
             risk_score=0.0,
-            mitigation="Review and resolve the compliance finding.",
+            mitigation=mitigation,
+            document_references=document_references,
             **pos_kwargs,
         )
+
+    @staticmethod
+    def _citation_description(citation: dict[str, Any]) -> str:
+        """Render a ``{"standard", "clause", "reason"}`` citation as one line.
+
+        The same wording the export archive uses for its "Standards References"
+        block -- ``<standard> Clause <clause>: <reason>`` -- written here as a
+        ``Topic/DocumentReference`` description. Any part the citation lacks is
+        left out rather than filled in, and a citation with nothing to say
+        yields ``""`` so the caller drops it.
+        """
+        standard = str(citation.get("standard") or "").strip()
+        clause = str(citation.get("clause") or "").strip()
+        reason = str(citation.get("reason") or "").strip()
+        head = " ".join(part for part in (standard, f"Clause {clause}" if clause else "") if part)
+        if head and reason:
+            return f"{head}: {reason}"
+        return head or reason
