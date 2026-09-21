@@ -212,7 +212,7 @@ TAGS_METADATA = [
     {"name": "Digital Inspector", "description": "Natural-language Q&A agent over one project's analysis results."},
     {"name": "Repositories", "description": "Registered GitHub repositories used as IFC model sources."},
     {"name": "Rules", "description": "The compliance rule library: CRUD, rulesets, extraction, import/export."},
-    {"name": "Analysis", "description": "Triggering and retrieving corrosion/seismic/architectural compliance runs."},
+    {"name": "Analysis", "description": "Triggering and retrieving architectural compliance runs."},
     {"name": "Documents", "description": "Uploaded specification documents and LLM-driven rule extraction."},
     {"name": "OpenCDE", "description": "buildingSMART OpenCDE Documents API compatibility surface."},
     {"name": "OpenCDE Foundation", "description": "buildingSMART OpenCDE Foundation API: versions, user, OAuth2."},
@@ -465,7 +465,7 @@ def download_report_alias(
     fmt: str,
     project_id: int,
     project: Annotated[dict, Depends(api_projects.get_authorized_project)],
-    slug: str = "corrosion",
+    slug: str = "architecture",
 ):
     """Download analysis report in CSV, JSON, or BCF format."""
     from fastapi import Response

@@ -23,11 +23,9 @@
     /**
      * Which analysis run produced the finding behind `elementGuid`, as an
      * `/analyze/export?slug=` value. `architecture` is the only slug the
-     * backend runs today (`RUNNABLE_SLUGS` in `app/services/analysis_runner.py`);
-     * the endpoint's own default (`app/main.py`) is still the legacy
-     * `"corrosion"` value, kept here in sync rather than renamed since it is
-     * a backend-owned convention, not a frontend cosmetic default. Null keeps
-     * that historical fallback for links that carry no slug.
+     * backend runs today (`RUNNABLE_SLUGS` in `app/services/analysis_runner.py`,
+     * matching the endpoint's own default in `app/main.py`). Null falls back
+     * to that same value for links that carry no slug.
      */
     analysisSlug?: string | null;
     /**
@@ -141,7 +139,7 @@
     if (!viewerAPI) return;
     // The slug is part of the key: the same element can be a finding in two
     // runs, and each lives in its own archive.
-    const slug = (analysisSlug || "corrosion").trim() || "corrosion";
+    const slug = (analysisSlug || "architecture").trim() || "architecture";
     const key = `${id}::${guid}::${slug}`;
     if (focusAttempted === key) return;
     focusAttempted = key;
