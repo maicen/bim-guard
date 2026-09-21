@@ -13,8 +13,6 @@ from app.modules import config
 print(json.dumps({
     "model": config.DEFAULT_LLM_MODEL,
     "openai_model": config.OPENAI_MODEL,
-    "mm": config.FEATURE_PATH_B_MM,
-    "xm": config.FEATURE_PATH_B_XM,
 }))
 """
 
@@ -62,16 +60,12 @@ def test_module_config_reads_environment_without_database(run_probe):
             "SUPABASE_KEY": "",
             "BIM_GUARD_LLM_MODEL": "openai/test-model",
             "OPENAI_MODEL": "test-openai-model",
-            "FEATURE_PATH_B_MM": "1",
-            "FEATURE_PATH_B_XM": "0",
         },
     )
 
     assert result == {
         "model": "openai/test-model",
         "openai_model": "test-openai-model",
-        "mm": True,
-        "xm": False,
     }
 
 

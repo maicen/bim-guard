@@ -185,9 +185,6 @@ def run_pipeline_cli(ifc_file: str | None = None) -> None:
         content = Path(ifc_file).read_bytes()
         parsed = Phase6Service.parse_ifc(content)
         print(f"Elements parsed: {GREEN}{len(parsed.get('elements', []))}{RESET}")
-        analysis_result = Phase6Service.run_corrosion(parsed)
-        issues = analysis_result.get("audit_issues", [])
-        print(f"Compliance issues found: {YELLOW}{len(issues)}{RESET}")
     else:
         print("Executing pipeline orchestrator workflow...")
         result = PipelineOrchestratorService.orchestrate_workflow()

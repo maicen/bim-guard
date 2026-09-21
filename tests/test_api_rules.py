@@ -42,7 +42,7 @@ def test_create_and_update_rule_persists_target_ifc_class():
             "target_ifc_class": "IfcPipeSegment",
             "property_name": "NominalDiameter",
             "mechanism": "CODE",
-            "category": "Piping",
+            "category": "Arch",
             "severity": "Medium",
             "ruleset_id": "BUILDING-CODE-PART9",
         },
@@ -197,14 +197,14 @@ def test_rule_folder_crud():
         json={
             "display_name": "Updated Test Folder Display Name",
             "description": "Updated description",
-            "category": "Piping",
-            "mechanism_scope": "GC-001",
+            "category": "Arch",
+            "mechanism_scope": "CODE",
         },
     )
     assert update_res.status_code == 200
     updated_data = update_res.json()
     assert updated_data["display_name"] == "Updated Test Folder Display Name"
-    assert updated_data["category"] == "Piping"
+    assert updated_data["category"] == "Arch"
 
     # 4. Delete folder
     delete_res = client.delete(f"/api/rules/folders/{test_ruleset_id}")
@@ -252,8 +252,8 @@ def test_rules_bulk_operations():
             "/api/rules/bulk-update",
             json={
                 "rule_ids": rule_ids,
-                "category": "Piping",
-                "mechanism": "GC-001",
+                "category": "Arch",
+                "mechanism": "CODE",
                 "severity": "Critical",
                 "needs_review": 1,
             },
@@ -263,8 +263,8 @@ def test_rules_bulk_operations():
 
         # Verify updates on rules
         updated_r1 = client.get(f"/api/rules/{r1['id']}").json()
-        assert updated_r1["category"] == "Piping"
-        assert updated_r1["mechanism"] == "GC-001"
+        assert updated_r1["category"] == "Arch"
+        assert updated_r1["mechanism"] == "CODE"
         assert updated_r1["severity"] == "Critical"
         assert updated_r1["needs_review"] == 1
     finally:

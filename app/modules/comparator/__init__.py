@@ -62,25 +62,6 @@ UNDETERMINED = "UNDETERMINED"
 _SCOPE_NUMERIC_PROPERTIES = {
     "nominal_diameter_mm": "NominalDiameter",
     "nominal_diameter_below_mm": "NominalDiameter",
-    # Support-derived, resolved by ifc_reader.ifc_supports into
-    # `scope_values` alongside the Pset-derived ones, so they need no separate
-    # machinery here. HangerRodLength is the LONGEST rod on the run: an
-    # exemption for "rods shorter than 150 mm" is only earned when every rod
-    # clears it.
-    "hanger_rod_length_below_mm": "HangerRodLength",
-    "hanger_rod_length_mm": "HangerRodLength",
-    "lateral_brace_spacing_mm": "LateralBraceSpacing",
-    "longitudinal_brace_spacing_mm": "LongitudinalBraceSpacing",
-    # Seismic-derived, resolved by ifc_reader.ifc_seismic into
-    # `scope_values` alongside the rest. FlexibleCouplingWithin is the distance
-    # from the brace FURTHEST from a coupling: "flexible couplings within
-    # 300 mm" is earned only when every brace has one, so the worst brace
-    # decides, exactly as the longest rod does above.
-    "mass_kg": "MassKg",
-    "mass_below_kg": "MassKg",
-    "seismic_force_coefficient_c": "SeismicForceCoefficientC",
-    "flexible_coupling_within_mm": "FlexibleCouplingWithin",
-    "spacing_extension_multiplier": "SpacingExtensionMultiplier",
 }
 
 #: Numeric predicate suffixes that state a bare ceiling rather than a band,
@@ -127,14 +108,6 @@ _SCOPE_BOOL_FIELDS = {
     # that writes no relationships looks exactly like a genuinely unsupported
     # run.
     "is_suspended": "is_suspended",
-    # Seismic detailing flags, resolved by ifc_reader.ifc_seismic. Both
-    # RELAX a rule when true, which is precisely why neither may default to
-    # False: a fabricated False fails compliant work, a fabricated True passes
-    # work that is not, and None -- UNDETERMINED -- is the only honest reading
-    # of a model that never authored the property. True requires EVERY support
-    # on the run to say so; one silent hanger leaves the run undetermined.
-    "details_prevent_rod_bending": "details_prevent_rod_bending",
-    "has_dual_structural_supports": "has_dual_structural_supports",
 }
 
 #: Predicate keys that scope a rule by the ROOMS an element connects to

@@ -2,7 +2,7 @@
 
 Validates:
 1. Typed RuleEvaluationRequest and RuleEvaluationResult models.
-2. Direct RuleEvaluator implementation on GalvanicCorrosionEngine, CreviceCorrosionEngine, and MICEngine.
+2. Direct RuleEvaluator implementation on the architectural engines.
 3. RuleEngineRegistry direct registration (without CallableRuleEvaluator).
 4. Repository and storage dependency injection across all services.
 5. ApplicationContainer bootstrap and composition.
@@ -19,9 +19,7 @@ from app.bootstrap import (
     reset_container,
     set_container,
 )
-from app.engines.bimguard_corrosion_engine import GalvanicCorrosionEngine
-from app.engines.bimguard_crevice_engine import CreviceCorrosionEngine
-from app.engines.bimguard_mic_engine import MICEngine
+from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
 from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
 from app.modules.comparator.engine_registry import (
     CallableRuleEvaluator,
@@ -95,7 +93,7 @@ class MockStorage:
 def test_rule_evaluation_contracts_typed_and_dict_compatible():
     """Verify RuleEvaluationResult supports typed attributes and dict compatibility."""
     result = RuleEvaluationResult(
-        rule_type="GC-001",
+        rule_type="ARCH-EGRESS-001",
         band="Medium",
         score=0.55,
         details={"voltage_gap_V": 0.45},
@@ -104,7 +102,7 @@ def test_rule_evaluation_contracts_typed_and_dict_compatible():
     )
 
     # Typed attribute access
-    assert result.rule_type == "GC-001"
+    assert result.rule_type == "ARCH-EGRESS-001"
     assert result.band == "Medium"
     assert result.score == 0.55
     assert result.details["voltage_gap_V"] == 0.45
@@ -123,59 +121,34 @@ def test_rule_evaluation_contracts_typed_and_dict_compatible():
 
     # Serialization
     d = result.to_dict()
-    assert d["rule_type"] == "GC-001"
+    assert d["rule_type"] == "ARCH-EGRESS-001"
     assert d["band"] == "Medium"
 
     # Typed request
     req = RuleEvaluationRequest(
-        rule_type="GC-001",
+        rule_type="ARCH-EGRESS-001",
         element={"material": "carbon_steel"},
         metadata={"run_id": "test"},
     )
-    assert req.rule_type == "GC-001"
+    assert req.rule_type == "ARCH-EGRESS-001"
     assert req.element["material"] == "carbon_steel"
 
 
 def test_physics_engines_implement_rule_evaluator_directly():
-    """Verify each physics engine satisfies RuleEvaluator protocol directly."""
-    galvanic = GalvanicCorrosionEngine()
-    crevice = CreviceCorrosionEngine()
-    mic = MICEngine()
+    """Verify each architectural engine satisfies RuleEvaluator protocol directly."""
+    egress = EgressAnalysisEngine()
+    daylight = SpatialDaylightEngine()
 
-    assert isinstance(galvanic, RuleEvaluator)
-    assert isinstance(crevice, RuleEvaluator)
-    assert isinstance(mic, RuleEvaluator)
+    assert isinstance(egress, RuleEvaluator)
+    assert isinstance(daylight, RuleEvaluator)
 
-    assert galvanic.rule_type == "GC-001"
-    assert crevice.rule_type == "CC-001"
-    assert mic.rule_type == "MC-001"
+    assert egress.rule_type == "ARCH-EGRESS-001"
+    assert daylight.rule_type == "ARCH-SPATIAL-001"
 
-    # Test galvanic evaluate directly returns RuleEvaluationResult
-    g_res = galvanic.evaluate({"material": "copper", "paired_material": "carbon_steel", "guid": "P-1"})
-    assert isinstance(g_res, RuleEvaluationResult)
-    assert g_res.rule_type == "GC-001"
-    assert g_res.band in ("Low", "Medium", "High", "Critical")
-    assert "voltage_gap_V" in g_res.details
-
-    # Test crevice evaluate directly returns RuleEvaluationResult
-    c_res = crevice.evaluate({"material": "stainless_steel", "joint_description": "flanged", "guid": "P-2"})
-    assert isinstance(c_res, RuleEvaluationResult)
-    assert c_res.rule_type == "CC-001"
-    assert "crevice_geometry" in c_res.details
-
-    # Test mic evaluate directly returns RuleEvaluationResult. MC-001 applies
-    # only to water, so the element must name a water system to be scored.
-    m_res = mic.evaluate(
-        {
-            "material": "carbon_steel",
-            "guid": "P-3",
-            "nominal_diameter_m": 0.1,
-            "system_type": "DOMESTICCOLDWATER",
-        }
-    )
-    assert isinstance(m_res, RuleEvaluationResult)
-    assert m_res.rule_type == "MC-001"
-    assert "flow_class" in m_res.details
+    # Test egress evaluate directly returns RuleEvaluationResult
+    e_res = egress.evaluate({"exit_count": 2, "storey_name": "Level 1"})
+    assert isinstance(e_res, RuleEvaluationResult)
+    assert e_res.rule_type == "ARCH-EGRESS-001"
 
 
 def test_registry_registers_engines_without_callable_adapters():
@@ -183,7 +156,7 @@ def test_registry_registers_engines_without_callable_adapters():
     registry = RuleEngineRegistry()
     register_default_engines(registry)
 
-    for rule_code in ["GC-001", "CC-001", "MC-001"]:
+    for rule_code in ["ARCH-EGRESS-001", "ARCH-SPATIAL-001"]:
         evaluator = registry.get(rule_code)
         assert not isinstance(evaluator, CallableRuleEvaluator)
         assert hasattr(evaluator, "evaluate")
@@ -298,9 +271,9 @@ def test_application_container_bootstrap():
     assert container.phase6_service is not None
 
     # Engines are registered in the container registry
-    assert container.engine_registry.supports("GC-001")
-    assert container.engine_registry.supports("CC-001")
-    assert container.engine_registry.supports("MC-001")
+    assert container.engine_registry.supports("ARCH-EGRESS-001")
+    assert container.engine_registry.supports("ARCH-SPATIAL-001")
+    assert container.engine_registry.supports("CODE-SHACL")
 
     # FastAPI dependencies resolve from the container
     from app.api.dependencies import (

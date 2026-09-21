@@ -395,57 +395,31 @@ class TestBCFRulesetLabels:
 
 
 class TestBCFTopicType:
-    """A clash, a verdict and a data-quality note are different kinds of topic.
+    """A verdict and a data-quality note are different kinds of topic.
 
     Before this, all 4,321 topics in the demo archives were ``TopicType="Issue"``,
-    so no coordination tool could filter the 2,937 seismic clashes apart from
-    the corrosion verdicts, or either from the data-quality notes.
+    so no coordination tool could filter the data-quality notes apart from the
+    compliance verdicts.
     """
-
-    def test_seismic_finding_is_a_clash(self):
-        seismic = issue(id="SB-0001", mechanism="SB-001 seismic bracing")
-        seismic.rule_id = "SB-001.01"
-        assert 'TopicType="Clash"' in _markup_for({"audit_issues": [seismic]}, "SB-0001")
 
     def test_data_quality_note_is_a_warning(self):
         markup = _markup_for({"audit_issues": [data_quality_issue()]}, "MC-0009")
         assert 'TopicType="Warning"' in markup
 
-    def test_corrosion_verdict_stays_an_issue(self):
+    def test_verdict_stays_an_issue(self):
         assert 'TopicType="Issue"' in _markup_for({"audit_issues": [issue(id="GC-0001")]}, "GC-0001")
-
-    def test_a_seismic_data_quality_note_is_a_warning_not_a_clash(self):
-        """Data quality wins over the engine: nothing was measured to clash."""
-        from app.modules.comparator.issue_schema import make_issue
-
-        note = make_issue(
-            id="SB-0009",
-            element_id="GUID-09",
-            rule_id="SB-001.DQ",
-            title="Bracing could not be evaluated",
-            mechanism=DATA_QUALITY,
-            band=RiskBand.LOW,
-            score=0.0,
-            mitigation="Review the IFC source.",
-            assignee_role="BIM coordinator",
-            metadata={"check": "geometry_unavailable"},
-            citations=[],
-        )
-        assert 'TopicType="Warning"' in _markup_for({"audit_issues": [note]}, "SB-0009")
 
     def test_every_emitted_type_is_declared_in_the_known_set(self):
         from app.modules.reporter.bcf_generator import TOPIC_TYPES
 
-        seismic = issue(id="SB-0002", mechanism="SB-001 seismic bracing")
-        seismic.rule_id = "SB-001.01"
-        result = {"audit_issues": [issue(id="GC-0002"), seismic, data_quality_issue()]}
+        result = {"audit_issues": [issue(id="GC-0002"), data_quality_issue()]}
         with zipfile.ZipFile(io.BytesIO(to_bcf(result))) as zf:
             found = set()
             for name in zf.namelist():
                 if name.endswith("markup.bcf"):
                     text = zf.read(name).decode("utf-8")
                     found.add(text.split('TopicType="', 1)[1].split('"', 1)[0])
-        assert found == {"Issue", "Clash", "Warning"}
+        assert found == {"Issue", "Warning"}
         assert found <= set(TOPIC_TYPES)
 
 
@@ -738,13 +712,13 @@ class TestBCFDocumentReferences:
         assert "<Description>NASA-STD-6012 — Table 2</Description>" in markup
 
     def test_standard_is_named_as_the_constants_catalogue_spells_it(self):
-        """Citations say 'EN ISO 15329'; NOTEBOOK_STANDARDS says 'EN ISO 15329:2007'."""
+        """Citations say 'ISO 16739-1'; NOTEBOOK_STANDARDS says 'ISO 16739-1:2024'."""
         finding = issue(
-            id="CC-0003",
-            citations=[{"standard": "EN ISO 15329", "clause": "T2", "reason": "wetting"}],
+            id="ARCH-0003",
+            citations=[{"standard": "ISO 16739-1", "clause": "T2", "reason": "schema"}],
         )
-        markup = _markup_for({"audit_issues": [finding]}, "CC-0003")
-        assert "<Description>EN ISO 15329:2007 — T2</Description>" in markup
+        markup = _markup_for({"audit_issues": [finding]}, "ARCH-0003")
+        assert "<Description>ISO 16739-1:2024 — T2</Description>" in markup
 
     def test_no_referenced_document_is_invented(self):
         """No URL or DOI exists for these standards, so none may be emitted."""
@@ -910,34 +884,34 @@ class TestBCFExtensionsSchema:
 class TestBCFTitleConvention:
     """Titles follow {DOMAIN}-{ENGINE}-{FLOOR}-{seq} so an archive sorts usefully.
 
-    Seismic titles previously read "Seismic bracing clearance clash on 19FnYm9E"
-    — one element, GUID truncated to eight characters — so the topic did not
-    say what clashed with what.
+    ``_ENGINE_DOMAIN`` is empty (no registered engine's id currently matches
+    the two-letter-dash-three-digit shape it keys on), so every rule id that
+    does match falls into the "GEN" default domain rather than a named one.
     """
 
     def _title(self, markup: str) -> str:
         return markup.split("<Title>", 1)[1].split("</Title>", 1)[0]
 
-    def test_corrosion_title_carries_domain_engine_floor_and_sequence(self):
+    def test_title_carries_domain_engine_floor_and_sequence(self):
         finding = issue(id="GC-0001", metadata={"floor": "Level 03 Roof"})
         title = self._title(_markup_for({"audit_issues": [finding]}, "GC-0001"))
-        assert title.startswith("PIP-GC-L03-0001 ")
+        assert title.startswith("GEN-GC-L03-0001 ")
 
     def test_basement_level_is_numbered_not_named(self):
         finding = issue(id="MC-0001", metadata={"floor": "Level 00 Basement"})
         finding.rule_id = "MC-001.01"
         title = self._title(_markup_for({"audit_issues": [finding]}, "MC-0001"))
-        assert title.startswith("PIP-MC-L00-0001 ")
+        assert title.startswith("GEN-MC-L00-0001 ")
 
-    def test_seismic_title_uses_the_seismic_domain_and_names_both_elements(self):
+    def test_a_finding_names_both_elements_when_it_implicates_a_partner(self):
         from app.modules.comparator.issue_schema import make_issue
 
         clash = make_issue(
             id="SB-0001",
             element_id="GUID-A",
             rule_id="SB-001.01",
-            title="Seismic bracing clearance clash on GUID-A",
-            mechanism="SB-001 seismic bracing",
+            title="Bracing clearance clash on GUID-A",
+            mechanism="SB-001 bracing",
             band=RiskBand.CRITICAL,
             score=0.9,
             mitigation="Relocate.",
@@ -946,19 +920,18 @@ class TestBCFTitleConvention:
             citations=[],
         )
         title = self._title(_markup_for({"audit_issues": [clash]}, "SB-0001"))
-        assert title == "SEI-SB-NA-0001 Bracing clearance clash GUID-A vs GUID-B"
+        assert title == "GEN-SB-NA-0001 Bracing clearance clash GUID-A vs GUID-B"
 
     def test_absent_floor_is_marked_not_invented(self):
-        """Every SB-001 finding on 1542 has an empty floor; L00 would be a guess."""
         finding = issue(id="XM-0001", metadata={})
         finding.rule_id = "XM-001.01"
         title = self._title(_markup_for({"audit_issues": [finding]}, "XM-0001"))
-        assert title.startswith("PIP-XM-NA-0001 ")
+        assert title.startswith("GEN-XM-NA-0001 ")
 
     def test_floor_without_a_level_number_uses_its_name(self):
         finding = issue(id="GC-0002", metadata={"floor": "Roof"})
         title = self._title(_markup_for({"audit_issues": [finding]}, "GC-0002"))
-        assert title.startswith("PIP-GC-ROOF-0001 ")
+        assert title.startswith("GEN-GC-ROOF-0001 ")
 
     def test_sequence_is_stable_across_two_exports_of_one_result(self):
         result = {

@@ -122,10 +122,10 @@ export interface ScimTokenMintResult {
 /**
  * Canonical analysis domains. Mirrors the keys normalised by
  * `normalize_analysis_type` in app/constants.py; legacy stored values
- * ('Architectural', 'Piping (Corrosive)', 'Halo') collapse onto these via
+ * ('Architectural', 'Architecture') collapse onto this via
  * `normalizeAnalysisDomain` in ./analysisDomain.ts.
  */
-export type AnalysisDomain = "Arch" | "Piping" | "seismic";
+export type AnalysisDomain = "Arch";
 
 export const PROJECT_TYPES = [
   "RESIDENTIAL",

@@ -161,48 +161,21 @@ class EngineSpec:
 #: Every engine the endpoint reports, in payload order.
 #:
 #: ``declared_status`` is what an engine reports until a run touches it, and the
-#: values in use here mean three different things:
+#: values in use here mean two different things:
 #:
-#: ``GC-001`` / ``CC-001``
-#:     Implemented and instrumented. ``pending`` means "no run yet".
-#: ``MM-001`` / ``XM-001``
-#:     Path B comparators. ``FEATURE_PATH_B_MM`` / ``FEATURE_PATH_B_XM`` in
-#:     :mod:`app.modules.config` gate them only in
-#:     ``comparator.compliance_orchestrator``, which no API route calls.
-#:     On the live path they are ``NETWORK_MECHANISMS`` in
-#:     ``phase_6c_corrosion_ui`` and run whenever selected -- which the analyse
-#:     page now does by default. ``pending`` here means "not instrumented",
-#:     exactly as it does for MC-001 below, not "not running".
-#: ``MC-001``
-#:     Declared ``not_implemented`` because the frontend contract for this
-#:     endpoint specifies it. **Note that this repository does ship an MC-001
-#:     engine** -- :mod:`app.engines.bimguard_mic_engine`, wired into
-#:     ``phase_6c_corrosion_ui.MECHANISMS`` and running on every corrosion
-#:     analysis. To report it as a live engine, change this one value to
-#:     ``Status.PENDING`` and instrument it exactly as GC-001 is. Tracking always
-#:     wins over the declared status, so a tracked MC-001 run would report
-#:     ``running`` / ``complete`` regardless of this value.
 #: ``GRAPH-001``
 #:     The theme-agnostic graph engine (``app.engines.bimguard_graph_engine``),
 #:     run from ``orchestrator._run_graph_intelligence`` under the same
 #:     ``enable_graph`` flag as ``graph_summary``. ``pending`` means "no run
-#:     yet", exactly as it does for GC-001/CC-001.
-#: ``SB-001``
-#:     Blue Halo seismic clearance (``app.modules.phase_6.phase_6d_seismic``).
-#:     Reported here for the same reason GRAPH-001 is: it is a real engine a
-#:     user can start from the analyse page, and an engine the endpoint does
-#:     not know about is an engine whose run the UI can only render as a frozen
-#:     zero. It runs under its own ``run_key`` (:data:`SEISMIC_RUN_KEY`), so it
-#:     reaches a client through :func:`merged_snapshot` rather than through the
-#:     default key. ``pending`` means "no run yet".
+#:     yet".
 #: ``DIGITAL-INSPECTOR``
 #:     The LangGraph agent behind ``POST /api/projects/{id}/inspect``
 #:     (``app.digital_inspector.runner``). Registered because its runner binds a
 #:     tracker before its first emit and ``tracker.run`` raises on a code it does
 #:     not know, so until this entry existed every inspector question failed
 #:     with ``KeyError``. It runs under its own ``run_key``
-#:     (:data:`INSPECTOR_RUN_KEY`), for SB-001's reason: a question asked while
-#:     an analysis is running must not reset that analysis's stages.
+#:     (:data:`INSPECTOR_RUN_KEY`): a question asked while an analysis is
+#:     running must not reset that analysis's stages.
 #:     It is a driver around an LLM, not a compliance kernel, so it reports no
 #:     :class:`Stage` transitions: it records ``query_chars`` when a question
 #:     starts, then finishes with ``complete(tool_calls=...)`` or ``fail``. A
@@ -211,13 +184,7 @@ class EngineSpec:
 #:     is stamped Export/100%, and a failed one Validation/0%, stages it never
 #:     entered.
 ENGINE_SPECS: tuple[EngineSpec, ...] = (
-    EngineSpec("GC-001", "Galvanic corrosion", Status.PENDING),
-    EngineSpec("CC-001", "Crevice corrosion", Status.PENDING),
-    EngineSpec("MM-001", "Material / media comparator", Status.PENDING),
-    EngineSpec("XM-001", "Cross-material comparator", Status.PENDING),
-    EngineSpec("MC-001", "Microbially influenced corrosion", Status.NOT_IMPLEMENTED),
     EngineSpec("GRAPH-001", "Graph topology intelligence", Status.PENDING),
-    EngineSpec("SB-001", "Blue Halo seismic clearance", Status.PENDING),
     EngineSpec("DIGITAL-INSPECTOR", "Digital Inspector agent", Status.PENDING),
 )
 
@@ -227,13 +194,10 @@ ENGINES: dict[str, EngineSpec] = {spec.code: spec for spec in ENGINE_SPECS}
 #: Codes in payload order, for callers that iterate without touching the specs.
 ENGINE_CODES: tuple[str, ...] = tuple(spec.code for spec in ENGINE_SPECS)
 
-#: Ruleset codes for the two instrumented engines. The engines import these
-#: rather than repeating the literal, so a code change cannot leave one call
-#: site emitting under a name the endpoint does not know.
-GC_ENGINE = "GC-001"
-CC_ENGINE = "CC-001"
+#: Ruleset codes for the instrumented engines. The engines import these rather
+#: than repeating the literal, so a code change cannot leave one call site
+#: emitting under a name the endpoint does not know.
 GRAPH_ENGINE = "GRAPH-001"
-SB_ENGINE = "SB-001"
 DIGITAL_INSPECTOR_ENGINE = "DIGITAL-INSPECTOR"
 
 
@@ -241,40 +205,27 @@ DIGITAL_INSPECTOR_ENGINE = "DIGITAL-INSPECTOR"
 # Run keys
 # ---------------------------------------------------------------------------
 
-#: The corrosion pipeline's run key, and the value every ``run_key`` argument
-#: defaults to. Named rather than spelled ``"default"`` at each call site so
-#: the three concurrent paths below read as three members of one set.
+#: The architecture pipeline's run key, and the value every ``run_key``
+#: argument defaults to. Named rather than spelled ``"default"`` at each call
+#: site so the concurrent paths below read as members of one set.
 DEFAULT_RUN_KEY = "default"
 
 #: The graph engine's run key (``orchestrator._run_graph_intelligence``).
 GRAPH_RUN_KEY = "graph"
 
-#: Blue Halo's run key (``analysis_runner`` seismic path). Distinct from
-#: :data:`DEFAULT_RUN_KEY` because both analyses can be started against one
-#: project: sharing a key would have the seismic run's ``reset=True`` discard
-#: an in-flight corrosion run's stages, which is the conflict that kept the
-#: seismic path untracked -- and unreportable -- until now.
-SEISMIC_RUN_KEY = "seismic"
-
 #: The Digital Inspector's run key (``app.digital_inspector.runner``). Distinct
 #: from :data:`DEFAULT_RUN_KEY` because a question can be asked about a project
-#: while its corrosion analysis is running: sharing a key would have the
-#: inspector's ``reset=True`` discard that analysis's in-flight stages, and
-#: would fold the inspector's progress into the corrosion progress average,
-#: which the frontend scopes by run key.
+#: while its analysis is running: sharing a key would have the inspector's
+#: ``reset=True`` discard that analysis's in-flight stages, and would fold the
+#: inspector's progress into the analysis progress average, which the frontend
+#: scopes by run key.
 INSPECTOR_RUN_KEY = "inspector"
 
 #: Which run key owns each engine. Every engine belongs to exactly one run, so
 #: a merge across run keys (see :func:`merged_snapshot`) can never have two
 #: trackers claiming one engine's cell.
 RUN_KEY_BY_ENGINE: dict[str, str] = {
-    GC_ENGINE: DEFAULT_RUN_KEY,
-    CC_ENGINE: DEFAULT_RUN_KEY,
-    "MM-001": DEFAULT_RUN_KEY,
-    "XM-001": DEFAULT_RUN_KEY,
-    "MC-001": DEFAULT_RUN_KEY,
     GRAPH_ENGINE: GRAPH_RUN_KEY,
-    SB_ENGINE: SEISMIC_RUN_KEY,
     DIGITAL_INSPECTOR_ENGINE: INSPECTOR_RUN_KEY,
 }
 

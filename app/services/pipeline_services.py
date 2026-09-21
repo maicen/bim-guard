@@ -37,87 +37,7 @@ class AuditIssue:
 
 
 class AnalysisService:
-    """Run-only pipeline for compliance assessment and reporting."""
-
-    def __init__(
-        self,
-        *,
-        evaluator: Callable[[list[Any]], list[dict[str, Any]]] | None = None,
-    ) -> None:
-        """Initialize the read-only evaluator dependency."""
-        self._evaluator = evaluator
-
-    def run(
-        self,
-        elements: list[Any],
-        *,
-        run_id: str = "BGR-AUDIT",
-        source_path: Path | None = None,
-    ) -> dict[str, Any]:
-        """Evaluate immutable input elements and return rows, issues, and BCF topics."""
-        evaluator = self._evaluator
-        if evaluator is None:
-            from app.modules.comparator.compliance_runner import run_compliance_checks
-
-            evaluator = run_compliance_checks
-
-        source_hash = self._file_sha256(source_path) if source_path is not None else None
-        try:
-            from app.services.corrosion_rule_catalog import reload_all_catalogs
-
-            reload_all_catalogs()
-        except Exception:
-            pass
-        rows = evaluator(elements)
-        if source_path is not None and self._file_sha256(source_path) != source_hash:
-            raise RuntimeError("Audit pipeline modified the source IFC file")
-        issues = self._build_issues(rows, run_id=run_id)
-        return {
-            "pipeline": "audit",
-            "element_count": len(rows),
-            "results": rows,
-            "issues": [asdict(issue) for issue in issues],
-            "bcf_topics": [self._to_bcf_topic(issue) for issue in issues],
-            "source_sha256": source_hash,
-        }
-
-    @staticmethod
-    def _file_sha256(path: Path) -> str:
-        """Return the SHA-256 digest of an audit source file."""
-        return hashlib.sha256(path.read_bytes()).hexdigest()
-
-    @staticmethod
-    def _build_issues(rows: list[dict[str, Any]], *, run_id: str) -> tuple[AuditIssue, ...]:
-        """Convert evaluator rows into immutable per-mechanism audit findings."""
-        from app.modules.comparator.issue_adapter import (
-            IssueIdAllocator,
-            issues_from_path_a,
-        )
-
-        mutable_issues = issues_from_path_a(
-            rows,
-            id_allocator=IssueIdAllocator(run_id),
-            include_low=False,
-        )
-        return tuple(
-            AuditIssue(
-                id=issue.id,
-                element_id=issue.element_id,
-                rule_id=issue.rule_id,
-                title=issue.title,
-                band=issue.band.value,
-                score=issue.score,
-                mechanism=issue.mechanism,
-                description=issue.description or "",
-                mitigation=issue.mitigation,
-                details=dict(issue.metadata),
-                # Path A rows carry no rule record, so the adapter emits none
-                # today; forwarding keeps whatever it does cite from being
-                # dropped here on the way to the exporter.
-                citations=[dict(citation) for citation in issue.citations],
-            )
-            for issue in mutable_issues
-        )
+    """Read-only pipeline for folding DB-backed rule results into an audit."""
 
     @staticmethod
     def _rule_citations(rule: dict[str, Any]) -> list[dict[str, str]]:
@@ -477,18 +397,6 @@ class PipelineOrchestratorService:
         from app.modules.phase_6.phase_6e_export import export
 
         return export(summary_payload, fmt, source_reference=source_reference)
-
-
-def run_compliance_analysis(
-    elements: list[Any],
-    *,
-    run_id: str = "BGR-AUDIT",
-    source_path: Path | None = None,
-    service: AnalysisService | None = None,
-) -> dict[str, Any]:
-    """Explicit read-only Phase 1 analysis entry point."""
-    analysis_service = service or AnalysisService()
-    return analysis_service.run(elements, run_id=run_id, source_path=source_path)
 
 
 def enhance_model(

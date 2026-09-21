@@ -181,7 +181,7 @@
     if (!selectedProjectId) return;
     isLoading = true;
     try {
-      result = await analyzeApi.getResults(selectedProjectId, "corrosion");
+      result = await analyzeApi.getResults(selectedProjectId, "architecture");
     } catch {
       result = null;
     } finally {

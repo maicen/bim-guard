@@ -117,18 +117,18 @@ def test_create_project_persists_building_code():
 
 
 def test_create_project_without_building_code_is_allowed():
-    """Verify a Piping project may be created with no code, as step 3 says it may."""
+    """Verify a project may be created with no building code, as step 3 says it may."""
     from app.services.projects_service import ProjectsService
 
     response = client.post(
         "/api/projects",
         json={
-            "name": "Corrosion, no code",
+            "name": "Arch, no code",
             "client_name": "Test Client",
             "short_name": "NoCode",
             "project_code": "NOC",
             "country": "Canada",
-            "analysis_type": "Piping",
+            "analysis_type": "Arch",
         },
     )
     assert response.status_code == 201
@@ -196,7 +196,7 @@ def test_bulk_update_projects():
                 "project_ids": [p1_id, p2_id],
                 "status": "Active",
                 "country": "UK",
-                "analysis_type": "seismic",
+                "analysis_type": "Arch",
             },
         )
         assert res.status_code == 200
@@ -206,8 +206,8 @@ def test_bulk_update_projects():
 
         up1 = svc.get_project(p1_id)
         up2 = svc.get_project(p2_id)
-        assert up1["status"] == "Active" and up1["country"] == "UK" and up1["analysis_type"] == "seismic"
-        assert up2["status"] == "Active" and up2["country"] == "UK" and up2["analysis_type"] == "seismic"
+        assert up1["status"] == "Active" and up1["country"] == "UK" and up1["analysis_type"] == "Arch"
+        assert up2["status"] == "Active" and up2["country"] == "UK" and up2["analysis_type"] == "Arch"
     finally:
         svc.delete_project(p1_id)
         svc.delete_project(p2_id)

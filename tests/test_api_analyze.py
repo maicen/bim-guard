@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from starlette.testclient import TestClient
 
-from app.api.analyze import _selected_engines
 from app.main import app
-from app.modules.contracts import AnalysisRunRequest
 
 client = TestClient(app)
 NONEXISTENT_ID = 999_999_999
@@ -35,35 +33,6 @@ def test_analyze_export_invalid_slug():
     """Verify exporting with invalid slug returns 400."""
     response = client.get("/api/analyze/export?project_id=1&slug=invalid_slug&fmt=bcf")
     assert response.status_code == 400
-
-
-def test_run_request_accepts_an_engine_selection():
-    """The analyse page sends the checked engines; the contract must carry them."""
-    payload = AnalysisRunRequest(project_id=1, slug="corrosion", engines=["GC", "CC"])
-    assert _selected_engines(payload) == ["GC", "CC"]
-
-
-def test_run_request_without_engines_selects_everything():
-    """``None`` is "no selection made", which runs every engine."""
-    assert _selected_engines(AnalysisRunRequest(project_id=1)) is None
-
-
-def test_empty_engine_selection_is_preserved():
-    """An empty list must not be rounded up to "all" on the way through."""
-    payload = AnalysisRunRequest(project_id=1, engines=[])
-    assert _selected_engines(payload) == []
-
-
-def test_rule_ids_still_narrow_a_run():
-    """The older field names the same thing, so it is honoured as a fallback."""
-    payload = AnalysisRunRequest(project_id=1, rule_ids=["GC-001.01"])
-    assert _selected_engines(payload) == ["GC-001.01"]
-
-
-def test_engines_wins_over_rule_ids():
-    """When both are sent, the explicit engine selection is the request."""
-    payload = AnalysisRunRequest(project_id=1, engines=["CC"], rule_ids=["GC-001.01"])
-    assert _selected_engines(payload) == ["CC"]
 
 
 # ── Export Band Filtering Tests ──────────────────────────────────────────────────
@@ -164,7 +133,7 @@ def _synthetic_analysis_result_for_export_tests():
     return {
         "pipeline": "audit",
         "project_id": 119,
-        "slug": "corrosion",
+        "slug": "architecture",
         "element_count": 50,
         "audit_issues": issues,
         "issue_stats": {"total": 18, "critical": 3, "high": 4, "medium": 5, "low": 6, "data_quality": 7},
@@ -199,7 +168,7 @@ def test_export_csv_all_findings_with_low():
 
     synthetic = _synthetic_analysis_result_for_export_tests()
     with patch("app.api.analyze.run_analysis", return_value=synthetic):
-        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=true")
+        response = client.get("/api/analyze/export?project_id=119&slug=architecture&fmt=csv&include_low=true")
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
         assert len(lines) == 26
@@ -210,7 +179,7 @@ def test_export_csv_without_low():
     from unittest.mock import patch
 
     with patch("app.api.analyze.run_analysis", side_effect=_mock_run_analysis_factory()):
-        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_low=false")
+        response = client.get("/api/analyze/export?project_id=119&slug=architecture&fmt=csv&include_low=false")
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
         assert len(lines) == 20
@@ -229,7 +198,7 @@ def test_export_csv_band_filtered():
     synthetic = _synthetic_analysis_result_for_export_tests()
     with patch("app.api.analyze.run_analysis", return_value=synthetic):
         response = client.get(
-            "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=critical&band=high&band=medium"
+            "/api/analyze/export?project_id=119&slug=architecture&fmt=csv&band=critical&band=high&band=medium"
         )
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
@@ -246,7 +215,7 @@ def test_export_csv_exclude_data_quality():
     synthetic = _synthetic_analysis_result_for_export_tests()
     with patch("app.api.analyze.run_analysis", return_value=synthetic):
         response = client.get(
-            "/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&include_data_quality=false"
+            "/api/analyze/export?project_id=119&slug=architecture&fmt=csv&include_data_quality=false"
         )
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
@@ -259,7 +228,7 @@ def test_export_csv_data_quality_only():
 
     synthetic = _synthetic_analysis_result_for_export_tests()
     with patch("app.api.analyze.run_analysis", return_value=synthetic):
-        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=csv&band=data_quality")
+        response = client.get("/api/analyze/export?project_id=119&slug=architecture&fmt=csv&band=data_quality")
         assert response.status_code == 200
         lines = response.text.strip().split("\n")
         assert len(lines) == 8
@@ -280,7 +249,7 @@ def test_export_bcf_band_filtered():
 
     with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
         response = client.get(
-            "/api/analyze/export?project_id=119&slug=corrosion&fmt=bcf&band=critical&band=high&band=medium"
+            "/api/analyze/export?project_id=119&slug=architecture&fmt=bcf&band=critical&band=high&band=medium"
         )
         assert response.status_code == 200
         bcf_zip = zipfile.ZipFile(io.BytesIO(response.content))
@@ -312,7 +281,7 @@ def test_export_json_critical_only():
         return synthetic
 
     with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
-        response = client.get("/api/analyze/export?project_id=119&slug=corrosion&fmt=json&band=critical")
+        response = client.get("/api/analyze/export?project_id=119&slug=architecture&fmt=json&band=critical")
         assert response.status_code == 200
         data = response.json()
         assert len(data.get("findings", [])) == 3
@@ -454,7 +423,7 @@ def test_results_endpoint_accepts_the_ascending_sort_values():
     with patch("app.api.analyze.run_analysis", side_effect=mock_run_analysis):
         for sort, first in (("band_asc", "BGR-0003"), ("score_asc", "BGR-0003")):
             response = client.get(
-                f"/api/analyze/results/4242/corrosion?limit=10&sort={sort}"
+                f"/api/analyze/results/4242/architecture?limit=10&sort={sort}"
             )
             assert response.status_code == 200, (sort, response.text)
             body = response.json()
@@ -464,5 +433,5 @@ def test_results_endpoint_accepts_the_ascending_sort_values():
 
 def test_results_endpoint_still_rejects_an_unknown_sort():
     """The Literal must stay closed, or a typo would silently sort by default."""
-    response = client.get("/api/analyze/results/4242/corrosion?limit=10&sort=sideways")
+    response = client.get("/api/analyze/results/4242/architecture?limit=10&sort=sideways")
     assert response.status_code == 422

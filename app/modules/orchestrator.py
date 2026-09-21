@@ -510,62 +510,21 @@ class BIMGuard_App:
     def _run_theme_compliance(
         selected_theme: str, elements: list, ifc_path, project_id: int, log_progress
     ) -> dict:
-        """Run the MEP corrosion/compliance pipeline, when the theme selects it."""
-        from app.services.pipeline_services import run_compliance_analysis
+        """Return the empty compliance envelope for a theme with no pipeline of its own.
 
-        compliance_results = []
-        compliance_error = None
-        cost_impact = None
-        issue_stats: dict = {}
-        audit_issues: list[dict] = []
-        bcf_topics: list[dict] = []
-        audit_source_sha256: str | None = None
-
-        if selected_theme == "MEP":
-            log_progress(55, "mep-compliance-started", elements=len(elements))
-            try:
-                audit_result = run_compliance_analysis(
-                    elements,
-                    run_id=f"BGR-{project_id}",
-                    source_path=ifc_path,
-                )
-                raw_results = audit_result["results"]
-                audit_issues = audit_result["issues"]
-                bcf_topics = audit_result["bcf_topics"]
-                audit_source_sha256 = audit_result["source_sha256"]
-                # Normalise band names to Title case for the UI
-                band_map = {
-                    "LOW": "Low",
-                    "MEDIUM": "Medium",
-                    "HIGH": "High",
-                    "CRITICAL": "Critical",
-                }
-                for r in raw_results:
-                    r["risk_band"] = band_map.get(r.get("overall_band", "Low"), "Low")
-                compliance_results = raw_results
-
-                bands = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
-                for r in compliance_results:
-                    b = r.get("risk_band", "Low")
-                    if b in bands:
-                        bands[b] += 1
-                issue_stats = bands
-                log_progress(65, "mep-compliance-complete", results=len(compliance_results))
-            except Exception as exc:
-                compliance_error = str(exc)
-                log_progress(65, "mep-compliance-failed", error=type(exc).__name__)
-                logger.exception("MEP compliance checks failed project_id=%d", project_id)
-        else:
-            log_progress(65, "mep-compliance-skipped")
-
+        Architecture's findings come from ``_run_rule_compliance`` and the
+        registered ARCH-* engines, not from this method, so it always reports
+        "skipped" rather than branching on the theme.
+        """
+        log_progress(65, "theme-compliance-skipped")
         return {
-            "compliance_results": compliance_results,
-            "compliance_error": compliance_error,
-            "cost_impact": cost_impact,
-            "issue_stats": issue_stats,
-            "audit_issues": audit_issues,
-            "bcf_topics": bcf_topics,
-            "audit_source_sha256": audit_source_sha256,
+            "compliance_results": [],
+            "compliance_error": None,
+            "cost_impact": None,
+            "issue_stats": {},
+            "audit_issues": [],
+            "bcf_topics": [],
+            "audit_source_sha256": None,
         }
 
     @staticmethod

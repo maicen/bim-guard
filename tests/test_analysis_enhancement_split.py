@@ -4,11 +4,9 @@ from types import SimpleNamespace
 import app.modules.ifc_reader as ifc_read_module
 from app.services.persistence import PersistenceService, _MemoryClient
 from app.services.pipeline_services import (
-    AnalysisService,
     EnhancementService,
     enhance_model,
     execute_model_enhancement,
-    run_compliance_analysis,
 )
 from app.services.models_service import ModelsService
 
@@ -48,66 +46,27 @@ def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypa
     assert opened_paths[0] == source_path
 
 
-def test_analysis_and_enhancement_services_are_separated():
-    element = SimpleNamespace(
-        GlobalId="GUID-001",
-        Name="Carbon Steel Pipe",
-        material="carbon_steel",
-        environment="normal",
-        system_type="Cooling Water",
-        zone="Zone A",
-        floor="Level 1",
-        nominal_diameter_m=0.2,
-        flow_velocity_ms=1.0,
-        operating_temp_c=30.0,
-        dead_leg_length_m=0.5,
-        insulation_condition="poor",
-    )
+def test_enhancement_plan_reports_requested_changes():
+    element = SimpleNamespace(GlobalId="GUID-001", Name="Steel Beam", material="carbon_steel")
 
     source_before = dict(vars(element))
-    analysis = AnalysisService().run([element])
-    assert analysis["pipeline"] == "audit"
-    assert analysis["element_count"] == 1
-    assert "results" in analysis
-    assert isinstance(analysis["results"], list)
-    assert isinstance(analysis["issues"], list)
-    assert len(analysis["bcf_topics"]) == len(analysis["issues"])
-    assert vars(element) == source_before
-
     enhancement = EnhancementService().plan(
         [element],
-        changes={"material": "stainless_steel", "insulation_condition": "improved"},
+        changes={"material": "stainless_steel"},
     )
     assert enhancement["pipeline"] == "enhancement"
     assert enhancement["version"] == 1
     assert enhancement["items"][0]["element_id"] == "GUID-001"
     assert enhancement["items"][0]["changes"]["material"] == "stainless_steel"
+    assert vars(element) == source_before
 
 
-def test_phase_1_analysis_and_enhancement_entry_points_are_explicit():
-    element = SimpleNamespace(
-        GlobalId="GUID-002",
-        Name="Carbon Steel Valve",
-        material="carbon_steel",
-        environment="normal",
-        system_type="Cooling Water",
-        zone="Zone B",
-        floor="Level 2",
-        nominal_diameter_m=0.15,
-        flow_velocity_ms=0.8,
-        operating_temp_c=35.0,
-        dead_leg_length_m=0.3,
-        insulation_condition="poor",
-    )
-
-    analysis = run_compliance_analysis([element])
-    assert analysis["pipeline"] == "audit"
-    assert analysis["element_count"] == 1
-    assert analysis["results"][0]["guid"] == "GUID-002"
+def test_enhance_model_entry_point_is_explicit():
+    element = SimpleNamespace(GlobalId="GUID-002", Name="Steel Column", material="carbon_steel")
 
     enhancement = enhance_model(
         [element],
-        changes={"material": "duplex_steel", "insulation_condition": "improved"},
+        changes={"material": "duplex_steel"},
         version=2,
     )
     assert enhancement["pipeline"] == "enhancement"

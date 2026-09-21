@@ -392,7 +392,7 @@ class ProjectCreateRequest(BaseModel):
     )
     description: Optional[str] = Field(default="", description="Optional description")
     country: str = Field(..., description="Jurisdiction governing code applicability")
-    analysis_type: str = Field(..., description="Analysis domain: Arch, Piping, or seismic")
+    analysis_type: str = Field(..., description="Analysis domain: Arch")
     organization_id: Optional[int] = Field(default=None, description="Owning organization ID")
 
     # Wizard step 3: optional building code ID
@@ -971,7 +971,7 @@ class RuleCreateRequest(BaseModel):
     mechanism: Optional[str] = Field(default="CODE", description="Domain or mechanism (e.g. GC-001, CODE)")
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
-    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch")
     target_ifc_class: Optional[str] = Field(
         default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow), often bSDD-sourced"
     )
@@ -1078,7 +1078,7 @@ class RuleResponse(TimestampFields):
     mechanism: Optional[str] = None
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
-    category: Optional[str] = Field(default="Arch", description="Domain category: Arch, Piping, or seismic")
+    category: Optional[str] = Field(default="Arch", description="Domain category: Arch")
     target_ifc_class: Optional[str] = Field(
         default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)"
     )
@@ -1257,7 +1257,7 @@ class RuleFolderResponse(BaseModel):
     display_name: str
     description: Optional[str] = ""
     mechanism_scope: Optional[str] = ""
-    category: str = Field(default="Arch", description="Ruleset category: Arch, Piping, or seismic")
+    category: str = Field(default="Arch", description="Ruleset category: Arch")
     rules: list[RuleResponse] = Field(default_factory=list)
 
 
@@ -1268,7 +1268,7 @@ class RuleFolderCreateRequest(BaseModel):
     display_name: Optional[str] = Field(default=None, description="Display name")
     description: Optional[str] = Field(default="", description="Description")
     mechanism_scope: Optional[str] = Field(default="", description="Mechanism scope (e.g. CODE, GC-001, SEISMIC)")
-    category: str = Field(default="Arch", description="Ruleset category: Arch, Piping, or seismic")
+    category: str = Field(default="Arch", description="Ruleset category: Arch")
 
 
 class RuleFolderUpdateRequest(BaseModel):
@@ -1285,7 +1285,7 @@ class RuleBulkUpdateRequest(BaseModel):
 
     rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to update")
     ruleset_id: Optional[str] = Field(default=None, description="Assign to ruleset folder")
-    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch")
     mechanism: Optional[str] = Field(default=None, description="Mechanism: CODE, GC-001, CC-001, MC-001, SEISMIC")
     severity: Optional[str] = Field(default=None, description="Severity: Critical, High, Medium, Low")
     needs_review: Optional[int] = Field(default=None, description="Needs review flag: 0 or 1")
@@ -1309,7 +1309,7 @@ class RuleFolderBulkUpdateRequest(BaseModel):
     """Payload for updating multiple ruleset folders in bulk."""
 
     ruleset_ids: list[str] = Field(..., min_length=1, description="Ruleset IDs to update")
-    category: Optional[str] = Field(default=None, description="Domain category: Arch, Piping, or seismic")
+    category: Optional[str] = Field(default=None, description="Domain category: Arch")
     mechanism_scope: Optional[str] = Field(default=None, description="Mechanism scope")
 
 
@@ -1407,24 +1407,7 @@ class AnalysisRunRequest(BaseModel):
     """Request to trigger compliance analysis."""
 
     project_id: int = Field(..., description="Target project ID")
-    slug: str = Field(default="corrosion", description="Analysis type slug (corrosion, seismic)")
-    rule_ids: Optional[list[str]] = Field(default=None, description="Optional rule subset to evaluate")
-    engines: Optional[list[str]] = Field(
-        default=None,
-        description=(
-            "Engine codes to execute, e.g. ['GC-001', 'CC-001']. Prefixes ('GC') and "
-            "rule ids ('GC-001.01') are accepted. None runs every engine; an empty "
-            "list runs none. Unselected engines are skipped, not filtered afterwards."
-        ),
-    )
-    include_low: bool = Field(
-        default=True,
-        description=(
-            "Emit Low-band verdicts. True by default: a Low verdict is an "
-            "assessed finding, and suppressing it made whole engines look "
-            "empty. Set false for the Medium-and-above view."
-        ),
-    )
+    slug: str = Field(default="architecture", description="Analysis type slug (architecture)")
     use_cache: bool = Field(default=True, description="Whether to use cached analysis results")
     enable_shacl: bool = Field(default=False, description="Enable SHACL validation side-channel")
 
@@ -1487,7 +1470,7 @@ class AnalysisResultContract(BaseModel):
 
     pipeline: str = Field(default="audit", description="Pipeline identifier")
     project_id: int
-    slug: str = "corrosion"
+    slug: str = "architecture"
     element_count: int = 0
     audit_issues: list[AuditIssueContract] = Field(default_factory=list)
     issue_stats: IssueStatsContract = Field(default_factory=IssueStatsContract)
@@ -1576,7 +1559,7 @@ class WorkflowStatusContract(BaseModel):
         default="default",
         description=(
             "Which concurrent run reported most recently -- 'default' for "
-            "corrosion, 'seismic' for Blue Halo, 'graph' for the graph engine, "
+            "architecture, 'graph' for the graph engine, "
             "'inspector' for the Digital Inspector agent. "
             "A client scopes a progress average to this rather than averaging "
             "one theme's engines against another theme's."

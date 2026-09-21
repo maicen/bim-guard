@@ -3,8 +3,8 @@
 Consumes ``AnalysisResult`` (data contracts §2), not the engines that produced
 it. Because :class:`Issue` is mechanism-agnostic by design — "every compliance
 domain produces the same shape, differentiated only by the ``mechanism`` string"
-— one exporter serves corrosion (Session C), seismic (Session D) and anything
-added later, with no per-mechanism branch.
+— one exporter serves architecture (Session C) and anything added later, with
+no per-mechanism branch.
 
 BCF IS NOT REIMPLEMENTED
 
@@ -281,9 +281,8 @@ def _creation_author(issue: Issue) -> str:
 
 
 #: Engines whose findings are geometric interferences rather than compliance
-#: verdicts. SB-001 reports one element intruding into another's clearance
-#: halo, which is a clash in every coordination tool's vocabulary.
-_CLASH_ENGINES: frozenset[str] = frozenset({"SB-001"})
+#: verdicts, as distinct from ordinary compliance findings.
+_CLASH_ENGINES: frozenset[str] = frozenset()
 
 
 def _topic_type(issue: Issue) -> str:
@@ -307,16 +306,11 @@ def _topic_type(issue: Issue) -> str:
     return "Issue"
 
 
-#: Engine id -> the domain segment of a topic title. Corrosion engines all
-#: assess pipework; SB-001 assesses seismic bracing.
-_ENGINE_DOMAIN: dict[str, str] = {
-    "GC-001": "PIP",
-    "CC-001": "PIP",
-    "MC-001": "PIP",
-    "MM-001": "PIP",
-    "XM-001": "PIP",
-    "SB-001": "SEI",
-}
+#: Engine id -> the domain segment of a topic title. Empty: no registered
+#: engine's id matches ``_ENGINE_CODE_RE`` (two letters, a dash, three
+#: digits), so ``_title`` always falls back to the finding's own title. Kept
+#: as an extension point for an engine that does emit a matching id.
+_ENGINE_DOMAIN: dict[str, str] = {}
 
 #: Title segment used where a finding records no floor. An explicit marker of
 #: absence, not a guess at a level: every SB-001 finding on project 1542 has an
@@ -783,28 +777,6 @@ def to_ids(result: dict) -> str:
     return build_ids_document(rules)
 
 
-def to_ifc(result: dict) -> bytes:
-    """Render SB-001 clearance envelopes as a standalone IFC4 model.
-
-    One IfcBuildingElementProxy box per finding that carries a halo bounding
-    box; everything else in the result is skipped. A result with no such
-    finding still produces a valid, empty model rather than an error -- the
-    caller decides whether an empty download is worth offering, and the API
-    checks :func:`count_clearance_zones` before answering.
-    """
-    from app.modules.reporter.halo_ifc_exporter import build_clearance_zone_ifc
-
-    issues = result.get("audit_issues", []) or []
-    project = str(result.get("project_name") or "").strip()
-    name = (
-        f"BIMGUARD AI seismic clearance zones - {project}"
-        if project
-        else "BIMGUARD AI seismic clearance zones"
-    )
-    logger.info("IFC clearance-zone export issues=%d", len(issues))
-    return build_clearance_zone_ifc(issues, project_name=name)
-
-
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
@@ -815,9 +787,6 @@ FORMATS: dict[str, tuple[str, str]] = {
     "json": ("application/json", "json"),
     "bcf": ("application/octet-stream", "bcf"),
     "ids": ("application/xml", "ids"),
-    # IFC-SPF (ISO 10303-21). Only SB-001 findings carry the geometry this
-    # writes, so for any other mechanism it produces a valid but empty model.
-    "ifc": ("application/x-step", "ifc"),
 }
 
 
@@ -846,7 +815,5 @@ def export(result: dict, fmt: str) -> tuple[bytes, str, str]:
         return to_json(result).encode("utf-8"), media_type, extension
     if key == "ids":
         return to_ids(result).encode("utf-8"), media_type, extension
-    if key == "ifc":
-        return to_ifc(result), media_type, extension
     return to_bcf(result), media_type, extension
 

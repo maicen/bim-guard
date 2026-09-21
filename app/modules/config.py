@@ -73,34 +73,8 @@ DOCLING_LOCAL_URL = os.environ.get("DOCLING_LOCAL_URL", "")
 # ── Google Drive import ────────────────────────────────────────────────────
 # API-key-only access to publicly link-shared ("Anyone with the link") Drive
 # files via the Drive v3 REST API — see app/services/google_drive_service.py.
-# Deliberately distinct from GOOGLE_API_KEY above (that one is Gemini's) —
-# different concern, different key, same reasoning as the FEATURE_PATH_B_MM/
-# FEATURE_PATH_B_XM split below.
+# Deliberately distinct from GOOGLE_API_KEY above (that one is Gemini's).
 GOOGLE_DRIVE_API_KEY = os.environ.get("GOOGLE_DRIVE_API_KEY", "")
-
-# ── Path B feature flags ─────────────────────────────────────────────────
-# Gate the MM-001 and XM-001 comparators independently. Both default OFF.
-#
-# Two flags, not one: MM-001 is APPROVED v1.0 and runs entirely from disk,
-# while XM-001 is still DRAFT and its loader reaches the database for the
-# GC-001 galvanic series. They must not be wired on the same switch.
-# Set to the string "1" to enable; any other value reads as off.
-FEATURE_PATH_B_MM = os.environ.get("FEATURE_PATH_B_MM", "0") == "1"
-FEATURE_PATH_B_XM = os.environ.get("FEATURE_PATH_B_XM", "0") == "1"
-
-# Tier 3 geometric adjacency in the piping producer (piping_producer.
-# _geometric_adjacency). Feeds XM-001: elements Tiers 1 and 2 cannot resolve
-# are skipped as connectivity-indeterminable today, and this tier measures
-# real tessellated surface distance to recover them.
-#
-# A third flag rather than a rider on FEATURE_PATH_B_XM, because the cost
-# profile is different in kind: the other two gate which comparators run,
-# this one gates a tessellation pass during extraction. A site may want
-# XM-001 on and this off on large models.
-# Set to the string "1" to enable; any other value reads as off.
-FEATURE_XM_GEOMETRIC_ADJACENCY = (
-    os.environ.get("FEATURE_XM_GEOMETRIC_ADJACENCY", "0") == "1"
-)
 
 # ── Source document labels ────────────────────────────────────────────────────
 SOURCE_DOC_PDF = "BuildingCode_PDF"

@@ -148,7 +148,7 @@ def test_get_issue_proof_uses_the_real_stored_issue_not_a_dummy():
     app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
 
     def fake_run_analysis(slug, project_id, **kwargs):
-        if slug == "corrosion":
+        if slug == "architecture":
             return {"audit_issues": [real_issue]}
         return {"audit_issues": []}
 

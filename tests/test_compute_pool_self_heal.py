@@ -13,9 +13,7 @@ from concurrent.futures.process import BrokenProcessPool
 
 import pytest
 
-from app.modules.phase_6.phase_6c_corrosion_ui import run_corrosion_analysis
 from app.services import compute_pool
-from tests.test_compute_pool import _sample_element
 
 
 def _crash_worker(_: int) -> int:
@@ -133,30 +131,3 @@ def test_shutdown_with_wait_does_not_hang_on_broken_pool() -> None:
     thread.start()
     assert finished.wait(timeout=30), "shutdown_compute_pool(wait=True) hung on a broken pool"
     assert compute_pool._POOL is None
-
-
-def test_corrosion_fallback_after_pool_break_matches_sequential(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A broken pool mid-analysis yields the sequential result, with no duplicates."""
-    elements = [_sample_element(i) for i in range(40)]
-    parsed = {"quality": {"valid": True}, "elements": elements}
-    engines = ["GC-001", "CC-001", "MC-001"]
-
-    monkeypatch.setenv("BIMGUARD_DISABLE_MULTIPROCESSING", "1")
-    sequential = run_corrosion_analysis(parsed, include_low=True, engines=engines)
-    monkeypatch.delenv("BIMGUARD_DISABLE_MULTIPROCESSING")
-
-    real_run_in_pool = compute_pool.run_in_pool
-
-    def breaking_run_in_pool(func, arg_sets):
-        # A real worker crash, raised from inside the analysis's pool call.
-        real_run_in_pool(_crash_worker, [(0,)])
-
-    monkeypatch.setattr(compute_pool, "run_in_pool", breaking_run_in_pool)
-    fallback = run_corrosion_analysis(parsed, include_low=True, engines=engines)
-
-    assert [i.id for i in fallback["audit_issues"]] == [i.id for i in sequential["audit_issues"]]
-    assert [(i.rule_id, i.element_id, i.band) for i in fallback["audit_issues"]] == [
-        (i.rule_id, i.element_id, i.band) for i in sequential["audit_issues"]
-    ]

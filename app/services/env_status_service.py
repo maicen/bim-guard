@@ -69,9 +69,6 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     EnvVarSpec("BIM_GUARD_LOG_FILE", "Server", "Optional log file path."),
     EnvVarSpec("BIM_GUARD_VERBOSITY", "Server", "CLI/agent verbosity level."),
     # ── Feature flags ────────────────────────────────────────────────────────
-    EnvVarSpec("FEATURE_PATH_B_MM", "Feature Flags", "Enables the MM-001 comparator."),
-    EnvVarSpec("FEATURE_PATH_B_XM", "Feature Flags", "Enables the XM-001 (DRAFT) comparator."),
-    EnvVarSpec("FEATURE_XM_GEOMETRIC_ADJACENCY", "Feature Flags", "Enables Tier-3 tessellated-surface adjacency for XM-001."),
     # ── AI module (experimental orchestrator, app/ai/) ──────────────────────
     EnvVarSpec("AI_FEATURE_ENABLED", "AI Module", "Master switch for the app/ai orchestrator module."),
     EnvVarSpec("AI_VLM_ENABLED", "AI Module", "Enables vision-language-model features."),

@@ -102,7 +102,7 @@ def _reject(token: str):
 
 
 def _export(client: TestClient, fmt: str, *, token: str | None, header: bool = False):
-    url = f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt={fmt}"
+    url = f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt={fmt}"
     headers = {}
     if token and header:
         headers["Authorization"] = f"Bearer {token}"

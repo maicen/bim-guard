@@ -15,7 +15,7 @@ def test_workflow_snapshot_json():
     assert response.status_code == 200
     data = response.json()
     assert "engines" in data
-    assert "GC-001" in data["engines"]
+    assert "GRAPH-001" in data["engines"]
 
 
 def test_workflow_snapshot_bad_id():

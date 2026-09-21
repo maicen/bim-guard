@@ -1,10 +1,8 @@
 """The project Dashboard's Compliance Audit card opens the project's own domain tab.
 
-The card used to navigate to the hardcoded "arch" view, so a Seismic or Piping
-project always landed on the Architectural Compliance Audit tab. It now
-resolves the project's ``analysis_type`` through ``viewForAnalysisDomain``
-(``frontend/src/lib/analysisDomain.ts``), and App.svelte selects the audit
-tab from that route (``/arch``, ``/piping``, ``/seismic``).
+Architecture is now the only analysis domain, so every stored or legacy
+``analysis_type`` value resolves to the same "arch" view through
+``viewForAnalysisDomain`` (``frontend/src/lib/analysisDomain.ts``).
 
 The mapping is executed for real under Node's type stripping (Node >= 22.6);
 the frontend has no test runner of its own. Those tests skip where no
@@ -61,28 +59,23 @@ def _views_for(analysis_types: list[str | None]) -> list[str]:
 
 
 CASES = [
-    # Seismic, as stored today and as older projects stored it.
-    ("seismic", "seismic"),
-    ("Seismic", "seismic"),
-    ("Halo", "seismic"),
-    ("Piping (Seismic)", "seismic"),
-    # Piping.
-    ("Piping", "piping"),
-    ("piping", "piping"),
-    ("Piping (Corrosive)", "piping"),
-    # Architectural.
+    # Current and legacy spellings of the architectural domain.
     ("Arch", "arch"),
     ("Architectural", "arch"),
-    # No domain, or one that maps to no tab: Architectural, never an error.
+    ("Architecture", "arch"),
+    ("arch", "arch"),
+    # No domain, or a retired one (Piping, seismic): Architectural, never an error.
     (None, "arch"),
     ("", "arch"),
     ("   ", "arch"),
     ("Structural", "arch"),
+    ("Piping", "arch"),
+    ("seismic", "arch"),
 ]
 
 
-def test_each_domain_opens_its_own_audit_tab():
-    """Seismic -> Seismic tab, Piping -> Piping tab, anything else -> Architectural."""
+def test_each_domain_opens_the_architectural_audit_tab():
+    """Every domain value, current or retired, opens the Architectural tab."""
     domains = [domain for domain, _ in CASES]
     expected = [view for _, view in CASES]
     assert _views_for(domains) == expected

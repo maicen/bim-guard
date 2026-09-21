@@ -1256,12 +1256,10 @@ export const analyzeApi = {
    */
   async run(
     projectId: number,
-    slug: "corrosion" | "seismic" = "corrosion",
+    slug: "architecture" = "architecture",
     background = false,
     useCache = true,
-    engines?: string[],
     signal?: AbortSignal,
-    includeLow?: boolean,
     enableShacl?: boolean,
   ): Promise<AnalysisResult> {
     const res = await apiFetch(`${API_BASE}/analyze/run?background=${background}`, {
@@ -1271,8 +1269,6 @@ export const analyzeApi = {
         project_id: projectId,
         slug,
         use_cache: useCache,
-        engines: engines ?? null,
-        ...(includeLow === undefined ? {} : { include_low: includeLow }),
         ...(enableShacl === undefined ? {} : { enable_shacl: enableShacl }),
       }),
       signal,
@@ -1291,7 +1287,7 @@ export const analyzeApi = {
    */
   async getResults(
     projectId: number,
-    slug: "corrosion" | "seismic" = "corrosion",
+    slug: "architecture" = "architecture",
     useCache = true,
     engines?: string[],
     signal?: AbortSignal,

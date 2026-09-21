@@ -1,6 +1,6 @@
 """Unit and integration tests for ISO 19650 compliance and the CDE state machine workflow."""
 
-from app.modules.comparator.compliance_runner import run_ids_loin_verification
+from app.modules.comparator.ids_verification import run_ids_loin_verification
 from app.modules.contracts import CDEState
 from app.modules.document_parsing.iso_validator import ISO19650Validator
 from app.modules.phase_6.phase_6e_export import export

@@ -9,10 +9,10 @@ WHAT WENT WRONG
     and SSE ``status`` frames had no top-level ``status`` at all -- so a
     finished run was never recognised as finished.
 
-    These tests drive the real drivers (``analysis_runner``, with model loading
-    and the kernels stubbed) while an SSE stream is subscribed, and assert what
-    the stream and the polled routes actually send -- the boundary the frontend
-    consumes.
+    These tests drive the pipeline tracker directly against two synthetic
+    engine codes (so they do not drift with which real engines exist) while
+    an SSE stream is subscribed, and assert what the stream and the polled
+    routes actually send -- the boundary the frontend consumes.
 
 NO LIVE DATABASE and NO SERVER; the endpoints are driven in-process.
 
@@ -26,20 +26,14 @@ import json
 
 import pytest
 
-import app.services.analysis_runner as runner
 from app.api.events import _sse_generator
 from app.services import pipeline_tracker as pt
 from app.services.analysis_cache import ANALYSIS_CACHE
-from app.services.pipeline_tracker import (
-    CC_ENGINE,
-    GC_ENGINE,
-    GRAPH_ENGINE,
-    GRAPH_RUN_KEY,
-    SB_ENGINE,
-    SEISMIC_RUN_KEY,
-    Stage,
-)
+from app.services.pipeline_tracker import GRAPH_ENGINE, GRAPH_RUN_KEY, EngineSpec, Stage, Status
 from app.services.workflow_status import overall_status, status_snapshot
+
+TEST_ENGINE_A = "TEST-A"
+TEST_ENGINE_B = "TEST-B"
 
 
 @pytest.fixture(autouse=True)
@@ -52,34 +46,16 @@ def _clean_state():
     ANALYSIS_CACHE.clear()
 
 
-def empty_result() -> dict:
-    """Build an AnalysisResult with no error."""
-    return {
-        "audit_issues": [],
-        "issue_stats": {},
-        "cost_impact": None,
-        "compliance_error": None,
-        "compliance_is_demo": False,
-    }
-
-
 @pytest.fixture
-def stub_drivers(monkeypatch):
-    """Serve model bytes and kernel results without storage or IFC parsing."""
-    monkeypatch.setattr(runner, "model_bytes", lambda project_id: (b"IFC", None))
-    monkeypatch.setattr(
-        runner, "model_bytes_all", lambda project_id: ([("primary.ifc", b"IFC")], None)
+def two_test_engines(monkeypatch: pytest.MonkeyPatch):
+    """Register two synthetic engines, isolated from the real ENGINE_SPECS."""
+    specs = pt.ENGINE_SPECS + (
+        EngineSpec(TEST_ENGINE_A, "Test Engine A", Status.PENDING),
+        EngineSpec(TEST_ENGINE_B, "Test Engine B", Status.PENDING),
     )
-    monkeypatch.setattr(
-        runner,
-        "parse_ifc_bytes",
-        lambda content, source_ref="", with_piping=False: {
-            "quality": {"valid": True},
-            "elements": [object(), object()],
-        },
-    )
-    monkeypatch.setattr(runner, "run_corrosion_analysis", lambda parsed, **kw: empty_result())
-    monkeypatch.setattr(runner, "run_seismic_analysis", lambda content, **kw: empty_result())
+    monkeypatch.setattr(pt, "ENGINE_SPECS", specs)
+    monkeypatch.setattr(pt, "ENGINES", {spec.code: spec for spec in specs})
+    monkeypatch.setattr(pt, "ENGINE_CODES", tuple(spec.code for spec in specs))
 
 
 class _ConnectedRequest:
@@ -102,10 +78,7 @@ def run_with_stream(project_id: int, drive) -> tuple[list[str], list[dict]]:
     own thread:
 
     * **live** -- the overall status at the moment of every event after which
-      the SSE generator sends a ``status`` frame. Taken from an event
-      subscriber, since a synchronous driver finishes before the generator can
-      interleave; this is the sequence a client sees when the run executes on
-      a worker thread, as it does under uvicorn.
+      the SSE generator sends a ``status`` frame.
     * **streamed** -- the ``status`` frames the real ``_sse_generator`` yields:
       the initial one (subscribed before the run) and the frames it sends while
       draining the run's events, read until the first terminal frame. Fails
@@ -150,50 +123,51 @@ def _parse_status(chunk: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_a_corrosion_run_reports_running_then_complete(stub_drivers):
-    live, frames = run_with_stream(11, lambda: runner.run_analysis("corrosion", 11))
+def test_a_run_reports_running_then_complete(two_test_engines):
+    def drive():
+        with pt.tracking(11):
+            pt.emit(TEST_ENGINE_B, Stage.ENGINE_EXECUTION)
+            pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+            pt.complete(TEST_ENGINE_A)
+            pt.complete(TEST_ENGINE_B)
+
+    live, frames = run_with_stream(11, drive)
 
     # Subscribed before anything was tracked.
     assert frames[0]["status"] == "idle"
-    # Running for every transition until the last engine finishes. GC-001
-    # completes first while CC-001 is still assembling its report, so that
-    # frame must still read running -- complete means *every* engine is done.
+    # Running for every transition until the last engine finishes: TEST-A
+    # completes first while TEST-B is still executing, so that frame must
+    # still read running -- complete means *every* engine is done.
     assert live[-1] == "complete"
     assert set(live[:-1]) == {"running"}
     # And the stream itself carries the terminal status the frontend waits for.
     assert frames[-1]["status"] == "complete"
     engines = frames[-1]["engines"]
-    assert engines[GC_ENGINE]["status"] == engines[CC_ENGINE]["status"] == "complete"
+    assert engines[TEST_ENGINE_A]["status"] == engines[TEST_ENGINE_B]["status"] == "complete"
 
 
-def test_a_seismic_run_reports_running_then_complete(stub_drivers):
-    live, frames = run_with_stream(12, lambda: runner.run_analysis("seismic", 12))
+def test_a_failed_run_reports_failed(two_test_engines):
+    def drive():
+        with pt.tracking(13):
+            pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+            pt.fail(TEST_ENGINE_A, "no models")
 
-    assert live[-1] == "complete"
-    assert set(live[:-1]) == {"running"}
-    assert frames[-1]["status"] == "complete"
-    assert frames[-1]["run_key"] == SEISMIC_RUN_KEY
-
-
-def test_a_failed_run_reports_failed(stub_drivers, monkeypatch):
-    monkeypatch.setattr(
-        runner,
-        "run_seismic_analysis",
-        lambda content, **kw: {**empty_result(), "compliance_error": "no models"},
-    )
-
-    live, frames = run_with_stream(13, lambda: runner.run_analysis("seismic", 13))
+    live, frames = run_with_stream(13, drive)
 
     assert live[-1] == "failed"
     assert frames[-1]["status"] == "failed"
 
 
-def test_the_polled_status_route_agrees_with_the_stream(stub_drivers):
+def test_the_polled_status_route_agrees_with_the_stream(two_test_engines):
     from starlette.testclient import TestClient
 
     from app.main import app
 
-    runner.run_analysis("corrosion", 14)
+    with pt.tracking(14):
+        pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+        pt.complete(TEST_ENGINE_A)
+        pt.emit(TEST_ENGINE_B, Stage.ENGINE_EXECUTION)
+        pt.complete(TEST_ENGINE_B)
 
     assert TestClient(app).get("/api/analyze/status/14").json()["status"] == "complete"
 
@@ -207,48 +181,47 @@ def test_an_untracked_project_is_idle():
     assert status_snapshot(20)["status"] == "idle"
 
 
-def test_uninstrumented_engines_do_not_hold_a_finished_run_open():
-    """MM-001 / XM-001 / MC-001 are never tracked; they must not block ``complete``."""
+def test_uninstrumented_engines_do_not_hold_a_finished_run_open(two_test_engines):
+    """An engine that is registered but never touched must not block ``complete``."""
     with pt.tracking(21):
-        for code in (GC_ENGINE, CC_ENGINE):
-            pt.emit(code, Stage.ENGINE_EXECUTION)
-            pt.complete(code)
+        pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+        pt.complete(TEST_ENGINE_A)
 
     snap = status_snapshot(21)
-    assert snap["engines"]["MM-001"]["status"] == "pending"
+    assert snap["engines"][TEST_ENGINE_B]["status"] == "pending"
     assert snap["status"] == "complete"
 
 
-def test_a_run_with_one_engine_still_working_is_running():
+def test_a_run_with_one_engine_still_working_is_running(two_test_engines):
     with pt.tracking(22):
-        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
-        pt.emit(CC_ENGINE, Stage.ENGINE_EXECUTION)
-        pt.complete(GC_ENGINE)
+        pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+        pt.emit(TEST_ENGINE_B, Stage.ENGINE_EXECUTION)
+        pt.complete(TEST_ENGINE_A)
 
     assert status_snapshot(22)["status"] == "running"
 
 
-def test_a_later_run_still_working_keeps_the_project_running():
-    """A graph pass after corrosion finishes must not read as the project being done."""
+def test_a_later_run_still_working_keeps_the_project_running(two_test_engines):
+    """A graph pass after the default run finishes must not read as the project being done."""
     with pt.tracking(23):
-        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
-        pt.complete(GC_ENGINE)
+        pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+        pt.complete(TEST_ENGINE_A)
     with pt.tracking(23, run_key=GRAPH_RUN_KEY):
         pt.emit(GRAPH_ENGINE, Stage.ENGINE_EXECUTION)
 
     assert status_snapshot(23)["status"] == "running"
 
 
-def test_a_stale_failure_in_another_run_does_not_fail_the_active_one():
+def test_a_stale_failure_in_another_run_does_not_fail_the_active_one(two_test_engines):
     with pt.tracking(24):
-        pt.emit(GC_ENGINE, Stage.ENGINE_EXECUTION)
-        pt.fail(GC_ENGINE, "old corrosion failure")
-    with pt.tracking(24, run_key=SEISMIC_RUN_KEY):
-        pt.emit(SB_ENGINE, Stage.VALIDATION)
-        pt.complete(SB_ENGINE)
+        pt.emit(TEST_ENGINE_A, Stage.ENGINE_EXECUTION)
+        pt.fail(TEST_ENGINE_A, "old failure")
+    with pt.tracking(24, run_key=GRAPH_RUN_KEY):
+        pt.emit(GRAPH_ENGINE, Stage.VALIDATION)
+        pt.complete(GRAPH_ENGINE)
 
     snap = status_snapshot(24)
-    assert snap["run_key"] == SEISMIC_RUN_KEY
+    assert snap["run_key"] == GRAPH_RUN_KEY
     assert snap["status"] == "complete"
 
 
@@ -256,8 +229,8 @@ def test_any_failure_in_the_active_run_fails_it():
     snap = {
         "run_key": "default",
         "engines": {
-            GC_ENGINE: {"status": "complete", "run_key": "default"},
-            CC_ENGINE: {"status": "failed", "run_key": "default"},
+            TEST_ENGINE_A: {"status": "complete", "run_key": "default"},
+            TEST_ENGINE_B: {"status": "failed", "run_key": "default"},
         },
     }
     assert overall_status(snap) == "failed"

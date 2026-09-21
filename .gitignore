@@ -23,6 +23,9 @@ docs/MonsterUI/
 
 apply_benchmark_patch*.ps1
 
+# Full database backups (production data — never commit)
+data/backups/
+
 # User-uploaded files and generated artifacts (not seed data)
 data/uploads/
 data/bimguard.sqlite

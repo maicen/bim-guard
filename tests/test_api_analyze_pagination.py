@@ -19,7 +19,7 @@ from app.main import app
 from app.modules.comparator.issue_schema import Issue, RiskBand
 
 PROJECT_ID = 4242
-RESULTS_URL = f"/api/analyze/results/{PROJECT_ID}/corrosion"
+RESULTS_URL = f"/api/analyze/results/{PROJECT_ID}/architecture"
 
 #: Engine codes the synthetic run spreads its findings across, cycled so that
 #: band, engine and score vary independently of each other.

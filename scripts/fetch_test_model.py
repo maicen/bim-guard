@@ -457,12 +457,8 @@ def main(argv: list[str] | None = None) -> int:
     if barren:
         print()
         print("warning: no resolvable materials measured in " + ", ".join(barren))
-        print("  The galvanic engine scores material pairs, so these models will")
-        print("  produce no GC-001 findings. Use a model with a non-zero mat% -")
-        print("  run --list to compare.")
+        print("  Use --list to compare models before relying on one.")
 
-    print()
-    print("Next: python scripts/run_full_pipeline.py --model " + downloaded[0].as_posix())
     return 0
 
 

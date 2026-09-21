@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 """Validate every BCF archive in the repository against the BCF 2.1 schemas.
 
-``scripts/regenerate_demo_bcf.py`` validates the three engine demo archives it
-regenerates, and reports on the 38-model sweep. This walks the whole corpus --
-demos, batch exports, seismic runs, sweep archives, anything else on disk --
-and gives one pass/fail line per archive, so the validation report can state
-what fraction of the archives actually validate rather than what fraction of
-one hand-picked directory does.
+This walks the whole corpus -- demos, batch exports, sweep archives, anything
+else on disk -- and gives one pass/fail line per archive, so the validation
+report can state what fraction of the archives actually validate rather than
+what fraction of one hand-picked directory does.
 
 The distinction that matters when reading the output: an archive with **zero
 topics validates trivially**. An empty zip has nothing to violate a schema. The

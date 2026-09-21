@@ -42,7 +42,7 @@ def test_project_update_endpoint(client: TestClient) -> None:
                 "description": "Updated description",
                 "status": "Active",
                 "country": "Canada",
-                "analysis_type": "Piping",
+                "analysis_type": "Architectural",
             },
         )
         assert response.status_code == 200
@@ -51,7 +51,7 @@ def test_project_update_endpoint(client: TestClient) -> None:
         assert data["description"] == "Updated description"
         assert data["status"] == "Active"
         assert data["country"] == "Canada"
-        assert data["analysis_type"] == "Piping"
+        assert data["analysis_type"] == "Arch"
     finally:
         service.delete_project(project_id)
 

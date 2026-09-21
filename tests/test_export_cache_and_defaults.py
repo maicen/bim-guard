@@ -1,9 +1,9 @@
 """One analysis, many reads: cache reuse, export defaults and finding provenance.
 
 The 2026-09-06 audit found the demo path re-running the engines for every read.
-``POST /analyze/corrosion`` passed ``use_cache=False`` unconditionally, the
-export forked the cache key by passing the caller's ``include_low`` into the
-run, and the store expired after 30 minutes. These tests pin the behaviour that
+``POST /analyze/run`` passed ``use_cache=False`` unconditionally, the export
+forked the cache key by passing the caller's ``include_low`` into the run, and
+the store expired after 30 minutes. These tests pin the behaviour that
 replaces it: analyse once, then results, exports and chip toggles are served
 from the stored result.
 """
@@ -33,12 +33,12 @@ def _issues() -> list[Issue]:
         Issue(
             id=f"MED-{i}",
             element_id=f"elem_med_{i}",
-            rule_id="CC-001.01",
+            rule_id="ARCH-EGRESS-001.01",
             title=f"Medium finding {i}",
             band=RiskBand.MEDIUM,
             score=0.5,
-            mechanism="CC-001 crevice corrosion",
-            metadata={"mechanism_code": "CC-001"},
+            mechanism="ARCH-EGRESS-001 egress",
+            metadata={"mechanism_code": "ARCH-EGRESS-001"},
         )
         for i in range(2)
     ]
@@ -46,12 +46,12 @@ def _issues() -> list[Issue]:
         Issue(
             id=f"LOW-{i}",
             element_id=f"elem_low_{i}",
-            rule_id="GC-001.01",
+            rule_id="ARCH-SPATIAL-001.01",
             title=f"Low finding {i}",
             band=RiskBand.LOW,
             score=0.1,
-            mechanism="GC-001 galvanic corrosion",
-            metadata={"mechanism_code": "GC-001"},
+            mechanism="ARCH-SPATIAL-001 daylight",
+            metadata={"mechanism_code": "ARCH-SPATIAL-001"},
         )
         for i in range(3)
     ]
@@ -59,12 +59,12 @@ def _issues() -> list[Issue]:
         Issue(
             id=f"DQ-{i}",
             element_id=f"elem_dq_{i}",
-            rule_id="MC-001.DATA",
+            rule_id="ARCH-EGRESS-001.DATA",
             title=f"Data quality note {i}",
             band=RiskBand.LOW,
             score=0.1,
             mechanism="data_quality",
-            metadata={"check": "hydraulics_unavailable", "mechanism_code": "MC-001"},
+            metadata={"check": "geometry_unavailable", "mechanism_code": "ARCH-EGRESS-001"},
         )
         for i in range(2)
     ]
@@ -72,11 +72,11 @@ def _issues() -> list[Issue]:
 
 
 def _result() -> dict:
-    """An ``AnalysisResult`` shaped like the corrosion runner's."""
+    """An ``AnalysisResult`` shaped like the architecture runner's."""
     return {
         "pipeline": "audit",
         "project_id": PROJECT_ID,
-        "slug": "corrosion",
+        "slug": "architecture",
         "element_count": 7,
         "audit_issues": _issues(),
         "issue_stats": {
@@ -116,48 +116,22 @@ def test_second_run_with_identical_arguments_is_served_from_the_cache():
     ANALYSIS_CACHE.clear()
     runs = []
 
-    def fake_corrosion(content, project_id, engines, *, include_low=True):
-        runs.append(engines)
+    def fake_architecture(project_id, enable_shacl=False):
+        runs.append(project_id)
         return _result()
 
     with (
         patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
-        patch.object(analysis_runner, "_run_corrosion_tracked", side_effect=fake_corrosion),
+        patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
-        first = analysis_runner.run_analysis(
-            "corrosion", PROJECT_ID, engines=["GC-001", "CC-001"], include_low=True
-        )
-        second = analysis_runner.run_analysis(
-            "corrosion", PROJECT_ID, engines=["GC-001", "CC-001"], include_low=True
-        )
+        first = analysis_runner.run_analysis("architecture", PROJECT_ID)
+        second = analysis_runner.run_analysis("architecture", PROJECT_ID)
 
     assert first["cached"] is False
     assert second["cached"] is True
     assert len(runs) == 1, "the engines ran twice for one unchanged model"
     assert len(second["audit_issues"]) == len(first["audit_issues"])
     assert second["issue_stats"] == first["issue_stats"]
-
-
-def test_a_different_engine_selection_is_a_different_result():
-    """Toggling a chip must miss rather than serve another selection's answer."""
-    from app.services import analysis_runner
-
-    ANALYSIS_CACHE.clear()
-    runs = []
-
-    def fake_corrosion(content, project_id, engines, *, include_low=True):
-        runs.append(engines)
-        return _result()
-
-    with (
-        patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
-        patch.object(analysis_runner, "_run_corrosion_tracked", side_effect=fake_corrosion),
-    ):
-        analysis_runner.run_analysis("corrosion", PROJECT_ID, engines=["GC-001", "CC-001"])
-        narrowed = analysis_runner.run_analysis("corrosion", PROJECT_ID, engines=["GC-001"])
-
-    assert narrowed["cached"] is False
-    assert len(runs) == 2
 
 
 def test_export_is_served_from_the_run_the_page_already_computed():
@@ -171,19 +145,18 @@ def test_export_is_served_from_the_run_the_page_already_computed():
     ANALYSIS_CACHE.clear()
     runs = []
 
-    def fake_corrosion(content, project_id, engines, *, include_low=True):
-        runs.append(engines)
+    def fake_architecture(project_id, enable_shacl=False):
+        runs.append(project_id)
         return _result()
 
     with (
         patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
-        patch.object(analysis_runner, "_run_corrosion_tracked", side_effect=fake_corrosion),
+        patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
-        analysis_runner.run_analysis("corrosion", PROJECT_ID, engines=["GC-001", "CC-001"])
+        analysis_runner.run_analysis("architecture", PROJECT_ID)
         for fmt in ("csv", "json", "bcf"):
             response = client.get(
-                f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt={fmt}"
-                "&engines=GC-001&engines=CC-001"
+                f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt={fmt}"
             )
             assert response.status_code == 200, fmt
 
@@ -201,17 +174,17 @@ def test_export_asking_to_drop_low_reuses_the_full_run():
     ANALYSIS_CACHE.clear()
     runs = []
 
-    def fake_corrosion(content, project_id, engines, *, include_low=True):
-        runs.append(include_low)
+    def fake_architecture(project_id, enable_shacl=False):
+        runs.append(project_id)
         return _result()
 
     with (
         patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
-        patch.object(analysis_runner, "_run_corrosion_tracked", side_effect=fake_corrosion),
+        patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
-        analysis_runner.run_analysis("corrosion", PROJECT_ID, include_low=True)
+        analysis_runner.run_analysis("architecture", PROJECT_ID)
         response = client.get(
-            f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=csv&include_low=false"
+            f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt=csv&include_low=false"
         )
 
     assert response.status_code == 200
@@ -228,7 +201,7 @@ def test_cache_capacity_and_ttl_come_from_the_environment():
     assert analysis_cache.TTL_SECONDS == 86400.0
 
     store = AnalysisCache(max_entries=analysis_cache.MAX_ENTRIES, ttl_seconds=analysis_cache.TTL_SECONDS)
-    key = CacheKey(project_id=PROJECT_ID, slug="corrosion", source_sha256="abc", engines=("GC-001",))
+    key = CacheKey(project_id=PROJECT_ID, slug="architecture", source_sha256="abc")
     store.put(key, {"audit_issues": []})
 
     with patch("app.services.analysis_cache.time.monotonic", return_value=3600.0):
@@ -252,7 +225,7 @@ def test_env_override_is_read_and_a_bad_value_falls_back():
 def test_bcf_default_carries_only_medium_and_above():
     """Low verdicts and data-quality notes stay out of the coordination archive."""
     with patch("app.api.analyze.run_analysis", return_value=_result()):
-        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=bcf")
+        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt=bcf")
 
     assert response.status_code == 200
     assert _topics(response.content) == 2
@@ -262,7 +235,7 @@ def test_bcf_still_carries_low_and_notes_when_asked_explicitly():
     """Both remain available as opt-ins; only the default changed."""
     with patch("app.api.analyze.run_analysis", return_value=_result()):
         response = client.get(
-            f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=bcf"
+            f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt=bcf"
             "&include_low=true&include_data_quality=true"
         )
 
@@ -273,7 +246,7 @@ def test_bcf_still_carries_low_and_notes_when_asked_explicitly():
 def test_csv_default_stays_the_asset_register():
     """CSV keeps every assessed element and every note: 7 rows plus a header."""
     with patch("app.api.analyze.run_analysis", return_value=_result()):
-        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=csv")
+        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt=csv")
 
     assert response.status_code == 200
     assert len(response.text.strip().splitlines()) == 8
@@ -282,7 +255,7 @@ def test_csv_default_stays_the_asset_register():
 def test_json_default_stays_the_asset_register():
     """JSON keeps the same set as CSV, verdicts and notes together."""
     with patch("app.api.analyze.run_analysis", return_value=_result()):
-        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=corrosion&fmt=json")
+        response = client.get(f"/api/analyze/export?project_id={PROJECT_ID}&slug=architecture&fmt=json")
 
     assert response.status_code == 200
     payload = response.json()

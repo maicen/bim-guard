@@ -98,27 +98,6 @@ def get_authorized_project_for_analyze_flexible(
     return require_project_access(project_id, current_user, service, memberships, profiles)
 
 
-#: Corrosion engine codes a corrosion run may be narrowed to, matching the
-#: ``MechanismSpec.code`` values in ``phase_6c_corrosion_ui``. Issues carry rule
-#: ids like "GC-001.01" and "GC-001.DATA", so a prefix match selects an engine's
-#: verdicts and its data-quality notes together.
-#:
-#: All five engines are here, and the list must stay in step with
-#: ``phase_6c_corrosion_ui.MECHANISMS``. A code missing from this tuple is not
-#: merely unselectable: it is dropped from ``wanted`` in
-#: :func:`_filter_issues_by_engine`, so a caller naming it alongside a listed
-#: engine ran it and then had its findings filtered away. MM-001 and XM-001
-#: were absent while the network mechanisms that produce them were running,
-#: which is exactly that silent loss.
-SELECTABLE_ENGINES: tuple[str, ...] = (
-    "GC-001",
-    "CC-001",
-    "MC-001",
-    "MM-001",
-    "XM-001",
-)
-
-
 def _issue_stats(issues: list) -> dict[str, int]:
     """Count ``issues`` by band, keeping data-quality notes out of the totals.
 
@@ -136,40 +115,6 @@ def _issue_stats(issues: list) -> dict[str, int]:
         if band in stats:
             stats[band] += 1
     return stats
-
-
-def _filter_issues_by_engine(result: dict, engines: list[str]) -> dict:
-    """Narrow an ``AnalysisResult`` to the issues the given engines raised.
-
-    This is the legacy ``rule_ids`` path only. The analyse page sends
-    ``engines``, which ``resolve_mechanisms`` honours before the element loop,
-    so an unselected engine is never entered rather than being run and then
-    filtered. Narrowing here is what remains for a caller that predates that
-    field.
-
-    Applied to what ``run_analysis`` returns rather than inside it: narrowing
-    before the cache write would store a partial run, and while
-    :class:`~app.services.analysis_cache.CacheKey` now carries the engine
-    tuple and would keep the two apart, the result a cache entry holds should
-    be the whole run its key describes.
-
-    An empty or unrecognised selection returns the result untouched, so a
-    caller cannot accidentally narrow a run down to nothing.
-    """
-    wanted = [e for e in engines if e in SELECTABLE_ENGINES]
-    if not wanted:
-        return result
-
-    kept = [
-        i
-        for i in result.get("audit_issues", [])
-        if any(i.rule_id.startswith(code) for code in wanted)
-    ]
-
-    # issue_stats describes the whole run, so it is recomputed rather than
-    # carried across: a narrowed list under unnarrowed totals reads as data
-    # silently going missing.
-    return {**result, "audit_issues": kept, "issue_stats": _issue_stats(kept)}
 
 
 def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultContract:
@@ -238,19 +183,6 @@ def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultCo
     )
 
 
-def _selected_engines(payload: AnalysisRunRequest) -> list[str] | None:
-    """Return the engine codes a run request selected, or ``None`` for all.
-
-    ``engines`` is the field the analyse page sends. ``rule_ids`` predates it
-    and names the same thing in rule-id form, so it is honoured as a fallback
-    rather than silently ignored — an existing caller that narrowed a run
-    through it keeps working.
-    """
-    if payload.engines is not None:
-        return payload.engines
-    return payload.rule_ids
-
-
 # ---------------------------------------------------------------------------
 # Result pagination
 # ---------------------------------------------------------------------------
@@ -304,10 +236,7 @@ def _source_files_for(project_id: int) -> list[dict]:
 
     ``[{"filename": ..., "date": ...}, ...]`` naming each attached IFC and when
     it was uploaded, so a topic's ``Header/File`` names the model it was
-    actually computed from instead of the placeholder
-    ``BIMGUARD_AI_Model.ifc``. Seismic findings override this per finding from
-    their own ``source_model``; corrosion findings, which record no model of
-    their own, take this list.
+    actually computed from instead of the placeholder ``BIMGUARD_AI_Model.ifc``.
 
     A project whose models cannot be resolved yields an empty list rather than
     raising: a Header that names no file is a smaller failure than an export
@@ -562,7 +491,7 @@ def run_analysis_endpoint(
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     background: bool = Query(False, description="Run in background task if true"),
 ) -> AnalysisResultContract | AnalysisQueuedResponse:
-    """Execute analysis (corrosion or seismic) for a project."""
+    """Execute architectural compliance analysis for a project."""
     project_access(payload.project_id)
     slug = payload.slug.lower()
     if slug not in RUNNABLE_SLUGS:
@@ -571,16 +500,12 @@ def run_analysis_endpoint(
             detail=f"Unknown analysis slug {slug!r}. Supported: {RUNNABLE_SLUGS}",
         )
 
-    engines = _selected_engines(payload)
-
     if background:
         background_tasks.add_task(
             run_analysis,
             slug,
             payload.project_id,
             use_cache=payload.use_cache,
-            engines=engines,
-            include_low=payload.include_low,
             enable_shacl=payload.enable_shacl,
         )
         return AnalysisQueuedResponse(
@@ -594,8 +519,6 @@ def run_analysis_endpoint(
         slug,
         payload.project_id,
         use_cache=payload.use_cache,
-        engines=engines,
-        include_low=payload.include_low,
         enable_shacl=payload.enable_shacl,
     )
     if raw_result.get("compliance_error"):
@@ -603,11 +526,6 @@ def run_analysis_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=raw_result["compliance_error"],
         )
-    # Only corrosion has an engine subset. Applying a corrosion engine list to
-    # another slug would match no rule ids and silently return an empty run
-    # rather than the findings the caller asked for.
-    if payload.rule_ids and slug == "corrosion":
-        raw_result = _filter_issues_by_engine(raw_result, payload.rule_ids)
     return _format_result(slug, payload.project_id, raw_result)
 
 
@@ -643,84 +561,12 @@ def run_lbd_persistence(
     }
 
 
-@router.post("/corrosion", summary="Run corrosion analysis")
-def run_corrosion(
-    project_id: Annotated[int, Form(...)],
-    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
-    engines: Annotated[list[str] | None, Form()] = None,
-    include_low: Annotated[bool, Form()] = True,
-    use_cache: Annotated[bool, Form()] = True,
-) -> AnalysisResultContract:
-    """Run the selected corrosion engines.
-
-    All five are selectable: GC-001, CC-001 and MC-001 score each element,
-    while MM-001 and XM-001 assess the network once. Omitting ``engines`` runs
-    every one of them; naming a subset runs only those, and the rest are never
-    entered.
-
-    ``use_cache`` defaults to ``True``, matching ``/analyze/run``. This endpoint
-    used to pass ``False`` unconditionally, so pressing Run twice on an
-    unchanged model re-ran every engine and the response always said
-    ``cached=false`` — a 141-second answer to a question already answered, and
-    a report that could differ from the one the page was showing. Send
-    ``use_cache=false`` to force a recompute; that still refreshes the entry
-    rather than bypassing the store.
-    """
-    project_access(project_id)
-    raw_result = run_analysis(
-        "corrosion", project_id, use_cache=use_cache, engines=engines, include_low=include_low
-    )
-    if raw_result.get("compliance_error"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=raw_result["compliance_error"],
-        )
-    return _format_result("corrosion", project_id, raw_result)
-
-
-@router.post("/seismic", summary="Run seismic clearance analysis")
-def run_seismic(
-    project_id: Annotated[int, Form(...)],
-    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
-    use_cache: Annotated[bool, Form()] = True,
-) -> AnalysisResultContract:
-    """Run Blue Halo seismic clearance volume validation.
-
-    ``use_cache`` defaults to ``True`` for the reason given on
-    :func:`run_corrosion`: a federated clash run over three models is minutes of
-    work, and repeating it for an unchanged set of models answers a question
-    already answered. The cache key covers every attached model's digest, so
-    attaching or replacing one misses and recomputes on its own.
-    """
-    project_access(project_id)
-    raw_result = run_analysis("seismic", project_id, use_cache=use_cache)
-    if raw_result.get("compliance_error"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=raw_result["compliance_error"],
-        )
-    return _format_result("seismic", project_id, raw_result)
-
-
 @router.get("/results/{project_id}/{slug}", response_model=AnalysisResultContract)
 def get_analysis_results(
     project_id: int,
     slug: str,
     project: Annotated[dict, Depends(get_authorized_project_for_analyze)],
     use_cache: bool = Query(True, description="Whether to read from cache"),
-    engines: list[str] | None = Query(
-        None, description="Engine codes to run; omit to run every engine"
-    ),
-    include_low: bool = Query(
-        True,
-        description=(
-            "Emit Low-band verdicts. True by default: a Low verdict is an "
-            "assessed finding, and suppressing it made whole engines look "
-            "empty — every GC-001 finding on Clinic Plumbing bands Low. Set "
-            "false for the Medium-and-above view. This selects what the run "
-            "produces, unlike band/mechanism, which narrow what a page returns."
-        ),
-    ),
     limit: int | None = Query(
         None,
         ge=1,
@@ -739,10 +585,8 @@ def get_analysis_results(
     mechanism: list[str] | None = Query(
         None,
         description=(
-            "Engine code prefixes the returned issues are limited to, e.g. GC or "
-            "GC-001. Same prefix semantics as `engines`, but applied to what is "
-            "returned rather than to what runs. The token `data_quality` selects "
-            "the data-quality notes instead."
+            "Engine code prefixes the returned issues are limited to. The "
+            "token `data_quality` selects the data-quality notes instead."
         ),
     ),
     q: str | None = Query(
@@ -775,10 +619,6 @@ def get_analysis_results(
     ``mechanism``, ``q``, ``include_data_quality=false`` or ``sort`` narrows
     ``audit_issues`` and adds ``page``.
 
-    ``include_low`` is the exception among the parameters above: it selects
-    what the run computes, not what this page returns, so it changes the cache
-    key and never adds a ``page`` object on its own.
-
     Narrowing happens after ``run_analysis`` has returned, so the cache keeps
     the whole run and two callers paging the same result share one computation.
     ``issue_stats`` always counts the whole run: a page of 200 criticals under
@@ -790,9 +630,7 @@ def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown analysis slug {slug!r}.",
         )
-    raw_result = run_analysis(
-        slug, project_id, use_cache=use_cache, engines=engines, include_low=include_low, enable_shacl=enable_shacl
-    )
+    raw_result = run_analysis(slug, project_id, use_cache=use_cache, enable_shacl=enable_shacl)
     if raw_result.get("compliance_error"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -835,8 +673,8 @@ def get_workflow_status(
 ) -> WorkflowStatusContract:
     """Get the current live workflow stages and metrics for a project.
 
-    Merged across run keys, so the polled fallback reports a seismic or graph
-    run exactly as the SSE stream does. Without the merge the two disagreed:
+    Merged across run keys, so the polled fallback reports a graph run exactly
+    as the SSE stream does. Without the merge the two disagreed:
     the stream carried the events and this reported every engine as pending.
 
     ``status`` is the overall run state shared with the SSE ``status`` frames
@@ -855,24 +693,12 @@ def get_workflow_status(
 
 
 
-@router.get("/export", summary="Export analysis report as BCF, CSV, JSON or IFC")
+@router.get("/export", summary="Export analysis report as BCF, CSV or JSON")
 def export_analysis_report(
     project_id: Annotated[int, Query(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
-    slug: str = Query("corrosion"),
-    fmt: str = Query(
-        "bcf",
-        description=(
-            "Export format: bcf, csv, json or ifc. 'ifc' writes a standalone "
-            "IFC4 model of the SB-001 seismic clearance envelopes -- one "
-            "IfcBuildingElementProxy box per finding that carries one. A run "
-            "whose findings have no envelope geometry yields a valid but "
-            "empty model rather than an error."
-        ),
-    ),
-    engines: list[str] | None = Query(
-        None, description="Engine codes the export covers; omit for every engine"
-    ),
+    slug: str = Query("architecture"),
+    fmt: str = Query("bcf", description="Export format: bcf, csv or json."),
     include_low: bool | None = Query(
         None,
         description=(
@@ -903,9 +729,6 @@ def export_analysis_report(
 ):
     """Export compliance analysis findings into requested format.
 
-    ``engines`` must match the selection the page ran, or the export reports a
-    different set of findings from the results it was downloaded from.
-
     ONE RUN, FILTERED THREE WAYS
 
         The analysis is always requested with ``include_low=True`` and served
@@ -929,9 +752,7 @@ def export_analysis_report(
     keep_low = (not wants_bcf) if include_low is None else include_low
     keep_data_quality = (not wants_bcf) if include_data_quality is None else include_data_quality
 
-    result = run_analysis(
-        slug, project_id, use_cache=True, engines=engines, include_low=True
-    )
+    result = run_analysis(slug, project_id, use_cache=True)
     if result.get("compliance_error"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result["compliance_error"])
 

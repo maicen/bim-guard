@@ -11,9 +11,6 @@ catalog columns, derives the check from the dimension key when the export did
 not spell one out, and preserves every key it did not consume in
 ``parameters`` so nothing extracted is silently dropped.
 
-It is the file-driven counterpart to ``scripts/seed_nfpa13_clearances.py``,
-which carries the same rule shape as hardcoded dictionaries.
-
 Input format
 ------------
 A file may hold either a bare JSON array of rule objects, or an object with the

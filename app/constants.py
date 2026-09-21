@@ -7,11 +7,9 @@ regenerate rather than editing this module by hand.
 
 from typing import Any
 
-#: Analysis types a project can be routed to matching rules categories: Arch, Piping, or seismic.
+#: Analysis types a project can be routed to matching rules categories: Arch.
 ANALYSIS_TYPES: list[str] = [
     "Arch",
-    "Piping",
-    "seismic",
 ]
 
 #: Defaults matching migration column defaults.
@@ -26,34 +24,23 @@ MAX_TOKENS_RULE_EXTRACTION: int = 4096
 #: Analysis type -> URL slug served by app/routes/analyze_*.py.
 ANALYSIS_ROUTES: dict[str, str] = {
     "Arch": "architecture",
-    "Piping": "corrosion",
-    "seismic": "seismic",
     # Legacy aliases
     "Architectural": "architecture",
     "Architecture": "architecture",
-    "Piping (Corrosive)": "corrosion",
-    "Seismic": "seismic",
-    "Halo": "seismic",
 }
 
 _ANALYSIS_TYPE_ALIASES: dict[str, set[str]] = {
     "Arch": {"Arch", "Architectural", "Architecture", "arch"},
-    "Piping": {"Piping", "Piping (Corrosive)", "piping", "corrosion"},
-    "seismic": {"seismic", "Seismic", "Halo", "Piping (Seismic)"},
 }
 
 
 def normalize_analysis_type(analysis_type: str, default: str = "Arch") -> str:
-    """Normalize legacy or alias analysis domain string into canonical domain name: Arch, Piping, or seismic."""
+    """Normalize legacy or alias analysis domain string into canonical domain name: Arch."""
     if not analysis_type:
         return default
     s = analysis_type.strip()
     if s in ("Arch", "Architectural", "Architecture", "arch"):
         return "Arch"
-    if s in ("Piping", "Piping (Corrosive)", "piping", "corrosion"):
-        return "Piping"
-    if s in ("seismic", "Seismic", "Halo", "Piping (Seismic)"):
-        return "seismic"
     return s
 
 #: Building codes offered by wizard step 3, keyed to the jurisdiction chosen in
@@ -408,10 +395,6 @@ COUNTRIES: list[str] = [
 
 #: Standard domains, in the order they should be presented.
 STANDARD_DOMAINS: list[str] = [
-    "Galvanic Corrosion",
-    "Crevice Corrosion",
-    "Mechanical Assembly",
-    "Structural Design",
     "BIM Information Management",
     "Building Safety & Compliance",
     "Regulatory / AI Governance",
@@ -423,122 +406,12 @@ STANDARD_DOMAINS: list[str] = [
 #: Normative references from the thesis, offered in wizard step 5.
 NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
     {
-        "id": "nasa-12",
-        "name": "NASA-STD-6012",
-        "domain": "Galvanic Corrosion",
-        "description": "Voltage thresholds and galvanic couple classification (0.15V harsh, 0.25V normal, 0.50V controlled)",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "imoa-4th",
-        "name": "IMOA Design Manual 4th Edition",
-        "domain": "Galvanic Corrosion",
-        "description": "PREN formula, stainless steel grade selection, galvanic series",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        # The id is left as it was coined: it may already appear in stored rows.
-        # "2025" was never an edition -- it is the worldstainless.org upload path
-        # the PDF is served from. The document is Materials and Applications
-        # Series Volume 10, ISBN 978-2-87997-263-3, (c) Euro Inox 2009, adapted
-        # from Merkblatt 829 (4th edition 2005). Held at
-        # docs/scraped_standards/corrosion_euro_inox_vol10_contact_other_metals.md.
-        "id": "worldstainless-25",
-        "name": "WorldStainless / Euro Inox Vol. 10 (2009)",
-        "domain": "Galvanic Corrosion",
-        "description": "Galvanic series, corrosion rate data, material compatibility",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "aucsc-24",
-        "name": "AUCSC Basic Corrosion Course (2024)",
-        "domain": "Galvanic Corrosion",
-        "description": "Galvanic series, electrolyte conductivity, potential differences",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "aga",
-        "name": "American Galvanizers Association",
-        "domain": "Galvanic Corrosion",
-        "description": "Coating life data, galvanised steel durability, coating protection",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "en-15329",
-        "name": "EN ISO 15329:2007",
-        "domain": "Crevice Corrosion",
-        "description": "Crevice corrosion testing, Critical Crevice Corrosion Temperature (CCT), wetting classes T0–T5",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "astm-g48",
-        "name": "ASTM G48 Method B",
-        "domain": "Crevice Corrosion",
-        "description": "CCT values for stainless steel grades, crevice corrosion testing methodology",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "ciria-c692",
-        "name": "CIRIA C692",
-        "domain": "Crevice Corrosion",
-        "description": "Stainless steel in construction, CCT data, joint design guidance",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "cibse-g",
-        "name": "CIBSE Guide G",
-        "domain": "Crevice Corrosion",
-        "description": "Plumbing and MEP crevice corrosion guidance, material selection for HVAC/water systems",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
-    },
-    {
-        "id": "prosoco-104",
-        "name": "Prosoco Tech Note 104",
-        "domain": "Mechanical Assembly",
-        "description": "Area ratio analysis for mechanical anchors, bimetallic corrosion in fixings",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo"],
-    },
-    {
-        "id": "bs-8539",
-        "name": "BS 8539",
-        "domain": "Mechanical Assembly",
-        "description": "Fixings in construction, bi-metallic assembly, corrosion protection",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo"],
-    },
-    {
-        "id": "en-1993-1-4",
-        "name": "EN 1993-1-4",
-        "domain": "Structural Design",
-        "description": "Structural stainless steel design, material grades, mechanical properties",
-        "source": "notebook",
-        "applicable_to": ["Halo"],
-    },
-    {
-        "id": "asce-7-22",
-        "name": "ASCE 7-22",
-        "domain": "Structural Design",
-        "description": "Seismic design standard, structural bracing requirements, loading",
-        "source": "notebook",
-        "applicable_to": ["Halo"],
-    },
-    {
         "id": "iso-19650",
         "name": "ISO 19650-1/2/3/6",
         "domain": "BIM Information Management",
         "description": "BIM information management, IFC property set framework, data exchange",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "iso-16739",
@@ -546,7 +419,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "BIM Information Management",
         "description": "Industry Foundation Classes (IFC) specification, open BIM standard",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "bcf-2-1",
@@ -554,7 +427,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "BIM Information Management",
         "description": "BIM Collaboration Format for issue tracking, viewpoints, markup",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "ids-1-0",
@@ -562,7 +435,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "BIM Information Management",
         "description": "Information Delivery Specification, data requirements definition (1 June 2024)",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "bimforum-lod-25",
@@ -570,7 +443,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "BIM Information Management",
         "description": "Level of Development (LOD) definitions, model maturity levels",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "building-safety-22",
@@ -578,7 +451,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Building Safety & Compliance",
         "description": "Golden Thread requirements for higher-risk buildings, compliance tracking",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "eu-ai-act",
@@ -586,7 +459,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Regulatory / AI Governance",
         "description": "AI system governance, transparency, risk management in automated decisions",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "nist-ai-rmf",
@@ -594,7 +467,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Regulatory / AI Governance",
         "description": "AI risk assessment, mitigation strategies, governance",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "cbc-2024",
@@ -602,7 +475,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Regional Building Code",
         "description": "US state building standard, structural and MEP requirements (California)",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "nbc-2020",
@@ -610,15 +483,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Regional Building Code",
         "description": "Canadian building standard, structural and MEP requirements",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Halo", "Architecture"],
-    },
-    {
-        "id": "hse-hsg274",
-        "name": "HSE HSG274",
-        "domain": "Safety & Health",
-        "description": "UK Health & Safety Executive guidance on Legionella in water systems, water treatment",
-        "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)"],
+        "applicable_to": ["Architecture"],
     },
     {
         "id": "cibse-tm13",
@@ -626,7 +491,7 @@ NOTEBOOK_STANDARDS: list[dict[str, Any]] = [
         "domain": "Thermal & Environmental",
         "description": "Thermal analysis, environmental design guidance for MEP systems",
         "source": "notebook",
-        "applicable_to": ["Piping (Corrosive)", "Architecture"],
+        "applicable_to": ["Architecture"],
     },
 ]
 

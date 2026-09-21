@@ -75,7 +75,7 @@ def test_opencde_auth_config_and_token():
 
 def test_opencde_project_documents_list_and_etags(cde_test_project):
     # First create a test project to query
-    proj_id = cde_test_project("OpenCDE Test Hospital", "GB", "Piping")
+    proj_id = cde_test_project("OpenCDE Test Hospital", "GB", "Arch")
 
     # Query OpenCDE documents
     response = client.get(f"/api/cde/v1/projects/{proj_id}/documents")
@@ -108,7 +108,7 @@ def test_opencde_documents_sync(cde_test_project):
 
 
 def test_gate1_promote_succeeds_with_no_outstanding_issues(cde_test_project):
-    proj_id = cde_test_project("Gate1 Clean Project", "GB", "Piping")
+    proj_id = cde_test_project("Gate1 Clean Project", "GB", "Arch")
 
     response = client.post("/api/cde/gate1/promote", json={"project_id": proj_id})
     assert response.status_code == 200
@@ -124,7 +124,7 @@ def test_gate1_promote_blocked_by_persisted_critical_issues(cde_test_project):
     Regression test for the bug where `promote_gate1` always passed
     `critical_issues_count=0` regardless of actual compliance results.
     """
-    proj_id = cde_test_project("Gate1 Blocked Project", "GB", "Piping")
+    proj_id = cde_test_project("Gate1 Blocked Project", "GB", "Arch")
 
     report_service = ReportArtifactService()
     artifact = report_service.persist_bcf(
