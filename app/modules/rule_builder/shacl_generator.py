@@ -43,6 +43,7 @@ from rdflib.namespace import RDF, SH, XSD
 
 from app.modules.ifc_reader.bot_graph import BIMGUARD
 from app.modules.ifc_reader.ontology_namespaces import AEC3PO
+from app.modules.room_types import ROOM_SCOPE_KEYS
 
 #: `RuleCreateRequest.operator` -> SHACL constraint predicate for a single
 #: bound. Only operators expressible as a per-element property constraint
@@ -75,8 +76,40 @@ _OPERATOR_TO_SPARQL = {
     "not_exists": True,
 }
 
+def _uses_room_scope(rule: dict[str, Any]) -> bool:
+    """Return True when `applies_when` or an inline exception scopes by connected room.
+
+    Accepts each field either decoded or as the raw JSON string a `rules` row
+    stores, since `rule_is_shacl_eligible` is called on both.
+    """
+
+    def _predicates(value: Any) -> list[dict]:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (TypeError, ValueError):
+                return []
+        if isinstance(value, dict):
+            nested = value.get("predicate")
+            return [value] + ([nested] if isinstance(nested, dict) else [])
+        if isinstance(value, list):
+            return [p for entry in value for p in _predicates(entry)]
+        return []
+
+    predicates = _predicates(rule.get("applies_when")) + _predicates(
+        rule.get("exceptions")
+    )
+    return any(ROOM_SCOPE_KEYS & set(p) for p in predicates)
+
+
 def rule_is_shacl_eligible(rule: dict[str, Any]) -> bool:
     """Return True when a rule's requirement can be expressed as a SHACL shape.
+
+    A rule scoped by connected room (`room_type_any_of` and friends) is never
+    eligible: which rooms an element connects to comes from graded space-boundary
+    evidence that the BOT graph does not carry, and an unresolvable scope would
+    fall back to targeting every element of the class -- a result that silently
+    disagrees with the comparator. It stays on the procedural path.
 
     `field_consistency` and `unique_within_scope` are narrowed relative to
     what the procedural comparator (`app.modules.comparator`) supports:
@@ -94,6 +127,8 @@ def rule_is_shacl_eligible(rule: dict[str, Any]) -> bool:
       pass does not attempt, so those stay on the procedural path too.
     """
     if not rule.get("target_ifc_class") or not rule.get("property_name"):
+        return False
+    if _uses_room_scope(rule):
         return False
     operator = str(rule.get("operator") or "")
     if operator == "between":

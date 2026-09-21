@@ -27,6 +27,26 @@ except ImportError:
     _IFC_AVAILABLE = False
 
 
+#: Where a space boundary came from. A boundary read from the model's own
+#: ``IfcRelSpaceBoundary`` is an authored fact; one derived from bounding-box
+#: contact is an approximation, and callers that must not act on an
+#: approximation (see ``ifc_rooms``) tell them apart by this tag.
+BOUNDARY_SOURCE_MODEL = "boundary"
+BOUNDARY_SOURCE_GEOMETRIC = "geometric"
+
+
+def boxes_touch(a: dict[str, float], b: dict[str, float], tol: float) -> bool:
+    """Return True when two axis-aligned boxes (mm) overlap or lie within ``tol``."""
+    return not (
+        a["max_x"] + tol < b["min_x"]
+        or a["min_x"] - tol > b["max_x"]
+        or a["max_y"] + tol < b["min_y"]
+        or a["min_y"] - tol > b["max_y"]
+        or a["max_z"] + tol < b["min_z"]
+        or a["min_z"] - tol > b["max_z"]
+    )
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_area_from_psets(element) -> float | None:
@@ -237,6 +257,7 @@ class IFCSpatialAdjacency:
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
         self._door_to_spaces: dict[str, list[str]] | None = None
+        self._element_to_spaces: dict[str, dict[str, str]] | None = None
         self.has_boundaries = False
         self.is_geometric_fallback = False
         self._built = False
@@ -277,6 +298,7 @@ class IFCSpatialAdjacency:
                         "element_guid": elem_guid,
                         "element_type": elem_type,
                         "physical": physical,
+                        "source": BOUNDARY_SOURCE_MODEL,
                     }
                 )
 
@@ -356,22 +378,12 @@ class IFCSpatialAdjacency:
             box = extractor.get_bounding_box(c) if extractor else None
             cand_boxes.append((c, guid, c.is_a(), box))
 
-        def _boxes_intersect(a: dict[str, float], b: dict[str, float], tol: float) -> bool:
-            return not (
-                a["max_x"] + tol < b["min_x"]
-                or a["min_x"] - tol > b["max_x"]
-                or a["max_y"] + tol < b["min_y"]
-                or a["min_y"] - tol > b["max_y"]
-                or a["max_z"] + tol < b["min_z"]
-                or a["min_z"] - tol > b["max_z"]
-            )
-
         found_any = False
         for s_guid, (sp, s_box) in space_boxes.items():
             for c_elem, c_guid, c_type, c_box in cand_boxes:
                 is_contact = False
                 if s_box is not None and c_box is not None:
-                    is_contact = _boxes_intersect(s_box, c_box, tolerance_mm)
+                    is_contact = boxes_touch(s_box, c_box, tolerance_mm)
                 else:
                     # Spatial container fallback: if element is contained in space's storey
                     s_storey = getattr(sp, "Decomposes", None)
@@ -393,6 +405,7 @@ class IFCSpatialAdjacency:
                             "element_guid": c_guid,
                             "element_type": c_type,
                             "physical": True,
+                            "source": BOUNDARY_SOURCE_GEOMETRIC,
                         }
                     )
                     if c_type in ("IfcWall", "IfcWallStandardCase"):
@@ -442,6 +455,27 @@ class IFCSpatialAdjacency:
                         if sg != space_guid:
                             adjacent.add(sg)
         return list(adjacent)
+
+    def get_element_spaces(self, element_guid: str) -> dict[str, str]:
+        """Return ``{space_guid: source}`` for every space this element bounds.
+
+        The inverse of ``_space_data``, built once and cached like
+        ``get_door_to_spaces`` (which it generalises to every element class).
+        Virtual boundaries are excluded -- they describe an imaginary dividing
+        line, not a physical element between two rooms. ``source`` is
+        ``BOUNDARY_SOURCE_MODEL`` or ``BOUNDARY_SOURCE_GEOMETRIC``.
+        """
+        if self._element_to_spaces is None:
+            mapping: dict[str, dict[str, str]] = {}
+            for sguid, data in self._space_data.items():
+                for b in data["boundaries"]:
+                    if not b["physical"]:
+                        continue
+                    mapping.setdefault(b["element_guid"], {})[sguid] = b.get(
+                        "source", BOUNDARY_SOURCE_MODEL
+                    )
+            self._element_to_spaces = mapping
+        return self._element_to_spaces.get(element_guid, {})
 
     def space_count(self) -> int:
         return len(self._space_data)

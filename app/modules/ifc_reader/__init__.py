@@ -36,6 +36,7 @@ from collections import Counter
 from pathlib import Path
 
 from app.logging_config import get_logger
+from app.modules.room_types import ROOM_SCOPE_KEYS
 
 logger = get_logger(__name__)
 
@@ -66,6 +67,18 @@ try:
     _SPATIAL_AVAILABLE = True
 except ImportError:
     _SPATIAL_AVAILABLE = False
+
+try:
+    from .ifc_rooms import (
+        ROOM_DERIVED_PROPERTIES,
+        ROOM_LINK_PROPERTIES,
+        ElementRoomLinker,
+        room_context,
+        room_derived_value,
+    )
+    _ROOMS_AVAILABLE = True
+except ImportError:
+    _ROOMS_AVAILABLE = False
 
 try:
     from .ifc_egress import IFCEgressGraph, check_exit_count, check_egress_travel_distance
@@ -458,6 +471,7 @@ class IFCReader:
         self.quality_improvements: list[str] = []
         self.geometry_extractor: "IFCGeometryExtractor | None" = None
         self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
+        self.room_linker: "ElementRoomLinker | None" = None
         self.egress_graph: "IFCEgressGraph | None" = None
         self.stair_engine: "IFCStairEngine | None" = None
         if self.file_path:
@@ -498,6 +512,12 @@ class IFCReader:
             self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
         if _SPATIAL_AVAILABLE:
             self.spatial_adjacency = IFCSpatialAdjacency(self.ifc_file).build()
+        if _ROOMS_AVAILABLE and self.spatial_adjacency is not None:
+            self.room_linker = ElementRoomLinker(
+                self.spatial_adjacency,
+                self.ifc_file,
+                geometry_extractor=self.geometry_extractor,
+            )
         if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
             self.egress_graph = IFCEgressGraph(
                 self.spatial_adjacency, geometry_extractor=self.geometry_extractor
@@ -1076,6 +1096,57 @@ class IFCReader:
             "interior_single_space_mismatch": d.get("interior_single_space_mismatch", False),
         }
 
+    @staticmethod
+    def _room_link_detail(room: dict | None) -> dict:
+        """Return the provenance payload for a room-derived value.
+
+        Names which evidence linked the element to its rooms, so a finding can
+        say how it knows.
+        """
+        r = room or {}
+        return {
+            "link_source": r.get("link_source"),
+            "connected_room_guids": r.get("room_guids") or [],
+            "connected_room_types": r.get("room_types") or [],
+            "warnings": [],
+        }
+
+    @classmethod
+    def _needs_room_context(
+        cls,
+        prop_name: str,
+        scope: dict,
+        exceptions: list[dict],
+    ) -> bool:
+        """Whether this rule needs the element's room links resolved.
+
+        Room resolution reads relationships (and, for a door or window with no
+        boundary of its own, a wall and some bounding boxes), so it must not run
+        for the rules that never ask about a room. Gated on the rule asking for
+        a room-derived property, or naming a room predicate in its scope or any
+        of its waivers.
+        """
+        if not _ROOMS_AVAILABLE:
+            return False
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        if normalized in ROOM_DERIVED_PROPERTIES or normalized in ROOM_LINK_PROPERTIES:
+            return True
+        for predicate in [scope] + [e.get("predicate") or {} for e in exceptions]:
+            if ROOM_SCOPE_KEYS & set(predicate or {}):
+                return True
+        return False
+
+    @staticmethod
+    def _needs_space_counts(prop_name: str) -> bool:
+        """Whether the property is one of the per-room element counts."""
+        normalized = str(prop_name or "").replace("_", "").replace(" ", "").lower()
+        return ROOM_DERIVED_PROPERTIES.get(normalized, "") in (
+            "DoorCount",
+            "WindowCount",
+            "WallCount",
+            "SlabCount",
+        )
+
     def _door_clear_opening_width(self, el) -> tuple[float | None, dict]:
         """Accessible clear (net passage) opening width for a door leaf, mm.
 
@@ -1205,6 +1276,7 @@ class IFCReader:
         support: dict | None = None,
         seismic: dict | None = None,
         stair: dict | None = None,
+        room: dict | None = None,
         unit_scale_mm: float = 1.0,
     ) -> tuple[object, "str | None", dict]:
         """
@@ -1254,10 +1326,18 @@ class IFCReader:
             if names:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
                 return ", ".join(names), "spatial:door_space_connection", dsc_rich
+            # Not a door (or a door with no boundary data): every other
+            # element class answers from its room links instead.
+            room_names = (room or {}).get("rooms")
+            if room_names:
+                return ", ".join(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("connectedspacecount", "spaceconnectioncount", "numberofconnectedspaces", "connectedspacescount"):
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
                 return door_space_connection.get("connected_space_count", 0), "spatial:door_space_connection", dsc_rich
+            room_names = (room or {}).get("rooms")
+            if room_names:
+                return len(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("interiorsinglespacemismatch", "interiorsinglespaceflag", "spaceconnectionmismatch"):
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
@@ -1280,6 +1360,14 @@ class IFCReader:
                 detail = dict((penetration or {}).get("annular_clearance_detail") or {})
                 detail["unit"] = "mm"
                 return clearance, "geometry:penetration", detail
+        elif _ROOMS_AVAILABLE and prop_key_name in ROOM_DERIVED_PROPERTIES:
+            # Room identity and what bounds a room: relationships
+            # (IfcRelSpaceBoundary, containment, the wall a door fills), never
+            # a Pset key. Falls through when the links could not answer, so a
+            # model that authors e.g. WindowCount itself still has it read.
+            value, detail = room_derived_value(prop_key_name, room)
+            if value is not None:
+                return value, "derived:rooms", detail
         elif prop_key_name in _SUPPORT_DERIVED_PROPERTIES:
             # Support spacings and rod lengths: relationships plus geometry,
             # resolved by ifc_supports, never a Pset key. Falls through to the
@@ -1601,6 +1689,12 @@ class IFCReader:
         # flight/landing/railing.
         _stair_cache: dict[int, dict] = {}
 
+        # Room links per element, keyed by (element, whether counts were
+        # wanted). The linker already memoises by GlobalId; this only avoids
+        # rebuilding the small context dict once per rule that targets the
+        # same element.
+        _room_cache: dict[tuple[int, bool], dict] = {}
+
         for rule_index, rule in enumerate(rules, start=1):
             rule_started_at = time.monotonic()
             scope_predicate = self._decode_json_obj(rule.get("applies_when"))
@@ -1664,6 +1758,11 @@ class IFCReader:
             needs_stair = _STAIR_AVAILABLE and self.stair_engine is not None and self._needs_stair_context(
                 prop_name, scope_predicate, resolved_exceptions
             )
+
+            needs_room = self.room_linker is not None and self._needs_room_context(
+                prop_name, scope_predicate, resolved_exceptions
+            )
+            wants_space_counts = needs_room and self._needs_space_counts(prop_name)
             logger.info(
                 "Rule extraction rule=%d/%d reference=%s target=%s property=%s pset=%s operator=%s fallback=%s",
                 rule_index,
@@ -1832,6 +1931,25 @@ class IFCReader:
                             stair = {}
                         _stair_cache[stair_id] = stair
 
+                # Which rooms this element connects to, and the evidence for
+                # saying so. Resolved only for rules that ask about a room.
+                room: dict = {}
+                if needs_room:
+                    room_key = (el.id(), wants_space_counts)
+                    if room_key in _room_cache:
+                        room = _room_cache[room_key]
+                    else:
+                        try:
+                            room = room_context(
+                                el,
+                                self.room_linker,
+                                include_counts=wants_space_counts,
+                            )
+                        except Exception as exc:
+                            logger.debug("Room context failed for %s: %s", el, exc)
+                            room = {}
+                        _room_cache[room_key] = room
+
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1844,6 +1962,7 @@ class IFCReader:
                     support=support,
                     seismic=seismic,
                     stair=stair,
+                    room=room,
                     unit_scale_mm=_unit_scale_mm,
                 )
 
@@ -1991,6 +2110,16 @@ class IFCReader:
                         "annular_clearance_detail": penetration.get(
                             "annular_clearance_detail"
                         ),
+                        # The rooms this element connects to. `or None` for the
+                        # same reason as host_classes above: "no room could be
+                        # linked" is not the claim "this element touches no
+                        # room", and an exporter that omits space boundaries
+                        # makes the first. The link source and note ride along
+                        # so an UNDETERMINED predicate can say why.
+                        "connected_rooms": room.get("rooms") or None,
+                        "connected_room_types": room.get("room_types") or None,
+                        "room_link_source": room.get("link_source"),
+                        "room_link_note": room.get("link_note"),
                         # Supports holding this element. Empty for rules that
                         # ask about neither a spacing nor a rod.
                         "support_count": support.get("support_count"),

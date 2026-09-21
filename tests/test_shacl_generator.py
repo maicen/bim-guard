@@ -158,3 +158,28 @@ def test_compile_shapes_sparql_target_for_material_scope():
     node_shape = next(shapes.subjects(RDF.type, SH.NodeShape))
     assert shapes.value(node_shape, SH.targetClass) is None
     assert shapes.value(node_shape, SH.target) is not None
+
+
+def test_room_scoped_rule_is_not_shacl_eligible():
+    # Which rooms an element connects to comes from graded space-boundary
+    # evidence the BOT graph does not carry. An unresolvable scope would fall
+    # back to targeting every door in the model, silently disagreeing with the
+    # comparator -- so a room-scoped rule stays on the procedural path.
+    rule = _door_width_rule(applies_when={"room_type_any_of": ["bedroom"]})
+    assert rule_is_shacl_eligible(rule) is False
+    assert list(compile_shapes([rule]).subjects(RDF.type, SH.NodeShape)) == []
+
+
+def test_room_scope_is_detected_in_a_raw_json_row_and_in_exceptions():
+    raw = _door_width_rule(applies_when='{"room_name_any_of": ["Kitchen"]}')
+    assert rule_is_shacl_eligible(raw) is False
+
+    waived = _door_width_rule(
+        exceptions=[{"reference": "EX-1", "predicate": {"room_type_none_of": ["closet"]}}]
+    )
+    assert rule_is_shacl_eligible(waived) is False
+
+
+def test_rule_without_room_scope_stays_eligible():
+    rule = _door_width_rule(applies_when={"material_any_of": ["steel"]})
+    assert rule_is_shacl_eligible(rule) is True

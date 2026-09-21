@@ -977,6 +977,17 @@ export interface RuleElementResult {
   guid?: string;
   storey?: string;
   space?: string;
+  /** Rooms the element connects to, present when the rule asked about rooms.
+   * `space` above is only direct IfcSpace containment, which most exporters
+   * never write for a door or wall. */
+  connected_rooms?: string[] | null;
+  /** How the rooms were linked: self / boundary / containment / host_wall /
+   * geometric_bbox / none. See app/modules/ifc_reader/ifc_rooms.py. */
+  room_link_source?: string | null;
+  /** Present when the element was checked although the rule's scope could not
+   * be decided for it (e.g. it connects to a room whose type is unknown). Each
+   * entry says what could not be resolved. */
+  scope_undetermined?: string[] | null;
   actual?: any;
   status?: string; // PASS, FAIL, MISSING
   reason?: string;

@@ -299,6 +299,11 @@ class ComplianceReporter:
                 # offsets the camera from it so the view doesn't sit
                 # exactly inside the element. None (no geometry resolved)
                 # falls back to the dataclass's own origin default.
+                # `space` is direct IfcSpace containment, empty for most doors
+                # and walls; the connected rooms say where the element is.
+                room_label = failure.get("space")
+                if room_label in (None, "", "—"):
+                    room_label = ", ".join(failure.get("connected_rooms") or []) or "—"
                 pos = failure.get("position_mm")
                 pos_kwargs = (
                     {
@@ -317,7 +322,7 @@ class ComplianceReporter:
                             f"Element : {element_name}\n"
                             f"Property: {property_name}\n"
                             f"Floor/room: {failure.get('storey') or '—'} / "
-                            f"{failure.get('space') or '—'}\n"
+                            f"{room_label}\n"
                             f"Issue   : {failure.get('reason', '')}"
                             f"{self._data_quality_text(failure)}"
                         ),

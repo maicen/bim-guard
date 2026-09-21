@@ -998,7 +998,12 @@ class RuleCreateRequest(BaseModel):
             "Scope predicate narrowing which elements this rule governs "
             "(e.g. {'material_any_of': ['gypsum']}) -- evaluated by "
             "app.modules.comparator against each element; an unrecognised or "
-            "untestable key leaves scope UNDETERMINED, never silently narrowed."
+            "untestable key leaves scope UNDETERMINED, never silently narrowed. "
+            "Room scope: room_type_any_of / room_type_all_of / room_type_none_of "
+            "(types from app.modules.room_types, e.g. {'room_type_any_of': "
+            "['bedroom']}) and room_name_any_of match against the rooms the "
+            "element connects to; an untyped or unlinked room leaves it "
+            "UNDETERMINED."
         ),
     )
     exceptions: Optional[list] = Field(

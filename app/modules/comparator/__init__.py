@@ -22,6 +22,7 @@ PARTIAL rather than an asserted FAIL.
 import re
 
 from app.modules.property_confidence import classify_property_confidence
+from app.modules.room_types import ROOM_SCOPE_KEYS, UNKNOWN_ROOM_TYPE
 
 # Case-insensitive string forms a rule's check_value might use for a boolean
 # IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
@@ -130,6 +131,15 @@ _SCOPE_BOOL_FIELDS = {
     "details_prevent_rod_bending": "details_prevent_rod_bending",
     "has_dual_structural_supports": "has_dual_structural_supports",
 }
+
+#: Predicate keys that scope a rule by the ROOMS an element connects to
+#: (``ROOM_SCOPE_KEYS``: room_type_any_of / _all_of / _none_of, room_name_any_of).
+#: They read ``connected_room_types`` / ``connected_rooms`` off the element
+#: record, which Module 2 fills from the element's space boundaries. Unlike the
+#: list fields above they need a three-way answer per room, because a room that
+#: exists but could not be typed says nothing either way -- see
+#: ``ComplianceComparator._room_predicate``.
+_SCOPE_ROOM_KEYS = ROOM_SCOPE_KEYS
 
 #: Predicate keys that are structurally meaningful but carry no per-element
 #: test: the extraction already guarantees them, so they are satisfied by
@@ -247,30 +257,32 @@ class ComplianceComparator:
 
             # Scope gate. Runs before the operator so an out-of-scope element
             # is never measured against a threshold that does not govern it.
+            scope_notes: list[str] = []
             if scope:
                 outcome, details = self._evaluate_predicate(scope, el)
                 if outcome == NO_MATCH:
                     not_applicable_count += 1
                     all_elements.append(
-                        self._entry(el, actual, "NOT_APPLICABLE", "outside rule scope")
+                        self._entry(el, actual, "NOT_APPLICABLE", "outside rule scope", scope_notes)
                     )
                     continue
                 if outcome == UNDETERMINED:
                     # Kept in scope deliberately: an unevaluable narrowing must
                     # not suppress the check.
                     undetermined_notes.extend(details)
+                    scope_notes = list(details)
 
             if operator in ("exists", "not_exists"):
                 present = actual is not None
                 wanted  = operator == "exists"
                 if present == wanted:
                     pass_count += 1
-                    all_elements.append(self._entry(el, actual, "PASS", ""))
+                    all_elements.append(self._entry(el, actual, "PASS", "", scope_notes))
                 else:
                     reason = "property missing" if wanted else "property should not exist"
                     fail_count += 1
-                    failures.append(self._failure(el, actual, reason))
-                    all_elements.append(self._entry(el, actual, "FAIL", reason))
+                    failures.append(self._failure(el, actual, reason, scope_notes))
+                    all_elements.append(self._entry(el, actual, "FAIL", reason, scope_notes))
                 continue
 
             if operator == "field_consistency":
@@ -294,7 +306,7 @@ class ComplianceComparator:
                         "space": el.get("space") or "—",
                     })
                     all_elements.append(
-                        self._entry(el, actual, "MISSING", f"{which} not found")
+                        self._entry(el, actual, "MISSING", f"{which} not found", scope_notes)
                     )
                     continue
                 ok = str(derived).strip().casefold() == str(compare_val).strip().casefold()
@@ -305,11 +317,11 @@ class ComplianceComparator:
                 )
                 if ok:
                     pass_count += 1
-                    all_elements.append(self._entry(el, actual, "PASS", ""))
+                    all_elements.append(self._entry(el, actual, "PASS", "", scope_notes))
                 else:
                     fail_count += 1
-                    failures.append(self._failure(el, actual, reason))
-                    all_elements.append(self._entry(el, actual, "FAIL", reason))
+                    failures.append(self._failure(el, actual, reason, scope_notes))
+                    all_elements.append(self._entry(el, actual, "FAIL", reason, scope_notes))
                 continue
 
             if actual is None:
@@ -320,7 +332,7 @@ class ComplianceComparator:
                     "storey": el.get("storey") or "—",
                     "space": el.get("space") or "—",
                 })
-                all_elements.append(self._entry(el, actual, "MISSING", "property not found"))
+                all_elements.append(self._entry(el, actual, "MISSING", "property not found", scope_notes))
                 continue
 
             # Property-referencing bounds (value_min_property / value_max_property)
@@ -337,7 +349,7 @@ class ComplianceComparator:
             passed, reason = self._compare(operator, actual, check_val, el_val_min, el_val_max, unit)
             if passed:
                 pass_count += 1
-                all_elements.append(self._entry(el, actual, "PASS", ""))
+                all_elements.append(self._entry(el, actual, "PASS", "", scope_notes))
             else:
                 # Waiver gate. Only a failing element is worth testing against
                 # the exemptions, and only this comparison path carries them
@@ -360,12 +372,12 @@ class ComplianceComparator:
                         }
                     )
                     all_elements.append(
-                        self._entry(el, actual, "WAIVED", f"{reason} — waived by {ref} ({label})")
+                        self._entry(el, actual, "WAIVED", f"{reason} — waived by {ref} ({label})", scope_notes)
                     )
                 else:
                     fail_count += 1
-                    failures.append(self._failure(el, actual, reason))
-                    all_elements.append(self._entry(el, actual, "FAIL", reason))
+                    failures.append(self._failure(el, actual, reason, scope_notes))
+                    all_elements.append(self._entry(el, actual, "FAIL", reason, scope_notes))
 
         # Status roll-up. The first four branches are the original ladder,
         # still reached first and in the same order, so a rule carrying
@@ -483,10 +495,68 @@ class ComplianceComparator:
                     return MATCH, ""
             return NO_MATCH, ""
 
+        if key in _SCOPE_ROOM_KEYS:
+            return ComplianceComparator._room_predicate(key, expected, el)
+
         # An unrecognised key is data the extractor does not supply -- a
         # relational predicate such as the host element's material or the
         # proximity of a flexible coupling. Undetermined, never assumed.
         return UNDETERMINED, f"predicate {key!r} is not supported by the extractor"
+
+    @staticmethod
+    def _room_predicate(key: str, expected, el: dict) -> tuple[str, str]:
+        """Evaluate a room-scope predicate against the rooms an element connects to.
+
+        An element can bound several rooms (a door joins two), so the type
+        predicates read as follows over the set of connected room types:
+
+          room_type_any_of   MATCH when at least one connected room is of a listed type
+          room_type_all_of   MATCH when every listed type is among the connected rooms
+          room_type_none_of  MATCH when no connected room is of a listed type
+          room_name_any_of   MATCH when a connected room's name contains a listed text
+
+        A connected room that could not be typed (``UNKNOWN_ROOM_TYPE``) is what
+        makes this tri-state. It might be the very type the rule names, so once
+        the known rooms have not settled the question the answer is UNDETERMINED,
+        not NO_MATCH -- an untyped room must never silently take an element out
+        of scope, nor silently keep it out of a ``none_of``.
+        """
+        wanted = expected if isinstance(expected, list) else [expected]
+        wanted_cf = {str(w).strip().casefold() for w in wanted if str(w).strip()}
+        reason = el.get("room_link_note") or "connected rooms not resolved on element"
+        if not wanted_cf:
+            return UNDETERMINED, f"{key} names no room"
+
+        if key == "room_name_any_of":
+            names = el.get("connected_rooms")
+            if names is None:
+                return UNDETERMINED, f"{key}: {reason}"
+            for name in names:
+                text = str(name).strip().casefold()
+                if text in wanted_cf or any(w in text for w in wanted_cf):
+                    return MATCH, ""
+            return NO_MATCH, ""
+
+        types = el.get("connected_room_types")
+        if types is None:
+            return UNDETERMINED, f"{key}: {reason}"
+        present = {str(t).strip().casefold() for t in types}
+        has_unknown = UNKNOWN_ROOM_TYPE in present
+        known = present - {UNKNOWN_ROOM_TYPE}
+        untyped = f"{key}: a connected room could not be typed"
+
+        if key == "room_type_any_of":
+            if known & wanted_cf:
+                return MATCH, ""
+            return (UNDETERMINED, untyped) if has_unknown else (NO_MATCH, "")
+        if key == "room_type_all_of":
+            if wanted_cf <= known:
+                return MATCH, ""
+            return (UNDETERMINED, untyped) if has_unknown else (NO_MATCH, "")
+        # room_type_none_of
+        if known & wanted_cf:
+            return NO_MATCH, ""
+        return (UNDETERMINED, untyped) if has_unknown else (MATCH, "")
 
     @classmethod
     def _evaluate_predicate(cls, predicate: dict, el: dict) -> tuple[str, list[str]]:
@@ -733,12 +803,23 @@ class ComplianceComparator:
         return ok, ("" if ok else reason)
 
     @staticmethod
-    def _failure(el, actual, reason) -> dict:
+    def _failure(el, actual, reason, scope_notes=None) -> dict:
         return {
             "element_name": el.get("name"),
             "guid": el.get("guid"),
             "storey": el.get("storey") or "—",
             "space": el.get("space") or "—",
+            # The rooms the element connects to, when the rule asked about
+            # rooms (None otherwise) -- `space` above is only direct IfcSpace
+            # containment, which most exporters never write for a door or wall.
+            "connected_rooms": el.get("connected_rooms"),
+            "room_link_source": el.get("room_link_source"),
+            # Why the element was checked although its scope could not be
+            # decided (an untyped room, an unresolved link). None when the
+            # scope predicate was settled either way. Without this a finding
+            # for a room that merely MIGHT be a kitchen reads the same as one
+            # for a room known to be.
+            "scope_undetermined": scope_notes or None,
             "actual": actual,
             "reason": reason,
             # (x, y, z) mm from Module 2, or None — consumed by Module 5's
@@ -759,13 +840,16 @@ class ComplianceComparator:
         }
 
     @staticmethod
-    def _entry(el, actual, status, reason) -> dict:
+    def _entry(el, actual, status, reason, scope_notes=None) -> dict:
         """Per-element record kept for every evaluated element (pass, fail, or missing)."""
         return {
             "element_name": el.get("name"),
             "guid": el.get("guid"),
             "storey": el.get("storey") or "—",
             "space": el.get("space") or "—",
+            "connected_rooms": el.get("connected_rooms"),
+            "room_link_source": el.get("room_link_source"),
+            "scope_undetermined": scope_notes or None,
             "actual": actual,
             "status": status,
             "reason": reason,
