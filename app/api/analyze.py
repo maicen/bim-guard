@@ -20,9 +20,9 @@ from fastapi import (
 
 from app.api.dependencies import (
     get_arch_analysis_service,
+    get_ifc_pipeline_service,
     get_membership_service,
     get_models_service,
-    get_phase6_service,
     get_profile_service,
     get_projects_service,
 )
@@ -49,12 +49,12 @@ from app.modules.contracts import (
     RevitSyncResponse,
     WorkflowStatusContract,
 )
-from app.modules.phase_6.phase_6e_export import export
+from app.modules.pipeline_io.analysis_result_exporter import export
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 from app.services.arch_analysis_service import ArchAnalysisService
+from app.services.ifc_pipeline_service import IFCPipelineService
 from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
-from app.services.phase6_service import Phase6Service
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
@@ -444,7 +444,7 @@ async def analyze_upload_ifc(
     ifc_file: Annotated[UploadFile, File(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     models_service: Annotated[ModelsService, Depends(get_models_service)],
-    phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
+    ifc_pipeline_service: Annotated[IFCPipelineService, Depends(get_ifc_pipeline_service)],
 ) -> IfcUploadAttachResponse:
     """Upload and attach an IFC model to a project."""
     project_access(project_id)
@@ -455,7 +455,7 @@ async def analyze_upload_ifc(
         )
 
     content = await ifc_file.read()
-    response = phase6_service.upload_service.upload(
+    response = ifc_pipeline_service.upload_service.upload(
         ifc_file.filename, content, project_id=project_id, kind="ifc"
     )
     if not response.success:

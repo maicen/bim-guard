@@ -7,13 +7,13 @@ import io
 import pytest
 from starlette.testclient import TestClient
 
+from app.document_upload_validation import md5_hex
 from app.main import app
 from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
 from app.services.projects_service import ProjectsService
 from app.services.rule_draft_service import RuleDraftService
 from app.services.rules_service import RuleService
-from app.utils import md5_hex
 
 
 @pytest.fixture(scope="module")

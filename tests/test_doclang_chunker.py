@@ -449,7 +449,7 @@ def test_create_document_packages_multimodal_assets_in_dclx():
 
 def test_validate_document_upload_dclg():
     """Verify validate_document_upload accepts valid .dclg XML and rejects invalid content/MIME."""
-    from app.utils import validate_document_upload
+    from app.document_upload_validation import validate_document_upload
 
     valid_xml = b"<?xml version=\"1.0\"?><doclang><heading>Test</heading></doclang>"
 
@@ -479,7 +479,7 @@ def test_validate_document_upload_dclx():
     import io
     import zipfile
 
-    from app.utils import validate_document_upload
+    from app.document_upload_validation import validate_document_upload
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -502,7 +502,7 @@ def test_validate_document_upload_dclx():
 
 def test_validate_document_upload_unsupported_suffix_mentions_dclg_and_dclx():
     """Verify unsupported file type message lists .dclg and .dclx."""
-    from app.utils import validate_document_upload
+    from app.document_upload_validation import validate_document_upload
 
     err = validate_document_upload("file.xyz", "application/octet-stream", b"dummy")
     assert err is not None

@@ -268,7 +268,7 @@ def test_application_container_bootstrap():
     assert container.documents_service is not None
     assert container.settings_service is not None
     assert container.analysis_service is not None
-    assert container.phase6_service is not None
+    assert container.ifc_pipeline_service is not None
 
     # Engines are registered in the container registry
     assert container.engine_registry.supports("ARCH-EGRESS-001")
@@ -279,7 +279,7 @@ def test_application_container_bootstrap():
     from app.api.dependencies import (
         get_analysis_service,
         get_documents_service,
-        get_phase6_service,
+        get_ifc_pipeline_service,
         get_projects_service,
         get_rules_service,
         get_settings_service,
@@ -290,7 +290,7 @@ def test_application_container_bootstrap():
     assert get_documents_service() is container.documents_service
     assert get_settings_service() is container.settings_service
     assert get_analysis_service() is container.analysis_service
-    assert get_phase6_service() is container.phase6_service
+    assert get_ifc_pipeline_service() is container.ifc_pipeline_service
 
     # Verify build_default_container creates a fresh container
     fresh = build_default_container()

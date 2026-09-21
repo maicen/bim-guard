@@ -15,16 +15,15 @@ from app.constants import (
     get_standard_reference,
     normalize_analysis_type,
 )
+from app.document_upload_validation import md5_hex, safe_upload_name
 from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
 from app.services.persistence import PersistenceService
 from app.utils import (
     cache_db_query,
     invalidate_cache,
-    md5_hex,
     now_iso_utc,
     rows_desc_by_id,
-    safe_upload_name,
 )
 
 logger = get_logger(__name__)
@@ -310,9 +309,7 @@ class ProjectsService:
             country: Jurisdiction governing which codes apply. Required.
             analysis_type: One of :data:`app.constants.ANALYSIS_TYPES`. Required.
             building_code: Building code ID from
-                :data:`app.constants.BUILDING_CODES`. Optional: a corrosion
-                project is judged against material and media rules, not a
-                jurisdiction's code, so it legitimately has none.
+                :data:`app.constants.BUILDING_CODES`. Optional.
             project_type: Building type from :data:`app.constants.PROJECT_TYPES`.
             project_size_sqm: Gross floor area in square metres.
             buildings_count: Number of buildings.
@@ -505,7 +502,7 @@ class ProjectsService:
     def attach_ifc(self, project_id: int, storage_ref: str) -> None:
         """Point a project at an IFC object already in storage.
 
-        Used by the Phase 6 upload route, where ``FileUploadService`` has
+        Used by the upload route, where ``FileUploadService`` has
         already stored the bytes and recorded their SHA-256 in
         ``uploaded_files``. Only the reference is written here: ``projects``
         has no SHA-256 column, and putting one into ``ifc_md5_hash`` would make

@@ -64,7 +64,7 @@ This document describes how the BIMGUARD AI application is architected across it
 │ - CODE-SHACL (Shacl engine)  ││ - Supabase Storage          │
 │ - GRAPH-TOPOLOGY-001         ││   (models, reports, BCF)    │
 │   (orphan-element graph)     ││ - SQLite / Fastlite Cache   │
-│ - Phase 6 Orchestrator       ││                             │
+│ - Pipeline I/O Orchestrator   ││                             │
 └──────────────────────────────┘└─────────────────────────────┘
 ```
 

@@ -1,9 +1,9 @@
-"""Session E — export an ``AnalysisResult`` as BCF 2.1, CSV or JSON.
+"""Analysis result exporter — export an ``AnalysisResult`` as BCF 2.1, CSV or JSON.
 
 Consumes ``AnalysisResult`` (data contracts §2), not the engines that produced
 it. Because :class:`Issue` is mechanism-agnostic by design — "every compliance
 domain produces the same shape, differentiated only by the ``mechanism`` string"
-— one exporter serves architecture (Session C) and anything added later, with
+— one exporter serves architecture and anything added later, with
 no per-mechanism branch.
 
 BCF IS NOT REIMPLEMENTED
@@ -45,7 +45,7 @@ from app.modules.reporter.bcf_generator import (
 logger = get_logger(__name__)
 
 #: Engine ids as they appear at the head of a ``rule_id``: two letters, a dash
-#: and three digits (``GC-001``, ``SB-001``). Anchored so a malformed rule id
+#: and three digits (``GR-001``, ``AR-001``). Anchored so a malformed rule id
 #: yields no engine rather than a fragment.
 _ENGINE_CODE_RE = re.compile(r"^[A-Z]{2}-\d{3}$")
 
@@ -87,24 +87,7 @@ CSV_COLUMNS: tuple[str, ...] = (
     "status",
     "is_data_quality",
     "check",
-    # SB-001 clash geometry. Blank on every other mechanism, which is the point:
-    # a seismic row is the only one where a reviewer can ask "by how much?" and
-    # the column answers without them opening the JSON export.
-    #
-    # NOT intrusion_depth_mm. The client-side CSV that pagination removed
-    # carried an IntrusionDepthMM column reading issue.details.intrusion_depth_mm
-    # -- and details is dict(issue.metadata) (app/api/analyze.py), so that column
-    # was blank on every row ever exported: phase_6d_seismic records the overlap
-    # as a volume and the requirement as a clearance, and has never written an
-    # intrusion depth. These two are what the mechanism actually measures.
-    "overlap_volume_mm3",
-    "clearance_mm",
     "standards",
-    # Where the engine's thresholds came from: database_rows, stored_payload or
-    # in_memory_fallback (app.services.corrosion_rule_catalog). Blank for
-    # mechanisms without a threshold catalog. Last, so every existing column
-    # keeps its position.
-    "catalog_source",
 )
 
 
@@ -172,13 +155,7 @@ def to_csv(result: dict) -> str:
                 # the mechanism string.
                 "is_data_quality": "yes" if _is_data_quality(issue) else "no",
                 "check": issue.metadata.get("check", ""),
-                # "" rather than 0 for a non-seismic row: a blank cell reads as
-                # "not applicable to this mechanism", a zero as "measured, and
-                # it was nothing".
-                "overlap_volume_mm3": issue.metadata.get("overlap_volume_mm3", ""),
-                "clearance_mm": issue.metadata.get("clearance_mm", ""),
                 "standards": _standards(issue),
-                "catalog_source": issue.metadata.get("catalog_source", ""),
             }
         )
     return buffer.getvalue()
@@ -241,7 +218,7 @@ def _encode(obj: Any) -> Any:
 
 
 def _engine_code(issue: Issue) -> str:
-    """Return the engine id that raised ``issue``, e.g. ``"GC-001"``.
+    """Return the engine id that raised ``issue``, e.g. ``"GR-001"``.
 
     Read from ``rule_id`` rather than ``metadata["mechanism_code"]`` because
     only ``rule_id`` is populated on every finding: XM-001's 510 verdicts and
@@ -291,7 +268,7 @@ def _topic_type(issue: Issue) -> str:
 
     * ``Warning`` — a data-quality note. Something could not be assessed; it is
       a modelling gap for the BIM coordinator, not a defect in the building.
-    * ``Clash`` — a geometric interference (SB-001).
+    * ``Clash`` — a geometric interference.
     * ``Issue`` — a compliance verdict against a scored element.
 
     Emitting ``Issue`` for all three, as this did before, made 2,937 seismic
@@ -469,35 +446,10 @@ _DESCRIPTION_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] 
         "INPUTS",
         (
             ("Material", "material", ""),
-            ("Material (anode)", "anode_material", ""),
-            ("Material (cathode)", "cathode_material", ""),
             ("Material source", "material_source", ""),
             ("Material confidence", "material_confidence", ""),
             ("Medium", "medium", ""),
-            ("Environment class", "environment_class", ""),
-            ("Environment source", "environment_source", ""),
-            ("Environment confidence", "environment_confidence", ""),
-            ("Environment severity", "environment_severity", ""),
-            ("Operating temperature", "operating_temperature_c", " °C"),
-            ("Galvanic couple basis", "galvanic_couple", ""),
-            ("Voltage gap", "voltage_gap_v", " V"),
             ("Separation", "separation", ""),
-            ("Nominal diameter (assumed)", "assumed_nominal_diameter_m", " m"),
-        ),
-    ),
-    (
-        "CLASH GEOMETRY",
-        (
-            ("Halo element", "halo_id", ""),
-            ("Clashing element", "clashing_element_id", ""),
-            ("Clashing element class", "clashing_element_class", ""),
-            ("Overlap volume", "overlap_volume_mm3", " mm³"),
-            ("Required clearance", "clearance_mm", " mm"),
-            ("Brace type", "brace_type", ""),
-            ("Rule variant", "rule_variant", ""),
-            ("Jurisdiction", "jurisdiction", ""),
-            ("Source model", "source_model", ""),
-            ("Clashing source model", "clashing_source_model", ""),
         ),
     ),
 )
@@ -506,17 +458,17 @@ _DESCRIPTION_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str], ...]], ...] 
 def _description(issue: Issue) -> str:
     """Render a structured, self-contained ``Topic/Description``.
 
-    A coordinator opening a topic in Revit or Solibri sees only this text. It
-    previously read, in full, "MC-001 assessed this element as medium." —
-    which names no element, no input, no threshold and no standard, so the
-    topic could not be acted on without going back to the web UI.
+    A coordinator opening a topic in Revit or Solibri sees only this text. A
+    description that says only "assessed this element as medium" names no
+    element, no input, no threshold and no standard, so the topic could not be
+    acted on without going back to the web UI.
 
     Every line is drawn from what the finding actually recorded. Absent values
     produce no line and an entirely absent section produces no heading, so the
     description never asserts a value the engine did not measure.
 
-    Sections, in order: the engine's own sentence, ELEMENT, INPUTS, CLASH
-    GEOMETRY (seismic only), ASSESSMENT, STANDARDS, MITIGATION.
+    Sections, in order: the engine's own sentence, ELEMENT, INPUTS,
+    ASSESSMENT, STANDARDS, MITIGATION.
     """
     meta = issue.metadata or {}
     blocks: list[str] = []
@@ -545,7 +497,6 @@ def _description(issue: Issue) -> str:
         _line("Band", issue.band.value),
         _line("Score", round(float(issue.score or 0.0), 4)),
         _line("Ruleset", meta.get("ruleset_version")),
-        _line("Catalog source", meta.get("catalog_source")),
         _line("Check", meta.get("check")),
     ]
     assessment = [line for line in assessment if line]

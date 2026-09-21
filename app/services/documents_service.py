@@ -686,8 +686,8 @@ class DocumentService:
             row (dict): the document row (existing or newly created)
             created (bool): False when an existing row was reused
         """
+        from app.document_upload_validation import md5_hex
         from app.modules.document_parsing.iso_validator import ISO19650Validator
-        from app.utils import md5_hex
 
         if start_page is not None and end_page is not None and Path(filename).suffix.lower() == ".pdf":
             from app.modules.document_parsing.pdf_page_range import slice_pdf_pages

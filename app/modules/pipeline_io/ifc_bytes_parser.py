@@ -1,6 +1,6 @@
-"""Session B — turn a stored IFC file into the ``ParsedIFC`` contract.
+"""IFC bytes parser — turn a stored IFC file into the ``ParsedIFC`` contract.
 
-Implements ``docs/PHASE_6_DATA_CONTRACTS.md`` §1. The contract's four rules
+Implements ``docs/PIPELINE_IO_DATA_CONTRACTS.md`` §1. The contract's four rules
 drive every design decision here:
 
 1. ``guid`` is the join key. Every downstream ``Issue.element_id`` is a guid
@@ -19,7 +19,7 @@ drive every design decision here:
 
 The element shape is :class:`~app.modules.ifc_reader.ifc_parser.ParsedElement`,
 which already exists and is **not** redefined here — this module composes the
-Module 2 reader into the envelope the Phase 6+ sessions agreed on.
+IFC reader into the envelope the pipeline stages agreed on.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class ParsedIFCQuality(TypedDict):
 
 
 class ParsedIFC(TypedDict):
-    """Session B's output envelope. See data contracts §1."""
+    """The parser's output envelope. See data contracts §1."""
 
     source_ref: str
     source_sha256: str

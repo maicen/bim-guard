@@ -470,7 +470,7 @@ def download_report_alias(
     """Download analysis report in CSV, JSON, or BCF format."""
     from fastapi import Response
 
-    from app.modules.phase_6.phase_6e_export import export
+    from app.modules.pipeline_io.analysis_result_exporter import export
     from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 
     if project_id <= 0:

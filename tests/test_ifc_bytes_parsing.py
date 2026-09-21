@@ -1,6 +1,6 @@
 """Contract tests for Session B's IFC parser.
 
-Every test here maps to a rule in ``docs/PHASE_6_DATA_CONTRACTS.md`` §1. The
+Every test here maps to a rule in ``docs/PIPELINE_IO_DATA_CONTRACTS.md`` §1. The
 rules are the specification; these assert the implementation obeys them.
 
 WHY THESE FIXTURES ARE SYNTHESISED
@@ -18,7 +18,7 @@ NO LIVE DATABASE
     contract rule 3, so its tests need no persistence and create no records —
     see data contracts §5.1 on why that matters in this repository.
 
-Run: uv run pytest tests/test_phase_6b_parsing.py -v
+Run: uv run pytest tests/test_ifc_bytes_parser.py -v
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import hashlib
 import pytest
 
 from app.modules.ifc_reader.ifc_parser import ParsedElement
-from app.modules.phase_6.phase_6b_parsing import (
+from app.modules.pipeline_io.ifc_bytes_parser import (
     ParsedIFC,
     elements_by_guid,
     parse_ifc_bytes,
@@ -296,7 +296,7 @@ class TestHierarchyDeduplication:
 
     def test_envelope_dedup_still_collapses_duplicates(self):
         """The guard itself, exercised directly rather than through a parse."""
-        from app.modules.phase_6.phase_6b_parsing import _deduplicate_by_guid
+        from app.modules.pipeline_io.ifc_bytes_parser import _deduplicate_by_guid
 
         rows = parse_ifc_bytes(build_ifc(specs=[("IfcPipeSegment", "P-01")]))["elements"]
         unique, collapsed = _deduplicate_by_guid(rows + rows)
@@ -384,7 +384,7 @@ class TestParsingNeverWrites:
         """
         import ast
 
-        import app.modules.phase_6.phase_6b_parsing as mod
+        import app.modules.pipeline_io.ifc_bytes_parser as mod
 
         tree = ast.parse(open(mod.__file__, encoding="utf-8").read())
         imported: set[str] = set()

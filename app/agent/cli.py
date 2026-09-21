@@ -173,7 +173,8 @@ async def run_cli(args: argparse.Namespace) -> None:
 def run_pipeline_cli(ifc_file: str | None = None) -> None:
     """Execute the full IFC parsing and rule-checking pipeline strictly via services without UI."""
     from pathlib import Path
-    from app.services.phase6_service import Phase6Service
+
+    from app.services.ifc_pipeline_service import IFCPipelineService
     from app.services.pipeline_services import PipelineOrchestratorService
     from app.services.pipeline_tracker import get_event_history
 
@@ -183,7 +184,7 @@ def run_pipeline_cli(ifc_file: str | None = None) -> None:
     if ifc_file and Path(ifc_file).exists():
         print(f"Parsing IFC file: {CYAN}{ifc_file}{RESET}")
         content = Path(ifc_file).read_bytes()
-        parsed = Phase6Service.parse_ifc(content)
+        parsed = IFCPipelineService.parse_ifc(content)
         print(f"Elements parsed: {GREEN}{len(parsed.get('elements', []))}{RESET}")
     else:
         print("Executing pipeline orchestrator workflow...")

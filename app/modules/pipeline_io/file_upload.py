@@ -1,6 +1,6 @@
-"""Session A — take an uploaded file into storage and record where it went.
+"""File upload — take an uploaded file into storage and record where it went.
 
-Session A owns writes; Session B (``phase_6b_parsing``) is pure read. This
+File upload owns writes; the parser (``ifc_bytes_parser``) is pure read. This
 module is the boundary between them: it puts bytes into object storage and
 hands back a :class:`StoredFileRef` carrying the storage reference and the
 SHA-256 of exactly those bytes.
@@ -8,10 +8,10 @@ SHA-256 of exactly those bytes.
 WHY SHA-256 AND NOT MD5
 
     ``ProjectsService.prepare_ifc_upload`` records an ``ifc_md5_hash``, but
-    model lineage (``resolve_analysis_ifc``) and the Phase 6B parser both key on
+    model lineage (``resolve_analysis_ifc``) and the IFC bytes parser both key on
     SHA-256. Introducing a third scheme would guarantee they never agree, so
     this service uses SHA-256 and nothing else. The digest here is byte-identical
-    to ``phase_6b_parsing.sha256_of`` over the same content — a test asserts it,
+    to ``ifc_bytes_parser.sha256_of`` over the same content — a test asserts it,
     because that equality is what makes the cache key work across the two
     sessions.
 
@@ -20,7 +20,7 @@ FAILURE IS A VALUE, NOT AN EXCEPTION
     ``ObjectStorage.save_upload`` raises when the bucket is unreachable. Routes
     calling this service render a message; they do not catch storage errors. So
     every entry point returns :class:`UploadResponse` with ``success`` set, and
-    the reason in ``error``. This mirrors the same rule Session B follows for
+    the reason in ``error``. This mirrors the same rule the parser follows for
     unreadable models.
 """
 
@@ -64,7 +64,7 @@ class StoredFileRef:
     Attributes:
         storage_ref: Reference returned by :meth:`ObjectStorage.save_upload`,
             e.g. ``sb://bucket/uploads/ifc/<uuid>_model.ifc``. This is what
-            Session B is handed.
+            the parser is handed.
         file_hash_sha256: Hex SHA-256 over the stored bytes. The lineage and
             re-parse cache key.
         filename: Original filename, stripped of any directory component.
@@ -103,7 +103,7 @@ class UploadResponse:
 def sha256_of(content: bytes) -> str:
     """Return the hex SHA-256 digest of ``content``.
 
-    Deliberately the same computation as ``phase_6b_parsing.sha256_of`` so the
+    Deliberately the same computation as ``ifc_bytes_parser.sha256_of`` so the
     upload-side and parse-side cache keys agree.
     """
     return hashlib.sha256(content).hexdigest()

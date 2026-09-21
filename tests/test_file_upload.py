@@ -7,7 +7,7 @@ NO LIVE STORAGE, NO LIVE DATABASE
     suite runs against the live Supabase project, where a test that stored a
     file would leave it in the bucket. See data contracts §5.1.
 
-Run: uv run pytest tests/test_phase_6a_upload.py -v
+Run: uv run pytest tests/test_file_upload.py -v
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import hashlib
 
 import pytest
 
-from app.modules.phase_6.phase_6a_upload import (
+from app.modules.pipeline_io.file_upload import (
     MAX_UPLOAD_BYTES,
     SUBDIR_BY_KIND,
     FileUploadService,
@@ -132,22 +132,22 @@ class TestSha256:
         b = service.upload("b.ifc", IFC_BYTES + b"\n").ref.file_hash_sha256
         assert a != b
 
-    def test_agrees_with_the_phase_6b_parser(self, service):
-        """The whole point of the digest: both sessions derive the same key.
+    def test_agrees_with_the_ifc_bytes_parser(self, service):
+        """The whole point of the digest: both stages derive the same key.
 
         If these ever diverge, an uploaded model and its parse would occupy
         different cache entries and every re-upload would re-parse.
 
-        Skips while the sessions are on separate branches — ``phase_6b_parsing``
+        Skips while the sessions are on separate branches — ``ifc_bytes_parser``
         lands with Session B — and becomes a live cross-session assertion the
         moment both are merged.
         """
-        phase_6b_parsing = pytest.importorskip(
-            "app.modules.phase_6.phase_6b_parsing",
+        ifc_bytes_parser = pytest.importorskip(
+            "app.modules.pipeline_io.ifc_bytes_parser",
             reason="Session B not merged into this branch yet",
         )
         ref = service.upload("model.ifc", IFC_BYTES).ref
-        assert ref.file_hash_sha256 == phase_6b_parsing.sha256_of(IFC_BYTES)
+        assert ref.file_hash_sha256 == ifc_bytes_parser.sha256_of(IFC_BYTES)
 
     def test_helper_agrees_with_service(self, service):
         ref = service.upload("model.ifc", IFC_BYTES).ref

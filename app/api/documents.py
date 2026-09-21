@@ -29,6 +29,7 @@ from app.api.dependencies import (
     get_profile_service,
 )
 from app.auth import CurrentUser, get_current_user, get_current_user_flexible
+from app.document_upload_validation import safe_upload_name, validate_document_upload
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEState,
@@ -65,7 +66,6 @@ from app.services.parsing_engine_instances_service import ParsingEngineInstances
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService, RuleGenerationFailedError
-from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 

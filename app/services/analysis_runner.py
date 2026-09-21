@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
-from app.modules.phase_6.phase_6b_parsing import sha256_of
+from app.modules.pipeline_io.ifc_bytes_parser import sha256_of
 from app.services.analysis_cache import ANALYSIS_CACHE, CacheKey
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
@@ -40,7 +40,7 @@ def failure_result(error: str) -> dict:
     """An ``AnalysisResult`` carrying only a reason it could not be produced.
 
     Errors cross this boundary as values, not exceptions — the same rule the
-    Phase 6 stages follow, so a route renders a message rather than a traceback.
+    pipeline I/O stages follow, so a route renders a message rather than a traceback.
     """
     return {
         "audit_issues": [],
@@ -100,7 +100,7 @@ def as_issue(raw: Issue | dict) -> Issue:
     The architecture pipeline emits findings as ``asdict(AuditIssue)`` dicts --
     a flat shape with a string ``band`` and a ``details`` mapping -- while
     :class:`Issue` is a dataclass with a :class:`RiskBand` and ``metadata``.
-    ``phase_6e_export`` reads attributes, so a dict reaches it as
+    ``analysis_result_exporter`` reads attributes, so a dict reaches it as
     ``AttributeError`` rather than as a report. Converting here keeps that
     difference in one place and leaves the exporter free of a per-pipeline
     branch.

@@ -1,16 +1,21 @@
-"""Phase 6 pipeline service facade for file parsing, analysis, and export."""
+"""Pipeline I/O service facade for file parsing, analysis, and export."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from app.modules.phase_6.phase_6a_upload import FileUploadService
-from app.modules.phase_6.phase_6b_parsing import parse_ifc_bytes
-from app.modules.phase_6.phase_6e_export import DATA_QUALITY, FORMATS, export, sort_issues
+from app.modules.pipeline_io.analysis_result_exporter import (
+    DATA_QUALITY,
+    FORMATS,
+    export,
+    sort_issues,
+)
+from app.modules.pipeline_io.file_upload import FileUploadService
+from app.modules.pipeline_io.ifc_bytes_parser import parse_ifc_bytes
 
 
-class Phase6Service:
-    """Service facade wrapping Phase 6 pipeline capabilities for UI routes."""
+class IFCPipelineService:
+    """Service facade wrapping pipeline I/O capabilities for UI routes."""
 
     def __init__(self) -> None:
         self.upload_service = FileUploadService()

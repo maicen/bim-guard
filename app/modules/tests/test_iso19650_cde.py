@@ -3,7 +3,7 @@
 from app.modules.comparator.ids_verification import run_ids_loin_verification
 from app.modules.contracts import CDEState
 from app.modules.document_parsing.iso_validator import ISO19650Validator
-from app.modules.phase_6.phase_6e_export import export
+from app.modules.pipeline_io.analysis_result_exporter import export
 from app.modules.reporter.bcf_generator import BCFIssue, _markup_xml
 from app.modules.rule_builder.ids_exporter import build_ids_document
 from app.services.cde_state_machine import CDEStateMachine

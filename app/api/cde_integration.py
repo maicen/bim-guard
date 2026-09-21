@@ -33,6 +33,7 @@ from app.api.dependencies import (
 )
 from app.api.projects import get_authorized_project, require_project_access
 from app.auth import CurrentUser, get_current_user
+from app.document_upload_validation import safe_upload_name, validate_document_upload
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEAuthConfigResponse,
@@ -57,7 +58,6 @@ from app.services.opencde_client import OpenCDEClientError, OpenCDEDocumentsClie
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.report_artifacts import ReportArtifactService
-from app.utils import safe_upload_name, validate_document_upload
 
 logger = get_logger(__name__)
 

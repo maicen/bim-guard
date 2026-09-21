@@ -31,6 +31,7 @@ from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
+from app.services.ifc_pipeline_service import IFCPipelineService
 from app.services.kuzu_provider import KuzuDatabaseProvider
 from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
@@ -49,7 +50,6 @@ from app.services.object_storage import ObjectStorage
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.permission_service import PermissionService
 from app.services.persistence import PersistenceService
-from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
@@ -131,7 +131,7 @@ class ApplicationContainer:
     ruleset_access_service: RulesetAccessService
     document_access_service: DocumentAccessService
     analysis_service: AnalysisService
-    phase6_service: Phase6Service
+    ifc_pipeline_service: IFCPipelineService
     arch_analysis_service: ArchAnalysisService
     digital_inspector_service: DigitalInspectorService
     graph_service: Any  # typed properly in the import if desired, but Any works for now without circular imports
@@ -718,7 +718,7 @@ def build_default_container() -> ApplicationContainer:
         )
 
     analysis_service = AnalysisService()
-    phase6_service = Phase6Service()
+    ifc_pipeline_service = IFCPipelineService()
 
     # 5. Physics & Architectural Engines & Registry
     registry = RuleEngineRegistry()
@@ -868,7 +868,7 @@ def build_default_container() -> ApplicationContainer:
         ruleset_access_service=ruleset_access_service,
         document_access_service=document_access_service,
         analysis_service=analysis_service,
-        phase6_service=phase6_service,
+        ifc_pipeline_service=ifc_pipeline_service,
         arch_analysis_service=arch_analysis_service,
         digital_inspector_service=digital_inspector_service,
         graph_service=graph_service,

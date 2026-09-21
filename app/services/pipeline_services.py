@@ -393,8 +393,8 @@ class PipelineOrchestratorService:
     def export_phase6(
         summary_payload: dict[str, Any], fmt: str, source_reference: str = ""
     ) -> tuple[bytes, str, str]:
-        """Export Phase 6 summary data into requested file format."""
-        from app.modules.phase_6.phase_6e_export import export
+        """Export pipeline summary data into requested file format."""
+        from app.modules.pipeline_io.analysis_result_exporter import export
 
         return export(summary_payload, fmt, source_reference=source_reference)
 

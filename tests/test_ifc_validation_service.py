@@ -1,6 +1,6 @@
 """Tests for IFC Pre-Flight Validation Service & Upload Gateway."""
 
-from app.modules.phase_6.phase_6a_upload import FileUploadService
+from app.modules.pipeline_io.file_upload import FileUploadService
 from app.services.ifc_validation_service import IFCValidationService
 
 SAMPLE_VALID_IFC = b"""ISO-10303-21;

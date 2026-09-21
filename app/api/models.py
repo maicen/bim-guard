@@ -12,14 +12,23 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 
 from app.api.dependencies import (
     get_github_repo_service,
+    get_ifc_pipeline_service,
     get_models_service,
     get_naming_config_service,
-    get_phase6_service,
 )
 from app.api.projects import get_authorized_project
 from app.logging_config import get_logger
@@ -33,10 +42,10 @@ from app.modules.contracts import (
 )
 from app.services import model_attach_tracker
 from app.services.github_repo_service import GitHubRepoService
+from app.services.ifc_pipeline_service import IFCPipelineService
 from app.services.iso_validator import ISO19650ValidationError, validate_and_parse_filename
 from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
-from app.services.phase6_service import Phase6Service
 
 logger = get_logger(__name__)
 
@@ -228,7 +237,7 @@ async def upload_models(
     project_id: int,
     project: Annotated[dict, Depends(get_authorized_project)],
     service: Annotated[ModelsService, Depends(get_models_service)],
-    phase6_service: Annotated[Phase6Service, Depends(get_phase6_service)],
+    ifc_pipeline_service: Annotated[IFCPipelineService, Depends(get_ifc_pipeline_service)],
     naming_service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
     background_tasks: BackgroundTasks,
     files: Annotated[list[UploadFile], File(description="IFC models to attach")],
@@ -316,7 +325,7 @@ async def upload_models(
         file_roles=file_roles,
         primary_index=primary_index,
         service=service,
-        phase6_service=phase6_service,
+        ifc_pipeline_service=ifc_pipeline_service,
     )
 
     return ModelUploadResponse(
@@ -333,7 +342,7 @@ def _attach_files_in_background(
     file_roles: list[str],
     primary_index: int,
     service: ModelsService,
-    phase6_service: Phase6Service,
+    ifc_pipeline_service: IFCPipelineService,
 ) -> None:
     """Store and attach every file, off the request/response cycle.
 
@@ -345,7 +354,7 @@ def _attach_files_in_background(
     attached_count = 0
     try:
         for index, (name, content, parsed) in enumerate(zip(names, contents, parsed_files)):
-            stored = phase6_service.upload_service.upload(
+            stored = ifc_pipeline_service.upload_service.upload(
                 name, content, project_id=project_id, kind="ifc"
             )
             if not stored.success or stored.ref is None:

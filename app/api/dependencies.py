@@ -17,6 +17,7 @@ from app.services.documents_service import DocumentService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
+from app.services.ifc_pipeline_service import IFCPipelineService
 from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
@@ -25,7 +26,6 @@ from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.permission_service import PermissionService
-from app.services.phase6_service import Phase6Service
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
@@ -67,9 +67,9 @@ def get_rules_service() -> RuleService:
     return get_container().rules_service
 
 
-def get_phase6_service() -> Phase6Service:
-    """Return the configured Phase6Service instance."""
-    return get_container().phase6_service
+def get_ifc_pipeline_service() -> IFCPipelineService:
+    """Return the configured IFCPipelineService instance."""
+    return get_container().ifc_pipeline_service
 
 
 def get_analysis_service() -> AnalysisService:

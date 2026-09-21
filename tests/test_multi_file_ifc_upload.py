@@ -35,11 +35,11 @@ import app.services.analysis_runner as runner
 from app.api.dependencies import (
     get_membership_service,
     get_models_service,
-    get_phase6_service,
+    get_ifc_pipeline_service,
     get_projects_service,
 )
 from app.main import app
-from app.modules.phase_6.phase_6a_upload import FileUploadService
+from app.modules.pipeline_io.file_upload import FileUploadService
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
 
@@ -221,7 +221,7 @@ def client(projects_service: ProjectsService, service: ModelsService, monkeypatc
 
     app.dependency_overrides[get_projects_service] = lambda: projects_service
     app.dependency_overrides[get_models_service] = lambda: service
-    app.dependency_overrides[get_phase6_service] = lambda: Phase6Double()
+    app.dependency_overrides[get_ifc_pipeline_service] = lambda: Phase6Double()
     app.dependency_overrides[get_membership_service] = lambda: FakeMemberships()
     # The runner holds module-level services of its own; point them at the same
     # ones so an upload made through the API is the model the analysis reads.
@@ -233,7 +233,7 @@ def client(projects_service: ProjectsService, service: ModelsService, monkeypatc
     # test that runs after this one in the same session.
     del app.dependency_overrides[get_projects_service]
     del app.dependency_overrides[get_models_service]
-    del app.dependency_overrides[get_phase6_service]
+    del app.dependency_overrides[get_ifc_pipeline_service]
     del app.dependency_overrides[get_membership_service]
 
 
@@ -568,7 +568,7 @@ def test_the_kernel_assesses_elements_from_every_model(client: TestClient) -> No
     data_quality Issue -- which makes the Issue count a direct measure of how
     many models the kernel actually opened.
     """
-    from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
+    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
 
     upload(client)
     models, error = runner.model_bytes_all(7)
@@ -587,7 +587,7 @@ def test_the_kernel_assesses_elements_from_every_model(client: TestClient) -> No
 
 def test_findings_name_the_model_they_came_from(client: TestClient) -> None:
     """A federated finding is only actionable if it says which file to open."""
-    from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
+    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
 
     upload(client)
     models, _ = runner.model_bytes_all(7)
@@ -606,7 +606,7 @@ def test_one_element_federated_twice_is_assessed_once(client: TestClient) -> Non
     each model and clash with itself, reporting a clearance failure nobody can
     fix.
     """
-    from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
+    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
 
     doubled = run_seismic_analysis(PIPING_MODEL, extra_models=[("PRJ-ORG-VS-L1-M3-C-0001.ifc", PIPING_MODEL)])
     alone = run_seismic_analysis(PIPING_MODEL)
@@ -658,7 +658,7 @@ def stub_geometries(monkeypatch, per_model: list[tuple[list, list]]) -> None:
     extraction: what matters is which element wins when two models disagree
     about the same GlobalId, and that is decided in run_seismic_analysis.
     """
-    from app.modules.phase_6 import phase_6d_seismic
+    from app.modules.pipeline_io import phase_6d_seismic
 
     calls = iter(per_model)
     monkeypatch.setattr(
@@ -688,7 +688,7 @@ def test_an_element_one_model_can_read_is_not_reported_unreadable(monkeypatch) -
     models it properly, is the normal case. Reporting it unassessed would be a
     finding about the federation rather than about the building.
     """
-    from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
+    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
 
     stub_geometries(
         monkeypatch,
@@ -705,7 +705,7 @@ def test_an_element_one_model_can_read_is_not_reported_unreadable(monkeypatch) -
 
 def test_an_element_no_model_can_read_is_reported_once(monkeypatch) -> None:
     """Unreadable everywhere is one finding, not one per model that tried."""
-    from app.modules.phase_6.phase_6d_seismic import run_seismic_analysis
+    from app.modules.pipeline_io.phase_6d_seismic import run_seismic_analysis
 
     stub_geometries(
         monkeypatch,

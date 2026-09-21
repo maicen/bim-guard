@@ -8,7 +8,7 @@ The other thing under test is that ``data_quality`` entries survive the export
 and stay distinguishable from verdicts — dropping them would restore the
 invisibility §4.2 failure mode 5 describes.
 
-Run: uv run pytest tests/test_phase_6e_export.py -v
+Run: uv run pytest tests/test_analysis_result_exporter.py -v
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import zipfile
 import pytest
 
 from app.modules.comparator.issue_schema import RiskBand, make_issue
-from app.modules.phase_6.phase_6e_export import (
+from app.modules.pipeline_io.analysis_result_exporter import (
     BAND_RANK,
     BAND_TO_BCF_PRIORITY,
     CSV_COLUMNS,
@@ -166,29 +166,12 @@ class TestCsv:
         findings = [r for r in rows if r["is_data_quality"] == "no"]
         assert all("NASA-STD-6012" in r["standards"] for r in findings)
 
-    def test_seismic_and_corrosion_export_identically(self, mixed_result):
+    def test_different_mechanisms_export_identically(self, mixed_result):
         """One exporter, no per-mechanism branch."""
         rows = list(csv.DictReader(io.StringIO(to_csv(mixed_result))))
         mechanisms = {r["mechanism"] for r in rows}
         assert any("GC-001" in m for m in mechanisms)
         assert any("SB-001" in m for m in mechanisms)
-
-    def test_a_seismic_row_carries_the_clash_geometry(self):
-        """The measurement a reviewer wants from an SB-001 row: by how much?"""
-        seismic = issue(
-            id="SB-0001",
-            mechanism="SB-001 seismic bracing",
-            metadata={"overlap_volume_mm3": 41250.0, "clearance_mm": 300.0},
-        )
-        rows = list(csv.DictReader(io.StringIO(to_csv({"audit_issues": [seismic]}))))
-        assert rows[0]["overlap_volume_mm3"] == "41250.0"
-        assert rows[0]["clearance_mm"] == "300.0"
-
-    def test_a_corrosion_row_leaves_the_clash_columns_blank(self):
-        """Blank, not 0: GC-001 did not measure an overlap of nothing."""
-        rows = list(csv.DictReader(io.StringIO(to_csv({"audit_issues": [issue()]}))))
-        assert rows[0]["overlap_volume_mm3"] == ""
-        assert rows[0]["clearance_mm"] == ""
 
     def test_commas_in_text_do_not_break_columns(self):
         result = {"audit_issues": [issue(id="GC-0001")], "issue_stats": {}}
@@ -591,15 +574,11 @@ class TestBCFStructuredDescription:
             metadata={
                 "material_source": "ifc_metadata",
                 "material_confidence": "high",
-                "environment_source": "inferred from spatial names",
-                "galvanic_couple": "bimetallic_pair_from_model",
             },
         )
         text = _description(_markup_for({"audit_issues": [finding]}, "GC-0002"))
         assert "Material source: ifc_metadata" in text
         assert "Material confidence: high" in text
-        assert "Environment source: inferred from spatial names" in text
-        assert "Galvanic couple basis: bimetallic_pair_from_model" in text
 
     def test_description_states_band_score_and_ruleset(self):
         finding = issue(id="CC-0003", metadata={"ruleset_version": "BIMGUARD-CC-001 v1.0.0"})
@@ -621,42 +600,6 @@ class TestBCFStructuredDescription:
         assert "NASA-STD-6012 — Table 2: gap 0.27V" in text
         assert "EN ISO 15329 — T1: severity 0.2" in text
 
-    def test_seismic_description_carries_the_clash_geometry_and_both_models(self):
-        from app.modules.comparator.issue_schema import make_issue
-
-        clash = make_issue(
-            id="SB-0001",
-            element_id="GUID-A",
-            rule_id="SB-001.01",
-            title="Bracing clearance clash",
-            mechanism="SB-001 seismic bracing",
-            band=RiskBand.CRITICAL,
-            score=0.9,
-            mitigation="Relocate.",
-            assignee_role="Mechanical engineer",
-            metadata={
-                "clashing_element_id": "GUID-B",
-                "clashing_element_class": "IfcBeam",
-                "overlap_volume_mm3": 131822370.75,
-                "clearance_mm": 200.0,
-                "source_model": "plumb.ifc",
-                "clashing_source_model": "str.ifc",
-                "jurisdiction": "BIMGUARD SB-001 screening calibration (authored thresholds, not code values)",
-            },
-            citations=[],
-        )
-        text = _description(_markup_for({"audit_issues": [clash]}, "SB-0001"))
-        assert "CLASH GEOMETRY" in text
-        assert "Clashing element: GUID-B" in text
-        assert "Overlap volume: 131,822,370.8 mm" in text
-        assert "Required clearance: 200 mm" in text
-        assert "Source model: plumb.ifc" in text
-        assert "Clashing source model: str.ifc" in text
-        assert (
-            "Jurisdiction: BIMGUARD SB-001 screening calibration "
-            "(authored thresholds, not code values)" in text
-        )
-
     def test_absent_values_produce_no_line_rather_than_an_empty_one(self):
         """An empty 'Material: ' asserts an empty material; silence asserts nothing."""
         finding = issue(id="GC-0005", metadata={"ifc_type": "IfcPipeSegment"})
@@ -664,11 +607,6 @@ class TestBCFStructuredDescription:
         assert "Material source:" not in text
         assert "System:" not in text
         assert "Floor:" not in text
-        assert "CLASH GEOMETRY" not in text
-
-    def test_corrosion_finding_has_no_clash_section(self):
-        text = _description(_markup_for({"audit_issues": [issue(id="GC-0006")]}, "GC-0006"))
-        assert "CLASH GEOMETRY" not in text
 
     def test_data_quality_note_states_the_failed_check(self):
         text = _description(_markup_for({"audit_issues": [data_quality_issue()]}, "MC-0009"))

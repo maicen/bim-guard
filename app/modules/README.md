@@ -18,7 +18,7 @@ app/modules/
 ├── rule_reliability.py         # How far a rule can be trusted to run against a real IFC model
 ├── scim_contracts.py           # SCIM 2.0 wire-format contracts for IdP-driven provisioning
 ├── llm_providers/               # LLM driver adapters (Anthropic, Gemini, Ollama, OpenAI, OpenRouter)
-├── document_parsing/           # Document → structured text/nodes (Module 1)
+├── document_parsing/           # Document → structured text/nodes
 │   ├── docling_extractor.py       — Docling-backed PDF/table extraction
 │   ├── document_extractor.py      — generic document text extraction
 │   ├── section_chunker.py         — splits extracted text into clause-scoped sections
@@ -32,7 +32,7 @@ app/modules/
 │   ├── llamaindex_program.py      — deontic statement extraction (shall/must/should)
 │   ├── engines/                   — parsing-engine driver adapters (Docling today)
 │   └── keywords/                  — keyword reference data used by extraction heuristics
-├── rule_builder/                # Structured text → compliance rules (Module 3)
+├── rule_builder/                # Structured text → compliance rules
 │   ├── llamaindex_rule_generator.py — the live LLM rule-extraction engine: a typed
 │   │                                  LlamaIndex Pydantic program producing schema-validated
 │   │                                  rule drafts. Wired in via app/services/rule_extraction_service.py.
@@ -47,7 +47,7 @@ app/modules/
 │   ├── rule_converter.py          — legacy direct GPT-4o converter, kept only for its
 │   │                                 existing LLM test coverage; not used by the live path
 │   └── regex_rule_converter.py    — legacy free/offline regex converter, same status
-├── ifc_reader/                  # IFC parsing, property resolution, quality gate (Module 2)
+├── ifc_reader/                  # IFC parsing, property resolution, quality gate
 │   ├── ifc_parser.py               — raw IFC element reader
 │   ├── ifc_geometry.py             — geometry-derived property extraction
 │   ├── ifc_graph.py                — spatial/topological graph traversal (NetworkX)
@@ -65,15 +65,15 @@ app/modules/
 │                                      auto-improvement of IFC files (used only by the
 │                                      separately authorized enhancement pipeline, never
 │                                      by the audit/analysis path)
-├── comparator/                  # IFC element data vs. rule library (Module 4)
+├── comparator/                  # IFC element data vs. rule library
 │   ├── engine_registry.py          — RuleEvaluator registry (ARCH-EGRESS-001, ARCH-SPATIAL-001, CODE-SHACL)
 │   ├── ids_verification.py         — buildingSMART IDS-based verification path
 │   ├── issue_adapter.py            — maps engine results onto the shared issue contract
-│   └── issue_schema.py             — Issue data contract (Module 4 → Module 5)
-├── reporter/                     # Report generation (Module 5)
+│   └── issue_schema.py             — Issue data contract (comparator → reporter)
+├── reporter/                     # Report generation
 │   └── bcf_generator.py             — BCF 2.1 ZIP output
-├── phase_6/                      # Legacy phase-numbered pipeline stages (upload, parsing,
-│                                    export) — see docs/PHASE_6_DATA_CONTRACTS.md for stage
+├── pipeline_io/                  # Upload, parsing, and export pipeline stages
+│                                    — see docs/PIPELINE_IO_DATA_CONTRACTS.md for stage
 │                                    boundaries
 └── tests/
     ├── conftest.py
