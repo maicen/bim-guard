@@ -8,8 +8,8 @@ one rule. Comparators produce list[Issue]. Reporter consumes
 list[Issue] to produce BCF 2.1 output, dashboard summaries, and PDF reports.
 
 The Issue schema is deliberately mechanism-agnostic. Every compliance
-domain (galvanic, crevice, clearance, centre-to-centre, seismic, fire,
-accessibility) produces the same shape, differentiated only by the
+domain (clearance, centre-to-centre, egress, accessibility) produces the
+same shape, differentiated only by the
 `mechanism` string and mechanism-specific values in `metadata`.
 
 UI consumption: the frontend component brief (docs/app-interior-design.md)
@@ -58,8 +58,8 @@ class Issue:
 
     # --- Identity ---
     id: str  # human-readable, e.g. "BGR-0007"
-    element_id: str  # FK to PipingElement.id (IFC GUID)
-    rule_id: str  # FK to rules table, or rule ref like "GC-001.03"
+    element_id: str  # FK to the parsed IFC element (IFC GUID)
+    rule_id: str  # FK to rules table, or rule ref like "ARCH-EGRESS-001.03"
 
     # --- Summary ---
     title: str  # short headline shown in lists
@@ -68,7 +68,7 @@ class Issue:
     # --- Classification ---
     band: RiskBand = RiskBand.LOW
     score: float = 0.0  # 0.0 – 1.0 composite
-    mechanism: str = ""  # "GC-001 galvanic", "CC-001 crevice", …
+    mechanism: str = ""  # "ARCH-EGRESS-001", "ARCH-SPATIAL-001", …
 
     # --- Remediation guidance ---
     mitigation: str = ""  # recommended remediation
@@ -80,9 +80,7 @@ class Issue:
     updated_at: str = ""  # ISO 8601 UTC
 
     # --- Mechanism-specific extras ---
-    # For galvanic: {"anode_material": "GalvanisedSteel", "cathode_material": "SS316",
-    #                "voltage_v": 0.74, "area_ratio": 0.02, "pren": 25.2, ...}
-    # For crevice: {"joint_type": "JT-004", "cct_required_c": 35, "cct_material_c": 10, ...}
+    # For egress: {"clear_width_mm": 810, "required_width_mm": 860, ...}
     # Rule of thumb: put anything here that a reviewer would want to see in the
     # issue detail panel but that doesn't fit a top-level field.
     metadata: dict = field(default_factory=dict)
@@ -340,29 +338,21 @@ if __name__ == "__main__":
     example = make_issue(
         id="BGR-0007",
         element_id="3Kf7q8XzR1pP2mN4gV8xQ",
-        rule_id="GC-001.03",
-        title="Dissimilar metal coupling — galvanised steel to SS316",
-        mechanism="GC-001 galvanic",
+        rule_id="ARCH-EGRESS-001.03",
+        title="Door clear width below minimum egress requirement",
+        mechanism="ARCH-EGRESS-001",
         band=RiskBand.CRITICAL,
         score=0.89,
-        mitigation="Insert dielectric union between dissimilar materials.",
+        mitigation="Widen the door leaf or replace with a compliant unit.",
         metadata={
-            "anode_material": "GalvanisedSteel",
-            "cathode_material": "SS316",
-            "voltage_v": 0.74,
-            "area_ratio": 0.02,
-            "environment_class": "T3_chloride",
+            "clear_width_mm": 780,
+            "required_width_mm": 860,
         },
         citations=[
             {
-                "standard": "NASA-STD-6012",
-                "clause": "Table 2",
-                "reason": "voltage gap 0.74V exceeds 0.15V threshold for harsh environment",
-            },
-            {
-                "standard": "EN 1993-1-4",
-                "clause": "§A.4",
-                "reason": "guidance on dissimilar metal connections",
+                "standard": "IBC",
+                "clause": "1010.1.1",
+                "reason": "clear width 780mm is below the 860mm minimum for means of egress",
             },
         ],
     )

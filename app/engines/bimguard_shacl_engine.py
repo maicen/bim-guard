@@ -6,7 +6,7 @@ run against a BOT graph (`app.modules.ifc_reader.bot_graph`) than as the
 existing per-element operator/threshold comparator path. This is the
 "hybrid" bridge from the ontology-integration proposal: geometry stays
 computed by the existing pure-Python engines (`ifc_geometry.py`,
-`ifc_egress.py`, `ifc_stair.py`, `blue_halo/`) and is written onto the graph
+`ifc_egress.py`, `ifc_stair.py`) and is written onto the graph
 as literals (`bot_graph.enrich_literal`); this engine only validates the
 resulting graph.
 

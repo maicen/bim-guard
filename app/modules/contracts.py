@@ -966,9 +966,9 @@ class RuleReliabilityResponse(BaseModel):
 class RuleCreateRequest(BaseModel):
     """Payload for creating or registering a rule."""
 
-    rule_id: str = Field(..., description="Unique rule identifier (e.g. GC-001.01)")
+    rule_id: str = Field(..., description="Unique rule identifier (e.g. ARCH-EGRESS-001.01)")
     description: Optional[str] = Field(default="", description="Rule human description")
-    mechanism: Optional[str] = Field(default="CODE", description="Domain or mechanism (e.g. GC-001, CODE)")
+    mechanism: Optional[str] = Field(default="CODE", description="Domain or mechanism (e.g. IFC, CODE)")
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
     category: Optional[str] = Field(default=None, description="Domain category: Arch")
@@ -1267,7 +1267,7 @@ class RuleFolderCreateRequest(BaseModel):
     ruleset_id: str = Field(..., description="Unique ruleset identifier")
     display_name: Optional[str] = Field(default=None, description="Display name")
     description: Optional[str] = Field(default="", description="Description")
-    mechanism_scope: Optional[str] = Field(default="", description="Mechanism scope (e.g. CODE, GC-001, SEISMIC)")
+    mechanism_scope: Optional[str] = Field(default="", description="Mechanism scope (e.g. CODE, IFC)")
     category: str = Field(default="Arch", description="Ruleset category: Arch")
 
 
@@ -1286,7 +1286,7 @@ class RuleBulkUpdateRequest(BaseModel):
     rule_ids: list[int] = Field(..., min_length=1, description="Rule IDs to update")
     ruleset_id: Optional[str] = Field(default=None, description="Assign to ruleset folder")
     category: Optional[str] = Field(default=None, description="Domain category: Arch")
-    mechanism: Optional[str] = Field(default=None, description="Mechanism: CODE, GC-001, CC-001, MC-001, SEISMIC")
+    mechanism: Optional[str] = Field(default=None, description="Mechanism: CODE, IFC")
     severity: Optional[str] = Field(default=None, description="Severity: Critical, High, Medium, Low")
     needs_review: Optional[int] = Field(default=None, description="Needs review flag: 0 or 1")
     property_set: Optional[str] = Field(default=None, description="Property set name")
@@ -1680,7 +1680,7 @@ class RuleEvaluationRequest(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    rule_type: str = Field(..., description="Target rule code (e.g. GC-001, CC-001, MC-001)")
+    rule_type: str = Field(..., description="Target rule code (e.g. ARCH-EGRESS-001, ARCH-SPATIAL-001)")
     element: Any = Field(..., description="Target IFC element, element pair, or dictionary data")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Contextual evaluation metadata")
 

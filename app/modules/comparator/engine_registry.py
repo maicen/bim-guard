@@ -2,7 +2,7 @@
 
 This keeps the compliance runner open for extension without hard-coding a new
 conditional branch for every rule family. Each evaluator is registered under its
-rule code (for example "GC-001") and resolved through an explicit evaluator
+rule code (for example "ARCH-EGRESS-001") and resolved through an explicit evaluator
 contract rather than an ad hoc callable assumption.
 """
 

@@ -19,8 +19,7 @@ Two output paths are provided:
 
 Multi-element findings
 ----------------------
-A galvanic couple (GC-001) implicates *two* elements -- an anode and a
-cathode -- and a clearance breach implicates the offending element plus what
+A clearance breach implicates the offending element plus what
 it clashes with. :class:`Issue` carries a single ``element_id``, so any
 additional IFC GUIDs are read out of ``Issue.metadata`` by
 :meth:`BCFExporter.collect_elements`. The resulting viewpoint selects and
@@ -29,7 +28,7 @@ colours every implicated element, not just the primary one.
 Relationship to ``reporter.bcf_generator``
 --------------------------------------------------
 ``app/modules/reporter/bcf_generator.py`` writes an equivalent
-archive from its own ``BCFIssue`` dataclass on the Blue Halo path, but its
+archive from its own ``BCFIssue`` dataclass on the persisted-report path, but its
 viewpoint selects a single component. This module is the services-layer
 entry point, works directly off the Module 4 ``Issue`` contract, and supports
 multi-component selection. The two are candidates for consolidation; the

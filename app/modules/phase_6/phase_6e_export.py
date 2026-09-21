@@ -9,8 +9,7 @@ no per-mechanism branch.
 BCF IS NOT REIMPLEMENTED
 
     ``reporter.bcf_generator`` already produces spec-compliant BCF 2.1
-    archives, and ``blue_halo_bcf_exporter`` already renders Halo clashes
-    through the same helpers. This module maps :class:`Issue` onto
+    archives. This module maps :class:`Issue` onto
     ``BCFIssue`` and calls ``generate_bcf``; it writes no XML of its own.
 
 DATA QUALITY IS NOT A FINDING

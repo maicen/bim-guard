@@ -15,8 +15,8 @@ DESIGN CONSTRAINTS, AND WHY
     value rather than inventing a second key.
 
     **Keyed on the engines that ran, too.** The engine selection is part of
-    what produced the result, so it is part of the key. A run of GC-001 alone
-    and a run of all three engines over the same model are different results,
+    what produced the result, so it is part of the key. A run of one engine alone
+    and a run of every engine over the same model are different results,
     and one must never be served for the other.
 
     **A miss is never an error.** Callers run the analysis on a miss. The cache
@@ -102,20 +102,19 @@ class CacheKey:
 
     Attributes:
         project_id: Owning project.
-        slug: Analysis slug, e.g. ``"corrosion"`` or ``"seismic"``. Two
+        slug: Analysis slug, e.g. ``"architecture"``. Two
             analyses of one model are different results.
         source_sha256: Digest of the model the result was computed from. This
             is what makes staleness impossible rather than merely unlikely.
         engines: Ruleset codes the result was computed from, canonicalised and
             in a stable order. A partial run is a different result from a full
-            one, so without this a GC-001-only run would be served back to a
+            one, so without this a single-engine run would be served back to a
             request that asked for every engine — the same staleness the digest
             rules out, arriving through the selection instead of the model.
             Empty means the caller made no selection.
         include_low: Whether the result carries Low-band verdicts. A run that
             suppressed them is a different result from one that kept them --
-            on Clinic Plumbing the difference is GC-001's 6,587 findings -- so
-            without this the first of the two to be computed would be served
+            so without this the first of the two to be computed would be served
             back to a caller who asked for the other.
     """
 

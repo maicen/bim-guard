@@ -28,7 +28,7 @@ class BCFIssue:
     service_type: str
     floor: str
     risk_band: str
-    mechanism: str  # galvanic / crevice / combined
+    mechanism: str  # e.g. ARCH-EGRESS-001
     risk_score: float
     mitigation: str
     camera_x: float = 0.0
@@ -43,8 +43,8 @@ class BCFIssue:
     suitability_code: str = ""
     revision_code: str = ""
     cde_state: str = ""
-    #: Further IFC GlobalIds implicated in the finding (e.g. the cathode of a
-    #: galvanic couple). They are selected and coloured in the viewpoint
+    #: Further IFC GlobalIds implicated in the finding (e.g. the element a
+    #: clash was detected against). They are selected and coloured in the viewpoint
     #: alongside ``component_guid``; blanks and duplicates are dropped.
     related_component_guids: list = field(default_factory=list)
     #: ``Topic/CreationAuthor``. Names the engine that raised the finding and,
@@ -507,7 +507,7 @@ _BAND_COLOURS: dict[str, str] = {
 UNKNOWN_BAND_COLOUR = "FF888888"
 
 #: Colour for the partner elements a finding implicates -- the other side of
-#: a clash, the other half of a galvanic couple. Distinct from every band
+#: a clash. Distinct from every band
 #: colour so the subject and its counterpart are told apart at a glance.
 PARTNER_COLOUR = "FF0070C0"
 

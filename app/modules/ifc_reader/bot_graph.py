@@ -260,7 +260,7 @@ def enrich_literal(
     """Attach one engine-computed value to an element node as an RDF literal.
 
     Used to write geometry-engine outputs (`ifc_geometry.py`, `ifc_egress.py`,
-    `ifc_stair.py`, `blue_halo/`) back onto the BOT graph so SHACL shapes can
+    `ifc_stair.py`) back onto the BOT graph so SHACL shapes can
     constrain them -- e.g. `enrich_literal(graph, door_guid,
     "calculatedClearWidth", 880.0)`.
 

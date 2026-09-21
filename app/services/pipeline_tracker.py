@@ -1,6 +1,6 @@
-"""Live stage and metric tracking for the corrosion engine pipeline.
+"""Live stage and metric tracking for the compliance engine pipeline.
 
-A run of the corrosion engines over a large IFC model takes seconds to tens of
+A run of the compliance engines over a large IFC model takes seconds to tens of
 seconds, and until now nothing outside the process could see how far it had got.
 This module records that progress as it happens so
 ``GET /api/workflow/{project_id}`` can report it, and so the logs carry a timed
@@ -36,8 +36,8 @@ INSTRUMENTATION IS AMBIENT, NOT A PARAMETER
     concurrently cannot write into each other's tracker.
 
 CONCURRENT RUNS, AND READING THEM BACK AS ONE
-    A project can have more than one analysis in flight -- corrosion, Blue Halo
-    seismic, the graph engine, a Digital Inspector question -- so the store is
+    A project can have more than one analysis in flight -- the architectural
+    compliance run, the graph engine, a Digital Inspector question -- so the store is
     keyed by ``(project_id, run_key)`` and each theme owns a key. That is what
     stops one theme's ``reset=True`` from wiping another's in-flight stages.
 
@@ -50,7 +50,7 @@ DECLARED STATUS FOR ENGINES THAT HAVE NOT RUN
     An engine nobody has tracked reports only its declared status --
     ``{"status": "pending"}`` -- rather than a stage-zero shape that would read
     as "started and got nowhere". See :data:`ENGINE_SPECS` for what each engine's
-    declared status means and why MC-001's differs from the others.
+    declared status means and why DIGITAL-INSPECTOR's differs from the others.
 
 STORAGE
     Process-local, bounded and expiring, mirroring
@@ -148,7 +148,7 @@ class EngineSpec:
     """One engine the workflow endpoint reports on.
 
     Attributes:
-        code: Ruleset code, e.g. ``"GC-001"``. The key in the API payload.
+        code: Ruleset code, e.g. ``"GRAPH-001"``. The key in the API payload.
         label: Human name, for logs and for clients that want more than a code.
         declared_status: What the engine reports before anything tracks it.
     """
@@ -680,10 +680,10 @@ def merged_snapshot(project_id: int) -> dict[str, Any]:
         them: ``GET /api/workflow/{id}`` and every SSE ``status`` frame called
         :func:`snapshot` with the default key, so a run under any other key was
         tracked correctly and then reported as though it had never started.
-        That is what left a seismic run showing a frozen zero while its engine
+        That is what left a run showing a frozen zero while its engine
         worked -- the tracking was missing on one side and unreadable on the
-        other. Merging here fixes the reading half for SB-001 and for GRAPH-001
-        together, because they had the same cause.
+        other. Merging here fixes the reading half for GRAPH-001 and other
+        non-default run keys, because they had the same cause.
 
     HOW ENGINES ARE RESOLVED
 
@@ -733,8 +733,8 @@ def merged_snapshot(project_id: int) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 #: The tracker the current context writes to, or ``None``. Holds the tracker
-#: rather than a single engine run because GC-001 and CC-001 interleave -- the
-#: analysis loops elements on the outside and mechanisms on the inside -- so a
+#: rather than a single engine run because the comparator's engines interleave --
+#: the analysis loops elements on the outside and rules on the inside -- so a
 #: single "current engine" would be wrong on every other call.
 _ACTIVE: ContextVar[Optional[PipelineTracker]] = ContextVar(
     "bimguard_pipeline_tracker", default=None
@@ -785,7 +785,7 @@ def emit(code: str, stage: Optional[Stage] = None, **metrics: Any) -> None:
     validation sweep, or the tests that call them directly.
 
     Args:
-        code: Ruleset code, e.g. ``"GC-001"``.
+        code: Ruleset code, e.g. ``"GRAPH-001"``.
         stage: Stage being entered, or ``None`` to record metrics only.
         **metrics: Metric values to merge; ``None`` values are ignored.
     """

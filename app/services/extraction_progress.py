@@ -1,13 +1,13 @@
 """In-process progress tracking for document rule-draft extraction.
 
 Deliberately separate from `pipeline_tracker`: that tracker is a fixed
-corrosion-engine registry (GC-001/CC-001/...) keyed by project_id, and
+engine registry (see `ENGINE_SPECS`) keyed by project_id, and
 `RuleExtractionService.ingest_with_llamaindex` used to (incorrectly) bind
 it under a document_id with an unregistered engine code, which crashed on
 every call -- see the fix in that method. Document extraction has no
 "engine" concept at all, just "how many of N clause-nodes are done", so
 this is a much smaller, dedicated structure rather than another attempt to
-fit that shape onto the corrosion registry.
+fit that shape onto the engine registry.
 
 Polled via `GET /api/documents/{id}/rules/extract-progress` while
 `POST /api/documents/{id}/rules/extract-drafts` is in flight.

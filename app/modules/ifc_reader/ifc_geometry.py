@@ -2,16 +2,13 @@
 BIMGUARD AI — IFC Geometry Extraction
 modules/ifc_geometry.py
 
-Two responsibilities:
+Responsibility:
 
-  1. Pipe surface area — used by the GC-001 corrosion engine.
-     Reads actual mesh geometry or falls back to nominal-diameter estimation.
-
-  2. Tier 1 architectural geometry — measurements for architectural elements
-     (windows, railings, stairs, ramps, corridors, slabs).
-     Derives Height, Width, SillHeight, HandrailHeight, Slope, Volume,
-     FootprintArea, SurfaceArea, and CorridorWidth when those values are
-     absent from property sets.
+  Tier 1 architectural geometry — measurements for architectural elements
+  (windows, railings, stairs, ramps, corridors, slabs).
+  Derives Height, Width, SillHeight, HandrailHeight, Slope, Volume,
+  FootprintArea, SurfaceArea, and CorridorWidth when those values are
+  absent from property sets.
 
 Native engine:
      All mesh operations now delegate to ifcopenshell.util.shape where
@@ -28,7 +25,6 @@ Usage:
 
 import logging
 import math
-from typing import Optional
 
 logger = logging.getLogger("bimguard.geometry")
 
@@ -217,9 +213,6 @@ class IFCGeometryExtractor:
     Tier 1 (architectural): bounding-box + polygon measurements — height,
     width, corridor width, sill height, handrail height, slope, volume,
     footprint area, surface area.
-
-    Pipe surface area (GC-001 corrosion engine): unchanged API, updated
-    internals.
     """
 
     def __init__(self, ifc_model=None):
@@ -942,155 +935,3 @@ class IFCGeometryExtractor:
 
         return None
 
-    # ── SURFACE AREA FOR PIPE CORROSION (GC-001) ─────────────────────────────
-
-    def get_external_surface_area(
-        self,
-        element,
-        nominal_diameter_m: float,
-        insulation_thickness_m: float = 0.0,
-        length_m: Optional[float] = None,
-    ) -> dict:
-        """
-        Calculate the external surface area of a pipe element.
-
-        Tries in order:
-        1. Outer surface area via ifcopenshell.util.shape.get_outer_surface_area()
-        2. Length from IfcQuantityLength quantity set
-        3. Estimation from nominal diameter and default length
-
-        Returns dict with keys: area_m2, area_with_insulation_m2, length_m, method
-        """
-        result = {
-            "area_m2": None,
-            "area_with_insulation_m2": None,
-            "length_m": None,
-            "method": "unknown",
-        }
-
-        # Try actual geometry first
-        area_m2 = self.get_surface_area_m2(element)
-        if area_m2 and area_m2 > 0:
-            result["area_m2"] = area_m2
-            result["method"] = "geometry"
-            circumference = math.pi * nominal_diameter_m
-            if circumference > 0:
-                result["length_m"] = area_m2 / circumference
-
-        # Try quantity set for length if geometry gave nothing
-        if result["length_m"] is None and element is not None:
-            qset_length = self._get_quantity_length(element)
-            if qset_length:
-                result["length_m"] = qset_length
-                result["method"] = "quantity_set"
-                result["area_m2"] = math.pi * nominal_diameter_m * qset_length
-
-        # Fall back to provided or default length
-        if result["length_m"] is None:
-            fallback_length = length_m if length_m else self._default_length(nominal_diameter_m)
-            result["length_m"] = fallback_length
-            result["area_m2"] = math.pi * nominal_diameter_m * fallback_length
-            if result["method"] == "unknown":
-                result["method"] = "estimated"
-
-        # Calculate area with insulation
-        if result["area_m2"] is not None:
-            outer_d = nominal_diameter_m + 2 * insulation_thickness_m
-            result["area_with_insulation_m2"] = math.pi * outer_d * result["length_m"]
-
-        return result
-
-    def _get_quantity_length(self, element) -> Optional[float]:
-        """Read pipe length from Qto_PipeSegmentBaseQuantities.Length."""
-        try:
-            for rel in getattr(element, "IsDefinedBy", []):
-                if not hasattr(rel, "RelatingPropertyDefinition"):
-                    continue
-                pdef = rel.RelatingPropertyDefinition
-                if pdef.is_a("IfcElementQuantity"):
-                    for qty in pdef.Quantities:
-                        if qty.is_a("IfcQuantityLength") and "length" in qty.Name.lower():
-                            return float(qty.LengthValue)
-        except Exception:
-            pass
-        return None
-
-    def _default_length(self, nominal_diameter_m: float) -> float:
-        if nominal_diameter_m <= 0.05:
-            return 3.0
-        return 6.0
-
-    # ── AREA RATIO (GC-001 corrosion) ─────────────────────────────────────────
-
-    def calculate_area_ratio(
-        self,
-        anode_area_m2: float,
-        cathode_area_m2: float,
-    ) -> tuple[float, str]:
-        """GC-001 anode-to-cathode area ratio and risk band."""
-        if cathode_area_m2 <= 0:
-            return (1.0, "Critical")
-        ratio = anode_area_m2 / cathode_area_m2
-        if ratio > 5.0:
-            return (ratio, "Favourable")
-        elif ratio > 2.0:
-            return (ratio, "Acceptable")
-        elif ratio > 0.5:
-            return (ratio, "Moderate")
-        elif ratio > 0.1:
-            return (ratio, "Unfavourable")
-        else:
-            return (ratio, "Critical")
-
-
-# ── ESTIMATION UTILITIES (no IFC model required) ──────────────────────────────
-
-def estimate_surface_area(
-    nominal_diameter_m: float,
-    length_m: float,
-    insulation_thickness_m: float = 0.0,
-) -> dict:
-    """Estimate pipe surface area from nominal dimensions (no IFC geometry needed)."""
-    pipe_area = math.pi * nominal_diameter_m * length_m
-    insulated_d = nominal_diameter_m + 2 * insulation_thickness_m
-    insulated_area = math.pi * insulated_d * length_m
-    return {
-        "area_m2": round(pipe_area, 4),
-        "area_with_insulation_m2": round(insulated_area, 4),
-        "length_m": length_m,
-        "method": "nominal_diameter_estimate",
-    }
-
-
-def nps_to_od_m(nps_inch: float) -> float:
-    """Convert NPS (nominal pipe size in inches) to OD in metres per ASME B36.10M."""
-    NPS_OD_TABLE = {
-        0.125: 0.01080, 0.25: 0.01350, 0.375: 0.01730, 0.5: 0.02130,
-        0.75: 0.02670, 1.0: 0.03340, 1.25: 0.04220, 1.5: 0.04830,
-        2.0: 0.06030, 2.5: 0.07300, 3.0: 0.08890, 3.5: 0.10160,
-        4.0: 0.11430, 5.0: 0.14130, 6.0: 0.16830, 8.0: 0.21910,
-        10.0: 0.27305, 12.0: 0.32385, 14.0: 0.35560, 16.0: 0.40640,
-        18.0: 0.45720, 20.0: 0.50800, 22.0: 0.55880, 24.0: 0.60960,
-    }
-    if nps_inch in NPS_OD_TABLE:
-        return NPS_OD_TABLE[nps_inch]
-    keys = sorted(NPS_OD_TABLE.keys())
-    for i, k in enumerate(keys[:-1]):
-        if k < nps_inch < keys[i + 1]:
-            ratio = (nps_inch - k) / (keys[i + 1] - k)
-            return NPS_OD_TABLE[k] + ratio * (NPS_OD_TABLE[keys[i + 1]] - NPS_OD_TABLE[k])
-    return nps_inch * 0.0254
-
-
-def dn_to_od_m(dn: int) -> float:
-    """Convert DN to OD in metres per EN 10220 / ISO 4200."""
-    DN_OD_TABLE = {
-        6: 0.01080, 8: 0.01350, 10: 0.01730, 15: 0.02130, 20: 0.02670,
-        25: 0.03340, 32: 0.04220, 40: 0.04830, 50: 0.06030, 65: 0.07300,
-        80: 0.08890, 90: 0.10160, 100: 0.11430, 125: 0.14130, 150: 0.16830,
-        200: 0.21910, 250: 0.27305, 300: 0.32385, 350: 0.35560, 400: 0.40640,
-        450: 0.45720, 500: 0.50800, 600: 0.60960,
-    }
-    if dn in DN_OD_TABLE:
-        return DN_OD_TABLE[dn]
-    return dn / 1000.0 * 1.05

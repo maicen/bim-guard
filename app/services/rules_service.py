@@ -848,8 +848,8 @@ class RuleService:
             started existing.
 
             That is what the ruleset seeder asks, and answering it from a
-            cached snapshot is how a second copy of every GC-001, CC-001 and
-            MC-001 band row reached the table on 2026-09-06, after the
+            cached snapshot is how a second copy of every seeded rule row
+            reached the table on 2026-09-06, after the
             existence guard was in place and after migration
             ``20260903100400_dedupe_seeded_rules`` had removed the earlier
             duplicates (audit F1). An idempotency check has to read the table.
@@ -1221,7 +1221,7 @@ class RuleService:
         Expected format:
             {
                 "ruleset_id": "MY-RULESET",
-                "mechanism":  "GC-001",          # optional
+                "mechanism":  "IFC",             # optional
                 "rules": [
                     {
                         "ref":           "R-001",
