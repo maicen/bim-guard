@@ -27,6 +27,7 @@ from app.api.dependencies import (
     get_parsing_engine_instances_service,
     get_permission_service,
     get_profile_service,
+    get_ruleset_access_service,
 )
 from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.document_upload_validation import safe_upload_name, validate_document_upload
@@ -66,6 +67,7 @@ from app.services.parsing_engine_instances_service import ParsingEngineInstances
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService, RuleGenerationFailedError
+from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
 
@@ -1117,6 +1119,7 @@ async def extract_rule_drafts(
     memberships: Annotated[MembershipService, Depends(get_membership_service)],
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
     model: Optional[str] = None,
     organization_id: Optional[int] = Query(
         None, description="Organization whose LLM provider key to use; defaults to the caller's."
@@ -1162,6 +1165,14 @@ async def extract_rule_drafts(
         # The model rejected every clause (bad/missing key, no credit, ...): report the
         # provider's own reason, not an empty "success".
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    # Each run mints a fresh EXTRACTED-<timestamp> ruleset, the same way
+    # create_rule_folder mints a new folder. Reviewing and promoting its drafts
+    # is grant-checked (see RulesetAccessChecker), so without this the org that
+    # just ran the extraction gets a 403 on every accept/promote.
+    if llm_org_id is not None:
+        for batch_ruleset_id in {d.proposed_rule.ruleset_id for d in drafts if d.proposed_rule.ruleset_id}:
+            ruleset_access.add_org_grant(llm_org_id, batch_ruleset_id)
     return RuleExtractionDraftListResponse(drafts=drafts)
 
 

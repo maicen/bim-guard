@@ -181,6 +181,7 @@ def test_extract_drafts_route_reports_a_total_model_failure_as_502():
                     memberships=memberships,
                     document_access=MagicMock(),
                     profiles=profiles,
+                    ruleset_access=MagicMock(),
                     model="m",
                     organization_id=1,
                     x_org_id=None,
@@ -190,4 +191,51 @@ def test_extract_drafts_route_reports_a_total_model_failure_as_502():
 
     assert exc_info.value.status_code == 502
     assert "failed on all 2 clauses" in exc_info.value.detail
+
+
+def test_extract_drafts_route_grants_the_requesting_org_its_new_batch_ruleset():
+    """Reviewing/promoting a draft is grant-checked, so the org that ran the extraction must hold the grant."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    from app.api.documents import extract_rule_drafts
+
+    service = MagicMock()
+    service.get_document.return_value = {"id": 500}
+    service.get_document_text.return_value = "The door shall be 900 mm wide."
+    memberships = MagicMock()
+    memberships.org_ids_for_user.return_value = {1}
+    profiles = MagicMock()
+    profiles.is_superadmin.return_value = False
+    ruleset_access = MagicMock()
+
+    def _draft(ruleset_id):
+        return SimpleNamespace(proposed_rule=SimpleNamespace(ruleset_id=ruleset_id))
+
+    async def extracted(*args, **kwargs):
+        return [_draft("EXTRACTED-20260921-000000"), _draft("EXTRACTED-20260921-000000")]
+
+    with (
+        patch("app.api.documents.RuleExtractionService") as extraction,
+        patch("app.api.documents.RuleExtractionDraftListResponse", side_effect=lambda drafts: drafts),
+    ):
+        extraction.return_value.extract_rule_drafts = extracted
+        asyncio.run(
+            extract_rule_drafts(
+                500,
+                service=service,
+                access_checker=lambda *a, **k: None,
+                current_user=SimpleNamespace(id="user-1"),
+                memberships=memberships,
+                document_access=MagicMock(),
+                profiles=profiles,
+                ruleset_access=ruleset_access,
+                model="m",
+                organization_id=1,
+                x_org_id=None,
+                body=None,
+            )
+        )
+
+    ruleset_access.add_org_grant.assert_called_once_with(1, "EXTRACTED-20260921-000000")
 

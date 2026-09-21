@@ -175,6 +175,19 @@
     draftRules = draftRules.map((d) => (d.id === draft.id ? updated : d));
   }
 
+  async function reviewDraftRow(
+    draft: RuleExtractionDraft,
+    status: "accepted" | "rejected",
+  ): Promise<void> {
+    error = "";
+    successMessage = "";
+    try {
+      await reviewDraft(draft, status);
+    } catch (err: any) {
+      error = err.message || `Failed to ${status === "accepted" ? "accept" : "reject"} draft.`;
+    }
+  }
+
   function openEditDraftModal(draft: RuleExtractionDraft) {
     editingDraft = draft;
     // Edit on a clone, not the live table row -- otherwise a bound input
@@ -1024,7 +1037,7 @@
                         {#if draft.status === "pending_review"}
                           <button
                             type="button"
-                            onclick={() => reviewDraft(draft, "accepted")}
+                            onclick={() => reviewDraftRow(draft, "accepted")}
                             class="rounded-lg bg-surface-card p-1.5 text-success transition-colors hover:bg-success-bg/60"
                             title="Accept draft"
                           >
@@ -1032,7 +1045,7 @@
                           </button>
                           <button
                             type="button"
-                            onclick={() => reviewDraft(draft, "rejected")}
+                            onclick={() => reviewDraftRow(draft, "rejected")}
                             class="rounded-lg bg-surface-card p-1.5 text-critical transition-colors hover:bg-critical-bg/60"
                             title="Reject draft"
                           >
