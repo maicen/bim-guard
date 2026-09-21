@@ -116,6 +116,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
 
 ## Working rules
 
+- **Legacy Piping/Seismic/corrosion domain removal (STRICT)**: The app is Architecture-only now; the old Piping/corrosion (GC-001/CC-001/MC-001) and Seismic (Blue Halo SB-001) domains are being incrementally removed. If your work touches a file still referencing those domains, delete the legacy code/UI/docs as part of your change — unless it looks data-dependent (e.g. live `rules` rows) or would require a new migration, in which case ask the user first. Never retroactively edit an already-applied `supabase/migrations/` file to do this. See [CLAUDE.md](CLAUDE.md) for the full rule.
 - **Architecture Direction**: Target all user-facing features to the Svelte 5 frontend (`frontend/`) and FastAPI backend (`app/api/`).
 - **Contract Parity**: When modifying API endpoints in `app/api/**`, always update or create strict Pydantic schemas in `app/modules/contracts.py` and synchronize TypeScript interfaces in `frontend/src/lib/types.ts`.
 - **ISO 19650 & CDE Governance**: Ensure all project and document entities carry ISO 19650 metadata (`project_code`, `originator`, `volume_system`, `level`, `type`, `role`, `number`, `suitability_code`, `revision_code`, `cde_state`). State transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) must be governed by `CDEStateMachine`.

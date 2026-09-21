@@ -100,6 +100,12 @@ The frontend signs in via Google OAuth only (`frontend/src/lib/auth.svelte.ts`).
 
 ---
 
+## Legacy Piping/Seismic/Corrosion Domain Removal (STRICT)
+
+The app is Architecture-only now; the old Piping/corrosion (GC-001/CC-001/MC-001) and Seismic (Blue Halo SB-001) domains are being incrementally removed across the codebase. If your work touches a file that still references those domains — Piping, corrosion, seismic, galvanic, crevice, microbiological, Blue Halo, or the retired rule slugs — delete that legacy code, UI option, or stale doc reference as part of your change, even if it wasn't the thing you were asked to fix. Exception: don't silently delete anything that looks data-dependent (e.g. a rule-category value live rows in the `rules` table might still use) or that would require a new migration to fully retire — ask the user first. Never retroactively edit an already-applied file in `supabase/migrations/`; migrations are an immutable historical record. See [CLAUDE.md](../../CLAUDE.md) for the full rule.
+
+---
+
 ## API & Backend Rules (`app/api/**`)
 
 1. **Always use Pydantic schemas**: Every route in `app/api/` must accept and return strict Pydantic models defined in `app/modules/contracts.py`. Never return raw HTML or unvalidated dictionaries.

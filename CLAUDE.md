@@ -11,6 +11,19 @@ YOU MUST FOLLOW THEM.
 | AGENTS.md, CLAUDE.md, .github/instructions/project-specific.instructions.md | Coding agents | How to build the project |
 | DESIGN.md | Design agents | How the project should look and feel |
 
+## Legacy Piping/Seismic/Corrosion Domain Removal (STRICT)
+
+BIM Guard used to support three analysis domains — Piping/corrosion (GC-001 galvanic, CC-001 crevice, MC-001 microbiological), Seismic (Blue Halo SB-001), and Architecture. The Piping and Seismic domains have been **removed**; the app is Architecture-only going forward. This removal is an ongoing, incremental cleanup, not a single finished commit — pieces of the old domains are still being found and deleted across the codebase.
+
+**Whenever your work touches a file that still references the removed domains — Piping, corrosion, seismic, galvanic, crevice, microbiological, Blue Halo, or the retired rule slugs (GC-001, CC-001, MC-001, MM-001, XM-001, PC-001, SB-001) — delete that legacy code/UI/reference as part of your change, even if it isn't the thing you were asked to fix.** This includes:
+- Dead imports, components, routes, or branches that are unreachable now that the domain is gone (e.g. a frontend view or dropdown option for "Piping"/"Seismic").
+- Stale comments, docstrings, and doc references describing the old three-domain architecture as if it still exists.
+- Backend code paths, constants, or types still keyed on the removed domains once nothing live depends on them.
+
+**Do not** silently delete something in these categories if it looks data-dependent or destructive instead of just dead code — e.g. a rule-category value that might still be referenced by live rows in the `rules` table, or anything that would require a new Supabase migration to fully retire. In those cases, stop and ask the user how to proceed rather than guessing. Also never retroactively edit an already-applied file in `supabase/migrations/` to "clean up" a legacy reference — migrations are an immutable historical record (see Schema Migrations below); a new migration is the only way to change data going forward.
+
+If you're mid-task and notice legacy-domain code nearby that's out of scope for the current change, either fix it inline if it's a trivial, safe deletion, or flag it explicitly to the user rather than leaving it unmentioned.
+
 ## Repository Structure & Root Directory Protection (STRICT)
 
 **CRITICAL RULE: NEVER CREATE OR PLACE FILES IN THE REPOSITORY ROOT.**
