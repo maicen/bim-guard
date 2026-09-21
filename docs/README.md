@@ -13,10 +13,7 @@ These files should be treated as current sources of truth.
 - `../DESIGN.md`
 - `../.github/instructions/project-specific.instructions.md`
 - `architecture.md`
-- `BIMGUARD_DATA_ARCHITECTURE.md`
 - `CONVENTIONS.md`
-- `HERMES_CONTEXT.md` — AI research brief, retained as historical evidence; unverified, do not cite
-- `PIPELINE_IO_DATA_CONTRACTS.md`
 - `ifc-property-mapping.md`
 
 ## Client-Facing Q&A (`client-qa/`)
@@ -32,7 +29,6 @@ as historical reference, not as current capability.
 - `../frontend/README.md`
 - `deployment_orbstack_cloudflare.md` — OrbStack Docker + Cloudflare Tunnel deployment guide
 - `MonsterUI/llms.txt.md` — reference docs for the MonsterUI component library used by the retired FastHTML frontend; kept for archive context only, not the current Svelte 5 SPA
-- `RESOURCES.md` — research bibliography for the original galvanic/crevice/microbiological corrosion rule engines; kept for archive context only, that domain has been removed
 
 ## Validation & Research (`validation/`)
 
@@ -83,8 +79,6 @@ plans, session summaries).
 
 These files are intentionally retained for historical reference.
 - `archive/index.html` (Legacy frontend prototype)
-- `archive/2026-04-migration-from-nextjs.md`
-- `INTEGRATION_GUIDE.md`
 
 ## Documentation Maintenance Rules
 
