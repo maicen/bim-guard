@@ -148,9 +148,17 @@ class AnalysisService:
 
     @staticmethod
     def _to_bcf_topic(issue: AuditIssue) -> dict[str, Any]:
-        """Return a deterministic BCF-compatible topic payload for one finding."""
+        """Return a deterministic BCF-compatible topic payload for one finding.
+
+        ``ruleset_id`` is added, and named in the description, only when the
+        finding's rule stored one: a hand-authored rule with no ruleset gets no
+        line rather than a blank one.
+        """
         description = f"{issue.description}\n\nElementGUID: {issue.element_id}"
-        return {
+        ruleset_id = str(issue.details.get("ruleset_id") or "").strip()
+        if ruleset_id:
+            description += f"\nRuleset: {ruleset_id}"
+        topic: dict[str, Any] = {
             "guid": str(uuid5(NAMESPACE_URL, f"bim-guard:{issue.id}:{issue.element_id}")),
             "title": issue.title,
             "description": description,
@@ -161,6 +169,9 @@ class AnalysisService:
             "rule_id": issue.rule_id,
             "position_mm": issue.details.get("position_mm"),
         }
+        if ruleset_id:
+            topic["ruleset_id"] = ruleset_id
+        return topic
 
     def include_rule_results(
         self,
@@ -194,6 +205,7 @@ class AnalysisService:
                         mitigation="Correct the IFC property and re-run the audit.",
                         details={
                             "run_id": run_id,
+                            "ruleset_id": rule.get("ruleset_id"),
                             "property_name": rule.get("property_name"),
                             "target": rule.get("target"),
                             "severity": severity,

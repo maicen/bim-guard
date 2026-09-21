@@ -147,6 +147,11 @@ class ReportArtifactService:
         rule_id = str(topic.get("rule_id") or "BIM-GUARD")
         due_date = datetime.now(UTC).date().isoformat()
 
+        labels = [rule_id, str(topic.get("type") or "Issue")]
+        ruleset_id = str(topic.get("ruleset_id") or "").strip()
+        if ruleset_id:
+            labels.append(f"Ruleset:{ruleset_id}")
+
         # Camera/target share the element's centroid — same convention as
         # the corrosion-engine BCF path (bcf_generator.issues_from_results).
         # position_mm comes from Module 2 (world mm); the viewer's fragments
@@ -171,7 +176,7 @@ class ReportArtifactService:
             status=str(topic.get("status") or "Open").title(),
             assigned_to="BIM Coordinator",
             due_date=due_date,
-            labels=[rule_id, str(topic.get("type") or "Issue")],
+            labels=labels,
             component_guid=element_guid,
             component_name=element_guid,
             service_type=rule_id,

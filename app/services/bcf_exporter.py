@@ -249,6 +249,9 @@ class BCFExporter:
             f"Element ID: {issue.element_id}",
             f"Rule ID: {issue.rule_id}",
         ]
+        ruleset_id = self._ruleset_id(issue)
+        if ruleset_id:
+            lines.append(f"Ruleset: {ruleset_id}")
         related = [e for e in elements if e.role != "primary"]
         if related:
             joined = ", ".join(f"{e.ifc_guid} ({e.role})" for e in related)
@@ -259,9 +262,24 @@ class BCFExporter:
             lines.append(f"\nMitigation: {issue.mitigation}")
         return "\n".join(lines)
 
+    @staticmethod
+    def _ruleset_id(issue: Issue) -> str:
+        """Return the ruleset the finding's rule belongs to, or ``""``.
+
+        Read from ``Issue.metadata["ruleset_id"]``, which a rule-backed finding
+        carries from the ruleset its rule stores. Findings from engines that
+        consult no rule record have none, and get no ruleset line or label.
+        """
+        if isinstance(issue.metadata, dict):
+            return str(issue.metadata.get("ruleset_id") or "").strip()
+        return ""
+
     def _labels(self, issue: Issue) -> List[str]:
         """Return the BCF labels for *issue*, including ISO 19650 governance tags."""
         labels = [issue.mechanism, issue.band.value]
+        ruleset_id = self._ruleset_id(issue)
+        if ruleset_id:
+            labels.append(f"Ruleset:{ruleset_id}")
         if issue.metadata and isinstance(issue.metadata, dict):
             if issue.metadata.get("suitability_code"):
                 labels.append(f"Suitability:{issue.metadata['suitability_code']}")
