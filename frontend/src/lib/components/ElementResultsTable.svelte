@@ -58,8 +58,6 @@
     return fmtVal(el.actual) + (unit && el.actual != null ? ` ${unit}` : "");
   }
 
-  const ELEMENT_NAME_LIMIT = 32;
-
   let filtered = $derived(
     search.trim()
       ? elements.filter((el) => {
@@ -151,24 +149,16 @@
         {#each paged as el (el.guid)}
           {@const fullName = el.element_name || "—"}
           <tr class="border-b border-border-subtle last:border-0 {rowBg(el)}">
-            <td class="px-3 py-2">
-              <span class="inline-flex items-center gap-1">
+            <td class="max-w-xs px-3 py-2">
+              <span class="inline-flex items-start gap-1">
                 {#if el.data_quality_warnings?.length}
                   <Tooltip text={el.data_quality_warnings.join(" ")}>
                     {#snippet trigger()}
-                      <AlertTriangle class="h-3 w-3 shrink-0 text-amber-400" />
+                      <AlertTriangle class="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
                     {/snippet}
                   </Tooltip>
                 {/if}
-                <Tooltip text={fullName} disabled={fullName.length <= ELEMENT_NAME_LIMIT}>
-                  {#snippet trigger()}
-                    <span class="cursor-default font-mono text-xs text-fg-primary"
-                      >{fullName.slice(0, ELEMENT_NAME_LIMIT)}{fullName.length > ELEMENT_NAME_LIMIT
-                        ? "…"
-                        : ""}</span
-                    >
-                  {/snippet}
-                </Tooltip>
+                <span class="wrap-break-word min-w-0 font-mono text-xs text-fg-primary">{fullName}</span>
               </span>
             </td>
             <td class="px-3 py-2">
