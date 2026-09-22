@@ -178,6 +178,7 @@ class RuleDraftService:
             source_node_id=row.get("source_node_id") or None,
             source_page_number=clause_meta.get("page_number"),
             source_bbox=row.get("bbox") or clause_meta.get("bbox"),
+            target_ifc_class=payload.target_ifc_class or "",
             property_set=payload.property_set or "",
             property_name=payload.property_name or "",
             operator=payload.operator or "==",
