@@ -5,6 +5,7 @@ from typing import Any
 
 from postgrest.exceptions import APIError
 
+from app.services.documents_service import DocumentService
 from app.services.persistence import PersistenceService
 from app.utils import (
     cache_db_query,
@@ -118,6 +119,7 @@ class RuleService:
         *,
         rules_repo=None,
         folders_repo=None,
+        documents_service: DocumentService | None = None,
         db=None,
     ):
         """Initialize the rules table with required schema columns and dependency injection.
@@ -127,6 +129,7 @@ class RuleService:
         RuleService reads/writes only that connection, never the shared app
         database. Used for test isolation.
         """
+        self._documents_service = documents_service if documents_service is not None else DocumentService()
         all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
         self._rules = (
             rules_repo
@@ -314,6 +317,26 @@ class RuleService:
             }
         )
 
+    def _derive_folder_display_name(self, source_document_id: int | None) -> str:
+        """Best-effort human-readable folder name from an uploaded source document's filename.
+
+        Lets an auto-created ruleset folder (e.g. an AI extraction batch's
+        "EXTRACTED-<timestamp>" id) title itself after the document the user
+        actually uploaded instead of surfacing that machine-generated slug as
+        both the folder's title and its id.
+        """
+        if not source_document_id:
+            return ""
+        try:
+            doc = self._documents_service.get_document(source_document_id)
+        except Exception:
+            return ""
+        filename = str((doc or {}).get("filename") or "").strip()
+        if not filename:
+            return ""
+        stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+        return stem.strip()
+
     def _drop_folder_if_orphan(self, ruleset_id: str) -> None:
         """Delete a folder row when no rules reference its ruleset_id anymore."""
         normalized = self.normalize_ruleset_id(ruleset_id)
@@ -462,6 +485,7 @@ class RuleService:
         saved = self._rules.insert(row)
         self._ensure_folder(
             kwargs.get("ruleset_id", ""),
+            display_name=self._derive_folder_display_name(kwargs.get("source_document_id")),
             mechanism_scope=kwargs.get("mechanism", ""),
             category=row["category"],
         )
@@ -490,6 +514,7 @@ class RuleService:
             seen_rulesets.add(normalized)
             self._ensure_folder(
                 ruleset_id,
+                display_name=self._derive_folder_display_name(kwargs.get("source_document_id")),
                 mechanism_scope=kwargs.get("mechanism", ""),
                 category=row["category"],
             )

@@ -575,14 +575,15 @@ def build_default_container() -> ApplicationContainer:
     )
     models_service.bind_project_mirror(projects_service)
 
-    rules_service = RuleService(
-        rules_repo=rules_repo,
-        folders_repo=folders_repo,
-    )
-
     documents_service = DocumentService(
         documents_repo=documents_repo,
         storage=storage,
+    )
+
+    rules_service = RuleService(
+        rules_repo=rules_repo,
+        folders_repo=folders_repo,
+        documents_service=documents_service,
     )
 
     settings_service = SettingsService(
