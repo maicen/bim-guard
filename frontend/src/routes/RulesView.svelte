@@ -1258,7 +1258,9 @@
                           {/snippet}
 
                           <div class="space-y-2">
-                            <p>{rule.description || "This rule carries no description."}</p>
+                            <p class="text-sm font-semibold leading-snug text-fg-primary">
+                              {rule.description || "This rule carries no description."}
+                            </p>
 
                             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
                               <dt class="uppercase tracking-wider text-fg-muted">Checks</dt>
