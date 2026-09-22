@@ -232,6 +232,37 @@ class BSDDOntologyRepository:
             for row in hits
         ]
 
+    def classes_for_property(self, property_name: str, limit: int = 20) -> list[BSDDClassItem]:
+        """Classes whose bSDD-defined property list contains *property_name* exactly.
+
+        The reverse of `_class_item`'s class -> properties assembly. Used to infer a
+        rule's target IFC class when the source text never names an entity but does
+        name a property (e.g. unstructured prose reading "riser height shall not
+        exceed 200mm" -- no class name, but "RiserHeight" is bSDD-scoped to
+        IfcStairFlight alone). Exact match, not substring: unlike `search_classes`
+        correcting an already-named class, this has no starting guess to narrow
+        against, so a loose match would attribute a property to unrelated classes
+        that merely share a substring.
+        """
+        self._refresh_if_stale()
+        lowered = property_name.strip().lower()
+        if not lowered:
+            return []
+        matching_prop_uris = {
+            uri
+            for uri, row in self._properties_by_uri.items()
+            if lowered == row["name"].strip().lower() or lowered == (row.get("code") or "").strip().lower()
+        }
+        if not matching_prop_uris:
+            return []
+        class_uris = [
+            class_uri
+            for class_uri, edges in self._edges_by_class.items()
+            if any(edge.get("property_uri") in matching_prop_uris for edge in edges)
+        ]
+        items = [self._class_item(uri) for uri in class_uris[:limit]]
+        return [item for item in items if item is not None]
+
     def list_classes(self) -> list[dict[str, Any]]:
         """Lightweight rows (uri/code/name/parent) for browsing -- e.g. a wiki tree."""
         self._refresh_if_stale()

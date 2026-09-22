@@ -145,6 +145,11 @@ class RuleDraftService:
         Delegates the actual insert to `RuleService.create_rule()` so the
         canonical rule table has exactly one write path, whether a rule came
         from the manual UI, `POST /api/rules/bulk`, or draft promotion.
+
+        Refuses to promote a draft whose `target_ifc_class` is empty: such a
+        rule can never match an IFC element, so writing it would silently
+        reproduce the bug this same field's own promotion wiring had (fixed
+        alongside this guard).
         """
         row = self.get_draft(draft_id)
         if row is None:
@@ -156,6 +161,14 @@ class RuleDraftService:
             )
 
         payload = RuleCreateRequest.model_validate(row.get("proposed_rule") or {})
+
+        if not (payload.target_ifc_class or "").strip():
+            raise ValueError(
+                f"Draft {draft_id} has no target_ifc_class -- promoting it would write a rule "
+                "that can never match any IFC element (see supabase/migrations/"
+                "20260922164528_backfill_missing_target_ifc_class.sql for what that looked like "
+                "in practice). Edit the draft to set an IFC entity type before accepting."
+            )
 
         existing_duplicate = self._find_existing_duplicate(payload)
         if existing_duplicate is not None:

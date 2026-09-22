@@ -57,7 +57,11 @@ def _draft(document_id: int = 1) -> RuleExtractionDraft:
             clause_id="9.8.2.1", node_type="paragraph", source_document_id=document_id
         ),
         proposed_rule=RuleCreateRequest(
-            rule_id="9.8.2.1", description="Stairs shall be >= 900mm wide", operator=">=", check_value="900"
+            rule_id="9.8.2.1",
+            description="Stairs shall be >= 900mm wide",
+            target_ifc_class="IfcStairFlight",
+            operator=">=",
+            check_value="900",
         ),
         confidence=0.9,
         extraction_method="llamaindex_pydantic",
@@ -204,6 +208,35 @@ def test_promote_draft_calls_rule_service_create_rule_and_records_promoted_id():
     assert table.rows[0]["promoted_rule_id"] == created["id"]
 
 
+def test_promote_draft_refuses_to_write_an_empty_target_ifc_class():
+    """A draft that still has no target_ifc_class must never reach the rules table.
+
+    The hard backstop behind the inference work in RuleExtractionService:
+    even if every grounding/inference path upstream fails to determine a
+    class, a rule that can never match an element must not be silently
+    promoted with target_ifc_class = '' (the exact bug this guard closes off
+    for good, regardless of what breaks upstream in the future).
+    """
+    service, _, rule_service = _service()
+    draft = RuleExtractionDraft(
+        source_document_id=1,
+        proposed_rule=RuleCreateRequest(
+            rule_id="REQ-NO-CLASS", description="Something shall be true", check_value="1"
+        ),
+    )
+    saved = service.save_drafts([draft])
+    draft_id = saved[0].id
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    try:
+        service.promote_draft(draft_id)
+        assert False, "expected ValueError for empty target_ifc_class"
+    except ValueError as exc:
+        assert "target_ifc_class" in str(exc)
+
+    assert rule_service.created == []
+
+
 def test_promote_draft_passes_through_target_ifc_class():
     service, _, rule_service = _service()
     draft = RuleExtractionDraft(
@@ -233,6 +266,7 @@ def test_promote_draft_passes_through_applies_when_and_exceptions():
         proposed_rule=RuleCreateRequest(
             rule_id="9.8.2.2",
             description="Gypsum partitions shall be fire-rated",
+            target_ifc_class="IfcWall",
             severity="mandatory",
             applies_when={"material_any_of": ["gypsum"]},
             exceptions=[{"reference": "9.8.2.2-exc", "predicate": {"is_suspended": True}}],

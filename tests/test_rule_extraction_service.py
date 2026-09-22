@@ -331,12 +331,17 @@ class FakeClassOntology:
     """Returns fixed search_classes/get_class_by_uri results, recording queries received."""
 
     def __init__(
-        self, search_matches: list[BSDDClassItem] | None = None, by_uri: dict[str, BSDDClassItem] | None = None
+        self,
+        search_matches: list[BSDDClassItem] | None = None,
+        by_uri: dict[str, BSDDClassItem] | None = None,
+        property_matches: dict[str, list[BSDDClassItem]] | None = None,
     ) -> None:
         self.search_matches = search_matches or []
         self.by_uri = by_uri or {}
+        self.property_matches = property_matches or {}
         self.search_queries: list[str] = []
         self.uri_queries: list[str] = []
+        self.property_class_queries: list[str] = []
 
     def search_classes(self, query: str, limit: int = 5):
         self.search_queries.append(query)
@@ -348,6 +353,10 @@ class FakeClassOntology:
 
     def search_properties(self, query: str, limit: int = 8):
         return []
+
+    def classes_for_property(self, property_name: str, limit: int = 20):
+        self.property_class_queries.append(property_name)
+        return self.property_matches.get(property_name, [])
 
 
 class FakeClauseGrounding:
@@ -455,6 +464,83 @@ def test_kg_clause_grounding_is_a_noop_without_a_clause_id():
 
     assert grounded is draft
     assert clause_grounding.class_queries == [None]
+
+
+def test_kg_clause_grounding_fires_even_when_llm_named_no_class_at_all():
+    """The KG override no longer requires a starting (even if wrong) class name.
+
+    Regression coverage for the gap _ground_target_class used to have: it
+    returned immediately whenever the LLM left target_ifc_class blank,
+    skipping the clause-keyed KG path even though that path never depended
+    on having a class name to correct in the first place.
+    """
+    ontology = FakeClassOntology(
+        search_matches=[],
+        by_uri={"urn:kg/1": _class_item("urn:kg/1", "IfcBuildingSystem", "Building System")},
+    )
+    clause_grounding = FakeClauseGrounding(classes_by_clause={"A-1.1.2.7": ["urn:kg/1"]})
+    service = RuleExtractionService(
+        ontology=ontology, bsdd_client=FakeBSDDClient([]), clause_grounding=clause_grounding
+    )
+    draft = _draft(property_set=None, property_name=None, target_ifc_class="", clause_id="A-1.1.2.7")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == "IfcBuildingSystem"
+    assert "KG clause grounding" in (grounded.review_notes or "")
+
+
+def test_infers_target_class_from_property_when_llm_named_no_class():
+    """Unstructured prose that names a property but no entity still resolves.
+
+    E.g. "Private stairs shall have a maximum riser height of 200mm" gives
+    the LLM a clean property_name (RiserHeight) but no "Entity" column to
+    read a class from -- bSDD scoping RiserHeight to IfcStairFlight alone is
+    enough to fill target_ifc_class without a KG-promoted clause at all.
+    """
+    ontology = FakeClassOntology(
+        property_matches={"RiserHeight": [_class_item("urn:p/1", "IfcStairFlight")]},
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name="RiserHeight", target_ifc_class="")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == "IfcStairFlight"
+    assert grounded.proposed_rule.needs_review == 0
+    assert "inferred target IFC class IfcStairFlight" in (grounded.review_notes or "")
+    assert ontology.property_class_queries == ["RiserHeight"]
+
+
+def test_ambiguous_property_class_inference_is_not_guessed():
+    """A property genuinely shared by multiple classes is left for a human, not guessed."""
+    ontology = FakeClassOntology(
+        property_matches={
+            "FireRating": [_class_item("urn:p/1", "IfcDoor"), _class_item("urn:p/2", "IfcWindow")]
+        },
+    )
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name="FireRating", target_ifc_class="")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == ""
+    assert grounded.proposed_rule.needs_review == 1
+    assert "Could not infer a unique target IFC class" in (grounded.review_notes or "")
+    assert "flagged for manual review" in (grounded.review_notes or "")
+
+
+def test_unresolvable_target_class_forces_review_instead_of_staying_silently_blank():
+    """No class, no property, no KG match: still never leaves the draft looking clean."""
+    ontology = FakeClassOntology()
+    service = RuleExtractionService(ontology=ontology, bsdd_client=FakeBSDDClient([]))
+    draft = _draft(property_set=None, property_name=None, target_ifc_class="")
+
+    grounded = service._ground_draft_with_bsdd(draft)
+
+    assert grounded.proposed_rule.target_ifc_class == ""
+    assert grounded.proposed_rule.needs_review == 1
+    assert "No target IFC class could be determined" in (grounded.review_notes or "")
 
 
 def test_kg_property_hint_appended_when_not_already_applied():

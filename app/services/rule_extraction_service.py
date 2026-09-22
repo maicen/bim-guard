@@ -329,53 +329,106 @@ class RuleExtractionService:
             logger.warning("bSDD class grounding lookup failed class_name=%s error=%s", class_name, exc)
             return []
 
+    def _classes_for_property_grounded(self, property_name: str) -> list[contracts.BSDDClassItem]:
+        """Classes whose bSDD property list defines *property_name*, local ontology only.
+
+        No live-bSDD fallback here, unlike the other _*_grounded methods:
+        BSDDClient has no reverse property->class search endpoint to fall
+        back to, so a local miss is simply a miss.
+        """
+        try:
+            return self._ontology.classes_for_property(property_name, limit=10)
+        except Exception as exc:  # noqa: BLE001 - a lookup failure must not block extraction
+            logger.warning(
+                "bSDD reverse property->class lookup failed property_name=%s error=%s", property_name, exc
+            )
+            return []
+
     def _ground_target_class(
         self, rule: contracts.RuleCreateRequest, *, clause_id: str | None = None
     ) -> tuple[contracts.RuleCreateRequest, str | None]:
-        """Correct an extracted rule's target_ifc_class against bSDD.
+        """Correct -- or, when the LLM left it blank, infer -- target_ifc_class against bSDD.
 
-        Two independent correction paths, tried in order:
+        Correction/inference paths, tried in order:
 
-        1. Spelling/casing (unchanged, applies to every document): the LLM
-           is prompted for a real IFC entity type (e.g. "IfcDoor") but
+        1. Spelling/casing (only when the LLM proposed a class at all): the
+           LLM is prompted for a real IFC entity type (e.g. "IfcDoor") but
            sometimes drifts on casing ("ifcdoor") or spelling. When bSDD's
            own class search has a case-insensitive exact code match, that
            canonical spelling replaces whatever the LLM produced.
 
         2. Knowledge-graph override (only when `clause_id` is covered by a
-           promoted grounding index, see ClauseGroundingIndex): this only
-           runs when path 1 found *no* exact match at all -- i.e. the LLM's
-           proposed class isn't a real, confirmable bSDD class/code, not
-           merely mis-cased. In that situation a clause-aware LLM judgment
+           promoted grounding index, see ClauseGroundingIndex): runs whenever
+           path 1 didn't already return a confirmed exact match -- that
+           includes both "the LLM's proposed class isn't a real, confirmable
+           bSDD class/code" and "the LLM proposed no class at all". This
+           path is clause-keyed, not class-name-keyed, so it needs no
+           starting guess to correct. A clause-aware LLM judgment
            (kg.correct_graph.py's verification pass, run once per document
            in bim-guard-evaluation and promoted here) is a much stronger
-           signal than leaving an unconfirmed, possibly-invented class name
-           in place, so its top trusted candidate is applied instead.
+           signal than leaving an unconfirmed or missing class name in
+           place, so its top trusted candidate is applied instead.
 
-        Path 1 alone still leaves the rule untouched on a miss outside any
-        promoted index, for the reason _search_properties_grounded does: a
-        miss is not itself evidence the class is wrong, only that it could
-        not be confirmed by spelling alone.
+        3. Property-scoped inference (only when the class is still unknown
+           after 1 and 2, i.e. an unstructured clause outside any promoted
+           KG index that never names an entity): bSDD scopes most properties
+           to a small, specific set of owning classes, so the rule's own
+           `property_name` (which the LLM extracts far more reliably than an
+           entity name from prose that never states one) can often pin the
+           class down on its own -- e.g. "RiserHeight" resolves to
+           IfcStairFlight with no "Entity" column to read. Applied only when
+           exactly one class defines that property; a genuine tie (the
+           property is legitimately shared, e.g. across IfcDoor and
+           IfcWindow) is left for a human rather than guessed.
+
+        Never returns a rule whose target_ifc_class silently stays blank
+        without a note explaining why -- see the "still empty" check in
+        `_ground_draft_with_bsdd`, which forces `needs_review` in that case
+        so a class-less rule can surface to a reviewer instead of promoting
+        inert (see also RuleDraftService.promote_draft's hard refusal to
+        write an empty target_ifc_class at all).
         """
         class_name = (rule.target_ifc_class or "").strip()
-        if not class_name:
-            return rule, None
 
-        matches = self._search_classes_grounded(class_name)
-        match = next((m for m in matches if m.code.strip().lower() == class_name.lower()), None)
-        if match is not None:
-            if match.code == class_name:
-                return rule, None
-            corrected_rule = rule.model_copy(update={"target_ifc_class": match.code})
-            note = f"bSDD grounding: corrected target IFC class to {match.code} (was {class_name})."
-            return corrected_rule, note
+        if class_name:
+            matches = self._search_classes_grounded(class_name)
+            match = next((m for m in matches if m.code.strip().lower() == class_name.lower()), None)
+            if match is not None:
+                if match.code == class_name:
+                    return rule, None
+                corrected_rule = rule.model_copy(update={"target_ifc_class": match.code})
+                note = f"bSDD grounding: corrected target IFC class to {match.code} (was {class_name})."
+                return corrected_rule, note
 
         kg_matches = self._kg_classes_grounded(clause_id)
         top = kg_matches[0] if kg_matches else None
         if top is not None and top.code.strip().lower() != class_name.lower():
             corrected_rule = rule.model_copy(update={"target_ifc_class": top.code})
-            note = f'KG clause grounding: corrected target IFC class to {top.code} (was unconfirmed "{class_name}").'
+            was = class_name or "unset"
+            note = f'KG clause grounding: corrected target IFC class to {top.code} (was unconfirmed "{was}").'
             return corrected_rule, note
+
+        if class_name:
+            return rule, None
+
+        prop_name = (rule.property_name or "").strip()
+        if prop_name:
+            candidates = self._classes_for_property_grounded(prop_name)
+            codes = sorted({c.code for c in candidates if c.code})
+            if len(codes) == 1:
+                corrected_rule = rule.model_copy(update={"target_ifc_class": codes[0]})
+                note = (
+                    f'bSDD grounding: inferred target IFC class {codes[0]} from property '
+                    f'"{prop_name}" (no entity named in the source text; bSDD defines this '
+                    f"property on exactly that one class)."
+                )
+                return corrected_rule, note
+            if len(codes) > 1:
+                note = (
+                    f'Could not infer a unique target IFC class for property "{prop_name}" -- '
+                    f'bSDD defines it on multiple classes ({", ".join(codes[:5])}); needs manual selection.'
+                )
+                return rule, note
 
         return rule, None
 
@@ -505,6 +558,19 @@ class RuleExtractionService:
         rule, class_note = self._ground_target_class(rule, clause_id=clause_id)
         if class_note:
             notes.append(class_note)
+
+        if not (rule.target_ifc_class or "").strip():
+            # Nothing above could name or infer an entity for this rule. Force
+            # it into review rather than letting it carry an empty
+            # target_ifc_class forward silently -- a rule in that state can
+            # never match an element (see promote_draft's matching refusal to
+            # ever write one to public.rules).
+            rule = rule.model_copy(update={"needs_review": 1})
+            notes.append(
+                "No target IFC class could be determined for this rule (not named in the "
+                "source text, and bSDD grounding found no match by clause or property) -- "
+                "flagged for manual review; it cannot be promoted until one is set."
+            )
 
         rule, property_note = self._ground_property(rule)
         if property_note:
