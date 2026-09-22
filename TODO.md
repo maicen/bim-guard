@@ -294,10 +294,14 @@ empty grant table, not a flag.
       sees every project in their own org; a plain member sees only their
       group's granted projects, none if ungrouped.
 - [x] `project_ruleset_bindings`: which of an org's granted rulesets are
-      actually bound to one project (owner-controlled, always a subset of the
-      org's grants — `RulesetAccessService.set_project_bindings`). A fresh
-      project has none; `ArchAnalysisService.run_analysis` rejects a
-      `rule_folder` that isn't bound.
+      curated/assigned to one project (owner-controlled, always a subset of
+      the org's grants — `RulesetAccessService.set_project_bindings`). A
+      fresh project has none. This is a curation aid surfaced via the
+      Dashboard's "Rule Assignments" modal, not a run-time gate:
+      `ArchAnalysisService.run_analysis` only requires `rule_folder` to be
+      granted to the project's *organization* (`organization_ruleset_grants`),
+      so any model can be tested against any ruleset the org has access to,
+      bound or not.
 - [x] Backfill: the pre-existing default organization and its projects were
       grandfathered into full access to every ruleset that existed at
       migration time, so today's single-tenant behavior didn't regress; only

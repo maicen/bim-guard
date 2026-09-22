@@ -14,10 +14,11 @@
   let { project, onClose }: Props = $props();
 
   // "Zero bindings unless assigned": a brand-new project starts with none of
-  // these checked, and nothing runs against a ruleset until this list says
-  // so (see ArchAnalysisService.run_analysis's gate). `available` is this
-  // project's organization's own grant from the superadmin's ruleset-access
-  // screen -- a project can only bind a subset of it.
+  // these checked. This list is a curation aid, not a run-time gate -- an
+  // audit may be run against any ruleset granted to the org regardless of
+  // what's checked here (see ArchAnalysisService.run_analysis). `available`
+  // is this project's organization's own grant from the superadmin's
+  // ruleset-access screen -- a project can only bind a subset of it.
   let available = $state.raw<string[]>([]);
   const selected: Set<string> = new SvelteSet();
   let loading = $state(true);
@@ -81,8 +82,9 @@
     </p>
   {:else}
     <p class="mb-3 text-xs text-fg-muted">
-      Only rulesets checked here run against this project's analysis. Built-in code rules always
-      apply; this controls the custom rulesets your organization has been granted.
+      Checked rulesets are this project's recommended set. Built-in code rules always apply, and
+      any ruleset your organization has been granted can still be run against this project
+      whether or not it's checked here — this only records which ones are the intended fit.
     </p>
     <div class="max-h-80 space-y-1 overflow-y-auto">
       {#each available as rulesetId (rulesetId)}

@@ -172,35 +172,52 @@ def test_narrowing_org_grants_does_not_retroactively_unbind_a_project(
     assert ruleset_access.list_project_bindings(1) == ["BUILDING-CODE-PART9"]
 
 
-def test_arch_analysis_rejects_a_ruleset_not_bound_to_the_project(
+class FakeProjectsService:
+    """Stands in for ProjectsService, returning a fixed organization_id."""
+
+    def __init__(self, organization_id: int | None) -> None:
+        self._organization_id = organization_id
+
+    def get_project(self, project_id: int) -> dict[str, Any] | None:
+        if self._organization_id is None:
+            return None
+        return {"id": project_id, "organization_id": self._organization_id}
+
+
+def test_arch_analysis_rejects_a_ruleset_not_granted_to_the_project_org(
     ruleset_access: RulesetAccessService,
 ) -> None:
     service = ArchAnalysisService(
-        projects_service=object(),
+        projects_service=FakeProjectsService(10),
         rules_service=object(),
         documents_service=object(),
         report_service=object(),
         ruleset_access_service=ruleset_access,
     )
-    with pytest.raises(ValueError, match="not assigned to this project"):
+    with pytest.raises(ValueError, match="not granted to this project's organization"):
         service.run_analysis(project_id=1, rule_folder="BUILDING-CODE-PART9")
 
 
-def test_arch_analysis_allows_a_ruleset_bound_to_the_project(monkeypatch) -> None:
-    """The gate opens once the ruleset is bound.
+def test_arch_analysis_allows_any_ruleset_granted_to_the_org_even_when_unbound(monkeypatch) -> None:
+    """The gate is org-level, not project-level.
 
-    Everything past that point is exercised by other test modules, so this
-    only checks that the gate does not fire.
+    A ruleset granted to the project's organization may be used to test any
+    of that org's projects, whether or not it has also been bound to this
+    specific project via the "Rule Assignments" modal -- that per-project
+    assignment is a curation aid for owners/admins, not a prerequisite for
+    running an analysis. Everything past the gate is exercised by other test
+    modules, so this only checks that the gate does not fire.
     """
     ruleset_access = RulesetAccessService(
         organization_ruleset_grants_repo=FakeTable(),
         project_ruleset_bindings_repo=FakeTable(),
     )
     ruleset_access.set_org_grants(10, ["BUILDING-CODE-PART9"])
-    ruleset_access.set_project_bindings(1, ["BUILDING-CODE-PART9"], organization_id=10)
+    # Deliberately left unbound to project 1 -- proves the run is gated on
+    # the org grant alone, not on project_ruleset_bindings.
 
     service = ArchAnalysisService(
-        projects_service=object(),
+        projects_service=FakeProjectsService(10),
         rules_service=object(),
         documents_service=object(),
         report_service=object(),

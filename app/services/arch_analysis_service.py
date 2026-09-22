@@ -50,20 +50,26 @@ class ArchAnalysisService:
         """Execute architectural compliance checks for a project and return response model.
 
         Raises:
-            ValueError: if *rule_folder* is given but isn't bound to this
-                project (see ``RulesetAccessService`` / "zero bindings unless
-                assigned") -- a project's owner must explicitly assign a
-                custom ruleset before an analysis run can select it. Built-in
-                code rules (an empty ``rule_folder``) are unaffected.
+            ValueError: if *rule_folder* is given but isn't granted to this
+                project's organization (see ``RulesetAccessService`` /
+                ``organization_ruleset_grants``). Any ruleset the org has
+                been granted may be used to test any of its projects --
+                per-project "Rule Assignments" (``project_ruleset_bindings``)
+                is a curation aid for owners/admins, not a run-time gate, so
+                a model can be checked against any granted ruleset without
+                first being bound to it. Built-in code rules (an empty
+                ``rule_folder``) are unaffected.
         """
         from app.services.pipeline_services import PipelineOrchestratorService
 
         if rule_folder and self._ruleset_access is not None:
-            bound = self._ruleset_access.list_project_bindings(project_id)
-            if rule_folder not in bound:
+            project = self._projects.get_project(project_id)
+            organization_id = (project or {}).get("organization_id")
+            granted = self._ruleset_access.list_org_grants(organization_id) if organization_id is not None else []
+            if rule_folder not in granted:
                 raise ValueError(
-                    f"Ruleset {rule_folder!r} is not assigned to this project. "
-                    "Ask the project's organization owner to assign it first."
+                    f"Ruleset {rule_folder!r} is not granted to this project's organization. "
+                    "Ask a superadmin to grant it first."
                 )
 
         result = PipelineOrchestratorService.orchestrate_workflow(
