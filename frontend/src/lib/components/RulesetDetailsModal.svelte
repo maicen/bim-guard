@@ -98,7 +98,7 @@
                     </span>
                   {/if}
                 </div>
-                <div class="text-xs font-medium text-fg-secondary mt-0.5">{rule.description || rule.source_text || "Specification clause"}</div>
+                <div class="text-xs font-medium text-fg-secondary mt-0.5 line-clamp-2">{rule.description || rule.source_text || "Specification clause"}</div>
                 {#if rule.target_ifc_class}
                   <div class="mt-1 flex flex-wrap gap-1">
                     <span class="rounded bg-surface-card px-1.5 py-0.5 text-micro text-fg-muted border border-border-default">

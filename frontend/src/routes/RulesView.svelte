@@ -31,6 +31,7 @@
   } from "lucide-svelte";
   import { rulesApi, ruleExtractionApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
+  import { cn } from "../lib/utils/cn";
   import type {
     Rule,
     RuleFolder,
@@ -88,6 +89,20 @@
   // the resolved page/snippet to jump to and highlight within it.
   let viewingSource: RuleSourceResponse | null = $state(null);
   let sourceViewError = $state("");
+
+  // The quoted source_text in a rule's hover card is the *entire* extraction
+  // chunk (often a whole document section covering several sibling rules,
+  // not just this one — see llamaindex_ingestor.py's section-level chunking),
+  // so it can run to a full table. Clamp it by default; "View source in
+  // document" already gives the precise, highlighted location for anyone who
+  // needs to verify past what fits here.
+  let expandedSourceRuleIds: Set<number> = $state(new Set());
+  function toggleSourceExpanded(ruleId: number) {
+    const next = new Set(expandedSourceRuleIds);
+    if (next.has(ruleId)) next.delete(ruleId);
+    else next.add(ruleId);
+    expandedSourceRuleIds = next;
+  }
 
   async function viewRuleSource(ruleId: number) {
     sourceViewError = "";
@@ -1268,9 +1283,26 @@
                           {#snippet footer()}
                             <div class="space-y-1.5">
                               {#if rule.source_text}
-                                <span class="block wrap-break-word italic">
-                                  “{rule.source_text}”
-                                </span>
+                                {@const isExpanded = expandedSourceRuleIds.has(rule.id)}
+                                <div>
+                                  <span
+                                    class={cn(
+                                      "block wrap-break-word italic",
+                                      !isExpanded && "line-clamp-3",
+                                    )}
+                                  >
+                                    “{rule.source_text}”
+                                  </span>
+                                  {#if rule.source_text.length > 220}
+                                    <button
+                                      type="button"
+                                      onclick={() => toggleSourceExpanded(rule.id)}
+                                      class="mt-1 font-semibold text-accent hover:underline"
+                                    >
+                                      {isExpanded ? "Show less" : "Show full extracted section"}
+                                    </button>
+                                  {/if}
+                                </div>
                               {/if}
                               {#if rule.source_document_id}
                                 <button
