@@ -1258,7 +1258,7 @@
                           {/snippet}
 
                           <div class="space-y-2">
-                            <p class="text-sm font-semibold leading-snug text-fg-primary">
+                            <p class="text-sm font-semibold leading-snug text-accent">
                               {rule.description || "This rule carries no description."}
                             </p>
 
