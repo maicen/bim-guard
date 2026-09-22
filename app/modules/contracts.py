@@ -1515,6 +1515,159 @@ class ArchAnalysisResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Compliance Report (PDF / Excel) Contracts
+# ---------------------------------------------------------------------------
+
+
+class ReportCoverContract(BaseModel):
+    """Cover-page identity and ISO 19650 metadata for a rendered report."""
+
+    project_name: str
+    project_code: str = ""
+    model_file_name: str = ""
+    report_id: str = Field(..., description="Deterministic id, e.g. BGR-<project_id>-<YYYYMMDDHHMMSS>")
+    analysis_date: str = Field(..., description="ISO 8601 date the analysis was run")
+    discipline: str = "Architecture"
+    ifc_schema: str = ""
+    suitability_code: str = ""
+    revision_code: str = ""
+    cde_state: str = ""
+    document_id: str = Field("", description="ISO 19650 container/document identifier string")
+
+
+class ReportTopFailedRuleContract(BaseModel):
+    """One row of the executive summary's worst-offending-rules list."""
+
+    rule_reference: str
+    rule_description: str = ""
+    fail_count: int = 0
+
+
+class ReportExecutiveSummaryContract(BaseModel):
+    """Headline counts, narrative and chart SVGs for the executive summary page."""
+
+    elements_evaluated: int = 0
+    unique_elements_evaluated: int = 0
+    rules_executed: int = 0
+    rules_with_elements: int = 0
+    checks_run: int = 0
+    passed: int = 0
+    failed: int = 0
+    unable_to_verify: int = 0
+    pass_rate: float = 0.0
+    mandatory_failed: int = 0
+    narrative: str = ""
+    ruleset_chart_svg: str = ""
+    storey_chart_svg: str = ""
+    top_failed_rules: list[ReportTopFailedRuleContract] = Field(default_factory=list)
+
+
+class ReportScopeContract(BaseModel):
+    """Model/analysis scope and document-control table for the report."""
+
+    model_file_name: str = ""
+    ifc_schema: str = ""
+    element_count: int = 0
+    storey_count: Optional[int] = None
+    ruleset_names: list[str] = Field(default_factory=list)
+    # Not recorded per analysis run today -- left unset rather than fabricated;
+    # the template renders these as "Pending" instead of a made-up value.
+    model_hash: Optional[str] = None
+    rule_database_version: Optional[str] = None
+    engine_version: Optional[str] = None
+    generated_at: str = ""
+    generated_by: str = ""
+
+
+class ReportRulesetResultContract(BaseModel):
+    """One row of the results-by-ruleset table."""
+
+    ruleset_id: str
+    ruleset_name: str
+    source_citation: str = ""
+    rule_count: int = 0
+    passed: int = 0
+    failed: int = 0
+    unable_to_verify: int = 0
+    pass_rate: float = 0.0
+
+
+class ReportPriorityFindingContract(BaseModel):
+    """One detailed finding card in the priority-findings section."""
+
+    rule_reference: str
+    rule_description: str = ""
+    element_name: str = ""
+    element_guid: str = ""
+    storey: str = ""
+    measured: str = ""
+    required: str = ""
+    difference: str = ""
+    citation: str = ""
+    ifc_property: str = ""
+    reliability: str = "low"
+    reliability_reason: str = ""
+    action_required: str = ""
+    assignee_role: str = "BIM coordinator"
+    severity: str = "mandatory"
+
+
+class ReportFindingRowContract(BaseModel):
+    """One flat row of the findings register table."""
+
+    element_name: str = ""
+    element_guid: str = ""
+    storey: str = ""
+    rule_reference: str = ""
+    measured: str = ""
+    required: str = ""
+    difference: str = ""
+    severity: str = "mandatory"
+
+
+class ReportUnverifiedRowContract(BaseModel):
+    """One rule that could not be verified against the model (not a failure)."""
+
+    rule_reference: str
+    rule_description: str = ""
+    reason: str = ""
+    affected_count: int = 0
+
+
+class ReportRuleRegisterRowContract(BaseModel):
+    """One row of the full rule register, for finding -> rule -> clause traceability."""
+
+    rule_reference: str
+    rule_description: str = ""
+    citation: str = ""
+    ifc_property: str = ""
+    reliability: str = "low"
+    status: str = ""
+    fail_count: int = 0
+    total_count: int = 0
+
+
+class ReportModel(BaseModel):
+    """Deterministic, fully-computed data for one rendered compliance report.
+
+    Built once by ``ReportService`` from a project's analysis run and handed
+    unchanged to both the Jinja2 HTML/PDF template and the Excel export --
+    neither formatter recomputes anything, they only lay out what is here.
+    """
+
+    cover: ReportCoverContract
+    executive_summary: ReportExecutiveSummaryContract
+    scope: ReportScopeContract
+    results_by_ruleset: list[ReportRulesetResultContract] = Field(default_factory=list)
+    priority_findings: list[ReportPriorityFindingContract] = Field(default_factory=list)
+    findings_register: list[ReportFindingRowContract] = Field(default_factory=list)
+    findings_register_total: int = 0
+    findings_register_truncated: bool = False
+    unable_to_verify: list[ReportUnverifiedRowContract] = Field(default_factory=list)
+    rule_register: list[ReportRuleRegisterRowContract] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Workflow Status & Live Pipeline Contracts
 # ---------------------------------------------------------------------------
 

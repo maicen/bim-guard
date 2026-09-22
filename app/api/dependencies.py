@@ -29,6 +29,7 @@ from app.services.permission_service import PermissionService
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.report_service import ReportService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
 from app.services.scim_service import ScimService
@@ -90,6 +91,11 @@ def get_settings_service() -> SettingsService:
 def get_arch_analysis_service() -> ArchAnalysisService:
     """Return the configured ArchAnalysisService instance."""
     return get_container().arch_analysis_service
+
+
+def get_report_service() -> ReportService:
+    """Return the configured ReportService instance."""
+    return get_container().report_service
 
 
 def get_github_repo_service() -> GitHubRepoService:

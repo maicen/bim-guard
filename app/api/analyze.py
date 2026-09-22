@@ -25,6 +25,7 @@ from app.api.dependencies import (
     get_models_service,
     get_profile_service,
     get_projects_service,
+    get_report_service,
 )
 from app.api.projects import (
     ProjectAccessChecker,
@@ -58,6 +59,8 @@ from app.services.models_service import ModelsService
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
+from app.services.report_rendering import render_report_html, render_report_pdf
+from app.services.report_service import ReportService
 from app.services.workflow_status import status_snapshot
 
 logger = get_logger(__name__)
@@ -784,6 +787,53 @@ def export_analysis_report(
     return Response(
         content=content,
         media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/report/{project_id}", summary="Render a compliance report as PDF or HTML")
+def get_analysis_report(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
+    slug: str = Query("architecture"),
+    format: str = Query("pdf", description="Output format: pdf (download) or html (in-app preview)."),
+    report_service: ReportService = Depends(get_report_service),
+):
+    """Render the project's latest compliance analysis as a formatted report.
+
+    Built from ``rule_compliance``/``rule_compliance_summary`` (see
+    ``ReportService``), not from ``audit_issues`` -- the only source in this
+    run that records a rule having *passed*, which the report's executive
+    summary and pass-rate figures depend on. Deterministic: no LLM, every
+    number and sentence comes from the analysis run and a fixed template.
+    """
+    project_access(project_id)
+    if slug not in RUNNABLE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown slug {slug!r}")
+
+    try:
+        model = report_service.build_report_model(project_id, slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    fmt = format.strip().lower()
+    if fmt == "html":
+        return Response(content=render_report_html(model, render_target="full"), media_type="text/html")
+    if fmt != "pdf":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported report format {format!r}; expected pdf or html.",
+        )
+
+    try:
+        pdf_bytes = render_report_pdf(model)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+
+    filename = f"bimguard-report-{slug}-project-{project_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

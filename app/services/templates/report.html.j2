@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{{ cover.project_name }} — Compliance Report</title>
+<style>
+  :root {
+    --fg-primary: #0f172a;
+    --fg-secondary: #334155;
+    --fg-muted: #64748b;
+    --surface-canvas: #f8fafc;
+    --surface-card: #ffffff;
+    --border-subtle: #f1f5f9;
+    --border-default: #e2e8f0;
+    --accent: #0066cc;
+    --critical: #be123c;
+    --critical-bg: #ffe4e6;
+    --critical-border: #fecdd3;
+    --warning: #b45309;
+    --warning-bg: #fef3c7;
+    --warning-border: #fde68a;
+    --success: #047857;
+    --success-bg: #d1fae5;
+    --success-border: #6ee7b7;
+    --info: #4338ca;
+    --info-bg: #e0e7ff;
+    --info-border: #c7d2fe;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--fg-primary);
+    background: var(--surface-card);
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+  h1, h2, h3 { font-weight: 600; color: var(--fg-primary); margin: 0 0 8px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14px; }
+  h3 { font-size: 11.5px; }
+  p { margin: 0 0 8px; color: var(--fg-secondary); }
+  .section { padding: 0 18mm; }
+  .section + .section { page-break-before: always; padding-top: 4mm; }
+  .muted { color: var(--fg-muted); }
+  .small { font-size: 9px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border-default); vertical-align: top; }
+  th { background: var(--surface-canvas); color: var(--fg-muted); font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; }
+  td { font-size: 9.5px; color: var(--fg-secondary); }
+  .kpi-row { display: flex; gap: 8px; margin: 10px 0 16px; }
+  .kpi { flex: 1; border: 1px solid var(--border-default); border-radius: 8px; padding: 8px 10px; background: var(--surface-canvas); }
+  .kpi .value { font-size: 17px; font-weight: 700; color: var(--fg-primary); }
+  .kpi .label { font-size: 8.5px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge { display: inline-block; padding: 1.5px 7px; border-radius: 999px; font-size: 8.5px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+  .badge-mandatory { color: var(--critical); background: var(--critical-bg); border-color: var(--critical-border); }
+  .badge-recommended { color: var(--info); background: var(--info-bg); border-color: var(--info-border); }
+  .badge-high { color: var(--success); background: var(--success-bg); border-color: var(--success-border); }
+  .badge-medium { color: var(--warning); background: var(--warning-bg); border-color: var(--warning-border); }
+  .badge-low { color: var(--fg-muted); background: var(--border-subtle); border-color: var(--border-default); }
+  .badge-pass { color: var(--success); background: var(--success-bg); border-color: var(--success-border); }
+  .badge-fail { color: var(--critical); background: var(--critical-bg); border-color: var(--critical-border); }
+  .badge-unverified { color: var(--fg-muted); background: var(--border-subtle); border-color: var(--border-default); }
+  .finding-card { border: 1px solid var(--border-default); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; page-break-inside: avoid; }
+  .finding-card .finding-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .finding-card .finding-title { font-weight: 600; font-size: 10.5px; }
+  .tiles { display: flex; gap: 8px; margin: 6px 0; }
+  .tile { flex: 1; border: 1px solid var(--border-default); border-radius: 6px; padding: 5px 8px; background: var(--surface-canvas); }
+  .tile .tile-label { font-size: 8px; color: var(--fg-muted); text-transform: uppercase; }
+  .tile .tile-value { font-size: 11px; font-weight: 600; }
+  .citation { font-size: 9px; color: var(--fg-muted); font-style: italic; border-left: 2px solid var(--border-default); padding-left: 8px; margin: 6px 0; }
+  .action-line { font-size: 9.5px; color: var(--fg-primary); background: var(--surface-canvas); border-radius: 6px; padding: 6px 8px; margin-top: 6px; }
+  .cover { height: 297mm; width: 210mm; display: flex; flex-direction: column; justify-content: space-between; padding: 22mm 20mm; }
+  .cover .brand { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); }
+  .cover .title { font-size: 30px; font-weight: 700; margin: 40mm 0 6px; }
+  .cover .subtitle { font-size: 13px; color: var(--fg-muted); margin-bottom: 20mm; }
+  .cover table { margin: 0; }
+  .cover th { display: none; }
+  .cover td { border: none; padding: 3px 0; font-size: 10.5px; }
+  .cover td.k { color: var(--fg-muted); width: 42%; }
+  .cover td.v { color: var(--fg-primary); font-weight: 600; }
+  .cover .footer-note { font-size: 9px; color: var(--fg-muted); }
+  .disclaimer { border: 1px solid var(--border-default); background: var(--surface-canvas); border-radius: 8px; padding: 10px 12px; font-size: 9px; color: var(--fg-muted); margin-top: 10px; }
+  .chart-wrap { margin: 6px 0 16px; }
+  .empty-note { color: var(--fg-muted); font-size: 9.5px; font-style: italic; padding: 6px 0; }
+</style>
+</head>
+<body>
+
+{% if render_target in ("cover", "full") %}
+<div class="cover">
+  <div class="brand">BIM GUARD</div>
+  <div>
+    <div class="title">{{ cover.project_name }}</div>
+    <div class="subtitle">Architectural Compliance Report</div>
+    <table>
+      <tr><td class="k">Project code</td><td class="v">{{ cover.project_code or "—" }}</td></tr>
+      <tr><td class="k">Model file</td><td class="v">{{ cover.model_file_name or "—" }}</td></tr>
+      <tr><td class="k">Report ID</td><td class="v">{{ cover.report_id }}</td></tr>
+      <tr><td class="k">Analysis date</td><td class="v">{{ cover.analysis_date }}</td></tr>
+      <tr><td class="k">Discipline</td><td class="v">{{ cover.discipline }}</td></tr>
+      <tr><td class="k">IFC schema</td><td class="v">{{ cover.ifc_schema or "—" }}</td></tr>
+      <tr><td class="k">Suitability code</td><td class="v">{{ cover.suitability_code or "—" }}</td></tr>
+      <tr><td class="k">Revision / CDE state</td><td class="v">{{ cover.revision_code or "—" }} / {{ cover.cde_state or "—" }}</td></tr>
+      <tr><td class="k">ISO 19650 document ID</td><td class="v">{{ cover.document_id or "—" }}</td></tr>
+    </table>
+  </div>
+  <div class="footer-note">Generated by BIM Guard · Deterministic, database-driven compliance analysis · Not a certification of compliance</div>
+</div>
+{% if render_target == "full" %}<div style="page-break-before: always;"></div>{% endif %}
+{% endif %}
+
+{% if render_target in ("body", "full") %}
+
+<div class="section">
+  <h1>Executive Summary</h1>
+  <p>{{ executive_summary.narrative }}</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="value">{{ executive_summary.unique_elements_evaluated }}</div><div class="label">Elements evaluated</div></div>
+    <div class="kpi"><div class="value">{{ executive_summary.rules_executed }}</div><div class="label">Rules executed</div></div>
+    <div class="kpi"><div class="value">{{ executive_summary.checks_run }}</div><div class="label">Checks run</div></div>
+    <div class="kpi"><div class="value">{{ executive_summary.passed }}</div><div class="label">Passed</div></div>
+    <div class="kpi"><div class="value">{{ executive_summary.failed }}</div><div class="label">Failed</div></div>
+    <div class="kpi"><div class="value">{{ executive_summary.unable_to_verify }}</div><div class="label">Unable to verify</div></div>
+    <div class="kpi"><div class="value">{{ "%.1f"|format(executive_summary.pass_rate) }}%</div><div class="label">Verified pass rate</div></div>
+  </div>
+
+  <h3>Results by ruleset</h3>
+  {% if executive_summary.ruleset_chart_svg %}
+  <div class="chart-wrap">{{ executive_summary.ruleset_chart_svg|safe }}</div>
+  {% else %}
+  <div class="empty-note">No ruleset results to chart.</div>
+  {% endif %}
+
+  <h3>Top 5 failed rules</h3>
+  {% if executive_summary.top_failed_rules %}
+  <table>
+    <thead><tr><th>Rule</th><th>Description</th><th>Failures</th></tr></thead>
+    <tbody>
+      {% for row in executive_summary.top_failed_rules %}
+      <tr><td>{{ row.rule_reference }}</td><td>{{ row.rule_description }}</td><td>{{ row.fail_count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-note">No failed rules.</div>
+  {% endif %}
+
+  <h3>Failures by storey</h3>
+  {% if executive_summary.storey_chart_svg %}
+  <div class="chart-wrap">{{ executive_summary.storey_chart_svg|safe }}</div>
+  {% else %}
+  <div class="empty-note">No failures recorded against a storey.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Scope &amp; Document Control</h1>
+  <h3>Model &amp; analysis scope</h3>
+  <table>
+    <tbody>
+      <tr><td class="muted" style="width:38%">Model file</td><td>{{ scope.model_file_name or "—" }}</td></tr>
+      <tr><td class="muted">IFC schema</td><td>{{ scope.ifc_schema or "—" }}</td></tr>
+      <tr><td class="muted">Element count</td><td>{{ scope.element_count }}</td></tr>
+      <tr><td class="muted">Storey count</td><td>{{ scope.storey_count if scope.storey_count is not none else "—" }}</td></tr>
+      <tr><td class="muted">Rulesets applied</td><td>{{ scope.ruleset_names|join(", ") if scope.ruleset_names else "—" }}</td></tr>
+    </tbody>
+  </table>
+  <h3>Document control</h3>
+  <table>
+    <tbody>
+      <tr><td class="muted" style="width:38%">Model hash</td><td>{{ scope.model_hash or "Pending — not yet recorded per analysis run" }}</td></tr>
+      <tr><td class="muted">Rule database version</td><td>{{ scope.rule_database_version or "Pending — not yet recorded per analysis run" }}</td></tr>
+      <tr><td class="muted">Engine version</td><td>{{ scope.engine_version or "Pending — not yet recorded per analysis run" }}</td></tr>
+      <tr><td class="muted">Generated at</td><td>{{ scope.generated_at }}</td></tr>
+      <tr><td class="muted">Generated by</td><td>{{ scope.generated_by }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h1>Results by Ruleset</h1>
+  {% if results_by_ruleset %}
+  <table>
+    <thead><tr><th>Ruleset</th><th>Source</th><th>Rules</th><th>Passed</th><th>Failed</th><th>Unable to verify</th><th>Pass rate</th></tr></thead>
+    <tbody>
+      {% for row in results_by_ruleset %}
+      <tr>
+        <td>{{ row.ruleset_name }}</td>
+        <td class="small">{{ row.source_citation or "—" }}</td>
+        <td>{{ row.rule_count }}</td>
+        <td>{{ row.passed }}</td>
+        <td>{{ row.failed }}</td>
+        <td>{{ row.unable_to_verify }}</td>
+        <td>{{ "%.1f"|format(row.pass_rate) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-note">No rulesets were evaluated in this run.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Priority Findings</h1>
+  {% if priority_findings %}
+    {% for f in priority_findings %}
+    <div class="finding-card">
+      <div class="finding-head">
+        <span class="finding-title">{{ f.rule_reference }} — {{ f.element_name }}</span>
+        <span>
+          <span class="badge badge-{{ f.severity }}">{{ f.severity }}</span>
+          <span class="badge badge-{{ f.reliability }}">{{ f.reliability }} reliability</span>
+        </span>
+      </div>
+      <p class="small">{{ f.rule_description }}</p>
+      <div class="tiles">
+        <div class="tile"><div class="tile-label">Measured</div><div class="tile-value">{{ f.measured }}</div></div>
+        <div class="tile"><div class="tile-label">Required</div><div class="tile-value">{{ f.required }}</div></div>
+        <div class="tile"><div class="tile-label">Difference</div><div class="tile-value">{{ f.difference }}</div></div>
+        <div class="tile"><div class="tile-label">Storey</div><div class="tile-value">{{ f.storey }}</div></div>
+      </div>
+      <div class="citation">{{ f.citation }}</div>
+      <p class="small muted">IFC property: {{ f.ifc_property }} — {{ f.reliability_reason }}</p>
+      <div class="action-line"><strong>Action required:</strong> {{ f.action_required }} <span class="muted">(assignee: {{ f.assignee_role }})</span></div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty-note">No failures to prioritize — every checked rule passed or could not be evaluated.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Findings Register</h1>
+  <p class="small muted">
+    Showing {{ findings_register|length }} of {{ findings_register_total }} failed findings, most severe first.
+    {% if findings_register_truncated %}The full register is available in the CSV/Excel export.{% endif %}
+  </p>
+  {% if findings_register %}
+  <table>
+    <thead><tr><th>Element</th><th>Storey</th><th>Rule</th><th>Measured</th><th>Required</th><th>Diff</th><th>Severity</th></tr></thead>
+    <tbody>
+      {% for row in findings_register %}
+      <tr>
+        <td>{{ row.element_name }}</td>
+        <td>{{ row.storey }}</td>
+        <td>{{ row.rule_reference }}</td>
+        <td>{{ row.measured }}</td>
+        <td>{{ row.required }}</td>
+        <td>{{ row.difference }}</td>
+        <td><span class="badge badge-{{ row.severity }}">{{ row.severity }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-note">No failed findings.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Checks That Could Not Be Verified</h1>
+  <p class="small muted">These rules are not counted as failures — the model did not carry enough data to evaluate them.</p>
+  {% if unable_to_verify %}
+  <table>
+    <thead><tr><th>Rule</th><th>Description</th><th>Reason</th><th>Affected</th></tr></thead>
+    <tbody>
+      {% for row in unable_to_verify %}
+      <tr>
+        <td>{{ row.rule_reference }}</td>
+        <td>{{ row.rule_description }}</td>
+        <td>{{ row.reason }}</td>
+        <td>{{ row.affected_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-note">Every rule could be verified against this model.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Rule Register</h1>
+  <p class="small muted">Full traceability: finding → rule → clause → IFC property.</p>
+  {% if rule_register %}
+  <table>
+    <thead><tr><th>Rule</th><th>Citation</th><th>IFC property</th><th>Reliability</th><th>Status</th><th>Fail / Total</th></tr></thead>
+    <tbody>
+      {% for row in rule_register %}
+      <tr>
+        <td>{{ row.rule_reference }}<br/><span class="small muted">{{ row.rule_description }}</span></td>
+        <td class="small">{{ row.citation }}</td>
+        <td class="small">{{ row.ifc_property }}</td>
+        <td><span class="badge badge-{{ row.reliability }}">{{ row.reliability }}</span></td>
+        <td><span class="badge badge-{{ 'pass' if row.status == 'PASS' else ('fail' if row.status == 'FAIL' else 'unverified') }}">{{ row.status }}</span></td>
+        <td>{{ row.fail_count }} / {{ row.total_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-note">No rules were executed in this run.</div>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h1>Methodology &amp; Limitations</h1>
+  <p>
+    This report is produced entirely deterministically: every number is read directly from the
+    compliance analysis run, and every sentence is filled from a fixed template — no language model
+    is used to generate, summarize or interpret any result in this document.
+  </p>
+  <h3>Reliability tiers</h3>
+  <table>
+    <thead><tr><th>Tier</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-high">high</span></td><td>Read from an IFC schema attribute, the element's own type, or an explicit stored relationship — authored data BIM Guard cannot get wrong.</td></tr>
+      <tr><td><span class="badge badge-medium">medium</span></td><td>Read from a standard property set — true if found, but depends on the authoring tool having exported it.</td></tr>
+      <tr><td><span class="badge badge-low">low</span></td><td>Estimated by BIM Guard's own geometry engine, or not standard IFC data at all (a project-specific or manufacturer field) — can be wrong even when it looks plausible.</td></tr>
+    </tbody>
+  </table>
+  <div class="disclaimer">
+    This report is a compliance <em>analysis</em>, not a certification. It reflects what the supplied IFC
+    model contains at the time of analysis, checked against the rulesets selected for this project. It
+    does not constitute regulatory approval, and a professional review remains required before any
+    finding here is treated as a basis for design or construction decisions.
+  </div>
+</div>
+
+{% endif %}
+
+</body>
+</html>

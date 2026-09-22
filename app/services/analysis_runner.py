@@ -183,6 +183,13 @@ def _run_architecture(project_id: int, enable_shacl: bool = False) -> dict:
         "compliance_is_demo": raw.get("compliance_is_demo", False),
         "shacl_issues": raw.get("shacl_issues", []),
         "shacl_error": raw.get("shacl_error"),
+        # Per-rule pass/fail/missing detail and its aggregate, from the same
+        # orchestrator run that produced audit_issues above. The exporter and
+        # the analyse page have never needed these (audit_issues already tells
+        # them what failed), but the PDF report does: it is the only consumer
+        # that needs to say a rule *passed*, which no audit_issue ever records.
+        "rule_compliance": raw.get("rule_compliance", []),
+        "rule_compliance_summary": raw.get("rule_compliance_summary", {}),
     }
 
 

@@ -1334,6 +1334,15 @@ export const analyzeApi = {
     return withAuthToken(url);
   },
 
+  /**
+   * URL for the deterministic PDF/HTML compliance report (cover, executive
+   * summary, findings register, rule register, methodology) built from the
+   * project's latest analysis run.
+   */
+  getReportUrl(projectId: number, slug: string, format: "pdf" | "html" = "pdf"): string {
+    return withAuthToken(`${API_BASE}/analyze/report/${projectId}?slug=${slug}&format=${format}`);
+  },
+
   getBcfArtifactUrl(artifactId: number): string {
     return withAuthToken(`${API_BASE}/analyze/bcf/artifacts/${artifactId}`);
   },

@@ -404,7 +404,7 @@
   <PageHeader
     category="Reports"
     title="Compliance Reports & Exports"
-    subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, and JSON."
+    subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, JSON, and PDF."
     icon={FolderArchive}
   />
 
@@ -905,6 +905,43 @@
           />
         {/if}
       {/if}
+    </div>
+
+    <!-- ═══ PDF Compliance Report ═══ -->
+    <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
+      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex items-center gap-2">
+            <FileText class="h-4 w-4 text-accent" />
+            <h2 class="text-base font-bold tracking-tight text-fg-primary">PDF Compliance Report</h2>
+          </div>
+          <p class="mt-1 text-xs text-fg-muted">
+            A deterministic, database-driven report for {currentProject?.name || "this project"} —
+            cover, executive summary, priority findings, findings register and full rule
+            traceability, generated from the latest analysis run. No LLM is used.
+          </p>
+        </div>
+        <div class="flex shrink-0 flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onclick={() =>
+              window.open(analyzeApi.getReportUrl(selectedProjectId!, "architecture", "html"), "_blank")}
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3.5 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          >
+            <Eye class="h-3.5 w-3.5" />
+            <span>Preview</span>
+          </button>
+          <button
+            type="button"
+            onclick={() =>
+              window.open(analyzeApi.getReportUrl(selectedProjectId!, "architecture", "pdf"), "_blank")}
+            class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-accent-hover"
+          >
+            <Download class="h-3.5 w-3.5" />
+            <span>Download PDF</span>
+          </button>
+        </div>
+      </div>
     </div>
   {:else}
     <div

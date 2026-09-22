@@ -93,7 +93,16 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     BIM_GUARD_STORAGE_BACKEND=supabase \
     PORT=8000 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
+# Chromium for the PDF compliance report (app/services/report_rendering.py).
+# --with-deps installs Chromium's own apt packages (libnss3, libatk, etc.)
+# alongside the browser binary, so it must run as root, before USER bimguard
+# below; PLAYWRIGHT_BROWSERS_PATH above points the download somewhere the
+# app user can still read after the chown.
+RUN playwright install --with-deps chromium \
+    && chown -R bimguard:bimguard /opt/ms-playwright
 
 EXPOSE 8000
 

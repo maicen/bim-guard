@@ -53,6 +53,7 @@ from app.services.persistence import PersistenceService
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.report_service import ReportService
 from app.services.rules_service import (
     _FOLDER_COLUMNS,
     _META_COLUMNS,
@@ -133,6 +134,7 @@ class ApplicationContainer:
     analysis_service: AnalysisService
     ifc_pipeline_service: IFCPipelineService
     arch_analysis_service: ArchAnalysisService
+    report_service: ReportService
     digital_inspector_service: DigitalInspectorService
     graph_service: Any  # typed properly in the import if desired, but Any works for now without circular imports
     graph_triplestore_service: GraphTriplestoreService
@@ -733,6 +735,12 @@ def build_default_container() -> ApplicationContainer:
         ruleset_access_service=ruleset_access_service,
     )
 
+    report_service = ReportService(
+        projects_service=projects_service,
+        models_service=models_service,
+        rules_service=rules_service,
+    )
+
     digital_inspector_service = DigitalInspectorService()
     
     neo4j_uri = os.environ.get("NEO4J_URI", "").strip()
@@ -871,6 +879,7 @@ def build_default_container() -> ApplicationContainer:
         analysis_service=analysis_service,
         ifc_pipeline_service=ifc_pipeline_service,
         arch_analysis_service=arch_analysis_service,
+        report_service=report_service,
         digital_inspector_service=digital_inspector_service,
         graph_service=graph_service,
         graph_triplestore_service=graph_triplestore_service,
