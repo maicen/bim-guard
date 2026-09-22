@@ -59,6 +59,7 @@ from app.services.models_service import ModelsService
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
+from app.services.report_excel import render_report_excel
 from app.services.report_rendering import render_report_html, render_report_pdf
 from app.services.report_service import ReportService
 from app.services.workflow_status import status_snapshot
@@ -791,12 +792,14 @@ def export_analysis_report(
     )
 
 
-@router.get("/report/{project_id}", summary="Render a compliance report as PDF or HTML")
+@router.get("/report/{project_id}", summary="Render a compliance report as PDF, HTML or Excel")
 def get_analysis_report(
     project_id: int,
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
     slug: str = Query("architecture"),
-    format: str = Query("pdf", description="Output format: pdf (download) or html (in-app preview)."),
+    format: str = Query(
+        "pdf", description="Output format: pdf (download), html (in-app preview) or xlsx (working punch-list)."
+    ),
     report_service: ReportService = Depends(get_report_service),
 ):
     """Render the project's latest compliance analysis as a formatted report.
@@ -806,6 +809,11 @@ def get_analysis_report(
     run that records a rule having *passed*, which the report's executive
     summary and pass-rate figures depend on. Deterministic: no LLM, every
     number and sentence comes from the analysis run and a fixed template.
+
+    The PDF caps its findings register (see
+    ``ReportModel.findings_register_truncated``); ``xlsx`` is the uncapped,
+    filterable counterpart with blank Status/Assigned To/Resolved
+    Date/Notes columns for the user's own remediation tracking.
     """
     project_access(project_id)
     if slug not in RUNNABLE_SLUGS:
@@ -819,10 +827,17 @@ def get_analysis_report(
     fmt = format.strip().lower()
     if fmt == "html":
         return Response(content=render_report_html(model, render_target="full"), media_type="text/html")
+    if fmt == "xlsx":
+        filename = f"bimguard-report-{slug}-project-{project_id}.xlsx"
+        return Response(
+            content=render_report_excel(model),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     if fmt != "pdf":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported report format {format!r}; expected pdf or html.",
+            detail=f"Unsupported report format {format!r}; expected pdf, html or xlsx.",
         )
 
     try:

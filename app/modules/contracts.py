@@ -1593,10 +1593,18 @@ class ReportRulesetResultContract(BaseModel):
 
 
 class ReportPriorityFindingContract(BaseModel):
-    """One detailed finding card in the priority-findings section."""
+    """One detailed finding card in the priority-findings section.
+
+    Also reused, unlimited and ruleset-tagged, as ``ReportModel.all_findings``
+    -- the Excel export's Findings Register needs every field the PDF's
+    priority-finding cards already carry, plus which ruleset the rule belongs
+    to for filtering, so this shape is shared rather than duplicated.
+    """
 
     rule_reference: str
     rule_description: str = ""
+    ruleset_id: str = ""
+    ruleset_name: str = ""
     element_name: str = ""
     element_guid: str = ""
     storey: str = ""
@@ -1639,6 +1647,8 @@ class ReportRuleRegisterRowContract(BaseModel):
 
     rule_reference: str
     rule_description: str = ""
+    ruleset_id: str = ""
+    ruleset_name: str = ""
     citation: str = ""
     ifc_property: str = ""
     reliability: str = "low"
@@ -1665,6 +1675,10 @@ class ReportModel(BaseModel):
     findings_register_truncated: bool = False
     unable_to_verify: list[ReportUnverifiedRowContract] = Field(default_factory=list)
     rule_register: list[ReportRuleRegisterRowContract] = Field(default_factory=list)
+    #: Every failed finding, unlimited and ruleset-tagged -- unlike
+    #: ``findings_register`` (top-N, for the PDF), this is what the Excel
+    #: export's Findings Register sheet is built from.
+    all_findings: list[ReportPriorityFindingContract] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

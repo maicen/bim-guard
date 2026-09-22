@@ -264,6 +264,7 @@ class ReportService:
         findings_register, findings_total = self._build_findings_register(rule_compliance, findings_limit)
         unable_to_verify = self._build_unable_to_verify(rule_compliance)
         rule_register = self._build_rule_register(rule_compliance)
+        all_findings = self._build_all_findings(rule_compliance)
 
         return ReportModel(
             cover=cover,
@@ -276,6 +277,7 @@ class ReportService:
             findings_register_truncated=findings_total > len(findings_register),
             unable_to_verify=unable_to_verify,
             rule_register=rule_register,
+            all_findings=all_findings,
         )
 
     # -- Section builders --------------------------------------------------
@@ -436,36 +438,43 @@ class ReportService:
         is_mandatory = 0 if str(rule.get("severity") or "mandatory") == "mandatory" else 1
         return (is_mandatory, -int(rule.get("fail_count") or 0))
 
+    def _finding_contract(self, rule: dict, failure: dict) -> ReportPriorityFindingContract:
+        """Build one finding row, shared by the PDF's priority cards and the Excel register."""
+        actual = failure.get("actual")
+        assessment = assess_rule(rule)
+        ruleset_id = str(rule.get("ruleset_id") or "")
+        return ReportPriorityFindingContract(
+            rule_reference=_rule_reference(rule),
+            rule_description=str(rule.get("rule_desc") or ""),
+            ruleset_id=ruleset_id,
+            ruleset_name=self._ruleset_name(ruleset_id),
+            element_name=str(failure.get("element_name") or failure.get("guid") or ""),
+            element_guid=str(failure.get("guid") or ""),
+            storey=str(failure.get("storey") or "—"),
+            measured=_measured_text(rule, actual),
+            required=_required_text(rule),
+            difference=_difference_text(rule, actual),
+            citation=_citation_for(rule),
+            ifc_property=_ifc_property(rule),
+            reliability=assessment.level if assessment else "low",
+            reliability_reason=assessment.reason if assessment else "No specific IFC property recorded for this rule.",
+            action_required=_action_required(rule, actual),
+            assignee_role="BIM coordinator",
+            severity=str(rule.get("severity") or "mandatory"),
+        )
+
     def _build_priority_findings(
         self, rule_compliance: list[dict], limit: int
     ) -> list[ReportPriorityFindingContract]:
         pairs = self._flatten_failures(rule_compliance)
         pairs.sort(key=lambda pair: self._priority_rank(pair[0]))
+        return [self._finding_contract(rule, failure) for rule, failure in pairs[:limit]]
 
-        findings: list[ReportPriorityFindingContract] = []
-        for rule, failure in pairs[:limit]:
-            actual = failure.get("actual")
-            assessment = assess_rule(rule)
-            findings.append(
-                ReportPriorityFindingContract(
-                    rule_reference=_rule_reference(rule),
-                    rule_description=str(rule.get("rule_desc") or ""),
-                    element_name=str(failure.get("element_name") or failure.get("guid") or ""),
-                    element_guid=str(failure.get("guid") or ""),
-                    storey=str(failure.get("storey") or "—"),
-                    measured=_measured_text(rule, actual),
-                    required=_required_text(rule),
-                    difference=_difference_text(rule, actual),
-                    citation=_citation_for(rule),
-                    ifc_property=_ifc_property(rule),
-                    reliability=assessment.level if assessment else "low",
-                    reliability_reason=assessment.reason if assessment else "No specific IFC property recorded for this rule.",
-                    action_required=_action_required(rule, actual),
-                    assignee_role="BIM coordinator",
-                    severity=str(rule.get("severity") or "mandatory"),
-                )
-            )
-        return findings
+    def _build_all_findings(self, rule_compliance: list[dict]) -> list[ReportPriorityFindingContract]:
+        """Every failed finding, unlimited -- the Excel Findings Register's source."""
+        pairs = self._flatten_failures(rule_compliance)
+        pairs.sort(key=lambda pair: self._priority_rank(pair[0]))
+        return [self._finding_contract(rule, failure) for rule, failure in pairs]
 
     def _build_findings_register(
         self, rule_compliance: list[dict], limit: int
@@ -515,10 +524,13 @@ class ReportService:
         rows: list[ReportRuleRegisterRowContract] = []
         for rule in rule_compliance:
             assessment = assess_rule(rule)
+            ruleset_id = str(rule.get("ruleset_id") or "")
             rows.append(
                 ReportRuleRegisterRowContract(
                     rule_reference=_rule_reference(rule),
                     rule_description=str(rule.get("rule_desc") or ""),
+                    ruleset_id=ruleset_id,
+                    ruleset_name=self._ruleset_name(ruleset_id),
                     citation=_citation_for(rule),
                     ifc_property=_ifc_property(rule),
                     reliability=assessment.level if assessment else "low",
