@@ -48,6 +48,7 @@
   import SortHeader from "../lib/components/SortHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import Modal from "../lib/components/Modal.svelte";
   import RuleForm from "../lib/components/RuleForm.svelte";
   import HoverCard from "../lib/components/HoverCard.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
@@ -1600,36 +1601,20 @@
 </div>
 
 <!-- Rule Edit/Create Modal -->
-{#if isModalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col space-y-4 rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-border-default pb-3">
-        <h2 class="text-base font-bold text-fg-primary">
-          {editingRule ? "Edit Rule" : "Create New Rule"}
-        </h2>
-        <button
-          type="button"
-          onclick={() => (isModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto pr-1">
-        <RuleForm
-          {editingRule}
-          defaultRulesetId={newRuleDefaultRulesetId}
-          defaultCategory={newRuleDefaultCategory}
-          onCancel={() => (isModalOpen = false)}
-          onSaved={handleRuleSaved}
-        />
-      </div>
-    </div>
-  </div>
-{/if}
+<Modal
+  isOpen={isModalOpen}
+  title={editingRule ? "Edit Rule" : "Create New Rule"}
+  maxWidth="max-w-4xl"
+  onClose={() => (isModalOpen = false)}
+>
+  <RuleForm
+    {editingRule}
+    defaultRulesetId={newRuleDefaultRulesetId}
+    defaultCategory={newRuleDefaultCategory}
+    onCancel={() => (isModalOpen = false)}
+    onSaved={handleRuleSaved}
+  />
+</Modal>
 
 <!-- Styled Delete Confirmation Modal -->
 <ConfirmModal
