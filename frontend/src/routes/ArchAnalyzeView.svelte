@@ -1404,7 +1404,7 @@
                         <ChevronRight
                           class="h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-200 group-data-[state=open]:rotate-90"
                         />
-                        <span class="truncate text-xs font-medium text-fg-secondary">{ruleLabel}</span>
+                        <span class="truncate text-xs font-bold text-accent">{ruleLabel}</span>
                       </div>
                       <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
                         >{summaryTxt} · {ruleRequiredText(rule)}</span

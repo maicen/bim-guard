@@ -3,6 +3,7 @@
   import SortHeader from "./SortHeader.svelte";
   import TablePagination from "./TablePagination.svelte";
   import ConfidenceMeter from "./ConfidenceMeter.svelte";
+  import Tooltip from "./Tooltip.svelte";
   import { UNKNOWN_PROPERTY_CONFIDENCE } from "../propertyConfidence";
   import type { RuleElementResult } from "../types";
   import { splitRoomLabel } from "../roomTypes";
@@ -56,6 +57,8 @@
   function actualText(el: RuleElementResult): string {
     return fmtVal(el.actual) + (unit && el.actual != null ? ` ${unit}` : "");
   }
+
+  const ELEMENT_NAME_LIMIT = 32;
 
   let filtered = $derived(
     search.trim()
@@ -146,15 +149,26 @@
       </thead>
       <tbody>
         {#each paged as el (el.guid)}
+          {@const fullName = el.element_name || "—"}
           <tr class="border-b border-border-subtle last:border-0 {rowBg(el)}">
             <td class="px-3 py-2">
               <span class="inline-flex items-center gap-1">
                 {#if el.data_quality_warnings?.length}
-                  <span title={el.data_quality_warnings.join(" ")}>
-                    <AlertTriangle class="h-3 w-3 shrink-0 text-amber-400" />
-                  </span>
+                  <Tooltip text={el.data_quality_warnings.join(" ")}>
+                    {#snippet trigger()}
+                      <AlertTriangle class="h-3 w-3 shrink-0 text-amber-400" />
+                    {/snippet}
+                  </Tooltip>
                 {/if}
-                <span class="font-mono text-xs text-fg-primary">{(el.element_name || "—").slice(0, 32)}</span>
+                <Tooltip text={fullName} disabled={fullName.length <= ELEMENT_NAME_LIMIT}>
+                  {#snippet trigger()}
+                    <span class="cursor-default font-mono text-xs text-fg-primary"
+                      >{fullName.slice(0, ELEMENT_NAME_LIMIT)}{fullName.length > ELEMENT_NAME_LIMIT
+                        ? "…"
+                        : ""}</span
+                    >
+                  {/snippet}
+                </Tooltip>
               </span>
             </td>
             <td class="px-3 py-2">
