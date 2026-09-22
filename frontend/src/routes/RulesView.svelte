@@ -983,14 +983,17 @@
               <button
                 type="button"
                 onclick={() => (selectedFolderId = folder.ruleset_id)}
-                class="flex min-w-0 flex-1 items-center gap-2 truncate {isFolderSelectionMode ||
+                class="flex min-w-0 flex-1 items-center gap-2 {isFolderSelectionMode ||
                 selectedFolderRulesetIds.length > 0
                   ? 'px-1.5'
                   : 'px-2.5'} py-2 text-left"
                 title="{folder.display_name} ({folder.ruleset_id})"
               >
                 <Folder class="h-3.5 w-3.5 shrink-0" />
-                <span class="truncate">{folder.display_name}</span>
+                <span class="flex min-w-0 flex-col">
+                  <span class="truncate">{folder.display_name}</span>
+                  <span class="truncate text-nano font-normal opacity-60">{folder.ruleset_id}</span>
+                </span>
               </button>
 
               <div class="flex shrink-0 items-center gap-1 pr-2">
