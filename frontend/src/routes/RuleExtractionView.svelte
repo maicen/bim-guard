@@ -39,6 +39,7 @@
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
   import SectionTree from "../lib/components/SectionTree.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import Button from "../lib/components/ui/Button.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -131,10 +132,23 @@
   let editForm: RuleExtractionDraft["proposed_rule"] | null = $state(null);
   let viewingDraftSource: RuleSourceResponse | null = $state(null);
   let draftSourceError = $state("");
+  // Accept/reject/edit/promote failures, shown as a red alert inside the Draft
+  // Review section itself -- the page-level `error` banner sits above the fold
+  // once the table is scrolled into view, so a rejected click looked like a no-op.
+  let draftReviewError = $state("");
+
+  function describeDraftFailure(err: any, fallback: string): string {
+    const reason = err?.message || fallback;
+    if (err?.status === 403) {
+      return `${reason} A platform admin can grant your organization access under Ruleset access, or you can re-run the extraction.`;
+    }
+    return reason;
+  }
 
   $effect(() => {
     const docId = selectedDocId;
     draftRules = [];
+    draftReviewError = "";
     if (!docId) return;
 
     isLoadingDrafts = true;
@@ -179,17 +193,21 @@
     draft: RuleExtractionDraft,
     status: "accepted" | "rejected",
   ): Promise<void> {
-    error = "";
+    draftReviewError = "";
     successMessage = "";
     try {
       await reviewDraft(draft, status);
     } catch (err: any) {
-      error = err.message || `Failed to ${status === "accepted" ? "accept" : "reject"} draft.`;
+      draftReviewError = describeDraftFailure(
+        err,
+        `Failed to ${status === "accepted" ? "accept" : "reject"} "${draft.proposed_rule.rule_id}".`,
+      );
     }
   }
 
   function openEditDraftModal(draft: RuleExtractionDraft) {
     editingDraft = draft;
+    draftReviewError = "";
     // Edit on a clone, not the live table row -- otherwise a bound input
     // would mutate draftRules before the PATCH confirms the edit was saved.
     editForm = { ...draft.proposed_rule };
@@ -203,6 +221,7 @@
   function saveEditedDraft() {
     if (!editingDraft || !editForm) return;
     const draftId = editingDraft.id!;
+    draftReviewError = "";
     ruleExtractionApi
       .reviewDraft(draftId, { status: "edited", edited_rule: editForm })
       .then((updated) => {
@@ -210,7 +229,7 @@
         closeEditDraftModal();
       })
       .catch((err: any) => {
-        error = err.message || "Failed to save draft edits.";
+        draftReviewError = describeDraftFailure(err, "Failed to save draft edits.");
       });
   }
 
@@ -224,12 +243,16 @@
   }
 
   async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
+    draftReviewError = "";
     try {
       await ruleExtractionApi.promoteDraft(draft.id!);
       draftRules = draftRules.filter((d) => d.id !== draft.id);
       successMessage = `Promoted "${draft.proposed_rule.rule_id}" into the compliance rule library.`;
     } catch (err: any) {
-      error = err.message || "Failed to promote draft.";
+      draftReviewError = describeDraftFailure(
+        err,
+        `Failed to promote "${draft.proposed_rule.rule_id}".`,
+      );
     }
   }
 
@@ -259,17 +282,18 @@
     const toPromote = draftTable.selectedRows.filter(
       (d) => d.status === "accepted" || d.status === "edited",
     );
-    error = "";
+    draftReviewError = "";
     successMessage = "";
     if (toPromote.length === 0) {
-      error = "None of the selected drafts are accepted or edited — accept them before promoting.";
+      draftReviewError =
+        "None of the selected drafts are accepted or edited — accept them before promoting.";
       return;
     }
 
     bulkAction = "promote";
     const promotedIds = new Set<number | undefined>();
     let failed = 0;
-    let firstError = "";
+    let firstFailure: any = null;
     try {
       // One at a time: each promote inserts into the rule library.
       await runBulk(toPromote, 1, async (draft) => {
@@ -278,7 +302,7 @@
           promotedIds.add(draft.id);
         } catch (err: any) {
           failed += 1;
-          firstError ||= err.message || `Failed to promote "${draft.proposed_rule.rule_id}".`;
+          firstFailure ||= err;
         }
       });
     } finally {
@@ -291,24 +315,24 @@
       successMessage = `Promoted ${promotedIds.size} draft(s) into the compliance rule library.`;
     }
     if (failed > 0) {
-      error = `${failed} of ${toPromote.length} drafts could not be promoted: ${firstError}`;
+      draftReviewError = `${failed} of ${toPromote.length} drafts could not be promoted: ${describeDraftFailure(firstFailure, "Failed to promote draft.")}`;
     }
   }
 
   async function acceptSelectedDrafts(): Promise<void> {
     if (bulkAction) return;
     const toAccept = draftTable.selectedRows.filter((d) => d.status === "pending_review");
-    error = "";
+    draftReviewError = "";
     successMessage = "";
     if (toAccept.length === 0) {
-      error = "None of the selected drafts are pending review.";
+      draftReviewError = "None of the selected drafts are pending review.";
       return;
     }
 
     bulkAction = "accept";
     let accepted = 0;
     let failed = 0;
-    let firstError = "";
+    let firstFailure: any = null;
     try {
       await runBulk(toAccept, 5, async (draft) => {
         try {
@@ -316,7 +340,7 @@
           accepted += 1;
         } catch (err: any) {
           failed += 1;
-          firstError ||= err.message || `Failed to accept "${draft.proposed_rule.rule_id}".`;
+          firstFailure ||= err;
         }
       });
     } finally {
@@ -325,7 +349,7 @@
 
     if (accepted > 0) successMessage = `Accepted ${accepted} draft(s).`;
     if (failed > 0) {
-      error = `${failed} of ${toAccept.length} drafts could not be accepted: ${firstError}`;
+      draftReviewError = `${failed} of ${toAccept.length} drafts could not be accepted: ${describeDraftFailure(firstFailure, "Failed to accept draft.")}`;
     }
   }
 
@@ -871,6 +895,16 @@
         </p>
         <ReliabilityLegend class="mt-2" />
       </div>
+
+      {#if draftReviewError}
+        <Alert
+          type="error"
+          title="Draft review failed"
+          message={draftReviewError}
+          dismissible
+          onDismiss={() => (draftReviewError = "")}
+        />
+      {/if}
 
       {#if isLoadingDrafts}
         <LoadingState message="Loading extraction drafts…" />
@@ -1469,6 +1503,10 @@
           <X class="h-4 w-4" />
         </button>
       </div>
+
+      {#if draftReviewError}
+        <Alert type="error" title="Could not save changes" message={draftReviewError} />
+      {/if}
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
