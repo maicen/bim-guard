@@ -330,6 +330,16 @@
     document.body.removeChild(link);
   }
 
+  // Built at click time, not render time: this list is rendered once when it
+  // loads and can sit on screen for a while, but analyzeApi.getBcfArtifactUrl
+  // bakes in the auth token current at the moment it's called (a browser
+  // navigation can't carry an Authorization header) -- see authToken.ts's
+  // withAuthToken. A URL computed once up front would still download with
+  // that original token even after it's expired.
+  function downloadBcfArtifact(artifactId: number) {
+    window.location.href = analyzeApi.getBcfArtifactUrl(artifactId);
+  }
+
   function promptDeleteArtifact(artifact: BcfArtifact) {
     artifactToDelete = artifact;
     isDeleteArtifactModalOpen = true;
@@ -858,15 +868,15 @@
                             View 3D
                           </button>
                         {/if}
-                        <a
-                          href={analyzeApi.getBcfArtifactUrl(artifact.id)}
-                          download
+                        <button
+                          type="button"
+                          onclick={() => downloadBcfArtifact(artifact.id)}
                           class="inline-flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-600/30"
                           title="Download BCF 2.1 Zip"
                         >
                           <Download class="h-3.5 w-3.5" />
                           Zip
-                        </a>
+                        </button>
                         <button
                           type="button"
                           onclick={() => promptDeleteArtifact(artifact)}

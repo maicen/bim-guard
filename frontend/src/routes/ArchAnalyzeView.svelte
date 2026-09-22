@@ -179,6 +179,16 @@
     window.open(`/#/viewer?${params.toString()}`, "_blank");
   }
 
+  // Builds the download URL at click time, not render time: analyzeApi.getBcfArtifactUrl
+  // bakes in the current auth token (a plain browser navigation can't carry an
+  // Authorization header), and this page is routinely left open across a token
+  // refresh. An <a href> computed once when the result first loaded would still
+  // carry that original token indefinitely, so a click after it expires downloads
+  // a 401 JSON body instead of the report -- see authToken.ts's withAuthToken.
+  function downloadBcfArtifact(artifactId: number) {
+    window.location.href = analyzeApi.getBcfArtifactUrl(artifactId);
+  }
+
   async function runCheck() {
     if (!selectedProjectId) return;
     isRunning = true;
@@ -542,14 +552,14 @@
         View in 3D / BCF
       </button>
       {#if result.bcf_artifact_id}
-        <a
-          href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
-          download
+        <button
+          type="button"
+          onclick={() => downloadBcfArtifact(result.bcf_artifact_id!)}
           class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
         >
           <Download class="h-3.5 w-3.5" />
           BCF
-        </a>
+        </button>
       {/if}
     {/if}
 
@@ -586,14 +596,14 @@
       />
       <span>{bcfSaveMessage}</span>
       {#if result?.bcf_artifact_id}
-        <a
-          href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
-          download
+        <button
+          type="button"
+          onclick={() => downloadBcfArtifact(result!.bcf_artifact_id!)}
           class="ml-auto inline-flex items-center gap-1 rounded-lg border border-emerald-700 bg-emerald-900/60 px-2.5 py-1 text-emerald-200 transition-colors hover:bg-emerald-800"
         >
           <Download class="h-3 w-3" />
           Download BCF
-        </a>
+        </button>
       {/if}
     </div>
   {/if}
@@ -1480,14 +1490,14 @@
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
           {#if result.bcf_artifact_id}
-            <a
-              href={analyzeApi.getBcfArtifactUrl(result.bcf_artifact_id)}
-              download
+            <button
+              type="button"
+              onclick={() => downloadBcfArtifact(result!.bcf_artifact_id!)}
               class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-hover"
             >
               <Download class="h-3.5 w-3.5" />
               Generate BCF Report
-            </a>
+            </button>
           {/if}
           <button
             type="button"
