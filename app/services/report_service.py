@@ -308,10 +308,35 @@ class ReportService:
         if raw.get("compliance_error"):
             raise ValueError(str(raw["compliance_error"]))
 
+        return self.build_report_model_from_run(
+            project_id,
+            list(raw.get("rule_compliance") or []),
+            dict(raw.get("rule_compliance_summary") or {}),
+            priority_limit=priority_limit,
+            findings_limit=findings_limit,
+        )
+
+    def build_report_model_from_run(
+        self,
+        project_id: int,
+        rule_compliance: list[dict],
+        rule_compliance_summary: dict,
+        *,
+        priority_limit: int = _DEFAULT_PRIORITY_LIMIT,
+        findings_limit: int = _DEFAULT_FINDINGS_LIMIT,
+    ) -> ReportModel:
+        """Build a :class:`ReportModel` from an already-computed compliance run.
+
+        Pure function of ``rule_compliance``/``rule_compliance_summary`` --
+        no re-run, no cache. Used by :meth:`build_report_model` (the
+        unscoped, whole-project path) and, directly, by the ruleset-scoped
+        save-and-download PDF/CSV action, which already has these two values
+        from ``ArchAnalysisService.compute_rule_compliance`` and must not
+        trigger a second, separately-cached analysis run to get them.
+        """
         project = self._projects.get_project(project_id) or {}
         primary_model = self._models.get_primary(project_id) or {}
-        rule_compliance: list[dict] = list(raw.get("rule_compliance") or [])
-        summary: dict = dict(raw.get("rule_compliance_summary") or {})
+        summary: dict = dict(rule_compliance_summary)
 
         cover = self._build_cover(project, primary_model)
         executive_summary = self._build_executive_summary(summary, rule_compliance)

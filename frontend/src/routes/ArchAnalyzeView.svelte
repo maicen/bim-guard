@@ -82,9 +82,17 @@
   let isCheckingEnhancement = $state(false);
   let showEnhancementsModal = $state(false);
 
-  // BCF save tracking (backend auto-persists; we reflect the status)
-  let bcfSaveMessage = $state("");
-  let bcfSaveType: "success" | "error" = $state("success");
+  // Report save tracking, shared by BCF (backend auto-persists on every run;
+  // we just reflect the status), and PDF/CSV (persisted on demand by the
+  // save-and-download buttons below).
+  let reportSaveMessage = $state("");
+  let reportSaveType: "success" | "error" = $state("success");
+  let isSavingPdf = $state(false);
+  let isSavingCsv = $state(false);
+  // Which artifact reportSaveMessage is actually about, so the banner's
+  // quick-download button re-downloads the thing that was just saved rather
+  // than always assuming BCF.
+  let lastSavedArtifact: { type: "bcf" | "pdf" | "csv"; id: number } | null = $state(null);
 
   let prevArchKey = $state("");
 
@@ -137,7 +145,7 @@
   async function handleProjectChange() {
     result = null;
     error = "";
-    bcfSaveMessage = "";
+    reportSaveMessage = "";
     await checkEnhancedModel();
     if (!hasEnhancedModel) {
       showEnhancementsModal = true;
@@ -189,11 +197,35 @@
     window.location.href = analyzeApi.getBcfArtifactUrl(artifactId);
   }
 
+  /**
+   * Save-and-download for PDF/CSV: persists a ruleset-scoped report (scoped
+   * to whatever ruleset the last run used) and immediately downloads it,
+   * mirroring how BCF already saves automatically then downloads on click.
+   */
+  async function saveAndDownloadReport(artifactType: "pdf" | "csv") {
+    if (!selectedProjectId) return;
+    const setBusy = (v: boolean) => (artifactType === "pdf" ? (isSavingPdf = v) : (isSavingCsv = v));
+    setBusy(true);
+    reportSaveMessage = "";
+    try {
+      const artifact = await analyzeApi.persistReportArtifact(selectedProjectId, selectedFolder, artifactType);
+      reportSaveMessage = "Report saved in Reports & Exports tab";
+      reportSaveType = "success";
+      lastSavedArtifact = { type: artifactType, id: artifact.id };
+      window.location.href = analyzeApi.getReportArtifactUrl(artifactType, artifact.id);
+    } catch (err: any) {
+      reportSaveMessage = err.message || `Failed to save the ${artifactType.toUpperCase()} report.`;
+      reportSaveType = "error";
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runCheck() {
     if (!selectedProjectId) return;
     isRunning = true;
     error = "";
-    bcfSaveMessage = "";
+    reportSaveMessage = "";
     // Registers with the global pipeline tracker so a user who navigates away
     // mid-run still sees progress in the header and gets a completion toast.
     pipelineTracker.track(selectedProjectId, selectedProject?.name || `Project ${selectedProjectId}`);
@@ -202,11 +234,12 @@
       if (result) {
         initDomainState(result);
         if (result.bcf_artifact_id) {
-          bcfSaveMessage = `BCF report saved to database (artifact #${result.bcf_artifact_id})`;
-          bcfSaveType = "success";
+          reportSaveMessage = "Report saved in Reports & Exports tab";
+          reportSaveType = "success";
+          lastSavedArtifact = { type: "bcf", id: result.bcf_artifact_id };
         } else if (result.total_issues > 0) {
-          bcfSaveMessage = "BCF report auto-persistence encountered an issue.";
-          bcfSaveType = "error";
+          reportSaveMessage = "BCF report auto-persistence encountered an issue.";
+          reportSaveType = "error";
         }
       }
     } catch (err: any) {
@@ -561,6 +594,26 @@
           BCF
         </button>
       {/if}
+      <button
+        type="button"
+        disabled={isSavingPdf}
+        onclick={() => saveAndDownloadReport("pdf")}
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+        title="Save a ruleset-scoped PDF summary and download it"
+      >
+        <Download class="h-3.5 w-3.5" />
+        {isSavingPdf ? "Saving…" : "PDF"}
+      </button>
+      <button
+        type="button"
+        disabled={isSavingCsv}
+        onclick={() => saveAndDownloadReport("csv")}
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+        title="Save the full ruleset-scoped report as CSV and download it"
+      >
+        <Download class="h-3.5 w-3.5" />
+        {isSavingCsv ? "Saving…" : "CSV"}
+      </button>
     {/if}
 
     <button
@@ -584,25 +637,28 @@
     </div>
   {/if}
 
-  {#if bcfSaveMessage}
+  {#if reportSaveMessage}
     <div
       class="flex items-center gap-2 rounded-xl p-3.5 text-xs
-      {bcfSaveType === 'success'
+      {reportSaveType === 'success'
         ? 'border border-emerald-800 bg-emerald-950/40 text-emerald-300'
         : 'border border-rose-800 bg-rose-950/40 text-rose-300'}"
     >
       <CheckCircle2
-        class="h-4 w-4 shrink-0 {bcfSaveType === 'success' ? 'text-emerald-400' : 'text-rose-400'}"
+        class="h-4 w-4 shrink-0 {reportSaveType === 'success' ? 'text-emerald-400' : 'text-rose-400'}"
       />
-      <span>{bcfSaveMessage}</span>
-      {#if result?.bcf_artifact_id}
+      <span>{reportSaveMessage}</span>
+      {#if lastSavedArtifact}
         <button
           type="button"
-          onclick={() => downloadBcfArtifact(result!.bcf_artifact_id!)}
+          onclick={() =>
+            lastSavedArtifact?.type === "bcf"
+              ? downloadBcfArtifact(lastSavedArtifact.id)
+              : window.location.assign(analyzeApi.getReportArtifactUrl(lastSavedArtifact!.type, lastSavedArtifact!.id))}
           class="ml-auto inline-flex items-center gap-1 rounded-lg border border-emerald-700 bg-emerald-900/60 px-2.5 py-1 text-emerald-200 transition-colors hover:bg-emerald-800"
         >
           <Download class="h-3 w-3" />
-          Download BCF
+          Download {lastSavedArtifact.type.toUpperCase()}
         </button>
       {/if}
     </div>
@@ -1499,6 +1555,24 @@
               Generate BCF Report
             </button>
           {/if}
+          <button
+            type="button"
+            disabled={isSavingPdf}
+            onclick={() => saveAndDownloadReport("pdf")}
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+          >
+            <Download class="h-3.5 w-3.5" />
+            {isSavingPdf ? "Saving…" : "Save PDF Summary"}
+          </button>
+          <button
+            type="button"
+            disabled={isSavingCsv}
+            onclick={() => saveAndDownloadReport("csv")}
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+          >
+            <Download class="h-3.5 w-3.5" />
+            {isSavingCsv ? "Saving…" : "Download CSV"}
+          </button>
           <button
             type="button"
             onclick={() =>

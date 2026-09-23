@@ -29,6 +29,10 @@ _REPORT_ARTIFACT_SCHEMA = {
     "sha256": str,
     "issue_count": int,
     "created_at": str,
+    "rule_folder": str,
+    "ruleset_name": str,
+    "created_by": str,
+    "created_by_email": str,
 }
 
 
@@ -49,6 +53,10 @@ class ReportArtifactService:
         topics: list[dict[str, Any]],
         *,
         ifc_file_id: int | None = None,
+        rule_folder: str = "",
+        ruleset_name: str = "",
+        created_by: str | None = None,
+        created_by_email: str | None = None,
     ) -> dict[str, Any] | None:
         """Generate and persist a BCF export, returning its metadata row.
 
@@ -59,6 +67,15 @@ class ReportArtifactService:
                 from, when the caller knows which single model it covers.
                 Left ``None`` for the common case of a report federated
                 across every model a project holds.
+            rule_folder: The ruleset id the run was scoped to, or ``""`` for
+                an unscoped ("All Rules") run.
+            ruleset_name: Display name snapshot for ``rule_folder``, so the
+                saved row still reads correctly if the ruleset is later
+                renamed or deleted.
+            created_by: Supabase auth user id of whoever triggered the run,
+                or ``None`` when the caller has no authenticated user in
+                scope (e.g. a background/system-triggered run).
+            created_by_email: Email snapshot for ``created_by``.
         """
         if not topics:
             return None
@@ -66,34 +83,127 @@ class ReportArtifactService:
         filename = f"compliance_project_{project_id}.bcf"
         issues = [self._topic_to_issue(topic) for topic in topics]
         content = generate_bcf(issues, filename=filename)
-        storage_ref = self._storage.save_upload(filename, content, "reports/bcf")
+        return self._persist(
+            project_id,
+            "bcf",
+            filename,
+            content,
+            "application/octet-stream",
+            len(issues),
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=created_by,
+            created_by_email=created_by_email,
+            ifc_file_id=ifc_file_id,
+        )
+
+    def persist_pdf(
+        self,
+        project_id: int,
+        content: bytes,
+        filename: str,
+        *,
+        issue_count: int,
+        rule_folder: str = "",
+        ruleset_name: str = "",
+        created_by: str | None = None,
+        created_by_email: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a rendered PDF compliance report, returning its metadata row."""
+        return self._persist(
+            project_id,
+            "pdf",
+            filename,
+            content,
+            "application/pdf",
+            issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=created_by,
+            created_by_email=created_by_email,
+        )
+
+    def persist_csv(
+        self,
+        project_id: int,
+        content: bytes,
+        filename: str,
+        *,
+        issue_count: int,
+        rule_folder: str = "",
+        ruleset_name: str = "",
+        created_by: str | None = None,
+        created_by_email: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a rendered full-report CSV export, returning its metadata row."""
+        return self._persist(
+            project_id,
+            "csv",
+            filename,
+            content,
+            "text/csv",
+            issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=created_by,
+            created_by_email=created_by_email,
+        )
+
+    def _persist(
+        self,
+        project_id: int,
+        artifact_type: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        issue_count: int,
+        *,
+        rule_folder: str = "",
+        ruleset_name: str = "",
+        created_by: str | None = None,
+        created_by_email: str | None = None,
+        ifc_file_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Upload ``content`` to storage and insert its metadata row.
+
+        Shared by every ``persist_*`` method so the upload/rollback and
+        column shape stay in one place regardless of artifact type.
+        """
+        storage_ref = self._storage.save_upload(filename, content, f"reports/{artifact_type}")
         try:
             artifact = self._artifacts.insert(
                 {
                     "project_id": project_id,
                     "ifc_file_id": ifc_file_id,
-                    "artifact_type": "bcf",
+                    "artifact_type": artifact_type,
                     "filename": filename,
                     "storage_ref": storage_ref,
-                    "content_type": "application/octet-stream",
+                    "content_type": content_type,
                     "byte_size": len(content),
                     "sha256": hashlib.sha256(content).hexdigest(),
-                    "issue_count": len(issues),
+                    "issue_count": issue_count,
                     "created_at": now_iso_utc(),
+                    "rule_folder": rule_folder or "",
+                    "ruleset_name": ruleset_name or "",
+                    "created_by": created_by or "",
+                    "created_by_email": created_by_email or "",
                 }
             )
         except Exception:
             try:
                 self._storage.delete(storage_ref)
             except Exception:
-                logger.warning("Failed to clean up orphaned BCF object ref=%s", storage_ref, exc_info=True)
+                logger.warning(
+                    "Failed to clean up orphaned %s object ref=%s", artifact_type, storage_ref, exc_info=True
+                )
             raise
 
         logger.info(
-            "BCF report persisted project_id=%d artifact_id=%s issues=%d bytes=%d",
+            "%s report persisted project_id=%d artifact_id=%s issues=%d bytes=%d",
+            artifact_type.upper(),
             project_id,
             artifact.get("id"),
-            len(issues),
+            issue_count,
             len(content),
         )
         return artifact
@@ -106,19 +216,31 @@ class ReportArtifactService:
 
     def list_bcf(self) -> list[dict[str, Any]]:
         """Return all persisted BCF exports ordered from newest to oldest."""
-        rows = [row for row in self._artifacts.rows if row.get("artifact_type") == "bcf"]
-        return sorted(rows, key=lambda row: int(row.get("id") or 0), reverse=True)
+        return self.list_by_type("bcf")
 
     def get_bcf(self, artifact_id: int) -> dict[str, Any] | None:
         """Return one persisted BCF export by artifact ID."""
-        artifact = self._artifacts.get(artifact_id)
-        if artifact is None or artifact.get("artifact_type") != "bcf":
-            return None
-        return artifact
+        return self.get(artifact_id, "bcf")
 
     def delete_bcf(self, artifact_id: int) -> bool:
         """Delete a persisted BCF export and clean up storage."""
-        artifact = self.get_bcf(artifact_id)
+        return self.delete(artifact_id, "bcf")
+
+    def list_by_type(self, artifact_type: str) -> list[dict[str, Any]]:
+        """Return all persisted artifacts of ``artifact_type``, newest first."""
+        rows = [row for row in self._artifacts.rows if row.get("artifact_type") == artifact_type]
+        return sorted(rows, key=lambda row: int(row.get("id") or 0), reverse=True)
+
+    def get(self, artifact_id: int, artifact_type: str) -> dict[str, Any] | None:
+        """Return one persisted artifact by ID, scoped to ``artifact_type``."""
+        artifact = self._artifacts.get(artifact_id)
+        if artifact is None or artifact.get("artifact_type") != artifact_type:
+            return None
+        return artifact
+
+    def delete(self, artifact_id: int, artifact_type: str) -> bool:
+        """Delete a persisted artifact of ``artifact_type`` and clean up storage."""
+        artifact = self.get(artifact_id, artifact_type)
         if not artifact:
             return False
         storage_ref = artifact.get("storage_ref")

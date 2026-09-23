@@ -7,7 +7,6 @@
     AlertTriangle,
     Clock,
     DollarSign,
-    ScanEye,
     RefreshCw,
     FolderArchive,
     Shield,
@@ -34,6 +33,7 @@
   import BcfTopicEditModal from "../lib/components/BcfTopicEditModal.svelte";
   import BcfTopicDetailsModal from "../lib/components/BcfTopicDetailsModal.svelte";
   import BcfBulkEditModal from "../lib/components/BcfBulkEditModal.svelte";
+  import ReportArtifactsTable from "../lib/components/ReportArtifactsTable.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
@@ -45,9 +45,13 @@
   import { Select, type SelectOption } from "../lib/components/ui";
   import { createTableState } from "../lib/tableState.svelte";
 
+  type ArtifactType = "bcf" | "pdf" | "csv";
+
   const reportTabs: TabStripItem[] = [
     { id: "live_bcf", label: "Live BCF 2.1 Topics" },
     { id: "artifacts", label: "BCF Zip Artifacts" },
+    { id: "pdf_artifacts", label: "PDF Reports" },
+    { id: "csv_artifacts", label: "CSV Exports" },
   ];
 
   const statusFilterOptions: SelectOption[] = [
@@ -102,20 +106,73 @@
   let isLoading = false;
   let error = $state("");
 
-  // ARCH BCF Artifacts
+  // ARCH Report Artifacts -- BCF, PDF and CSV each get their own list, own
+  // loading flag and own project filter, but share one delete-confirmation
+  // flow and one table-state shape (BcfArtifact covers all three; it's the
+  // generic report_artifacts row).
   let bcfArtifacts: BcfArtifact[] = $state([]);
+  let pdfArtifacts: BcfArtifact[] = $state([]);
+  let csvArtifacts: BcfArtifact[] = $state([]);
   let isBcfLoading = $state(false);
-  let filterToSelectedProject = $state(false);
+  let isPdfLoading = $state(false);
+  let isCsvLoading = $state(false);
+  let bcfFilterToSelected = $state(false);
+  let pdfFilterToSelected = $state(false);
+  let csvFilterToSelected = $state(false);
   let isDeleteArtifactModalOpen = $state(false);
-  let artifactToDelete: BcfArtifact | null = $state(null);
+  let artifactToDelete: { type: ArtifactType; artifact: BcfArtifact } | null = $state(null);
   let isBulkDeleteArtifactsModalOpen = $state(false);
+  let bulkDeleteType: ArtifactType = $state("bcf");
 
-  // Artifact search, sort, paginate and select.
-  const artifactTable = createTableState<BcfArtifact, number>({
+  function artifactsFor(type: ArtifactType): BcfArtifact[] {
+    return type === "bcf" ? bcfArtifacts : type === "pdf" ? pdfArtifacts : csvArtifacts;
+  }
+
+  function setArtifactsFor(type: ArtifactType, rows: BcfArtifact[]): void {
+    if (type === "bcf") bcfArtifacts = rows;
+    else if (type === "pdf") pdfArtifacts = rows;
+    else csvArtifacts = rows;
+  }
+
+  function tableFor(type: ArtifactType) {
+    return type === "bcf" ? bcfArtifactTable : type === "pdf" ? pdfArtifactTable : csvArtifactTable;
+  }
+
+  function filterToSelectedFor(type: ArtifactType): boolean {
+    return type === "bcf" ? bcfFilterToSelected : type === "pdf" ? pdfFilterToSelected : csvFilterToSelected;
+  }
+
+  function setFilterToSelectedFor(type: ArtifactType, v: boolean): void {
+    if (type === "bcf") bcfFilterToSelected = v;
+    else if (type === "pdf") pdfFilterToSelected = v;
+    else csvFilterToSelected = v;
+  }
+
+  // Artifact search, sort, paginate and select -- one table-state instance
+  // per artifact type, each scoped to its own project-filter toggle.
+  const bcfArtifactTable = createTableState<BcfArtifact, number>({
     rows: () =>
-      filterToSelectedProject && selectedProjectId
+      bcfFilterToSelected && selectedProjectId
         ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
         : bcfArtifacts,
+    getId: (a) => a.id,
+    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
+    initialSort: { field: "id", asc: false },
+  });
+  const pdfArtifactTable = createTableState<BcfArtifact, number>({
+    rows: () =>
+      pdfFilterToSelected && selectedProjectId
+        ? pdfArtifacts.filter((a) => a.project_id === selectedProjectId)
+        : pdfArtifacts,
+    getId: (a) => a.id,
+    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
+    initialSort: { field: "id", asc: false },
+  });
+  const csvArtifactTable = createTableState<BcfArtifact, number>({
+    rows: () =>
+      csvFilterToSelected && selectedProjectId
+        ? csvArtifacts.filter((a) => a.project_id === selectedProjectId)
+        : csvArtifacts,
     getId: (a) => a.id,
     searchFields: (a) => [a.filename, getProjectName(a.project_id)],
     initialSort: { field: "id", asc: false },
@@ -124,7 +181,7 @@
   // Live BCF REST Topics
   let bcfTopics: BCFTopicResponse[] = $state([]);
   let isTopicsLoading = $state(false);
-  let activeTab: "live_bcf" | "artifacts" = $state("live_bcf");
+  let activeTab: "live_bcf" | "artifacts" | "pdf_artifacts" | "csv_artifacts" = $state("live_bcf");
   // Topic search, filter, sort, paginate and select.
   const topicTable = createTableState<BCFTopicResponse, string>({
     rows: () => bcfTopics || [],
@@ -159,7 +216,9 @@
   $effect(() => {
     const orgId = authState.activeOrganizationId;
     untrack(() => {
-      loadBcfArtifacts(orgId);
+      loadReportArtifacts("bcf", orgId);
+      loadReportArtifacts("pdf", orgId);
+      loadReportArtifacts("csv", orgId);
       projectsApi.list({ organization_id: orgId }).then((data) => {
         if (authState.activeOrganizationId !== orgId) return;
         projects = data.projects || [];
@@ -189,16 +248,25 @@
     }
   }
 
-  async function loadBcfArtifacts(orgId: number | null = authState.activeOrganizationId) {
-    isBcfLoading = true;
+  function setLoadingFor(type: ArtifactType, v: boolean): void {
+    if (type === "bcf") isBcfLoading = v;
+    else if (type === "pdf") isPdfLoading = v;
+    else isCsvLoading = v;
+  }
+
+  async function loadReportArtifacts(
+    type: ArtifactType,
+    orgId: number | null = authState.activeOrganizationId,
+  ) {
+    setLoadingFor(type, true);
     try {
-      const artifacts = await analyzeApi.listBcfArtifacts(orgId);
+      const artifacts = await analyzeApi.listReportArtifacts(type, orgId);
       if (authState.activeOrganizationId !== orgId) return;
-      bcfArtifacts = artifacts;
+      setArtifactsFor(type, artifacts);
     } catch {
-      if (authState.activeOrganizationId === orgId) bcfArtifacts = [];
+      if (authState.activeOrganizationId === orgId) setArtifactsFor(type, []);
     } finally {
-      if (authState.activeOrganizationId === orgId) isBcfLoading = false;
+      if (authState.activeOrganizationId === orgId) setLoadingFor(type, false);
     }
   }
 
@@ -296,12 +364,15 @@
     }
   }
 
-  function exportArtifactsToCsv() {
-    const target = artifactTable.selectedCount ? artifactTable.selectedRows : artifactTable.sorted;
+  function exportArtifactsToCsv(type: ArtifactType) {
+    const table = tableFor(type);
+    const target = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = [
       "ID",
       "ProjectID",
       "ProjectName",
+      "Ruleset",
+      "User",
       "Filename",
       "Issues",
       "ByteSize",
@@ -311,6 +382,8 @@
       a.id,
       a.project_id,
       `"${getProjectName(a.project_id).replace(/"/g, '""')}"`,
+      `"${(a.ruleset_name || "All Rules").replace(/"/g, '""')}"`,
+      `"${(a.created_by_email || "").replace(/"/g, '""')}"`,
       `"${(a.filename || "").replace(/"/g, '""')}"`,
       a.issue_count,
       a.byte_size,
@@ -323,7 +396,7 @@
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `bcf_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`,
+      `${type}_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -331,43 +404,51 @@
   }
 
   // Built at click time, not render time: this list is rendered once when it
-  // loads and can sit on screen for a while, but analyzeApi.getBcfArtifactUrl
+  // loads and can sit on screen for a while, but analyzeApi.getReportArtifactUrl
   // bakes in the auth token current at the moment it's called (a browser
   // navigation can't carry an Authorization header) -- see authToken.ts's
   // withAuthToken. A URL computed once up front would still download with
   // that original token even after it's expired.
-  function downloadBcfArtifact(artifactId: number) {
-    window.location.href = analyzeApi.getBcfArtifactUrl(artifactId);
+  function downloadReportArtifact(type: ArtifactType, artifactId: number) {
+    window.location.href = analyzeApi.getReportArtifactUrl(type, artifactId);
   }
 
-  function promptDeleteArtifact(artifact: BcfArtifact) {
-    artifactToDelete = artifact;
+  function promptDeleteArtifact(type: ArtifactType, artifact: BcfArtifact) {
+    artifactToDelete = { type, artifact };
     isDeleteArtifactModalOpen = true;
   }
 
   async function confirmDeleteArtifact() {
     if (!artifactToDelete) return;
+    const { type, artifact } = artifactToDelete;
     try {
-      await analyzeApi.deleteBcfArtifact(artifactToDelete.id);
-      bcfArtifacts = bcfArtifacts.filter((a) => a.id !== artifactToDelete!.id);
-      artifactTable.selectedIds.delete(artifactToDelete!.id);
+      await analyzeApi.deleteReportArtifact(type, artifact.id);
+      setArtifactsFor(type, artifactsFor(type).filter((a) => a.id !== artifact.id));
+      tableFor(type).selectedIds.delete(artifact.id);
       artifactToDelete = null;
     } catch (err: any) {
-      error = `Failed to delete BCF artifact: ${err.message}`;
+      error = `Failed to delete ${type.toUpperCase()} artifact: ${err.message}`;
     }
   }
 
+  function promptBulkDeleteArtifacts(type: ArtifactType) {
+    bulkDeleteType = type;
+    isBulkDeleteArtifactsModalOpen = true;
+  }
+
   async function confirmBulkDeleteArtifacts() {
-    if (!artifactTable.selectedCount) return;
+    const type = bulkDeleteType;
+    const table = tableFor(type);
+    if (!table.selectedCount) return;
     try {
-      for (const id of artifactTable.selectedIdList) {
-        await analyzeApi.deleteBcfArtifact(id);
+      for (const id of table.selectedIdList) {
+        await analyzeApi.deleteReportArtifact(type, id);
       }
-      bcfArtifacts = bcfArtifacts.filter((a) => !artifactTable.selectedIds.has(a.id));
-      artifactTable.clearSelection();
+      setArtifactsFor(type, artifactsFor(type).filter((a) => !table.selectedIds.has(a.id)));
+      table.clearSelection();
       isBulkDeleteArtifactsModalOpen = false;
     } catch (err: any) {
-      error = `Failed to delete selected BCF artifacts: ${err.message}`;
+      error = `Failed to delete selected ${type.toUpperCase()} artifacts: ${err.message}`;
     }
   }
 
@@ -376,25 +457,6 @@
     return p ? p.name : `Project #${projId}`;
   }
 
-  function formatBytes(bytes?: number): string {
-    if (!bytes) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  }
-
-  function formatDate(dateStr?: string): string {
-    if (!dateStr) return "—";
-    try {
-      return new Date(dateStr).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-    } catch {
-      return dateStr;
-    }
-  }
   let currentProject = $derived(projects.find((p) => p.id === selectedProjectId));
   // --- TOPIC COMPUTATIONS & SELECTION ---
 </script>
@@ -429,7 +491,11 @@
             >
               {activeTab === "live_bcf"
                 ? `${bcfTopics.length} Live Topics`
-                : `${bcfArtifacts.length} Artifacts`}
+                : activeTab === "artifacts"
+                  ? `${bcfArtifacts.length} Artifacts`
+                  : activeTab === "pdf_artifacts"
+                    ? `${pdfArtifacts.length} Artifacts`
+                    : `${csvArtifacts.length} Artifacts`}
             </span>
           </div>
           <p class="mt-1 text-xs text-fg-muted">
@@ -462,14 +528,18 @@
             type="button"
             onclick={() => {
               if (activeTab === "live_bcf") loadBcfTopics();
-              else loadBcfArtifacts();
+              else if (activeTab === "artifacts") loadReportArtifacts("bcf");
+              else if (activeTab === "pdf_artifacts") loadReportArtifacts("pdf");
+              else loadReportArtifacts("csv");
             }}
-            disabled={isTopicsLoading || isBcfLoading}
+            disabled={isTopicsLoading || isBcfLoading || isPdfLoading || isCsvLoading}
             class="rounded-xl border border-border-interactive bg-surface-overlay p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
             title="Refresh Deliverables"
           >
             <RefreshCw
-              class="h-3.5 w-3.5 {isTopicsLoading || isBcfLoading ? 'animate-spin' : ''}"
+              class="h-3.5 w-3.5 {isTopicsLoading || isBcfLoading || isPdfLoading || isCsvLoading
+                ? 'animate-spin'
+                : ''}"
             />
           </button>
         </div>
@@ -683,227 +753,60 @@
             }}
           />
         {/if}
-      {:else}
+      {:else if activeTab === "artifacts"}
         <!-- ── TAB 2: ARCHIVED BCF ZIP ARTIFACTS ── -->
-
-        <!-- Filters & Project Filter Toolbar -->
-        <div
-          class="flex flex-col items-center justify-between gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 sm:flex-row"
-        >
-          <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
-            <input
-              type="text"
-              bind:value={artifactTable.search}
-              placeholder="Filter BCF archives by filename or project..."
-              class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-            />
-          </div>
-
-          {#if selectedProjectId}
-            <div
-              class="flex items-center rounded-xl border border-border-default bg-surface-card p-1 text-xs"
-            >
-              <button
-                type="button"
-                onclick={() => (filterToSelectedProject = false)}
-                class="rounded-lg px-2.5 py-1 font-medium transition-colors {!filterToSelectedProject
-                  ? 'bg-surface-overlay text-fg-primary'
-                  : 'text-fg-muted hover:text-fg-primary'}"
-              >
-                All Projects
-              </button>
-              <button
-                type="button"
-                onclick={() => (filterToSelectedProject = true)}
-                class="rounded-lg px-2.5 py-1 font-medium transition-colors {filterToSelectedProject
-                  ? 'bg-blue-600 text-white'
-                  : 'text-fg-muted hover:text-fg-primary'}"
-              >
-                {currentProject?.name || "Selected"}
-              </button>
-            </div>
-          {/if}
-        </div>
-
-        <!-- Bulk Action Bar for Artifacts -->
-        <BulkActionBar
-          selectedCount={artifactTable.selectedCount}
-          itemLabel="BCF artifact"
-          onClearSelection={() => artifactTable.clearSelection()}
-          onBulkExport={exportArtifactsToCsv}
-          onBulkDelete={() => (isBulkDeleteArtifactsModalOpen = true)}
+        <ReportArtifactsTable
+          artifacts={bcfArtifacts}
+          tableState={bcfArtifactTable}
+          typeLabel="BCF"
+          downloadLabel="Zip"
+          {projects}
+          isLoading={isBcfLoading}
+          {selectedProjectId}
+          filterToSelectedProject={bcfFilterToSelected}
+          onFilterToggle={(v) => (bcfFilterToSelected = v)}
+          onDownload={(a) => downloadReportArtifact("bcf", a.id)}
+          onDeleteOne={(a) => promptDeleteArtifact("bcf", a)}
+          onBulkDelete={() => promptBulkDeleteArtifacts("bcf")}
+          onBulkExport={() => exportArtifactsToCsv("bcf")}
+          onViewIn3d={onSelectProjectForViewer
+            ? (a) => onSelectProjectForViewer!(a.project_id, undefined, a.id)
+            : undefined}
         />
-
-        {#if isBcfLoading && bcfArtifacts.length === 0}
-          <div class="p-12 text-center text-xs text-fg-muted">
-            <div
-              class="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"
-            ></div>
-            Loading BCF artifacts…
-          </div>
-        {:else if artifactTable.totalItems === 0}
-          <div
-            class="rounded-xl border border-dashed border-border-default p-12 text-center text-xs text-fg-muted"
-          >
-            {filterToSelectedProject
-              ? `No BCF reports found for ${currentProject?.name || "this project"}. Run an ARCH Compliance Audit to generate one.`
-              : "No persisted BCF artifacts found matching your filter."}
-          </div>
-        {:else}
-          <div class="overflow-x-auto rounded-xl border border-border-default">
-            <table class="w-full border-collapse text-left text-xs">
-              <thead>
-                <tr
-                  class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted"
-                >
-                  <th class="w-10 px-4 py-3">
-                    <TableCheckbox
-                      checked={artifactTable.allFilteredSelected}
-                      indeterminate={artifactTable.someFilteredSelected}
-                      onchange={() => artifactTable.toggleSelectAll()}
-                      title="Select all BCF artifacts"
-                    />
-                  </th>
-                  <SortHeader
-                    column="id"
-                    sortField={artifactTable.sortField}
-                    sortAsc={artifactTable.sortAsc}
-                    onSort={(f) => artifactTable.toggleSort(f)}
-                  >
-                    ID
-                  </SortHeader>
-                  <th class="px-4 py-3">Project</th>
-                  <SortHeader
-                    column="filename"
-                    sortField={artifactTable.sortField}
-                    sortAsc={artifactTable.sortAsc}
-                    onSort={(f) => artifactTable.toggleSort(f)}
-                  >
-                    Artifact / Filename
-                  </SortHeader>
-                  <SortHeader
-                    column="issue_count"
-                    sortField={artifactTable.sortField}
-                    sortAsc={artifactTable.sortAsc}
-                    onSort={(f) => artifactTable.toggleSort(f)}
-                  >
-                    Issues
-                  </SortHeader>
-                  <SortHeader
-                    column="byte_size"
-                    sortField={artifactTable.sortField}
-                    sortAsc={artifactTable.sortAsc}
-                    onSort={(f) => artifactTable.toggleSort(f)}
-                  >
-                    Size
-                  </SortHeader>
-                  <SortHeader
-                    column="created_at"
-                    sortField={artifactTable.sortField}
-                    sortAsc={artifactTable.sortAsc}
-                    onSort={(f) => artifactTable.toggleSort(f)}
-                  >
-                    Date
-                  </SortHeader>
-                  <th class="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border-subtle">
-                {#each artifactTable.paginated as artifact (artifact.id)}
-                  <tr
-                    class="transition-colors hover:bg-surface-hover {artifactTable.isSelected(
-                      artifact.id,
-                    )
-                      ? 'bg-surface-selected'
-                      : ''}"
-                  >
-                    <td class="w-10 px-4 py-3">
-                      <TableCheckbox
-                        checked={artifactTable.isSelected(artifact.id)}
-                        onchange={() => artifactTable.toggleSelect(artifact.id)}
-                        ariaLabel={`Select artifact ${artifact.filename}`}
-                      />
-                    </td>
-                    <td class="px-4 py-3 font-mono text-fg-muted">#{artifact.id}</td>
-                    <td class="px-4 py-3 font-medium text-fg-primary">
-                      {getProjectName(artifact.project_id)}
-                    </td>
-                    <td class="px-4 py-3">
-                      <div
-                        class="max-w-xs truncate font-mono text-fg-secondary"
-                        title={artifact.filename}
-                      >
-                        {artifact.filename}
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span
-                        class="inline-block rounded-md border px-2.5 py-0.5 text-micro font-semibold {artifact.issue_count >
-                        0
-                          ? 'border-rose-800 bg-rose-950/60 text-rose-300'
-                          : 'border-emerald-800 bg-emerald-950/60 text-emerald-300'}"
-                      >
-                        {artifact.issue_count} issue{artifact.issue_count === 1 ? "" : "s"}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 font-mono text-fg-muted">
-                      {formatBytes(artifact.byte_size)}
-                    </td>
-                    <td class="whitespace-nowrap px-4 py-3 text-fg-muted">
-                      {formatDate(artifact.created_at)}
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <div class="inline-flex items-center justify-end gap-1.5">
-                        {#if onSelectProjectForViewer}
-                          <button
-                            type="button"
-                            onclick={() =>
-                              onSelectProjectForViewer &&
-                              onSelectProjectForViewer(artifact.project_id, undefined, artifact.id)}
-                            class="inline-flex items-center gap-1 rounded-lg border border-emerald-800 bg-emerald-900/40 px-2.5 py-1 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-800/60"
-                            title="Open 3D Viewer with this BCF Report"
-                          >
-                            <ScanEye class="h-3.5 w-3.5" />
-                            View 3D
-                          </button>
-                        {/if}
-                        <button
-                          type="button"
-                          onclick={() => downloadBcfArtifact(artifact.id)}
-                          class="inline-flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-600/20 px-2.5 py-1 text-xs font-semibold text-blue-300 transition-colors hover:bg-blue-600/30"
-                          title="Download BCF 2.1 Zip"
-                        >
-                          <Download class="h-3.5 w-3.5" />
-                          Zip
-                        </button>
-                        <button
-                          type="button"
-                          onclick={() => promptDeleteArtifact(artifact)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
-                          title="Delete BCF archive"
-                        >
-                          <Trash2 class="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-
-          <TablePagination
-            currentPage={artifactTable.page}
-            pageSize={artifactTable.pageSize}
-            totalItems={artifactTable.totalItems}
-            onPageChange={(p) => (artifactTable.requestedPage = p)}
-            onPageSizeChange={(size) => {
-              artifactTable.pageSize = size;
-              artifactTable.requestedPage = 1;
-            }}
-          />
-        {/if}
+      {:else if activeTab === "pdf_artifacts"}
+        <!-- ── TAB 3: SAVED PDF REPORTS ── -->
+        <ReportArtifactsTable
+          artifacts={pdfArtifacts}
+          tableState={pdfArtifactTable}
+          typeLabel="PDF"
+          downloadLabel="PDF"
+          {projects}
+          isLoading={isPdfLoading}
+          {selectedProjectId}
+          filterToSelectedProject={pdfFilterToSelected}
+          onFilterToggle={(v) => (pdfFilterToSelected = v)}
+          onDownload={(a) => downloadReportArtifact("pdf", a.id)}
+          onDeleteOne={(a) => promptDeleteArtifact("pdf", a)}
+          onBulkDelete={() => promptBulkDeleteArtifacts("pdf")}
+          onBulkExport={() => exportArtifactsToCsv("pdf")}
+        />
+      {:else}
+        <!-- ── TAB 4: SAVED CSV EXPORTS ── -->
+        <ReportArtifactsTable
+          artifacts={csvArtifacts}
+          tableState={csvArtifactTable}
+          typeLabel="CSV"
+          downloadLabel="CSV"
+          {projects}
+          isLoading={isCsvLoading}
+          {selectedProjectId}
+          filterToSelectedProject={csvFilterToSelected}
+          onFilterToggle={(v) => (csvFilterToSelected = v)}
+          onDownload={(a) => downloadReportArtifact("csv", a.id)}
+          onDeleteOne={(a) => promptDeleteArtifact("csv", a)}
+          onBulkDelete={() => promptBulkDeleteArtifacts("csv")}
+          onBulkExport={() => exportArtifactsToCsv("csv")}
+        />
       {/if}
     </div>
 
@@ -1029,24 +932,24 @@
   />
 {/if}
 
-<!-- Delete Single BCF Artifact Modal -->
+<!-- Delete Single Report Artifact Modal (BCF, PDF or CSV) -->
 <ConfirmModal
   bind:isOpen={isDeleteArtifactModalOpen}
-  title="Delete BCF Report Artifact"
-  message={`Are you sure you want to delete BCF report archive "${artifactToDelete?.filename || ""}"?`}
-  confirmText="Delete BCF Archive"
+  title={`Delete ${artifactToDelete?.type.toUpperCase() || ""} Report Artifact`}
+  message={`Are you sure you want to delete ${artifactToDelete?.type.toUpperCase() || ""} report "${artifactToDelete?.artifact.filename || ""}"?`}
+  confirmText="Delete Report"
   danger={true}
   onConfirm={confirmDeleteArtifact}
   onCancel={() => (artifactToDelete = null)}
 />
 
-<!-- Bulk Delete BCF Artifacts Modal -->
+<!-- Bulk Delete Report Artifacts Modal (BCF, PDF or CSV) -->
 <ConfirmModal
   bind:isOpen={isBulkDeleteArtifactsModalOpen}
-  title="Delete Selected BCF Archives"
-  message={`Are you sure you want to delete ${artifactTable.selectedCount} selected BCF report archive(s)?`}
-  confirmText="Delete Selected Archives"
+  title={`Delete Selected ${bulkDeleteType.toUpperCase()} Reports`}
+  message={`Are you sure you want to delete ${tableFor(bulkDeleteType).selectedCount} selected ${bulkDeleteType.toUpperCase()} report(s)?`}
+  confirmText="Delete Selected Reports"
   danger={true}
   onConfirm={confirmBulkDeleteArtifacts}
-  onCancel={() => artifactTable.clearSelection()}
+  onCancel={() => tableFor(bulkDeleteType).clearSelection()}
 />

@@ -42,12 +42,8 @@ class ArchAnalysisService:
         self._registry = engine_registry if engine_registry is not None else DEFAULT_ENGINE_REGISTRY
         self._ruleset_access = ruleset_access_service
 
-    def run_analysis(
-        self,
-        project_id: int,
-        rule_folder: str = "",
-    ) -> ArchAnalysisResponse:
-        """Execute architectural compliance checks for a project and return response model.
+    def _run_orchestrator(self, project_id: int, rule_folder: str) -> dict:
+        """Validate ruleset access and run the orchestrator, returning its raw payload.
 
         Raises:
             ValueError: if *rule_folder* is given but isn't granted to this
@@ -72,11 +68,50 @@ class ArchAnalysisService:
                     "Ask a superadmin to grant it first."
                 )
 
-        result = PipelineOrchestratorService.orchestrate_workflow(
+        return PipelineOrchestratorService.orchestrate_workflow(
             project_id=project_id,
             analysis_theme="Architecture",
             rule_folder=rule_folder,
         )
+
+    def resolve_ruleset_name(self, rule_folder: str) -> str:
+        """Display-name snapshot for ``rule_folder``, or ``""`` when unscoped."""
+        if not rule_folder:
+            return ""
+        folder = self._rules.get_folder(rule_folder)
+        return str((folder or {}).get("display_name") or "")
+
+    def compute_rule_compliance(
+        self, project_id: int, rule_folder: str = ""
+    ) -> tuple[list[dict], dict]:
+        """Return ``(rule_compliance, rule_compliance_summary)`` for a ruleset-scoped run.
+
+        Side-effect free (no BCF persistence) -- unlike :meth:`run_analysis`,
+        which unconditionally persists a BCF artifact whenever the run
+        produces ``bcf_topics``. Used to build a ruleset-scoped PDF/CSV
+        report without ever creating a stray duplicate BCF row as a side
+        effect of that unrelated save action.
+        """
+        raw = self._run_orchestrator(project_id, rule_folder)
+        if "error" in raw:
+            raise ValueError(raw["error"])
+        return raw.get("rule_compliance", []), raw.get("rule_compliance_summary", {})
+
+    def run_analysis(
+        self,
+        project_id: int,
+        rule_folder: str = "",
+        *,
+        created_by: str | None = None,
+        created_by_email: str | None = None,
+    ) -> ArchAnalysisResponse:
+        """Execute architectural compliance checks for a project and return response model.
+
+        Raises:
+            ValueError: if *rule_folder* is given but isn't granted to this
+                project's organization -- see :meth:`_run_orchestrator`.
+        """
+        result = self._run_orchestrator(project_id, rule_folder)
 
         if "error" in result:
             raise ValueError(result["error"])
@@ -92,7 +127,14 @@ class ArchAnalysisService:
         bcf_artifact_id = None
         if bcf_topics:
             try:
-                persisted = self._report_svc.persist_bcf(project_id, bcf_topics)
+                persisted = self._report_svc.persist_bcf(
+                    project_id,
+                    bcf_topics,
+                    rule_folder=rule_folder,
+                    ruleset_name=self.resolve_ruleset_name(rule_folder),
+                    created_by=created_by,
+                    created_by_email=created_by_email,
+                )
                 if persisted:
                     bcf_artifact_id = persisted.get("id")
             except Exception:

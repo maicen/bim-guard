@@ -59,6 +59,7 @@ from app.services.models_service import ModelsService
 from app.services.profile_service import ProfileService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
+from app.services.report_csv import render_report_csv
 from app.services.report_excel import render_report_excel
 from app.services.report_rendering import render_report_html, render_report_pdf
 from app.services.report_service import ReportService
@@ -857,13 +858,19 @@ def get_analysis_report(
 def run_arch_analysis(
     project_id: Annotated[int, Form(...)],
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     rule_folder: Annotated[str, Form()] = "",
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
     """Run architectural compliance checks (egress, daylight, fire separations, clearances) against the active building-code ruleset."""
     project_access(project_id)
     try:
-        return arch_service.run_analysis(project_id=project_id, rule_folder=rule_folder)
+        return arch_service.run_analysis(
+            project_id=project_id,
+            rule_folder=rule_folder,
+            created_by=current_user.id,
+            created_by_email=current_user.email,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -981,7 +988,32 @@ def list_bcf_artifacts(
     from app.services.report_artifacts import ReportArtifactService
 
     artifacts = ReportArtifactService().list_bcf()
+    return _visible_report_artifacts(
+        artifacts,
+        current_user=current_user,
+        projects_service=projects_service,
+        memberships=memberships,
+        profiles=profiles,
+        organization_id=organization_id,
+        x_org_id=x_org_id,
+    )
 
+
+def _visible_report_artifacts(
+    artifacts: list[dict[str, Any]],
+    *,
+    current_user: CurrentUser,
+    projects_service: ProjectsService,
+    memberships: MembershipService,
+    profiles: ProfileService,
+    organization_id: Optional[int],
+    x_org_id: Optional[str],
+) -> list[dict[str, Any]]:
+    """Narrow *artifacts* to the ones whose project the caller may see.
+
+    Shared by every report-artifact list endpoint (BCF, PDF, CSV) -- see
+    ``list_bcf_artifacts`` for the visibility rules this implements.
+    """
     effective_org_id: Optional[int] = organization_id
     if effective_org_id is None and x_org_id and x_org_id.strip().isdigit():
         effective_org_id = int(x_org_id.strip())
@@ -1041,6 +1073,200 @@ def delete_bcf_artifact(
             detail=f"BCF artifact {artifact_id} not found.",
         )
 
+
+# ---------------------------------------------------------------------------
+# Generic Report Artifact Endpoints (PDF / CSV; BCF's routes above stay as-is)
+# ---------------------------------------------------------------------------
+
+#: Formats the "save and download" buttons can persist on demand. BCF isn't
+#: here -- it's already persisted automatically by POST /arch whenever a run
+#: produces findings, so a second, explicit save action for it would just
+#: create a duplicate row.
+_PERSISTABLE_ARTIFACT_TYPES = {"pdf", "csv"}
+#: Every type report_artifacts can hold, for the read-only routes below.
+_REPORT_ARTIFACT_TYPES = {"bcf", "pdf", "csv"}
+
+
+@router.post("/report-artifacts/{artifact_type}", summary="Save a ruleset-scoped PDF or CSV report")
+def persist_report_artifact(
+    artifact_type: str,
+    project_id: Annotated[int, Form(...)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    rule_folder: Annotated[str, Form()] = "",
+    arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
+    report_service: ReportService = Depends(get_report_service),
+) -> dict[str, Any]:
+    """Render and persist a ruleset-scoped PDF or CSV report.
+
+    Backs the audit page's "PDF" / "CSV" save-and-download buttons. Scoped
+    to whatever ``rule_folder`` was run (blank means "All Rules"), the same
+    way BCF already is -- built from
+    ``ArchAnalysisService.compute_rule_compliance``, which runs the
+    orchestrator fresh for this ruleset without the side effect of also
+    persisting a BCF artifact.
+    """
+    if artifact_type not in _PERSISTABLE_ARTIFACT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported artifact type {artifact_type!r}; expected pdf or csv.",
+        )
+    project_access(project_id)
+
+    from app.services.report_artifacts import ReportArtifactService
+
+    try:
+        rule_compliance, rule_compliance_summary = arch_service.compute_rule_compliance(project_id, rule_folder)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    model = report_service.build_report_model_from_run(project_id, rule_compliance, rule_compliance_summary)
+    ruleset_name = arch_service.resolve_ruleset_name(rule_folder)
+    issue_count = model.executive_summary.failed
+    report_svc = ReportArtifactService()
+
+    if artifact_type == "pdf":
+        content = render_report_pdf(model)
+        filename = f"bimguard-report-project-{project_id}.pdf"
+        artifact = report_svc.persist_pdf(
+            project_id,
+            content,
+            filename,
+            issue_count=issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=current_user.id,
+            created_by_email=current_user.email,
+        )
+    else:
+        content = render_report_csv(model)
+        filename = f"bimguard-report-project-{project_id}.csv"
+        artifact = report_svc.persist_csv(
+            project_id,
+            content,
+            filename,
+            issue_count=issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=current_user.id,
+            created_by_email=current_user.email,
+        )
+
+    return artifact
+
+
+@router.get("/report-artifacts/{artifact_type}/{artifact_id}", summary="Download a BCF/PDF/CSV report artifact by ID")
+def download_report_artifact(
+    artifact_type: str,
+    artifact_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
+):
+    """Download a persisted BCF, PDF or CSV report archive by artifact primary key."""
+    if artifact_type not in _REPORT_ARTIFACT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown artifact type {artifact_type!r}."
+        )
+
+    from fastapi.responses import FileResponse
+
+    from app.services.report_artifacts import ReportArtifactService
+
+    report_svc = ReportArtifactService()
+    artifact = report_svc.get(artifact_id, artifact_type)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{artifact_type.upper()} artifact {artifact_id} not found.",
+        )
+    # 404 (not 403) if the artifact's project isn't the caller's -- same
+    # reasoning as download_bcf_artifact above.
+    project_access(artifact["project_id"])
+
+    file_path = report_svc.materialize(artifact)
+    if file_path is None or not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve the report file from storage.",
+        )
+
+    filename = artifact.get("filename") or f"compliance_artifact_{artifact_id}.{artifact_type}"
+    return FileResponse(
+        str(file_path),
+        media_type=artifact.get("content_type") or "application/octet-stream",
+        filename=filename,
+    )
+
+
+@router.get(
+    "/report-artifacts/{artifact_type}",
+    response_model=list[dict[str, Any]],
+    summary="List persisted report artifacts by type",
+)
+def list_report_artifacts(
+    artifact_type: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    projects_service: Annotated[ProjectsService, Depends(get_projects_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    organization_id: Optional[int] = Query(None, description="Filter by organization ID"),
+    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
+) -> list[dict[str, Any]]:
+    """List persisted report artifacts of one type, newest first.
+
+    Same visibility rules as ``GET /bcf/list`` -- see that docstring.
+    """
+    if artifact_type not in _REPORT_ARTIFACT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown artifact type {artifact_type!r}."
+        )
+
+    from app.services.report_artifacts import ReportArtifactService
+
+    artifacts = ReportArtifactService().list_by_type(artifact_type)
+    return _visible_report_artifacts(
+        artifacts,
+        current_user=current_user,
+        projects_service=projects_service,
+        memberships=memberships,
+        profiles=profiles,
+        organization_id=organization_id,
+        x_org_id=x_org_id,
+    )
+
+
+@router.delete(
+    "/report-artifacts/{artifact_type}/{artifact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a report artifact by ID",
+)
+def delete_report_artifact(
+    artifact_type: str,
+    artifact_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+) -> None:
+    """Delete a persisted BCF, PDF or CSV report artifact."""
+    if artifact_type not in _REPORT_ARTIFACT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown artifact type {artifact_type!r}."
+        )
+
+    from app.services.report_artifacts import ReportArtifactService
+
+    report_svc = ReportArtifactService()
+    artifact = report_svc.get(artifact_id, artifact_type)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{artifact_type.upper()} artifact {artifact_id} not found.",
+        )
+    project_access(artifact["project_id"])
+
+    deleted = report_svc.delete(artifact_id, artifact_type)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{artifact_type.upper()} artifact {artifact_id} not found.",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -837,6 +837,14 @@ export interface BcfArtifact {
   sha256?: string;
   issue_count: number;
   created_at?: string;
+  /** Ruleset id the run was scoped to, or blank for an unscoped ("All Rules") run. */
+  rule_folder?: string | null;
+  /** Ruleset display-name snapshot taken at save time. */
+  ruleset_name?: string | null;
+  /** Supabase auth user id of whoever triggered the run, when known. */
+  created_by?: string | null;
+  /** Email snapshot for created_by, taken at save time. */
+  created_by_email?: string | null;
 }
 
 export interface ExtractedRule {

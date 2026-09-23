@@ -1376,6 +1376,49 @@ export const analyzeApi = {
     });
     return handleResponse<void>(res);
   },
+
+  /**
+   * Save a ruleset-scoped PDF or CSV report from the caller's most recent
+   * run of `ruleFolder` (blank means "All Rules"), returning its persisted
+   * artifact metadata. BCF isn't offered here -- it's already saved
+   * automatically by `runArch`.
+   */
+  async persistReportArtifact(
+    projectId: number,
+    ruleFolder: string,
+    artifactType: "pdf" | "csv",
+  ): Promise<BcfArtifact> {
+    const form = new FormData();
+    form.append("project_id", projectId.toString());
+    if (ruleFolder) form.append("rule_folder", ruleFolder);
+
+    const res = await apiFetch(`${API_BASE}/analyze/report-artifacts/${artifactType}`, {
+      method: "POST",
+      body: form,
+    });
+    return handleResponse<BcfArtifact>(res);
+  },
+
+  getReportArtifactUrl(artifactType: "bcf" | "pdf" | "csv", artifactId: number): string {
+    return withAuthToken(`${API_BASE}/analyze/report-artifacts/${artifactType}/${artifactId}`);
+  },
+
+  async listReportArtifacts(
+    artifactType: "bcf" | "pdf" | "csv",
+    organizationId?: number | null,
+  ): Promise<BcfArtifact[]> {
+    const effectiveOrg = organizationId !== undefined ? organizationId : getActiveOrgId();
+    const query = effectiveOrg ? `?organization_id=${effectiveOrg}` : "";
+    const res = await apiFetch(`${API_BASE}/analyze/report-artifacts/${artifactType}${query}`);
+    return handleResponse<BcfArtifact[]>(res);
+  },
+
+  async deleteReportArtifact(artifactType: "bcf" | "pdf" | "csv", artifactId: number): Promise<void> {
+    const res = await apiFetch(`${API_BASE}/analyze/report-artifacts/${artifactType}/${artifactId}`, {
+      method: "DELETE",
+    });
+    return handleResponse<void>(res);
+  },
 };
 
 export const dashboardApi = {
