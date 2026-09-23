@@ -83,16 +83,17 @@
   let showEnhancementsModal = $state(false);
 
   // Report save tracking, shared by BCF (backend auto-persists on every run;
-  // we just reflect the status), and PDF/CSV (persisted on demand by the
-  // save-and-download buttons below).
+  // we just reflect the status), and PDF/CSV/Excel (persisted on demand by
+  // the save-and-download buttons below).
   let reportSaveMessage = $state("");
   let reportSaveType: "success" | "error" = $state("success");
   let isSavingPdf = $state(false);
   let isSavingCsv = $state(false);
+  let isSavingXlsx = $state(false);
   // Which artifact reportSaveMessage is actually about, so the banner's
   // quick-download button re-downloads the thing that was just saved rather
   // than always assuming BCF.
-  let lastSavedArtifact: { type: "bcf" | "pdf" | "csv"; id: number } | null = $state(null);
+  let lastSavedArtifact: { type: "bcf" | "pdf" | "csv" | "xlsx"; id: number } | null = $state(null);
 
   let prevArchKey = $state("");
 
@@ -198,13 +199,14 @@
   }
 
   /**
-   * Save-and-download for PDF/CSV: persists a ruleset-scoped report (scoped
-   * to whatever ruleset the last run used) and immediately downloads it,
-   * mirroring how BCF already saves automatically then downloads on click.
+   * Save-and-download for PDF/CSV/Excel: persists a ruleset-scoped report
+   * (scoped to whatever ruleset the last run used) and immediately downloads
+   * it, mirroring how BCF already saves automatically then downloads on click.
    */
-  async function saveAndDownloadReport(artifactType: "pdf" | "csv") {
+  async function saveAndDownloadReport(artifactType: "pdf" | "csv" | "xlsx") {
     if (!selectedProjectId) return;
-    const setBusy = (v: boolean) => (artifactType === "pdf" ? (isSavingPdf = v) : (isSavingCsv = v));
+    const setBusy = (v: boolean) =>
+      artifactType === "pdf" ? (isSavingPdf = v) : artifactType === "xlsx" ? (isSavingXlsx = v) : (isSavingCsv = v);
     setBusy(true);
     reportSaveMessage = "";
     try {
@@ -603,6 +605,16 @@
       >
         <Download class="h-3.5 w-3.5" />
         {isSavingPdf ? "Saving…" : "PDF"}
+      </button>
+      <button
+        type="button"
+        disabled={isSavingXlsx}
+        onclick={() => saveAndDownloadReport("xlsx")}
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+        title="Save the full ruleset-scoped report as an Excel workbook and download it"
+      >
+        <Download class="h-3.5 w-3.5" />
+        {isSavingXlsx ? "Saving…" : "Excel"}
       </button>
       <button
         type="button"
@@ -1563,6 +1575,15 @@
           >
             <Download class="h-3.5 w-3.5" />
             {isSavingPdf ? "Saving…" : "Save PDF Summary"}
+          </button>
+          <button
+            type="button"
+            disabled={isSavingXlsx}
+            onclick={() => saveAndDownloadReport("xlsx")}
+            class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-card/60 px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+          >
+            <Download class="h-3.5 w-3.5" />
+            {isSavingXlsx ? "Saving…" : "Download Excel"}
           </button>
           <button
             type="button"

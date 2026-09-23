@@ -1378,15 +1378,15 @@ export const analyzeApi = {
   },
 
   /**
-   * Save a ruleset-scoped PDF or CSV report from the caller's most recent
-   * run of `ruleFolder` (blank means "All Rules"), returning its persisted
-   * artifact metadata. BCF isn't offered here -- it's already saved
-   * automatically by `runArch`.
+   * Save a ruleset-scoped PDF, CSV or Excel report from the caller's most
+   * recent run of `ruleFolder` (blank means "All Rules"), returning its
+   * persisted artifact metadata. BCF isn't offered here -- it's already
+   * saved automatically by `runArch`.
    */
   async persistReportArtifact(
     projectId: number,
     ruleFolder: string,
-    artifactType: "pdf" | "csv",
+    artifactType: "pdf" | "csv" | "xlsx",
   ): Promise<BcfArtifact> {
     const form = new FormData();
     form.append("project_id", projectId.toString());
@@ -1399,12 +1399,12 @@ export const analyzeApi = {
     return handleResponse<BcfArtifact>(res);
   },
 
-  getReportArtifactUrl(artifactType: "bcf" | "pdf" | "csv", artifactId: number): string {
+  getReportArtifactUrl(artifactType: "bcf" | "pdf" | "csv" | "xlsx", artifactId: number): string {
     return withAuthToken(`${API_BASE}/analyze/report-artifacts/${artifactType}/${artifactId}`);
   },
 
   async listReportArtifacts(
-    artifactType: "bcf" | "pdf" | "csv",
+    artifactType: "bcf" | "pdf" | "csv" | "xlsx",
     organizationId?: number | null,
   ): Promise<BcfArtifact[]> {
     const effectiveOrg = organizationId !== undefined ? organizationId : getActiveOrgId();

@@ -1082,12 +1082,12 @@ def delete_bcf_artifact(
 #: here -- it's already persisted automatically by POST /arch whenever a run
 #: produces findings, so a second, explicit save action for it would just
 #: create a duplicate row.
-_PERSISTABLE_ARTIFACT_TYPES = {"pdf", "csv"}
+_PERSISTABLE_ARTIFACT_TYPES = {"pdf", "csv", "xlsx"}
 #: Every type report_artifacts can hold, for the read-only routes below.
-_REPORT_ARTIFACT_TYPES = {"bcf", "pdf", "csv"}
+_REPORT_ARTIFACT_TYPES = {"bcf", "pdf", "csv", "xlsx"}
 
 
-@router.post("/report-artifacts/{artifact_type}", summary="Save a ruleset-scoped PDF or CSV report")
+@router.post("/report-artifacts/{artifact_type}", summary="Save a ruleset-scoped PDF, CSV or Excel report")
 def persist_report_artifact(
     artifact_type: str,
     project_id: Annotated[int, Form(...)],
@@ -1097,11 +1097,11 @@ def persist_report_artifact(
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
     report_service: ReportService = Depends(get_report_service),
 ) -> dict[str, Any]:
-    """Render and persist a ruleset-scoped PDF or CSV report.
+    """Render and persist a ruleset-scoped PDF, CSV or Excel report.
 
-    Backs the audit page's "PDF" / "CSV" save-and-download buttons. Scoped
-    to whatever ``rule_folder`` was run (blank means "All Rules"), the same
-    way BCF already is -- built from
+    Backs the audit page's "PDF" / "CSV" / "Excel" save-and-download buttons.
+    Scoped to whatever ``rule_folder`` was run (blank means "All Rules"), the
+    same way BCF already is -- built from
     ``ArchAnalysisService.compute_rule_compliance``, which runs the
     orchestrator fresh for this ruleset without the side effect of also
     persisting a BCF artifact.
@@ -1109,7 +1109,7 @@ def persist_report_artifact(
     if artifact_type not in _PERSISTABLE_ARTIFACT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported artifact type {artifact_type!r}; expected pdf or csv.",
+            detail=f"Unsupported artifact type {artifact_type!r}; expected pdf, csv or xlsx.",
         )
     project_access(project_id)
 
@@ -1138,6 +1138,19 @@ def persist_report_artifact(
             created_by=current_user.id,
             created_by_email=current_user.email,
         )
+    elif artifact_type == "xlsx":
+        content = render_report_excel(model)
+        filename = f"bimguard-report-project-{project_id}.xlsx"
+        artifact = report_svc.persist_xlsx(
+            project_id,
+            content,
+            filename,
+            issue_count=issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=current_user.id,
+            created_by_email=current_user.email,
+        )
     else:
         content = render_report_csv(model)
         filename = f"bimguard-report-project-{project_id}.csv"
@@ -1155,7 +1168,9 @@ def persist_report_artifact(
     return artifact
 
 
-@router.get("/report-artifacts/{artifact_type}/{artifact_id}", summary="Download a BCF/PDF/CSV report artifact by ID")
+@router.get(
+    "/report-artifacts/{artifact_type}/{artifact_id}", summary="Download a BCF/PDF/CSV/Excel report artifact by ID"
+)
 def download_report_artifact(
     artifact_type: str,
     artifact_id: int,

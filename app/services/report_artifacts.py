@@ -149,6 +149,32 @@ class ReportArtifactService:
             created_by_email=created_by_email,
         )
 
+    def persist_xlsx(
+        self,
+        project_id: int,
+        content: bytes,
+        filename: str,
+        *,
+        issue_count: int,
+        rule_folder: str = "",
+        ruleset_name: str = "",
+        created_by: str | None = None,
+        created_by_email: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a rendered Excel compliance workbook, returning its metadata row."""
+        return self._persist(
+            project_id,
+            "xlsx",
+            filename,
+            content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            issue_count,
+            rule_folder=rule_folder,
+            ruleset_name=ruleset_name,
+            created_by=created_by,
+            created_by_email=created_by_email,
+        )
+
     def _persist(
         self,
         project_id: int,
