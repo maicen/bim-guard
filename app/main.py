@@ -11,8 +11,9 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from httpx import TransportError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -379,6 +380,27 @@ class AgentDiscoveryLinkMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(AgentDiscoveryLinkMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+
+
+@app.exception_handler(TransportError)
+async def supabase_transport_error_handler(request: Request, exc: TransportError) -> JSONResponse:
+    """Report an unreachable Supabase as a clean 503 instead of a bare 500.
+
+    Every Supabase/PostgREST call already retries transient transport
+    failures (``execute_with_retry`` in ``app.services.db_adapters``), so this
+    only fires once those retries are exhausted -- Supabase was unreachable
+    for the whole request, not a one-off blip. Without this handler the
+    exception falls through to Starlette's default error response, which is
+    plain text with no JSON body, so the frontend's error parsing
+    (``handleResponse`` in ``frontend/src/lib/api.ts``) has nothing to read
+    and falls back to a bare "Internal Server Error (500)".
+    """
+    logger.warning("Supabase unreachable on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database temporarily unavailable. Please try again."},
+    )
+
 
 # Register API Gateway routers directly under /api prefix
 app.include_router(api_auth.router, prefix="/api/auth", tags=["Auth"])

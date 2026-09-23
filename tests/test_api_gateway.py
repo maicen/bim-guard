@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+
+from httpx import ConnectError
+from starlette.requests import Request
 from starlette.testclient import TestClient
 
 from app.main import app
@@ -70,5 +75,27 @@ def test_api_cors_headers():
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
     assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_supabase_transport_error_returns_clean_503():
+    """A network-level Supabase outage should surface as JSON 503, not a bare 500.
+
+    Without the handler, an unreachable Supabase raises `httpx.TransportError`
+    up through the route unhandled, and Starlette's default error response is
+    plain text with no JSON body -- exactly what leaves the frontend showing a
+    bare "Internal Server Error (500)" instead of a real message.
+    """
+    from app.main import supabase_transport_error_handler
+
+    scope = {"type": "http", "method": "POST", "path": "/api/projects", "headers": []}
+    request = Request(scope)
+    exc = ConnectError("Connection refused")
+
+    response = asyncio.run(supabase_transport_error_handler(request, exc))
+
+    assert response.status_code == 503
+    assert json.loads(response.body) == {
+        "detail": "Database temporarily unavailable. Please try again."
+    }
 
 
