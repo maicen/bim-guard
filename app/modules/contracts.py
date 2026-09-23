@@ -1657,6 +1657,49 @@ class ReportRuleRegisterRowContract(BaseModel):
     total_count: int = 0
 
 
+class ReportElementResultRowContract(BaseModel):
+    """One (rule, element) result on an element-type sheet: pass, fail, unable to verify, or waived.
+
+    Unlike ``ReportFindingRowContract`` (failures only, for the PDF), this
+    carries every evaluated outcome -- the Excel export's element-type sheets
+    are a full audit table per IFC class, not just a list of what failed.
+    """
+
+    element_name: str = ""
+    element_guid: str = ""
+    storey: str = ""
+    rule_reference: str
+    rule_description: str = ""
+    ruleset_id: str = ""
+    ruleset_name: str = ""
+    ifc_property: str = ""
+    measured: str = ""
+    required: str = ""
+    difference: str = ""
+    result: str = Field("unable_to_verify", description="pass | fail | unable_to_verify | waived")
+    severity: str = "mandatory"
+    reliability: str = "low"
+    citation: str = ""
+    action_required: str = ""
+    assignee_role: str = "BIM coordinator"
+
+
+class ReportElementTypeSheetContract(BaseModel):
+    """Every rule's result (pass/fail/unable-to-verify) for one IFC element type.
+
+    ``type_label`` is a friendly category name (e.g. "Doors") derived from
+    ``ifc_class`` (e.g. "IfcDoor") -- see ``ReportService._element_type_label``.
+    """
+
+    type_label: str
+    ifc_class: str = ""
+    rows: list[ReportElementResultRowContract] = Field(default_factory=list)
+    passed: int = 0
+    failed: int = 0
+    unable_to_verify: int = 0
+    waived: int = 0
+
+
 class ReportModel(BaseModel):
     """Deterministic, fully-computed data for one rendered compliance report.
 
@@ -1675,10 +1718,11 @@ class ReportModel(BaseModel):
     findings_register_truncated: bool = False
     unable_to_verify: list[ReportUnverifiedRowContract] = Field(default_factory=list)
     rule_register: list[ReportRuleRegisterRowContract] = Field(default_factory=list)
-    #: Every failed finding, unlimited and ruleset-tagged -- unlike
-    #: ``findings_register`` (top-N, for the PDF), this is what the Excel
-    #: export's Findings Register sheet is built from.
-    all_findings: list[ReportPriorityFindingContract] = Field(default_factory=list)
+    #: One entry per IFC element type (Doors, Windows, Stairs, ...), each
+    #: carrying every rule's full pass/fail/unable-to-verify result for that
+    #: type. This is what the Excel export's per-element-type sheets are built
+    #: from; the PDF does not use it.
+    element_type_sheets: list[ReportElementTypeSheetContract] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

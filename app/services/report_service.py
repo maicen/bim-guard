@@ -25,11 +25,14 @@ EVERYTHING IS DETERMINISTIC
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.modules.contracts import (
     ReportCoverContract,
+    ReportElementResultRowContract,
+    ReportElementTypeSheetContract,
     ReportExecutiveSummaryContract,
     ReportFindingRowContract,
     ReportModel,
@@ -72,6 +75,60 @@ _ACTION_TEMPLATES: dict[str, str] = {
 
 _DEFAULT_PRIORITY_LIMIT = 15
 _DEFAULT_FINDINGS_LIMIT = 50
+
+#: Per-element status (ComplianceComparator._entry) -> element-type sheet
+#: result label. NOT_APPLICABLE is deliberately absent: it means the rule's
+#: own scope excludes this element (e.g. a fire-door-only rule on a non-fire
+#: door), so it was never evaluated and showing it as a "result" would be
+#: noise, not a finding -- those rows are dropped, not mapped.
+_ELEMENT_RESULT_LABELS: dict[str, str] = {
+    "PASS": "pass",
+    "FAIL": "fail",
+    "MISSING": "unable_to_verify",
+    "WAIVED": "waived",
+}
+
+#: IFC class -> friendly sheet name, covering the classes BIM Guard's
+#: architecture engines actually target today (rule_reliability._SCHEMA_CLASSES
+#: plus the handful of others seen in rule target_ifc_class values). Anything
+#: else falls through to the CamelCase-splitting fallback in
+#: ``_element_type_label`` rather than being silently dropped.
+_ELEMENT_TYPE_LABELS: dict[str, str] = {
+    "IfcDoor": "Doors", "IfcDoorType": "Doors",
+    "IfcWindow": "Windows", "IfcWindowType": "Windows",
+    "IfcWall": "Walls", "IfcWallType": "Walls", "IfcWallStandardCase": "Walls",
+    "IfcCurtainWall": "Curtain Walls",
+    "IfcStair": "Stairs", "IfcStairFlight": "Stairs",
+    "IfcRamp": "Ramps", "IfcRampFlight": "Ramps",
+    "IfcRailing": "Railings",
+    "IfcRoof": "Roofs",
+    "IfcSlab": "Slabs & Floors",
+    "IfcColumn": "Columns",
+    "IfcBeam": "Beams",
+    "IfcCovering": "Coverings",
+    "IfcSpace": "Spaces & Rooms",
+    "IfcBuildingStorey": "Storeys",
+    "IfcOpeningElement": "Openings",
+    "IfcFurniture": "Furniture", "IfcFurnishingElement": "Furniture",
+    "IfcSanitaryTerminal": "Sanitary Fixtures",
+    "IfcBuildingElementProxy": "Other Building Elements",
+}  # fmt: skip
+
+_CAMEL_CASE_SPLIT_RE = re.compile(r"(?<!^)(?=[A-Z])")
+
+
+def _element_type_label(ifc_class: Any) -> str:
+    """Friendly sheet name for an IFC class, e.g. ``IfcDoor`` -> ``Doors``."""
+    cls = str(ifc_class or "").strip()
+    if not cls:
+        return "Other"
+    if cls in _ELEMENT_TYPE_LABELS:
+        return _ELEMENT_TYPE_LABELS[cls]
+    name = cls[3:] if cls.startswith("Ifc") else cls
+    words = _CAMEL_CASE_SPLIT_RE.sub(" ", name).strip()
+    if not words:
+        return "Other"
+    return words if words.endswith("s") else f"{words}s"
 
 
 def _num(value: Any) -> Optional[float]:
@@ -264,7 +321,7 @@ class ReportService:
         findings_register, findings_total = self._build_findings_register(rule_compliance, findings_limit)
         unable_to_verify = self._build_unable_to_verify(rule_compliance)
         rule_register = self._build_rule_register(rule_compliance)
-        all_findings = self._build_all_findings(rule_compliance)
+        element_type_sheets = self._build_element_type_sheets(rule_compliance)
 
         return ReportModel(
             cover=cover,
@@ -277,7 +334,7 @@ class ReportService:
             findings_register_truncated=findings_total > len(findings_register),
             unable_to_verify=unable_to_verify,
             rule_register=rule_register,
-            all_findings=all_findings,
+            element_type_sheets=element_type_sheets,
         )
 
     # -- Section builders --------------------------------------------------
@@ -439,7 +496,7 @@ class ReportService:
         return (is_mandatory, -int(rule.get("fail_count") or 0))
 
     def _finding_contract(self, rule: dict, failure: dict) -> ReportPriorityFindingContract:
-        """Build one finding row, shared by the PDF's priority cards and the Excel register."""
+        """Build one finding row for the PDF's priority-finding cards."""
         actual = failure.get("actual")
         assessment = assess_rule(rule)
         ruleset_id = str(rule.get("ruleset_id") or "")
@@ -470,11 +527,91 @@ class ReportService:
         pairs.sort(key=lambda pair: self._priority_rank(pair[0]))
         return [self._finding_contract(rule, failure) for rule, failure in pairs[:limit]]
 
-    def _build_all_findings(self, rule_compliance: list[dict]) -> list[ReportPriorityFindingContract]:
-        """Every failed finding, unlimited -- the Excel Findings Register's source."""
-        pairs = self._flatten_failures(rule_compliance)
-        pairs.sort(key=lambda pair: self._priority_rank(pair[0]))
-        return [self._finding_contract(rule, failure) for rule, failure in pairs]
+    def _build_element_type_sheets(self, rule_compliance: list[dict]) -> list[ReportElementTypeSheetContract]:
+        """Group every rule's full per-element result by IFC element type.
+
+        Unlike ``_flatten_failures`` (failures only), this walks each rule's
+        ``all_elements`` -- every element the rule actually evaluated, whatever
+        the outcome -- so a sheet shows the whole picture for its element type,
+        not just what went wrong. A rule that matched no elements at all still
+        gets one "unable to verify" row, so it isn't silently absent from the
+        type it targets.
+        """
+        groups: dict[str, list[dict]] = {}
+        for rule in rule_compliance:
+            groups.setdefault(_element_type_label(rule.get("target")), []).append(rule)
+
+        sheets: list[ReportElementTypeSheetContract] = []
+        for label in sorted(groups, key=lambda name: (name == "Other", name)):
+            rules = groups[label]
+            rows: list[ReportElementResultRowContract] = []
+            for rule in rules:
+                ruleset_id = str(rule.get("ruleset_id") or "")
+                ruleset_name = self._ruleset_name(ruleset_id)
+                assessment = assess_rule(rule)
+                reliability = assessment.level if assessment else "low"
+                all_elements = rule.get("all_elements") or []
+
+                if not all_elements:
+                    rows.append(
+                        ReportElementResultRowContract(
+                            element_name="—",
+                            rule_reference=_rule_reference(rule),
+                            rule_description=str(rule.get("rule_desc") or ""),
+                            ruleset_id=ruleset_id,
+                            ruleset_name=ruleset_name,
+                            ifc_property=_ifc_property(rule),
+                            required=_required_text(rule),
+                            difference="—",
+                            result="unable_to_verify",
+                            severity=str(rule.get("severity") or "mandatory"),
+                            reliability=reliability,
+                            citation=_citation_for(rule),
+                            assignee_role="BIM coordinator",
+                        )
+                    )
+                    continue
+
+                for el in all_elements:
+                    status = str(el.get("status") or "")
+                    if status == "NOT_APPLICABLE":
+                        continue
+                    result = _ELEMENT_RESULT_LABELS.get(status, "unable_to_verify")
+                    actual = el.get("actual")
+                    rows.append(
+                        ReportElementResultRowContract(
+                            element_name=str(el.get("element_name") or el.get("guid") or ""),
+                            element_guid=str(el.get("guid") or ""),
+                            storey=str(el.get("storey") or "—"),
+                            rule_reference=_rule_reference(rule),
+                            rule_description=str(rule.get("rule_desc") or ""),
+                            ruleset_id=ruleset_id,
+                            ruleset_name=ruleset_name,
+                            ifc_property=_ifc_property(rule),
+                            measured=_measured_text(rule, actual),
+                            required=_required_text(rule),
+                            difference=_difference_text(rule, actual) if result == "fail" else "—",
+                            result=result,
+                            severity=str(rule.get("severity") or "mandatory"),
+                            reliability=reliability,
+                            citation=_citation_for(rule),
+                            action_required=_action_required(rule, actual) if result == "fail" else "",
+                            assignee_role="BIM coordinator",
+                        )
+                    )
+
+            sheets.append(
+                ReportElementTypeSheetContract(
+                    type_label=label,
+                    ifc_class=str(rules[0].get("target") or ""),
+                    rows=rows,
+                    passed=sum(1 for r in rows if r.result == "pass"),
+                    failed=sum(1 for r in rows if r.result == "fail"),
+                    unable_to_verify=sum(1 for r in rows if r.result == "unable_to_verify"),
+                    waived=sum(1 for r in rows if r.result == "waived"),
+                )
+            )
+        return sheets
 
     def _build_findings_register(
         self, rule_compliance: list[dict], limit: int

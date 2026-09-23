@@ -2,30 +2,27 @@
 
 WHY THIS EXISTS ALONGSIDE THE PDF
 
-    The PDF's Findings Register is deliberately capped (see
-    ``ReportModel.findings_register_truncated``) -- a report meant to be read
-    has no room for hundreds of rows. This workbook is the uncapped, working
-    counterpart: every failed finding, one row each, filterable and sortable
-    in Excel, with blank Status/Assigned To/Resolved Date/Notes columns so it
-    can double as a live punch-list rather than a read-only snapshot.
+    The PDF's findings/rule sections are deliberately capped or flattened for
+    a document meant to be read. This workbook is the uncapped, working
+    counterpart, organized the way an engineer actually works: one sheet per
+    IFC element type (Doors, Windows, Stairs, Walls, ...), each listing every
+    rule's full result for that type -- pass, fail, or unable to verify, not
+    just what failed -- with blank Status/Assigned To/Resolved Date/Notes
+    columns so it can double as a live punch-list.
 
 SHEET LAYOUT
 
     Summary            -- cover/scope identity, executive KPIs, results by
-                           ruleset, top failed rules: the same numbers the
-                           PDF's first two pages show, laid out as tables.
-    Findings Register   -- every failed finding, ruleset-tagged, plus the
-                           tracking columns above. The main working sheet.
-    Rule Register       -- every rule executed, for finding -> rule -> clause
-                           traceability, same as the PDF's rule register.
-    Unable to Verify     -- rules that could not be evaluated against this
-                           model; kept separate so they are never read as
-                           failures.
+                           ruleset, top failed rules.
+    <Element type>      -- one sheet per ``ReportModel.element_type_sheets``
+                           entry (Doors, Windows, Stairs, Walls, Spaces, ...),
+                           every rule x element result for that type.
 """
 
 from __future__ import annotations
 
 import io
+import re
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -33,7 +30,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
-from app.modules.contracts import ReportModel
+from app.modules.contracts import ReportElementTypeSheetContract, ReportModel
 
 #: Literal light-mode hex values mirrored from frontend/src/app.css, same
 #: source ``report_charts.py`` draws from -- the workbook, the PDF and the
@@ -41,28 +38,25 @@ from app.modules.contracts import ReportModel
 _FG_PRIMARY = "0F172A"
 _HEADER_FILL = "0066CC"
 _HEADER_FONT = "FFFFFF"
-_SUBHEAD_FILL = "F1F5F9"
 
 _SEVERITY_FILL = {"mandatory": "FFE4E6", "recommended": "E0E7FF"}
 _SEVERITY_FONT = {"mandatory": "BE123C", "recommended": "4338CA"}
 _RELIABILITY_FILL = {"high": "D1FAE5", "medium": "FEF3C7", "low": "F1F5F9"}
 _RELIABILITY_FONT = {"high": "047857", "medium": "B45309", "low": "64748B"}
+_RESULT_FILL = {"pass": "D1FAE5", "fail": "FFE4E6", "unable_to_verify": "F1F5F9", "waived": "FEF3C7"}
+_RESULT_FONT = {"pass": "047857", "fail": "BE123C", "unable_to_verify": "64748B", "waived": "B45309"}
+_RESULT_LABEL = {"pass": "Pass", "fail": "Fail", "unable_to_verify": "Unable to Verify", "waived": "Waived"}
 
 _STATUS_OPTIONS = ("Open", "In Progress", "Resolved", "Won't Fix")
 
-_FINDINGS_HEADERS = (
-    "Element Name", "Element GUID", "Storey", "Ruleset", "Rule Reference",
-    "Rule Description", "Severity", "Measured", "Required", "Difference",
-    "Reliability", "IFC Property", "Citation", "Action Required", "Assignee Role",
+_ELEMENT_SHEET_HEADERS = (
+    "Element Name", "Element GUID", "Storey", "Rule Reference", "Rule Description",
+    "Ruleset", "IFC Property", "Measured", "Required", "Difference", "Result",
+    "Severity", "Reliability", "Citation", "Action Required", "Assignee Role",
     "Status", "Assigned To", "Resolved Date", "Notes",
 )  # fmt: skip
 
-_RULE_REGISTER_HEADERS = (
-    "Rule Reference", "Rule Description", "Ruleset", "Citation", "IFC Property",
-    "Reliability", "Evaluation Status", "Fail Count", "Total Count",
-)  # fmt: skip
-
-_UNVERIFIED_HEADERS = ("Rule Reference", "Rule Description", "Reason", "Affected Count")
+_INVALID_SHEET_NAME_CHARS = re.compile(r"[:\\/?*\[\]]")
 
 
 def _header_font() -> Font:
@@ -105,6 +99,20 @@ def _kv_block(ws: Worksheet, start_row: int, title: str, rows: list[tuple[str, o
         ws.cell(row=row, column=2, value=value if value not in (None, "") else "—").font = Font(size=10)
         row += 1
     return row + 1
+
+
+def _safe_sheet_name(name: str, used: set[str]) -> str:
+    r"""Excel sheet names: <=31 chars, no ``: \ / ? * [ ]``, unique within the workbook."""
+    cleaned = _INVALID_SHEET_NAME_CHARS.sub("-", name).strip() or "Sheet"
+    base = cleaned[:31]
+    candidate = base
+    suffix = 2
+    while candidate.casefold() in used:
+        trimmed = base[: 31 - len(f" ({suffix})")]
+        candidate = f"{trimmed} ({suffix})"
+        suffix += 1
+    used.add(candidate.casefold())
+    return candidate
 
 
 def _build_summary_sheet(wb: Workbook, model: ReportModel) -> None:
@@ -186,6 +194,24 @@ def _build_summary_sheet(wb: Workbook, model: ReportModel) -> None:
         row += 1
     row += 2
 
+    ws.cell(row=row, column=1, value="Element Types in This Workbook").font = Font(
+        bold=True, size=12, color=_FG_PRIMARY
+    )
+    row += 1
+    for col, text in enumerate(("Sheet", "Passed", "Failed", "Unable to Verify", "Waived"), start=1):
+        cell = ws.cell(row=row, column=col, value=text)
+        cell.font = _header_font()
+        cell.fill = _header_fill()
+    row += 1
+    for sheet in model.element_type_sheets:
+        ws.cell(row=row, column=1, value=sheet.type_label)
+        ws.cell(row=row, column=2, value=sheet.passed)
+        ws.cell(row=row, column=3, value=sheet.failed)
+        ws.cell(row=row, column=4, value=sheet.unable_to_verify)
+        ws.cell(row=row, column=5, value=sheet.waived)
+        row += 1
+    row += 2
+
     ws.cell(row=row, column=1, value="Top Failed Rules").font = Font(bold=True, size=12, color=_FG_PRIMARY)
     row += 1
     for col, text in enumerate(("Rule Reference", "Description", "Fail Count"), start=1):
@@ -200,18 +226,20 @@ def _build_summary_sheet(wb: Workbook, model: ReportModel) -> None:
         row += 1
 
 
-def _build_findings_sheet(wb: Workbook, model: ReportModel) -> None:
-    ws = wb.create_sheet("Findings Register")
-    _write_header_row(ws, 1, _FINDINGS_HEADERS)
+def _build_element_type_sheet(
+    wb: Workbook, sheet_model: ReportElementTypeSheetContract, used_names: set[str]
+) -> None:
+    ws = wb.create_sheet(_safe_sheet_name(sheet_model.type_label, used_names))
+    _write_header_row(ws, 1, _ELEMENT_SHEET_HEADERS)
     _autosize(
         ws,
         {
-            1: 20, 2: 16, 3: 14, 4: 18, 5: 20, 6: 30, 7: 12, 8: 14, 9: 16, 10: 12,
-            11: 12, 12: 26, 13: 40, 14: 40, 15: 16, 16: 14, 17: 16, 18: 16, 19: 30,
+            1: 20, 2: 16, 3: 14, 4: 20, 5: 30, 6: 18, 7: 26, 8: 14, 9: 16, 10: 12,
+            11: 16, 12: 12, 13: 12, 14: 40, 15: 40, 16: 16, 17: 16, 18: 16, 19: 16, 20: 30,
         },
     )
 
-    status_col = _FINDINGS_HEADERS.index("Status") + 1
+    status_col = _ELEMENT_SHEET_HEADERS.index("Status") + 1
     dv = DataValidation(
         type="list",
         formula1=f'"{",".join(_STATUS_OPTIONS)}"',
@@ -221,84 +249,47 @@ def _build_findings_sheet(wb: Workbook, model: ReportModel) -> None:
     ws.add_data_validation(dv)
 
     row = 2
-    for f in model.all_findings:
-        ws.cell(row=row, column=1, value=f.element_name)
-        ws.cell(row=row, column=2, value=f.element_guid)
-        ws.cell(row=row, column=3, value=f.storey)
-        ws.cell(row=row, column=4, value=f.ruleset_name)
-        ws.cell(row=row, column=5, value=f.rule_reference)
-        ws.cell(row=row, column=6, value=f.rule_description)
-        sev_cell = ws.cell(row=row, column=7, value=f.severity)
-        _fill_badge(sev_cell, f.severity, _SEVERITY_FILL, _SEVERITY_FONT)
-        ws.cell(row=row, column=8, value=f.measured)
-        ws.cell(row=row, column=9, value=f.required)
-        ws.cell(row=row, column=10, value=f.difference)
-        rel_cell = ws.cell(row=row, column=11, value=f.reliability)
-        _fill_badge(rel_cell, f.reliability, _RELIABILITY_FILL, _RELIABILITY_FONT)
-        ws.cell(row=row, column=12, value=f.ifc_property)
-        ws.cell(row=row, column=13, value=f.citation)
-        ws.cell(row=row, column=14, value=f.action_required)
-        ws.cell(row=row, column=15, value=f.assignee_role)
-        status_cell = ws.cell(row=row, column=status_col, value="Open")
+    for r in sheet_model.rows:
+        ws.cell(row=row, column=1, value=r.element_name)
+        ws.cell(row=row, column=2, value=r.element_guid)
+        ws.cell(row=row, column=3, value=r.storey)
+        ws.cell(row=row, column=4, value=r.rule_reference)
+        ws.cell(row=row, column=5, value=r.rule_description)
+        ws.cell(row=row, column=6, value=r.ruleset_name)
+        ws.cell(row=row, column=7, value=r.ifc_property)
+        ws.cell(row=row, column=8, value=r.measured)
+        ws.cell(row=row, column=9, value=r.required)
+        ws.cell(row=row, column=10, value=r.difference)
+        result_cell = ws.cell(row=row, column=11, value=_RESULT_LABEL.get(r.result, r.result))
+        _fill_badge(result_cell, r.result, _RESULT_FILL, _RESULT_FONT)
+        sev_cell = ws.cell(row=row, column=12, value=r.severity)
+        _fill_badge(sev_cell, r.severity, _SEVERITY_FILL, _SEVERITY_FONT)
+        rel_cell = ws.cell(row=row, column=13, value=r.reliability)
+        _fill_badge(rel_cell, r.reliability, _RELIABILITY_FILL, _RELIABILITY_FONT)
+        ws.cell(row=row, column=14, value=r.citation)
+        ws.cell(row=row, column=15, value=r.action_required)
+        ws.cell(row=row, column=16, value=r.assignee_role)
+        status_cell = ws.cell(row=row, column=status_col, value="Open" if r.result == "fail" else "")
         dv.add(status_cell)
         # Assigned To / Resolved Date / Notes are left blank for the user.
         row += 1
 
-    if not model.all_findings:
-        ws.cell(row=2, column=1, value="No failed findings in this analysis run.")
-
-
-def _build_rule_register_sheet(wb: Workbook, model: ReportModel) -> None:
-    ws = wb.create_sheet("Rule Register")
-    _write_header_row(ws, 1, _RULE_REGISTER_HEADERS)
-    _autosize(ws, {1: 20, 2: 30, 3: 18, 4: 40, 5: 26, 6: 12, 7: 16, 8: 12, 9: 12})
-
-    row = 2
-    for r in model.rule_register:
-        ws.cell(row=row, column=1, value=r.rule_reference)
-        ws.cell(row=row, column=2, value=r.rule_description)
-        ws.cell(row=row, column=3, value=r.ruleset_name)
-        ws.cell(row=row, column=4, value=r.citation)
-        ws.cell(row=row, column=5, value=r.ifc_property)
-        rel_cell = ws.cell(row=row, column=6, value=r.reliability)
-        _fill_badge(rel_cell, r.reliability, _RELIABILITY_FILL, _RELIABILITY_FONT)
-        ws.cell(row=row, column=7, value=r.status)
-        ws.cell(row=row, column=8, value=r.fail_count)
-        ws.cell(row=row, column=9, value=r.total_count)
-        row += 1
-
-    if not model.rule_register:
-        ws.cell(row=2, column=1, value="No rules were executed in this run.")
-
-
-def _build_unverified_sheet(wb: Workbook, model: ReportModel) -> None:
-    ws = wb.create_sheet("Unable to Verify")
-    _write_header_row(ws, 1, _UNVERIFIED_HEADERS)
-    _autosize(ws, {1: 20, 2: 30, 3: 46, 4: 12})
-
-    row = 2
-    for u in model.unable_to_verify:
-        ws.cell(row=row, column=1, value=u.rule_reference)
-        ws.cell(row=row, column=2, value=u.rule_description)
-        ws.cell(row=row, column=3, value=u.reason)
-        ws.cell(row=row, column=4, value=u.affected_count)
-        row += 1
-
-    if not model.unable_to_verify:
-        ws.cell(row=2, column=1, value="Every rule could be verified against this model.")
+    if not sheet_model.rows:
+        ws.cell(row=2, column=1, value="No rules were evaluated against this element type.")
 
 
 def render_report_excel(model: ReportModel) -> bytes:
-    """Render ``model`` to an .xlsx workbook: Summary, Findings Register, Rule Register, Unable to Verify."""
+    """Render ``model`` to an .xlsx workbook: Summary, then one sheet per IFC element type."""
     wb = Workbook()
-    # The default sheet Workbook() creates is replaced by the four built below,
-    # in display order, so "Summary" opens first rather than a blank "Sheet".
+    # The default sheet Workbook() creates is replaced by the sheets built
+    # below, in display order, so "Summary" opens first rather than a blank
+    # "Sheet".
     wb.remove(wb.active)
 
     _build_summary_sheet(wb, model)
-    _build_findings_sheet(wb, model)
-    _build_rule_register_sheet(wb, model)
-    _build_unverified_sheet(wb, model)
+    used_names = {"summary"}
+    for sheet_model in model.element_type_sheets:
+        _build_element_type_sheet(wb, sheet_model, used_names)
 
     out = io.BytesIO()
     wb.save(out)
