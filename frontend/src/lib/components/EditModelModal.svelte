@@ -4,6 +4,7 @@
   import Modal from "./Modal.svelte";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
+  import { MAX_IFC_UPLOAD_BYTES, describeOversizedFiles } from "../fileLimits";
 
   interface Props {
     isOpen: boolean;
@@ -50,7 +51,14 @@
 
   function handleReplacementInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    replacement = input.files?.[0] ?? null;
+    const picked = input.files?.[0] ?? null;
+    if (picked && picked.size > MAX_IFC_UPLOAD_BYTES) {
+      errorMessage = describeOversizedFiles([picked]);
+      replacement = null;
+    } else {
+      replacement = picked;
+      errorMessage = "";
+    }
     input.value = "";
   }
 

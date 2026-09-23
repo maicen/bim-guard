@@ -44,6 +44,12 @@
   import ProjectDetailsStep from "./ProjectDetailsStep.svelte";
   import TableCheckbox from "./TableCheckbox.svelte";
   import { RadioGroupRoot, RadioGroupItem } from "./ui";
+  import {
+    MAX_IFC_UPLOAD_BYTES,
+    formatFileSize,
+    partitionByUploadSize,
+    describeOversizedFiles,
+  } from "../fileLimits";
 
   interface Props {
     isOpen?: boolean;
@@ -261,14 +267,6 @@
     }
   }
 
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  }
-
   onMount(async () => {
     try {
       documents = await documentsApi.list({
@@ -302,8 +300,9 @@
     const candidates = Array.from(incoming ?? []);
     if (!candidates.length) return;
 
-    const accepted = candidates.filter((file) => /\.ifc$/i.test(file.name));
-    const rejectedCount = candidates.length - accepted.length;
+    const ifcCandidates = candidates.filter((file) => /\.ifc$/i.test(file.name));
+    const rejectedCount = candidates.length - ifcCandidates.length;
+    const { accepted, oversized } = partitionByUploadSize(ifcCandidates);
 
     const mergedFiles = [...ifcFiles];
     const mergedRoles = [...ifcRoles];
@@ -334,6 +333,9 @@
     }
     if (duplicateCount) {
       notices.push(`${duplicateCount} file${duplicateCount === 1 ? "" : "s"} already in the list.`);
+    }
+    if (oversized.length) {
+      notices.push(describeOversizedFiles(oversized));
     }
     ifcNotice = notices.join(" ");
   }
@@ -830,7 +832,7 @@
                                 </span>
                               </td>
                               <td class="whitespace-nowrap px-3 py-2 text-fg-muted">
-                                {formatBytes(item.size)}
+                                {formatFileSize(item.size)}
                               </td>
                               <td class="px-3 py-2 text-center">
                                 {#if isSelected}
@@ -886,7 +888,8 @@
                 <h3 class="mb-1 text-sm font-semibold text-fg-primary">Upload OpenBIM IFC Models</h3>
                 <p class="mx-auto mb-4 max-w-sm text-xs text-fg-muted">
                   Drag and drop IFC 2x3 or IFC4 models here, or browse. Attach one model per
-                  discipline — the primary is the one the compliance run analyses.
+                  discipline — the primary is the one the compliance run analyses. Each file must
+                  be under {formatFileSize(MAX_IFC_UPLOAD_BYTES)}.
                 </p>
                 <label
                   class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-interactive bg-surface-overlay px-4 py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"

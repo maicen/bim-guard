@@ -5,6 +5,7 @@
   import { RadioGroupRoot, RadioGroupItem, Select, type SelectOption } from "./ui";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
+  import { partitionByUploadSize, describeOversizedFiles } from "../fileLimits";
 
   interface Props {
     isOpen: boolean;
@@ -31,9 +32,10 @@
 
   function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    const newFiles = Array.from(input.files || []);
-    selectedFiles = [...selectedFiles, ...newFiles];
-    roles = [...roles, ...newFiles.map(() => "context")];
+    const { accepted, oversized } = partitionByUploadSize(Array.from(input.files || []));
+    selectedFiles = [...selectedFiles, ...accepted];
+    roles = [...roles, ...accepted.map(() => "context")];
+    errorMessage = oversized.length ? describeOversizedFiles(oversized) : "";
     input.value = "";
   }
 

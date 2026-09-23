@@ -51,10 +51,12 @@ EXTENSIONS_BY_KIND: dict[str, tuple[str, ...]] = {
     "standard": (".pdf", ".docx"),
 }
 
-#: Upload ceiling. Storage will accept more, but a model this large will not
-#: parse inside a request, so refusing early gives a better message than a
-#: timeout would.
-MAX_UPLOAD_BYTES: int = 512 * 1024 * 1024
+#: Upload ceiling. Matches the Supabase Storage bucket's own file_size_limit
+#: (see supabase/config.toml) — that backend, not this constant, is the real
+#: enforcement point, so refusing early here gives a clean message instead of
+#: letting a bigger file reach ``ObjectStorage.save_upload`` and fail there
+#: with a raw connection-drop error.
+MAX_UPLOAD_BYTES: int = 50 * 1024 * 1024
 
 
 @dataclass(frozen=True)
