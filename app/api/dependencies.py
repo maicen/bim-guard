@@ -14,6 +14,7 @@ from app.services.bsdd_ontology_repository import (
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
+from app.services.evaluation_service import EvaluationService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
@@ -91,6 +92,11 @@ def get_settings_service() -> SettingsService:
 def get_arch_analysis_service() -> ArchAnalysisService:
     """Return the configured ArchAnalysisService instance."""
     return get_container().arch_analysis_service
+
+
+def get_evaluation_service() -> EvaluationService:
+    """Return the configured EvaluationService instance."""
+    return get_container().evaluation_service
 
 
 def get_report_service() -> ReportService:

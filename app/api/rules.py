@@ -37,6 +37,7 @@ from app.modules.contracts import (
     RuleCreateRequest,
     RuleDraftReviewRequest,
     RuleExtractionDraft,
+    RuleExtractionDraftListResponse,
     RuleExtractionResponse,
     RuleFolderBulkActionResponse,
     RuleFolderBulkDeleteRequest,
@@ -1007,6 +1008,30 @@ def get_rule_draft_source(draft_id: int) -> RuleSourceResponse:
         snippet=snippet,
         bbox=bbox,
     )
+
+
+@router.get(
+    "/drafts",
+    response_model=RuleExtractionDraftListResponse,
+    summary="List rule extraction drafts across every document",
+)
+def list_all_rule_drafts(
+    status_filter: Annotated[Optional[str], Query(alias="status")] = None,
+    ruleset_id: Annotated[Optional[str], Query()] = None,
+) -> RuleExtractionDraftListResponse:
+    """Return extraction drafts system-wide, newest first.
+
+    Unlike `GET /documents/{id}/rules/drafts`, this isn't scoped to one
+    document -- it's the read path for consumers (e.g. the bim-guard-
+    evaluation companion repo) that need extraction-approval outcomes across
+    the whole system to score extraction accuracy. Same no-tenant-filter
+    rationale as the rest of this router: drafts are candidates for the
+    shared global rules catalog, not a per-organization resource.
+    """
+    from app.services.rule_draft_service import RuleDraftService
+
+    rows = RuleDraftService().list_all_drafts(status=status_filter, ruleset_id=ruleset_id)
+    return RuleExtractionDraftListResponse(drafts=[RuleExtractionDraft.model_validate(row) for row in rows])
 
 
 @router.post(

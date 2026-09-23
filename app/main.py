@@ -45,6 +45,9 @@ from app.api import (
     documents as api_documents,
 )
 from app.api import (
+    evaluation as api_evaluation,
+)
+from app.api import (
     events as api_events,
 )
 from app.api import (
@@ -416,6 +419,7 @@ app.include_router(
 app.include_router(api_repositories.router, prefix="/api/repositories", tags=["Repositories"])
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
+app.include_router(api_evaluation.router, prefix="/api/evaluation", tags=["Evaluation"])
 app.include_router(api_documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(api_documents.flexible_router, prefix="/api/documents", tags=["Documents"])
 app.include_router(api_cde.router, prefix="/api/cde", tags=["OpenCDE"])

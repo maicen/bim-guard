@@ -25,6 +25,7 @@
   import DocumentsView from "./routes/DocumentsView.svelte";
   import DocumentView from "./routes/DocumentView.svelte";
   import RuleExtractionView from "./routes/RuleExtractionView.svelte";
+  import EvaluationView from "./routes/EvaluationView.svelte";
   import RulesView from "./routes/RulesView.svelte";
   import ManualRuleEditorView from "./routes/ManualRuleEditorView.svelte";
   import ArchAnalyzeView from "./routes/ArchAnalyzeView.svelte";
@@ -385,7 +386,7 @@
   // different project from the Dashboard's registry while on one of these
   // re-runs that same view against the new project; from anywhere else it
   // just updates the context so the next project-scoped view you open has it.
-  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "viewer", "workflow", "models"]);
+  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "evaluation", "viewer", "workflow", "models"]);
 
   // Whether the app shell is in "project view" (project-scoped sidebar,
   // navbar, and dashboard) vs. "organization view". Driven by project_id
@@ -630,6 +631,8 @@
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
+        {:else if activeView === "evaluation"}
+          <EvaluationView initialProjectId={targetProjectId} />
         {:else if activeView === "user-manual"}
           <UserManualView onNavigate={handleSelectView} />
         {:else if activeView === "modeling-manual"}

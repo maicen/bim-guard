@@ -108,6 +108,26 @@ class RuleDraftService:
         ]
         return sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
 
+    def list_all_drafts(
+        self, status: str | None = None, ruleset_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return drafts across every source document, newest first.
+
+        Used by extraction-accuracy consumers (e.g. the bim-guard-evaluation
+        companion repo) that need approve/reject/edit outcomes system-wide,
+        not one document at a time like :meth:`list_drafts`.
+        """
+        rows = list(self._drafts.rows)
+        if status:
+            rows = [row for row in rows if row.get("status") == status]
+        if ruleset_id:
+            rows = [
+                row
+                for row in rows
+                if (row.get("proposed_rule") or {}).get("ruleset_id") == ruleset_id
+            ]
+        return sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+
     def get_draft(self, draft_id: int) -> dict[str, Any] | None:
         """Return one draft row by primary key."""
         return self._drafts.get(draft_id)

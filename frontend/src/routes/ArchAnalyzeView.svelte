@@ -23,8 +23,9 @@
     CheckCircle2,
     Save,
     AlertTriangle,
+    ClipboardCheck,
   } from "lucide-svelte";
-  import { projectsApi, analyzeApi, lineageApi, rulesApi } from "../lib/api";
+  import { projectsApi, analyzeApi, lineageApi, rulesApi, evaluationApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
@@ -94,6 +95,9 @@
   // quick-download button re-downloads the thing that was just saved rather
   // than always assuming BCF.
   let lastSavedArtifact: { type: "bcf" | "pdf" | "csv" | "xlsx"; id: number } | null = $state(null);
+
+  let isCapturingEvaluation = $state(false);
+  let evaluationCaptureMessage = $state("");
 
   let prevArchKey = $state("");
 
@@ -196,6 +200,28 @@
   // a 401 JSON body instead of the report -- see authToken.ts's withAuthToken.
   function downloadBcfArtifact(artifactId: number) {
     window.location.href = analyzeApi.getBcfArtifactUrl(artifactId);
+  }
+
+  /**
+   * Snapshot this run's PASS/FAIL verdicts into the evaluation set for human
+   * review. Recomputes server-side (see EvaluationService.capture_results),
+   * so this is safe to click any time a run has completed for this ruleset.
+   */
+  async function captureForEvaluation() {
+    if (!selectedProjectId) return;
+    isCapturingEvaluation = true;
+    evaluationCaptureMessage = "";
+    try {
+      const { captured_count } = await evaluationApi.capture({
+        project_id: selectedProjectId,
+        rule_folder: selectedFolder,
+      });
+      evaluationCaptureMessage = `Captured ${captured_count} result(s) for evaluation.`;
+    } catch (err: any) {
+      evaluationCaptureMessage = err.message || "Failed to capture results for evaluation.";
+    } finally {
+      isCapturingEvaluation = false;
+    }
   }
 
   /**
@@ -626,6 +652,16 @@
         <Download class="h-3.5 w-3.5" />
         {isSavingCsv ? "Saving…" : "CSV"}
       </button>
+      <button
+        type="button"
+        disabled={isCapturingEvaluation}
+        onclick={captureForEvaluation}
+        class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-3 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+        title="Snapshot this run's PASS/FAIL verdicts for human review in the Evaluation tab"
+      >
+        <ClipboardCheck class="h-3.5 w-3.5" />
+        {isCapturingEvaluation ? "Capturing…" : "Capture for Evaluation"}
+      </button>
     {/if}
 
     <button
@@ -673,6 +709,15 @@
           Download {lastSavedArtifact.type.toUpperCase()}
         </button>
       {/if}
+    </div>
+  {/if}
+
+  {#if evaluationCaptureMessage}
+    <div
+      class="flex items-center gap-2 rounded-xl border border-info-border bg-info-bg p-3.5 text-xs text-info"
+    >
+      <ClipboardCheck class="h-4 w-4 shrink-0" />
+      <span>{evaluationCaptureMessage}</span>
     </div>
   {/if}
 

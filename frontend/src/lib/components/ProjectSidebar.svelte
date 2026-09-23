@@ -10,6 +10,7 @@
     ChevronLeft,
     ChevronRight,
     ArrowLeft,
+    ClipboardCheck,
   } from "lucide-svelte";
   import { link, push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -73,6 +74,7 @@
       items: [
         { id: "arch", label: "Run Compliance Audit", icon: PlayCircle, highlight: true },
         { id: "reports", label: "Reports & Exports", icon: FileText },
+        { id: "evaluation", label: "Evaluation", icon: ClipboardCheck },
       ],
     },
     {

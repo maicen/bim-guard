@@ -28,6 +28,7 @@ from app.services.db_adapters import DatabaseAdapter
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
+from app.services.evaluation_service import EvaluationService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
@@ -109,6 +110,7 @@ class ApplicationContainer:
     audit_log_repo: DatabaseAdapter
     llm_call_log_repo: DatabaseAdapter
     scim_tokens_repo: DatabaseAdapter
+    evaluation_findings_repo: DatabaseAdapter
     lineage: SupabaseModelLineageRepository
     static_data_service: StaticDataService
     projects_service: ProjectsService
@@ -134,6 +136,7 @@ class ApplicationContainer:
     analysis_service: AnalysisService
     ifc_pipeline_service: IFCPipelineService
     arch_analysis_service: ArchAnalysisService
+    evaluation_service: EvaluationService
     report_service: ReportService
     digital_inspector_service: DigitalInspectorService
     graph_service: Any  # typed properly in the import if desired, but Any works for now without circular imports
@@ -318,6 +321,30 @@ def build_default_container() -> ApplicationContainer:
     naming_config_repo = PersistenceService.get_table(
         "project_naming_config",
         _NAMING_CONFIG_SCHEMA,
+    )
+
+    evaluation_findings_repo = PersistenceService.get_table(
+        "evaluation_findings",
+        {
+            "id": int,
+            "project_id": int,
+            "ifc_file_id": int,
+            "rule_id": int,
+            "rule_snapshot": dict,
+            "element_global_id": str,
+            "element_name": str,
+            "storey": str,
+            "space": str,
+            "bimguard_verdict": str,
+            "bimguard_reason": str,
+            "captured_by_email": str,
+            "captured_at": str,
+            "human_verdict": str,
+            "reviewer_email": str,
+            "reviewed_at": str,
+            "review_notes": str,
+            "created_at": str,
+        },
     )
 
     organizations_repo = PersistenceService.get_table(
@@ -735,6 +762,11 @@ def build_default_container() -> ApplicationContainer:
         ruleset_access_service=ruleset_access_service,
     )
 
+    evaluation_service = EvaluationService(
+        findings_repo=evaluation_findings_repo,
+        arch_analysis_service=arch_analysis_service,
+    )
+
     report_service = ReportService(
         projects_service=projects_service,
         models_service=models_service,
@@ -854,6 +886,7 @@ def build_default_container() -> ApplicationContainer:
         audit_log_repo=audit_log_repo,
         llm_call_log_repo=llm_call_log_repo,
         scim_tokens_repo=scim_tokens_repo,
+        evaluation_findings_repo=evaluation_findings_repo,
         lineage=lineage,
         static_data_service=static_data_service,
         projects_service=projects_service,
@@ -879,6 +912,7 @@ def build_default_container() -> ApplicationContainer:
         analysis_service=analysis_service,
         ifc_pipeline_service=ifc_pipeline_service,
         arch_analysis_service=arch_analysis_service,
+        evaluation_service=evaluation_service,
         report_service=report_service,
         digital_inspector_service=digital_inspector_service,
         graph_service=graph_service,
