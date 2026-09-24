@@ -9,6 +9,7 @@
   import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
   import TopHeader from "./lib/components/TopHeader.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
+  import OfflineBanner from "./lib/components/OfflineBanner.svelte";
   import Modal from "./lib/components/Modal.svelte";
   import PipelineProgress from "./lib/components/PipelineProgress.svelte";
   import { Activity } from "lucide-svelte";
@@ -727,6 +728,7 @@
 {/if}
 
 <Toaster />
+<OfflineBanner />
 
 <!-- Live pipeline detail, opened from the header's running-pipeline badge -->
 <Modal

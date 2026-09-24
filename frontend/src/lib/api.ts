@@ -150,6 +150,44 @@ export interface ApiError extends Error {
   url?: string;
   /** When this failure was observed client-side, for copyable diagnostic logs. */
   timestamp?: string;
+  /**
+   * True when `fetch` itself failed to get a response at all (DNS failure,
+   * connection refused, request aborted) rather than the server responding
+   * with a non-OK status. `status` is unset in this case -- there was no
+   * response to read one from.
+   */
+  isNetworkError?: boolean;
+}
+
+/**
+ * `fetch` rejects with a bare `TypeError` (message varies by browser: "Failed
+ * to fetch", "NetworkError when attempting to fetch resource.", "Load
+ * failed") when no HTTP response arrives at all -- offline, DNS failure, a
+ * dropped connection, CORS rejection. That shape is indistinguishable from a
+ * caller's own bug by `err.message` alone, and carries none of `ApiError`'s
+ * fields (`status`, `url`), so a catch site expecting one (`err?.status ===
+ * 403`, an errorLog entry) silently gets nothing useful. This normalizes it
+ * into the same `ApiError` shape `handleResponse` produces for a non-OK HTTP
+ * response, so every catch site downstream of `apiFetch` sees one consistent
+ * error type regardless of which layer failed.
+ */
+function toNetworkError(err: unknown, url: string): ApiError {
+  if (err instanceof DOMException && err.name === "AbortError") {
+    const failure = new Error("Request was cancelled.") as ApiError;
+    failure.url = url;
+    failure.timestamp = new Date().toISOString();
+    return failure;
+  }
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const failure = new Error(
+    offline
+      ? "You appear to be offline. Check your connection and try again."
+      : "Couldn't reach the BIM-Guard server. Check your connection and try again.",
+  ) as ApiError;
+  failure.url = url;
+  failure.timestamp = new Date().toISOString();
+  failure.isNetworkError = true;
+  return failure;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -211,7 +249,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
 async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   await authReady;
   const headers = { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) };
-  let res = await fetch(input, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(input, { ...init, headers });
+  } catch (err) {
+    throw toNetworkError(err, input);
+  }
 
   // If 401 Unauthorized and a token was attached, the token may have expired.
   // Attempt to refresh the session token once and retry with the new token.
@@ -223,7 +266,11 @@ async function apiFetch(input: string, init: RequestInit = {}): Promise<Response
         ...(init.headers as Record<string, string> | undefined),
         Authorization: `Bearer ${newToken}`,
       };
-      res = await fetch(input, { ...init, headers: retryHeaders });
+      try {
+        res = await fetch(input, { ...init, headers: retryHeaders });
+      } catch (err) {
+        throw toNetworkError(err, input);
+      }
     }
   }
 
