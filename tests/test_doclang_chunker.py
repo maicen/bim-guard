@@ -164,6 +164,25 @@ def test_doclang_chunker_with_bboxes():
     assert chunks[0]["page_number"] == 1
 
 
+def test_doclang_chunker_captures_element_id():
+    """A chunk's element_id matches the element_bboxes entry its bbox came from.
+
+    Both are pulled from the same positional index -- the same list
+    doclang_element_ids.assign_element_ids zips against to build
+    documents.element_bboxes, so this is the exact id a rule/draft
+    extracted from this chunk should be linked to (see source_element_id).
+    """
+    chunker = DocLangChunker()
+    bboxes = [
+        {"element_id": "elem-1", "bbox": {"x": 10.0, "y": 20.0, "width": 100.0, "height": 30.0}, "page_number": 1},
+        {"element_id": "elem-2", "bbox": {"x": 10.0, "y": 60.0, "width": 200.0, "height": 40.0}, "page_number": 1},
+        {"element_id": "elem-3", "bbox": {"x": 10.0, "y": 110.0, "width": 150.0, "height": 25.0}, "page_number": 2},
+    ]
+    chunks = chunker.chunk(SAMPLE_DOCLANG_XML, element_bboxes=bboxes)
+    assert len(chunks) > 0
+    assert chunks[0]["element_id"] == "elem-1"
+
+
 def test_llamaindex_nodes_from_doclang():
     ingestor = LlamaIndexIngestor()
     bboxes = [
@@ -180,6 +199,25 @@ def test_llamaindex_nodes_from_doclang():
     assert all(n.metadata.source_document_id == 99 for n in nodes)
     assert any(n.metadata.clause_id == "9.8.1" for n in nodes)
     assert any(n.metadata.node_type == "table" for n in nodes)
+
+
+def test_llamaindex_nodes_from_doclang_carries_element_id():
+    """A node's ClauseMetadata.element_id is threaded from the chunk's element_id.
+
+    Matches documents.element_bboxes[].element_id for the element the
+    node's bbox/page_number were pulled from.
+    """
+    ingestor = LlamaIndexIngestor()
+    bboxes = [
+        {"element_id": "elem-7", "bbox": {"x": 50.0, "y": 100.0, "width": 200.0, "height": 25.0}, "page_number": 3}
+    ]
+    nodes = ingestor.nodes_from_doclang(
+        SAMPLE_DOCLANG_XML,
+        source_document_id=99,
+        element_bboxes=bboxes,
+    )
+
+    assert nodes[0].metadata.element_id == "elem-7"
 
 
 def test_export_doclang_archive_endpoint(monkeypatch):

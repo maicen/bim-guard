@@ -440,6 +440,33 @@ export interface DocumentElementBboxesResponse {
   elements: DocumentElementBbox[];
 }
 
+/** Lightweight rule shape for the rule-source map view. */
+export interface RuleSourceSummary {
+  id: number;
+  rule_id?: string | null;
+  description?: string | null;
+  severity?: string | null;
+  category?: string | null;
+  source_page_number?: number | null;
+  source_bbox?: BoundingBox | null;
+}
+
+/** One document element annotated with the rule(s) extracted from it. */
+export interface DocumentElementWithRules extends DocumentElementBbox {
+  rules: RuleSourceSummary[];
+}
+
+/**
+ * Every rule extracted from a document, mapped against its exact source element.
+ * `unmapped_rules` holds rules with no `source_element_id` (extracted before that
+ * linkage existed) -- only an approximate page/bbox location, not an exact match.
+ */
+export interface RuleSourceMapResponse {
+  document_id: number;
+  elements: DocumentElementWithRules[];
+  unmapped_rules: RuleSourceSummary[];
+}
+
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;
@@ -508,6 +535,8 @@ export interface Rule extends Timestamps {
   source_text?: string;
   source_document_id?: number | null;
   source_node_id?: string | null;
+  /** Matches DocumentElementBbox.element_id -- the exact structural element this rule was extracted from, when known. */
+  source_element_id?: string | null;
   source_page_number?: number | null;
   source_bbox?: BoundingBox | null;
   mechanism?: string;
@@ -887,6 +916,7 @@ export interface ClauseMetadata {
   node_type?: "paragraph" | "table" | "list" | "heading";
   source_document_id: number;
   bbox?: BoundingBox | null;
+  element_id?: string | null;
 }
 
 export type RuleDraftStatus = "pending_review" | "accepted" | "rejected" | "edited";
@@ -931,6 +961,8 @@ export interface RuleExtractionDraft {
   id?: number | null;
   source_document_id: number;
   source_node_id?: string | null;
+  /** Matches DocumentElementBbox.element_id -- the exact structural element this draft was extracted from, when known. */
+  source_element_id?: string | null;
   source_snippet?: string | null;
   clause?: ClauseMetadata | null;
   bbox?: BoundingBox | null;

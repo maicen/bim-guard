@@ -92,6 +92,7 @@ class LlamaIndexIngestor:
             node_type = chunk.get("node_type") or "paragraph"
             bbox = chunk.get("bbox")
             page_number = chunk.get("page_number")
+            element_id = chunk.get("element_id")
 
             metadata = ClauseMetadata(
                 clause_id=section_number if section_number and _CLAUSE_ID_PATTERN.match(str(section_number)) else None,
@@ -101,6 +102,7 @@ class LlamaIndexIngestor:
                 node_type=node_type,
                 source_document_id=source_document_id,
                 bbox=bbox,
+                element_id=element_id,
             )
             nodes.append(
                 DocumentNodeContract(

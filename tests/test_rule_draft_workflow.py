@@ -49,10 +49,11 @@ class FakeRuleService:
         return rule
 
 
-def _draft(document_id: int = 1) -> RuleExtractionDraft:
+def _draft(document_id: int = 1, source_element_id: str | None = "elem-3") -> RuleExtractionDraft:
     return RuleExtractionDraft(
         source_document_id=document_id,
         source_node_id="node-1",
+        source_element_id=source_element_id,
         clause=ClauseMetadata(
             clause_id="9.8.2.1", node_type="paragraph", source_document_id=document_id
         ),
@@ -206,6 +207,21 @@ def test_promote_draft_calls_rule_service_create_rule_and_records_promoted_id():
     assert rule_service.created[0]["rule_id"] == "9.8.2.1"
     assert created["id"] == rule_service.created[0]["id"]
     assert table.rows[0]["promoted_rule_id"] == created["id"]
+
+
+def test_promote_draft_passes_through_source_element_id():
+    """A draft's exact source_element_id survives promotion into public.rules.
+
+    Matches DocumentElementBbox.element_id, for the rule-source map view.
+    """
+    service, _table, rule_service = _service()
+    saved = service.save_drafts([_draft(source_element_id="elem-3")])
+    draft_id = saved[0].id
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    service.promote_draft(draft_id)
+
+    assert rule_service.created[0]["source_element_id"] == "elem-3"
 
 
 def test_promote_draft_refuses_to_write_an_empty_target_ifc_class():

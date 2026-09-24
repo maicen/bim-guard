@@ -2,6 +2,7 @@
   import { run, stopPropagation } from "svelte/legacy";
 
   import { onMount, onDestroy, untrack } from "svelte";
+  import { push } from "svelte-spa-router";
   import {
     ListChecks,
     Search,
@@ -113,6 +114,15 @@
     } catch (err: any) {
       sourceViewError = err?.message || "Could not resolve this rule's source document.";
     }
+  }
+
+  function openRuleSourceMap(documentId: number) {
+    const params = new URLSearchParams();
+    params.set("doc_id", String(documentId));
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    push(`/rule-source?${params.toString()}`);
   }
 
   // Snapshots tab state
@@ -1332,14 +1342,24 @@
                                 </div>
                               {/if}
                               {#if rule.source_document_id}
-                                <button
-                                  type="button"
-                                  onclick={() => viewRuleSource(rule.id)}
-                                  class="inline-flex items-center gap-1 font-semibold text-accent hover:underline"
-                                >
-                                  <BookOpen class="h-3 w-3" />
-                                  <span>View source in document</span>
-                                </button>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <button
+                                    type="button"
+                                    onclick={() => viewRuleSource(rule.id)}
+                                    class="inline-flex items-center gap-1 font-semibold text-accent hover:underline"
+                                  >
+                                    <BookOpen class="h-3 w-3" />
+                                    <span>View source in document</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onclick={() => openRuleSourceMap(rule.source_document_id!)}
+                                    class="inline-flex items-center gap-1 font-semibold text-accent hover:underline"
+                                  >
+                                    <ExternalLink class="h-3 w-3" />
+                                    <span>Open in Rule-Source Map</span>
+                                  </button>
+                                </div>
                               {/if}
                             </div>
                           {/snippet}

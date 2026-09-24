@@ -57,6 +57,7 @@ class RuleDraftService:
                     "id": int,
                     "source_document_id": int,
                     "source_node_id": str,
+                    "source_element_id": str,
                     "source_snippet": str,
                     "clause": dict,
                     "proposed_rule": dict,
@@ -83,6 +84,7 @@ class RuleDraftService:
                 {
                     "source_document_id": draft.source_document_id,
                     "source_node_id": draft.source_node_id or "",
+                    "source_element_id": draft.source_element_id or "",
                     "source_snippet": draft.source_snippet or "",
                     "clause": draft.clause.model_dump() if draft.clause else None,
                     "bbox": draft.bbox or (draft.clause.bbox if draft.clause else None),
@@ -209,6 +211,7 @@ class RuleDraftService:
             source_text=row.get("source_snippet") or "",
             source_document_id=row.get("source_document_id"),
             source_node_id=row.get("source_node_id") or None,
+            source_element_id=row.get("source_element_id") or clause_meta.get("element_id") or None,
             source_page_number=clause_meta.get("page_number"),
             source_bbox=row.get("bbox") or clause_meta.get("bbox"),
             target_ifc_class=payload.target_ifc_class or "",

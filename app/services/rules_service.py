@@ -20,6 +20,7 @@ _RICH_COLUMNS = {
     "source_text": str,
     "source_document_id": int,  # FK to documents.id, when the rule was extracted from one
     "source_node_id": str,  # Links back to the draft's originating DocumentNodeContract.node_id
+    "source_element_id": str,  # Matches DocumentElementBbox.element_id -- the exact structural element, when known
     "source_page_number": int,  # 1-based source page number, carried from the draft's clause metadata
     "source_bbox": dict,  # Bounding box on that page: {l, t, r, b, coord_origin}
     "property_set": str,
@@ -371,6 +372,10 @@ class RuleService:
         """Return a single rule by primary key."""
         return self._rules.get(rule_id)
 
+    def list_by_document(self, document_id: int) -> list[dict]:
+        """Return every rule extracted from one source document, newest first."""
+        return [row for row in self.list_rules() if row.get("source_document_id") == document_id]
+
     def _build_rule_row(
         self,
         reference: str = "",
@@ -382,6 +387,7 @@ class RuleService:
         source_text: str = "",
         source_document_id: int | None = None,
         source_node_id: str | None = None,
+        source_element_id: str | None = None,
         source_page_number: int | None = None,
         source_bbox: dict | None = None,
         property_set: str = "",
@@ -440,6 +446,7 @@ class RuleService:
             "source_text": source_text or "",
             "source_document_id": source_document_id,
             "source_node_id": source_node_id or "",
+            "source_element_id": source_element_id or "",
             "source_page_number": source_page_number,
             "source_bbox": source_bbox or None,
             "property_set": property_set or "",

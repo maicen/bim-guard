@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ArrowLeft, BookOpen } from "lucide-svelte";
+  import { push } from "svelte-spa-router";
+  import { ArrowLeft, BookOpen, Route } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
+  import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import type { DocumentDetail } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
@@ -15,6 +17,16 @@
   }
 
   let { documentId, onBack }: Props = $props();
+
+  function openRuleSourceMap() {
+    if (documentId == null) return;
+    const params = new URLSearchParams();
+    params.set("doc_id", String(documentId));
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    push(`/rule-source?${params.toString()}`);
+  }
 
   let doc: DocumentDetail | null = $state(null);
   let loading = $state(true);
@@ -94,6 +106,16 @@
       {/if}
     {/snippet}
     {#snippet actions()}
+      {#if documentId != null}
+        <button
+          type="button"
+          onclick={openRuleSourceMap}
+          class="inline-flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <Route class="h-3.5 w-3.5" />
+          <span>Rule-Source Map</span>
+        </button>
+      {/if}
       <button
         type="button"
         onclick={onBack}

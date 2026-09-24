@@ -27,6 +27,7 @@ from app.api.dependencies import (
     get_parsing_engine_instances_service,
     get_permission_service,
     get_profile_service,
+    get_rules_service,
     get_ruleset_access_service,
 )
 from app.auth import CurrentUser, get_current_user, get_current_user_flexible
@@ -37,6 +38,7 @@ from app.modules.contracts import (
     DocumentDetailResponse,
     DocumentElementBbox,
     DocumentElementBboxesResponse,
+    DocumentElementWithRules,
     DocumentIngestResponse,
     DocumentResponse,
     DocumentSection,
@@ -51,6 +53,8 @@ from app.modules.contracts import (
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
     RuleExtractionProgressResponse,
+    RuleSourceMapResponse,
+    RuleSourceSummary,
 )
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
@@ -67,6 +71,7 @@ from app.services.parsing_engine_instances_service import ParsingEngineInstances
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService, RuleGenerationFailedError
+from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
 
 logger = get_logger(__name__)
@@ -1061,6 +1066,59 @@ def get_document_element_bboxes(
         )
     elements = [DocumentElementBbox(**record) for record in service.get_element_bboxes(doc)]
     return DocumentElementBboxesResponse(document_id=document_id, elements=elements)
+
+
+@router.get(
+    "/{document_id}/rule-source-map",
+    response_model=RuleSourceMapResponse,
+    summary="Every rule extracted from this document, mapped against its exact source element",
+)
+def get_document_rule_source_map(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    rules_service: Annotated[RuleService, Depends(get_rules_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+) -> RuleSourceMapResponse:
+    """Group this document's rules by the exact element (`source_element_id`) each was extracted from.
+
+    Rules with no `source_element_id` (extracted before that linkage existed)
+    are returned separately in `unmapped_rules`, with only their approximate
+    `source_page_number`/`source_bbox` location.
+    """
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    elements = [DocumentElementBbox(**record) for record in service.get_element_bboxes(doc)]
+    rules_by_element: dict[str, list[RuleSourceSummary]] = {}
+    unmapped_rules: list[RuleSourceSummary] = []
+    for row in rules_service.list_by_document(document_id):
+        summary = RuleSourceSummary(
+            id=row["id"],
+            rule_id=row.get("reference"),
+            description=row.get("description"),
+            severity=row.get("severity"),
+            category=row.get("category"),
+            source_page_number=row.get("source_page_number"),
+            source_bbox=row.get("source_bbox"),
+        )
+        element_id = row.get("source_element_id")
+        if element_id:
+            rules_by_element.setdefault(element_id, []).append(summary)
+        else:
+            unmapped_rules.append(summary)
+
+    elements_with_rules = [
+        DocumentElementWithRules(**el.model_dump(), rules=rules_by_element.get(el.element_id, []))
+        for el in elements
+    ]
+    return RuleSourceMapResponse(
+        document_id=document_id, elements=elements_with_rules, unmapped_rules=unmapped_rules
+    )
 
 
 @router.post(

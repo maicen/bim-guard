@@ -35,9 +35,20 @@
     highlightText?: string | null;
     /** Bounding box coordinates {l, t, r, b, coord_origin} on the page for visual halo highlighting. */
     bbox?: { l: number; t: number; r: number; b: number; coord_origin?: string } | null;
+    /** DocLang element id to select/highlight, driven externally (e.g. from a rule-source list) instead of a user click. */
+    selectedElementId?: string | null;
+    /** Called whenever the selected element changes, from either a user click or the `selectedElementId` prop. */
+    onElementSelect?: ((elementId: string | null) => void) | null;
   }
 
-  let { documentId, page = null, highlightText = null, bbox = null }: Props = $props();
+  let {
+    documentId,
+    page = null,
+    highlightText = null,
+    bbox = null,
+    selectedElementId: externalSelectedElementId = null,
+    onElementSelect = null,
+  }: Props = $props();
 
   // Single-page mode DOM refs
   let textLayerEl: HTMLDivElement = $state();
@@ -224,11 +235,19 @@
   // Shared across the rendered-blocks view, the XML tree, and the bbox
   // overlay -- clicking any one of them highlights/scrolls the others to
   // the same DocLang-injected element id (feature: click-to-sync selection).
-  let selectedElementId: string | null = $state(null);
+  let selectedElementId: string | null = $state(externalSelectedElementId);
 
   function selectElement(elementId: string | null) {
     selectedElementId = elementId;
+    onElementSelect?.(elementId);
   }
+
+  // Let a parent (e.g. the rule-source map view) drive which element is
+  // highlighted -- e.g. clicking a rule in a list, rather than clicking
+  // inside this viewer.
+  $effect(() => {
+    selectedElementId = externalSelectedElementId;
+  });
   let copiedXml = $state(false);
 
   function copyXmlToClipboard() {

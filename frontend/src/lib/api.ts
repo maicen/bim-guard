@@ -118,6 +118,7 @@ import type {
   RuleSnapshot,
   RuleSnapshotCreatePayload,
   RuleShaclShapeResponse,
+  RuleSourceMapResponse,
   RuleSourceResponse,
   SparqlQueryResult,
   SpatialTreeResponse,
@@ -1719,6 +1720,11 @@ export const documentsApi = {
   async getElementBboxes(id: number): Promise<DocumentElementBboxesResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/element-bboxes`);
     return handleResponse<DocumentElementBboxesResponse>(res);
+  },
+
+  async getRuleSourceMap(id: number): Promise<RuleSourceMapResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/rule-source-map`);
+    return handleResponse<RuleSourceMapResponse>(res);
   },
 
   getAssetUrl(id: number, filename: string): string {

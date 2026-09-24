@@ -798,6 +798,10 @@ class ClauseMetadata(BaseModel):
     bbox: Optional[dict[str, Any]] = Field(
         default=None, description="Bounding box coordinates on the page: {l, t, r, b, coord_origin}"
     )
+    element_id: Optional[str] = Field(
+        default=None,
+        description="DocLang element id this clause's bbox was zipped from -- matches DocumentElementBbox.element_id",
+    )
 
 
 class DeonticStatement(BaseModel):
@@ -911,6 +915,37 @@ class DocumentElementBboxesResponse(BaseModel):
 
     document_id: int
     elements: list[DocumentElementBbox] = Field(default_factory=list)
+
+
+class RuleSourceSummary(BaseModel):
+    """Lightweight rule shape for the rule-source map view."""
+
+    id: int
+    rule_id: Optional[str] = None
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    category: Optional[str] = None
+    source_page_number: Optional[int] = None
+    source_bbox: Optional[dict[str, Any]] = None
+
+
+class DocumentElementWithRules(DocumentElementBbox):
+    """One document element annotated with the rule(s) extracted from it."""
+
+    rules: list[RuleSourceSummary] = Field(default_factory=list)
+
+
+class RuleSourceMapResponse(BaseModel):
+    """Every rule extracted from a document, mapped against its exact source element.
+
+    ``unmapped_rules`` holds rules on this document with no ``source_element_id``
+    (extracted before that linkage existed) -- these only have an approximate
+    page/bbox location, not an exact element match.
+    """
+
+    document_id: int
+    elements: list[DocumentElementWithRules] = Field(default_factory=list)
+    unmapped_rules: list[RuleSourceSummary] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1104,9 @@ class RuleResponse(TimestampFields):
     source_node_id: Optional[str] = Field(
         default=None, description="Links back to the originating DocumentNodeContract.node_id, when known"
     )
+    source_element_id: Optional[str] = Field(
+        default=None, description="Matches DocumentElementBbox.element_id -- the exact structural element this rule was extracted from, when known"
+    )
     source_page_number: Optional[int] = Field(
         default=None, description="1-based source page number, when known"
     )
@@ -1145,6 +1183,9 @@ class RuleExtractionDraft(BaseModel):
     id: Optional[int] = None
     source_document_id: int
     source_node_id: Optional[str] = Field(default=None, description="Links back to DocumentNodeContract.node_id")
+    source_element_id: Optional[str] = Field(
+        default=None, description="Matches DocumentElementBbox.element_id -- the exact structural element this draft was extracted from, when known"
+    )
     source_snippet: Optional[str] = Field(
         default=None, description="The originating node's text, carried forward for promotion into rules.source_text"
     )

@@ -190,12 +190,13 @@ class DocLangChunker:
         current_node_type: str = "paragraph"
         current_bbox: dict[str, Any] | None = None
         current_page_number: int | None = None
+        current_element_id: str | None = None
 
         # Level hierarchy tracker: {level_int: section_number}
         level_map: dict[int, str] = {}
 
         def flush_current_chunk():
-            nonlocal current_content_blocks, current_node_type, current_bbox, current_page_number
+            nonlocal current_content_blocks, current_node_type, current_bbox, current_page_number, current_element_id
             if not current_content_blocks:
                 return
             combined_text = "\n\n".join(b for b in current_content_blocks if b.strip()).strip()
@@ -210,12 +211,14 @@ class DocLangChunker:
                         "node_type": current_node_type,
                         "bbox": current_bbox,
                         "page_number": current_page_number,
+                        "element_id": current_element_id,
                     }
                 )
             current_content_blocks = []
             current_node_type = "paragraph"
             current_bbox = None
             current_page_number = None
+            current_element_id = None
 
         bbox_idx = 0
         total_bboxes = len(element_bboxes) if element_bboxes else 0
@@ -285,6 +288,7 @@ class DocLangChunker:
                 elif total_bboxes > 0 and bbox_idx < total_bboxes:
                     current_bbox = element_bboxes[bbox_idx].get("bbox")
                     current_page_number = element_bboxes[bbox_idx].get("page_number")
+                    current_element_id = element_bboxes[bbox_idx].get("element_id")
                     bbox_idx += 1
 
             elif tag == "table":
@@ -298,6 +302,7 @@ class DocLangChunker:
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         current_bbox = element_bboxes[bbox_idx].get("bbox")
                         current_page_number = element_bboxes[bbox_idx].get("page_number")
+                        current_element_id = element_bboxes[bbox_idx].get("element_id")
                         bbox_idx += 1
                     flush_current_chunk()
 
@@ -308,6 +313,7 @@ class DocLangChunker:
                     if current_bbox is None and total_bboxes > 0 and bbox_idx < total_bboxes:
                         current_bbox = element_bboxes[bbox_idx].get("bbox")
                         current_page_number = element_bboxes[bbox_idx].get("page_number")
+                        current_element_id = element_bboxes[bbox_idx].get("element_id")
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         bbox_idx += 1
 
@@ -328,6 +334,7 @@ class DocLangChunker:
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         current_bbox = element_bboxes[bbox_idx].get("bbox")
                         current_page_number = element_bboxes[bbox_idx].get("page_number")
+                        current_element_id = element_bboxes[bbox_idx].get("element_id")
                         bbox_idx += 1
                     flush_current_chunk()
 
@@ -359,6 +366,7 @@ class DocLangChunker:
                         if total_bboxes > 0 and bbox_idx < total_bboxes:
                             current_bbox = element_bboxes[bbox_idx].get("bbox")
                             current_page_number = element_bboxes[bbox_idx].get("page_number")
+                            current_element_id = element_bboxes[bbox_idx].get("element_id")
                             bbox_idx += 1
                         flush_current_chunk()
 

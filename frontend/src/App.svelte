@@ -25,6 +25,7 @@
   import ViewerView from "./routes/ViewerView.svelte";
   import DocumentsView from "./routes/DocumentsView.svelte";
   import DocumentView from "./routes/DocumentView.svelte";
+  import RuleSourceView from "./routes/RuleSourceView.svelte";
   import RuleExtractionView from "./routes/RuleExtractionView.svelte";
   import EvaluationView from "./routes/EvaluationView.svelte";
   import RulesView from "./routes/RulesView.svelte";
@@ -608,6 +609,8 @@
           <DocumentsView />
         {:else if activeView === "document"}
           <DocumentView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
+        {:else if activeView === "rule-source"}
+          <RuleSourceView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
         {:else if activeView === "extract"}
           <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}

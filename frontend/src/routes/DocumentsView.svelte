@@ -14,6 +14,7 @@
     Sparkles,
     FileCode,
     Plus,
+    Route,
   } from "lucide-svelte";
   import Icon from "@iconify/svelte";
   import { documentsApi, parsingEnginesApi, orgParsingEnginesApi } from "../lib/api";
@@ -281,6 +282,15 @@
       params.set("org", String(authState.activeOrganizationId));
     }
     push(`/document?${params.toString()}`);
+  }
+
+  function openRuleSourceMap(id: number) {
+    const params = new URLSearchParams();
+    params.set("doc_id", String(id));
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    push(`/rule-source?${params.toString()}`);
   }
 
   async function generateDoclangForRow(doc: DocumentItem) {
@@ -592,6 +602,14 @@
                       title={doc.has_doclang ? "DocLang already generated" : "Generate DocLang"}
                     >
                       <Sparkles class="h-3.5 w-3.5 {generatingDoclangId === doc.id ? 'animate-pulse' : ''}" />
+                    </button>
+                    <button
+                      type="button"
+                      onclick={() => openRuleSourceMap(doc.id)}
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
+                      title="Rule-Source Map"
+                    >
+                      <Route class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
