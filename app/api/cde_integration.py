@@ -222,6 +222,7 @@ def list_cde_documents(
     try:
         project = projects_service.get_project(project_id) or {}
     except Exception:
+        logger.exception("Could not load project for CDE document listing project_id=%d", project_id)
         project = {}
 
     items: list[dict[str, Any]] = []
@@ -230,6 +231,7 @@ def list_cde_documents(
     try:
         files = models_service.list_models(project_id)
     except Exception:
+        logger.exception("Could not list models for CDE document listing project_id=%d", project_id)
         files = []
     for f in files:
         file_id = str(f.get("id") or f.get("file_name", "model.ifc"))
@@ -263,12 +265,14 @@ def list_cde_documents(
         document_access = get_container().document_access_service
         bound_ids = set(document_access.list_project_bindings(project_id))
     except Exception:
+        logger.exception("Could not list document bindings for project_id=%d", project_id)
         bound_ids = set()
 
     try:
         client_docs = projects_service.get_client_documents_by_project(project_id)
         client_doc_ids = {cd.get("document_id") for cd in client_docs if cd.get("document_id")}
     except Exception:
+        logger.exception("Could not list client documents for project_id=%d", project_id)
         client_doc_ids = set()
 
     project_code = project.get("project_code")

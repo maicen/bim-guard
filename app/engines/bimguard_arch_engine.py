@@ -48,7 +48,7 @@ class EgressAnalysisEngine(RuleEvaluator):
                     if val is not None:
                         return float(val)
         except Exception:
-            pass
+            logger.exception("Could not resolve max travel distance threshold (ref 9.9.10.1)")
         return None
 
     def _get_min_exits_per_floor(self) -> int | None:
@@ -66,7 +66,7 @@ class EgressAnalysisEngine(RuleEvaluator):
                     if val is not None:
                         return int(float(val))
         except Exception:
-            pass
+            logger.exception("Could not resolve min exits per floor threshold (ref 9.9.4.1)")
         return None
 
     def _get_egress_window_thresholds(self) -> dict[str, float | None]:
@@ -100,7 +100,7 @@ class EgressAnalysisEngine(RuleEvaluator):
                 if val is not None:
                     thresholds[key] = float(val)
         except Exception:
-            pass
+            logger.exception("Could not resolve egress window thresholds")
         return thresholds
 
     def _evaluate_egress_window(
@@ -350,7 +350,7 @@ class SpatialDaylightEngine(RuleEvaluator):
                     if val is not None and 0.0 < float(val) <= 1.0:
                         return float(val)
         except Exception:
-            pass
+            logger.exception("Could not resolve min daylight ratio threshold (ref 9.7.2.3)")
         return None
 
     def _get_min_fire_rating(self) -> float | None:
@@ -368,7 +368,7 @@ class SpatialDaylightEngine(RuleEvaluator):
                     if val is not None and float(val) > 1.0:
                         return float(val)
         except Exception:
-            pass
+            logger.exception("Could not resolve min fire separation rating threshold (ref 9.10.9)")
         return None
 
     def evaluate(

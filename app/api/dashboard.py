@@ -8,10 +8,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response
 
 from app.auth import CurrentUser, get_current_user
+from app.logging_config import get_logger
 from app.modules.contracts import DashboardStatsResponse
 from app.services.persistence import PersistenceService
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 _DB_HEALTH_CACHE = {
@@ -32,6 +34,7 @@ def _probe_db_health() -> bool:
         db.table("projects").select("id").limit(1).execute()
         ok = True
     except Exception:
+        logger.exception("Dashboard DB health probe failed")
         ok = False
 
     _DB_HEALTH_CACHE["checked_at"] = now
