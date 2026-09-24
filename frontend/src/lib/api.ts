@@ -146,6 +146,10 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 /** An `Error` from a non-OK response, carrying the HTTP status that caused it. */
 export interface ApiError extends Error {
   status?: number;
+  /** The request URL that produced this failure, for copyable diagnostic logs. */
+  url?: string;
+  /** When this failure was observed client-side, for copyable diagnostic logs. */
+  timestamp?: string;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -179,6 +183,8 @@ async function handleResponse<T>(res: Response): Promise<T> {
     // which is a bug to report rather than a condition to show the user.
     const failure = new Error(errorDetail) as ApiError;
     failure.status = res.status;
+    failure.url = res.url;
+    failure.timestamp = new Date().toISOString();
     throw failure;
   }
   if (res.status === 204) {

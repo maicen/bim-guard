@@ -136,6 +136,21 @@
   // Review section itself -- the page-level `error` banner sits above the fold
   // once the table is scrolled into view, so a rejected click looked like a no-op.
   let draftReviewError = $state("");
+  // Per-draft failures backing the copiable technical detail log below the
+  // banner -- the banner text alone only ever showed the first failure, which
+  // left reviewers unable to tell a platform admin exactly what failed for a
+  // bulk action that touched many drafts.
+  let draftReviewErrorLog: Array<{
+    draftId?: number;
+    ruleId?: string;
+    status?: number;
+    message: string;
+    url?: string;
+    timestamp?: string;
+  }> = $state([]);
+  let showDraftErrorDetails = $state(false);
+  let draftErrorCopied = $state(false);
+  let draftReviewErrorAction = $state("review");
 
   function describeDraftFailure(err: any, fallback: string): string {
     const reason = err?.message || fallback;
@@ -145,10 +160,57 @@
     return reason;
   }
 
+  function toFailureLogEntry(
+    err: any,
+    draft?: { id?: number; proposed_rule?: { rule_id?: string } },
+  ) {
+    return {
+      draftId: draft?.id,
+      ruleId: draft?.proposed_rule?.rule_id,
+      status: err?.status,
+      message: err?.message || String(err),
+      url: err?.url,
+      timestamp: err?.timestamp,
+    };
+  }
+
+  function buildDraftIssueLog(action: string): string {
+    const lines = [
+      `BIM Guard — Draft Review Error Log`,
+      `Action: ${action}`,
+      `Generated: ${new Date().toISOString()}`,
+      `Document ID: ${selectedDocId ?? "(none)"}`,
+      `Ruleset: ${draftRules[0]?.proposed_rule.ruleset_id ?? "(unknown)"}`,
+      `Failures: ${draftReviewErrorLog.length}`,
+      "",
+    ];
+    draftReviewErrorLog.forEach((f, i) => {
+      lines.push(
+        `[${i + 1}] draft #${f.draftId ?? "?"} (${f.ruleId ?? "unknown rule"}) — HTTP ${f.status ?? "?"}`,
+      );
+      if (f.url) lines.push(`    url: ${f.url}`);
+      if (f.timestamp) lines.push(`    at: ${f.timestamp}`);
+      lines.push(`    ${f.message}`);
+    });
+    return lines.join("\n");
+  }
+
+  async function copyDraftIssueLog(action: string) {
+    try {
+      await navigator.clipboard.writeText(buildDraftIssueLog(action));
+      draftErrorCopied = true;
+      setTimeout(() => (draftErrorCopied = false), 2000);
+    } catch {
+      // Clipboard access can be denied by the browser -- nothing useful to
+      // recover to, the details panel text is still selectable manually.
+    }
+  }
+
   $effect(() => {
     const docId = selectedDocId;
     draftRules = [];
     draftReviewError = "";
+    draftReviewErrorLog = [];
     if (!docId) return;
 
     isLoadingDrafts = true;
@@ -194,6 +256,7 @@
     status: "accepted" | "rejected",
   ): Promise<void> {
     draftReviewError = "";
+    draftReviewErrorLog = [];
     successMessage = "";
     try {
       await reviewDraft(draft, status);
@@ -202,6 +265,8 @@
         err,
         `Failed to ${status === "accepted" ? "accept" : "reject"} "${draft.proposed_rule.rule_id}".`,
       );
+      draftReviewErrorLog = [toFailureLogEntry(err, draft)];
+      draftReviewErrorAction = status === "accepted" ? "accept" : "reject";
     }
   }
 
@@ -221,7 +286,9 @@
   function saveEditedDraft() {
     if (!editingDraft || !editForm) return;
     const draftId = editingDraft.id!;
+    const draftBeingEdited = editingDraft;
     draftReviewError = "";
+    draftReviewErrorLog = [];
     ruleExtractionApi
       .reviewDraft(draftId, { status: "edited", edited_rule: editForm })
       .then((updated) => {
@@ -230,6 +297,8 @@
       })
       .catch((err: any) => {
         draftReviewError = describeDraftFailure(err, "Failed to save draft edits.");
+        draftReviewErrorLog = [toFailureLogEntry(err, draftBeingEdited)];
+        draftReviewErrorAction = "edit";
       });
   }
 
@@ -244,6 +313,7 @@
 
   async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
     draftReviewError = "";
+    draftReviewErrorLog = [];
     try {
       await ruleExtractionApi.promoteDraft(draft.id!);
       draftRules = draftRules.filter((d) => d.id !== draft.id);
@@ -253,6 +323,8 @@
         err,
         `Failed to promote "${draft.proposed_rule.rule_id}".`,
       );
+      draftReviewErrorLog = [toFailureLogEntry(err, draft)];
+      draftReviewErrorAction = "promote";
     }
   }
 
@@ -283,6 +355,7 @@
       (d) => d.status === "accepted" || d.status === "edited",
     );
     draftReviewError = "";
+    draftReviewErrorLog = [];
     successMessage = "";
     if (toPromote.length === 0) {
       draftReviewError =
@@ -292,8 +365,7 @@
 
     bulkAction = "promote";
     const promotedIds = new Set<number | undefined>();
-    let failed = 0;
-    let firstFailure: any = null;
+    const failures: typeof draftReviewErrorLog = [];
     try {
       // One at a time: each promote inserts into the rule library.
       await runBulk(toPromote, 1, async (draft) => {
@@ -301,8 +373,7 @@
           await ruleExtractionApi.promoteDraft(draft.id!);
           promotedIds.add(draft.id);
         } catch (err: any) {
-          failed += 1;
-          firstFailure ||= err;
+          failures.push(toFailureLogEntry(err, draft));
         }
       });
     } finally {
@@ -314,8 +385,10 @@
     if (promotedIds.size > 0) {
       successMessage = `Promoted ${promotedIds.size} draft(s) into the compliance rule library.`;
     }
-    if (failed > 0) {
-      draftReviewError = `${failed} of ${toPromote.length} drafts could not be promoted: ${describeDraftFailure(firstFailure, "Failed to promote draft.")}`;
+    if (failures.length > 0) {
+      draftReviewErrorLog = failures;
+      draftReviewErrorAction = "promote";
+      draftReviewError = `${failures.length} of ${toPromote.length} drafts could not be promoted: ${describeDraftFailure(failures[0], "Failed to promote draft.")}`;
     }
   }
 
@@ -323,6 +396,7 @@
     if (bulkAction) return;
     const toAccept = draftTable.selectedRows.filter((d) => d.status === "pending_review");
     draftReviewError = "";
+    draftReviewErrorLog = [];
     successMessage = "";
     if (toAccept.length === 0) {
       draftReviewError = "None of the selected drafts are pending review.";
@@ -331,16 +405,14 @@
 
     bulkAction = "accept";
     let accepted = 0;
-    let failed = 0;
-    let firstFailure: any = null;
+    const failures: typeof draftReviewErrorLog = [];
     try {
       await runBulk(toAccept, 5, async (draft) => {
         try {
           await reviewDraft(draft, "accepted");
           accepted += 1;
         } catch (err: any) {
-          failed += 1;
-          firstFailure ||= err;
+          failures.push(toFailureLogEntry(err, draft));
         }
       });
     } finally {
@@ -348,8 +420,10 @@
     }
 
     if (accepted > 0) successMessage = `Accepted ${accepted} draft(s).`;
-    if (failed > 0) {
-      draftReviewError = `${failed} of ${toAccept.length} drafts could not be accepted: ${describeDraftFailure(firstFailure, "Failed to accept draft.")}`;
+    if (failures.length > 0) {
+      draftReviewErrorLog = failures;
+      draftReviewErrorAction = "accept";
+      draftReviewError = `${failures.length} of ${toAccept.length} drafts could not be accepted: ${describeDraftFailure(failures[0], "Failed to accept draft.")}`;
     }
   }
 
@@ -902,8 +976,38 @@
           title="Draft review failed"
           message={draftReviewError}
           dismissible
-          onDismiss={() => (draftReviewError = "")}
+          onDismiss={() => {
+            draftReviewError = "";
+            draftReviewErrorLog = [];
+            showDraftErrorDetails = false;
+          }}
         />
+        {#if draftReviewErrorLog.length > 0}
+          <div class="rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                class="text-xs font-semibold text-fg-secondary hover:text-fg-primary"
+                onclick={() => (showDraftErrorDetails = !showDraftErrorDetails)}
+              >
+                {showDraftErrorDetails ? "Hide" : "Show"} technical details ({draftReviewErrorLog.length}
+                issue{draftReviewErrorLog.length === 1 ? "" : "s"})
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-border-default px-2.5 py-1 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                onclick={() => copyDraftIssueLog(draftReviewErrorAction)}
+              >
+                {draftErrorCopied ? "Copied!" : "Copy issue log"}
+              </button>
+            </div>
+            {#if showDraftErrorDetails}
+              <pre
+                class="mt-2 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-surface-card p-3 text-[11px] leading-relaxed text-fg-muted"
+              >{buildDraftIssueLog(draftReviewErrorAction)}</pre>
+            {/if}
+          </div>
+        {/if}
       {/if}
 
       {#if isLoadingDrafts}
