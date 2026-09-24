@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { FileText, Settings2 } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import { Select, Switch } from "./ui";
@@ -33,6 +34,14 @@
   let uploadErrorLogCopied = $state(false);
   let noParsingEngineConfigured = $state(false);
   let parsingEngineFailed = $state(false);
+  // Cancels the in-flight upload if the component unmounts mid-upload
+  // (navigating away) -- otherwise the fetch keeps running as an orphaned
+  // promise with no one left to report its result to.
+  let uploadAbortController: AbortController | null = null;
+
+  onDestroy(() => {
+    uploadAbortController?.abort();
+  });
 
   // Inline role check for now (matches the pattern in TopHeader.svelte /
   // UserMenu.svelte / DashboardView.svelte) -- swap for a proper
@@ -108,33 +117,37 @@
     uploadErrorLog = [];
     noParsingEngineConfigured = false;
     parsingEngineFailed = false;
+    uploadAbortController = new AbortController();
     try {
       const usePageRange = isPdfSelected && uploadLimitPages && !uploadPageRangeError;
-      const created = await documentsApi.upload(uploadFile, uploadDocType, {
-        engine_instance: uploadInstance || undefined,
-        generate_doclang: generateDoclangOnUpload,
-        organization_id: authState.activeOrganizationId,
-        start_page: usePageRange ? parseInt(uploadStartPage, 10) : undefined,
-        end_page: usePageRange ? parseInt(uploadEndPage, 10) : undefined,
-      });
+      const created = await documentsApi.upload(
+        uploadFile,
+        uploadDocType,
+        {
+          engine_instance: uploadInstance || undefined,
+          generate_doclang: generateDoclangOnUpload,
+          organization_id: authState.activeOrganizationId,
+          start_page: usePageRange ? parseInt(uploadStartPage, 10) : undefined,
+          end_page: usePageRange ? parseInt(uploadEndPage, 10) : undefined,
+        },
+        uploadAbortController.signal,
+      );
       resetState();
       onUploaded(created);
     } catch (err: any) {
+      if (uploadAbortController?.signal.aborted) return;
       const apiErr = err as ApiError;
-      // `fetch()` rejects with a bare TypeError when no HTTP response arrived
-      // at all -- the backend is down or unreachable. The wording is
-      // browser-specific ("Failed to fetch" / "NetworkError when attempting
-      // to fetch resource." / "Load failed"), so match on it rather than on
-      // TypeError alone, which would also swallow unrelated bugs.
-      const isNetworkFailure =
-        err instanceof TypeError && /fetch|network|load failed/i.test(err.message);
-      uploadError = isNetworkFailure
+      // apiFetch (lib/api.ts) already normalizes a fetch()-level failure
+      // (offline, unreachable backend) into this same ApiError shape with
+      // isNetworkError set, instead of a raw browser-specific TypeError.
+      uploadError = apiErr.isNetworkError
         ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
         : apiErr.message || "Failed to upload document.";
       noParsingEngineConfigured = apiErr.status === 422;
       parsingEngineFailed = apiErr.status === 502;
       uploadErrorLog = [toErrorLogEntry(err, uploadFile.name)];
     } finally {
+      uploadAbortController = null;
       isUploading = false;
     }
   }

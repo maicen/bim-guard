@@ -2,7 +2,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import { run, preventDefault } from "svelte/legacy";
 
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import {
     X,
     Check,
@@ -70,6 +70,15 @@
   let submitStatusMessage = $state("");
   let errorMessage = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
+  // Cancels the in-flight model attach/poll if the component unmounts
+  // mid-upload (navigating away) -- the project row is already saved by
+  // then, so this only stops the orphaned attach-status poll loop, not the
+  // project creation itself.
+  let uploadAbortController: AbortController | null = null;
+
+  onDestroy(() => {
+    uploadAbortController?.abort();
+  });
 
   // Form State
   let clientName = $state("");
@@ -540,14 +549,17 @@
         // the row fetched before the attach names no model yet.
         createdProject = await projectsApi.get(createdProject.id, { forceRefresh: true });
       } else if (ifcFiles.length) {
+        uploadAbortController = new AbortController();
         try {
           submitStatusMessage = "Attaching models...";
           await modelsApi.uploadAndWait(createdProject.id, ifcFiles, primaryIndex, ifcRoles, {
             onProgress: (attached, total) => {
               submitStatusMessage = `Attaching models... (${attached}/${total})`;
             },
+            signal: uploadAbortController.signal,
           });
         } catch (uploadErr: any) {
+          if (uploadAbortController?.signal.aborted) return;
           // The project row is already saved. Reporting that plainly and
           // staying open is better than closing on an error the user would
           // then try to fix by creating the project a second time.
@@ -558,6 +570,7 @@
           currentStep = 2;
           return;
         } finally {
+          uploadAbortController = null;
           submitStatusMessage = "";
         }
         // The primary is mirrored onto projects.ifc_file_path server-side, so

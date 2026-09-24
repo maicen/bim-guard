@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import Tooltip from "./Tooltip.svelte";
@@ -22,6 +23,16 @@
   let isSubmitting = $state(false);
   let errorMessage = $state("");
   let statusMessage = $state("");
+  // Cancels the in-flight upload/attach-status poll if the component
+  // unmounts mid-upload (navigating away) -- the modal's own Close button
+  // already refuses to close while isSubmitting, but a route change
+  // unmounts it regardless, and without this the poll loop in
+  // modelsApi.uploadAndWait kept running with nothing left to report to.
+  let uploadAbortController: AbortController | null = null;
+
+  onDestroy(() => {
+    uploadAbortController?.abort();
+  });
 
   function reset() {
     selectedFiles = [];
@@ -50,18 +61,22 @@
     isSubmitting = true;
     errorMessage = "";
     statusMessage = "Attaching models...";
+    uploadAbortController = new AbortController();
     try {
       await modelsApi.uploadAndWait(projectId, selectedFiles, primaryIndex, roles, {
         onProgress: (attached, total) => {
           statusMessage = `Attaching models... (${attached}/${total})`;
         },
+        signal: uploadAbortController.signal,
       });
       const updated = await modelsApi.list(projectId);
       onUploaded(updated);
       reset();
     } catch (err: any) {
+      if (uploadAbortController?.signal.aborted) return;
       errorMessage = err?.message || "Upload failed.";
     } finally {
+      uploadAbortController = null;
       isSubmitting = false;
       statusMessage = "";
     }

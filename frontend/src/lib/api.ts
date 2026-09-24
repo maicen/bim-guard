@@ -835,6 +835,7 @@ export const modelsApi = {
     files: File[],
     primaryIndex: number,
     roles: string[],
+    signal?: AbortSignal,
   ): Promise<ModelUploadResponse> {
     const form = new FormData();
     files.forEach((file) => form.append("files", file));
@@ -844,6 +845,7 @@ export const modelsApi = {
     const res = await apiFetch(`${API_BASE}/projects/${projectId}/models`, {
       method: "POST",
       body: form,
+      signal,
     });
     // The primary is mirrored onto projects.ifc_file_path server-side, so a
     // caller holding a project row fetched before this call should re-read it
@@ -872,15 +874,28 @@ export const modelsApi = {
     files: File[],
     primaryIndex: number,
     roles: string[],
-    options?: { onProgress?: (attached: number, total: number) => void; pollMs?: number },
+    options?: {
+      onProgress?: (attached: number, total: number) => void;
+      pollMs?: number;
+      /**
+       * Stops the attach-status poll loop below when the caller unmounts
+       * (a modal closed, the user navigated away) -- without this, the
+       * `while (true)` loop below keeps polling forever with nothing left
+       * to report progress to, an orphaned network loop that outlives the
+       * component that started it.
+       */
+      signal?: AbortSignal;
+    },
   ): Promise<void> {
-    const initial = await modelsApi.upload(projectId, files, primaryIndex, roles);
+    const initial = await modelsApi.upload(projectId, files, primaryIndex, roles, options?.signal);
     if (!initial.processing) return;
 
     const pollMs = options?.pollMs ?? 1500;
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      if (options?.signal?.aborted) return;
       await new Promise((resolve) => setTimeout(resolve, pollMs));
+      if (options?.signal?.aborted) return;
       const job = await modelsApi.attachStatus(projectId);
       options?.onProgress?.(job.attached, job.total);
       if (job.error) {
@@ -1573,6 +1588,7 @@ export const documentsApi = {
       start_page?: number | null;
       end_page?: number | null;
     },
+    signal?: AbortSignal,
   ): Promise<DocumentDetail> {
     const form = new FormData();
     form.append("file", file);
@@ -1593,6 +1609,7 @@ export const documentsApi = {
     const res = await apiFetch(`${API_BASE}/documents`, {
       method: "POST",
       body: form,
+      signal,
     });
     const created = await handleResponse<DocumentDetail>(res);
     _documentsStore.addOrUpdate({
