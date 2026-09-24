@@ -50,6 +50,8 @@
     partitionByUploadSize,
     describeOversizedFiles,
   } from "../fileLimits";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen?: boolean;
@@ -67,6 +69,7 @@
   let isSubmitting = $state(false);
   let submitStatusMessage = $state("");
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   // Form State
   let clientName = $state("");
@@ -240,6 +243,7 @@
     } catch (err: any) {
       activeRepoStructure = null;
       errorMessage = err.message || "Failed to read the repository structure.";
+      errorLog = [toErrorLogEntry(err, `repo #${repoId}`)];
     } finally {
       isRepoLoading = false;
     }
@@ -466,6 +470,7 @@
       }
     }
     errorMessage = "";
+    errorLog = [];
     currentStep = stepNum;
   }
 
@@ -479,6 +484,7 @@
 
     isSubmitting = true;
     errorMessage = "";
+    errorLog = [];
 
     try {
       const documentIds = Array.from(selectedDocIds);
@@ -574,6 +580,7 @@
       handleClose();
     } catch (err: any) {
       errorMessage = err.message || "Failed to complete project setup wizard.";
+      errorLog = [toErrorLogEntry(err, name.trim() || "new project")];
     } finally {
       isSubmitting = false;
     }
@@ -613,6 +620,7 @@
     selectedDocIds.clear();
     selectedStandardIds.clear();
     errorMessage = "";
+    errorLog = [];
     onClose();
   }
 </script>
@@ -688,10 +696,13 @@
       <!-- Body -->
       <div class="max-h-[60vh] flex-1 overflow-y-auto p-6">
         {#if errorMessage}
-          <div
-            class="mb-4 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-          >
-            {errorMessage}
+          <div class="mb-4">
+            <Alert
+              type="error"
+              message={errorMessage}
+              errors={errorLog}
+              logTitle="Project Wizard Error Log"
+            />
           </div>
         {/if}
 
@@ -1311,6 +1322,7 @@
                 }
               }
               errorMessage = "";
+              errorLog = [];
               currentStep += 1;
             }}
             class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover"

@@ -5,6 +5,8 @@
   import { documentsApi } from "../api";
   import { DOCUMENT_TYPES } from "../types";
   import type { DocumentItem, DocumentType } from "../types";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -24,12 +26,14 @@
   let editDocType = $state<string>("Specification");
   let isSavingEdit = $state(false);
   let editError = $state("");
+  let editErrorLog: ErrorLogEntry[] = $state([]);
 
   $effect(() => {
     if (doc && isOpen) {
       editFilename = doc.filename;
       editDocType = doc.doc_type || "Specification";
       editError = "";
+      editErrorLog = [];
     }
   });
 
@@ -55,6 +59,7 @@
       onClose();
     } catch (err: any) {
       editError = err.message || "Failed to update document.";
+      editErrorLog = [toErrorLogEntry(err, `document #${doc.id}`)];
     } finally {
       isSavingEdit = false;
     }
@@ -71,9 +76,12 @@
 >
   <div class="space-y-4">
     {#if editError}
-      <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-        {editError}
-      </div>
+      <Alert
+        type="error"
+        message={editError}
+        errors={editErrorLog}
+        logTitle="Document Edit Error Log"
+      />
     {/if}
 
     <div class="space-y-1.5">

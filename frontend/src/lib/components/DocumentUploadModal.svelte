@@ -7,6 +7,7 @@
   import { authState } from "../auth.svelte";
   import { DOCUMENT_TYPES } from "../types";
   import type { DocumentItem, DocumentType, ParsingEngineInstance } from "../types";
+  import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -28,6 +29,8 @@
   let generateDoclangOnUpload = $state(true);
   let isUploading = $state(false);
   let uploadError = $state("");
+  let uploadErrorLog: ErrorLogEntry[] = $state([]);
+  let uploadErrorLogCopied = $state(false);
   let noParsingEngineConfigured = $state(false);
   let parsingEngineFailed = $state(false);
 
@@ -86,6 +89,7 @@
     uploadStartPage = "1";
     uploadEndPage = "";
     uploadError = "";
+    uploadErrorLog = [];
     noParsingEngineConfigured = false;
     parsingEngineFailed = false;
     isUploading = false;
@@ -101,6 +105,7 @@
     if (isPdfSelected && uploadLimitPages && uploadPageRangeError) return;
     isUploading = true;
     uploadError = "";
+    uploadErrorLog = [];
     noParsingEngineConfigured = false;
     parsingEngineFailed = false;
     try {
@@ -128,6 +133,7 @@
         : apiErr.message || "Failed to upload document.";
       noParsingEngineConfigured = apiErr.status === 422;
       parsingEngineFailed = apiErr.status === 502;
+      uploadErrorLog = [toErrorLogEntry(err, uploadFile.name)];
     } finally {
       isUploading = false;
     }
@@ -157,6 +163,23 @@
             <Settings2 class="h-3.5 w-3.5" />
             Configure a parsing engine
           </a>
+        {/if}
+        {#if uploadErrorLog.length > 0}
+          <button
+            type="button"
+            onclick={async () => {
+              const ok = await copyToClipboard(
+                buildIssueLog("Document Upload Error Log", {}, uploadErrorLog),
+              );
+              if (ok) {
+                uploadErrorLogCopied = true;
+                setTimeout(() => (uploadErrorLogCopied = false), 2000);
+              }
+            }}
+            class="rounded-lg border border-rose-700 px-2.5 py-1 text-caption font-semibold text-rose-200 transition-colors hover:bg-rose-900/40"
+          >
+            {uploadErrorLogCopied ? "Copied!" : "Copy issue log"}
+          </button>
         {/if}
       </div>
     {/if}
