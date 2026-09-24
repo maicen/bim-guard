@@ -37,8 +37,10 @@
   import GitHubRepoManagerModal from "../lib/components/GitHubRepoManagerModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { RadioGroupRoot, RadioGroupItem } from "../lib/components/ui";
   import { createTableState } from "../lib/tableState.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   interface Props {
     initialProjectId: number | null;
@@ -50,6 +52,7 @@
   let files: Model[] = $state([]);
   let isLoading = $state(true);
   let loadError = $state("");
+  let loadErrorLog: ErrorLogEntry[] = $state([]);
   let isUploadOpen = $state(false);
   let fileToDelete: Model | null = $state(null);
   let isDeleteModalOpen = $state(false);
@@ -83,6 +86,7 @@
     const token = ++loadToken;
     isLoading = true;
     loadError = "";
+    loadErrorLog = [];
     try {
       const result = await modelsApi.list(projectId);
       if (token !== loadToken) return;
@@ -90,6 +94,7 @@
     } catch (err: any) {
       if (token !== loadToken) return;
       loadError = err?.message || "Could not load this project's models.";
+      loadErrorLog = [toErrorLogEntry(err, `project #${projectId}`)];
       files = [];
     } finally {
       if (token === loadToken) isLoading = false;
@@ -101,17 +106,20 @@
       repos = await githubReposApi.list();
     } catch (err: any) {
       loadError = err.message || "Failed to load connected GitHub repositories.";
+      loadErrorLog = [toErrorLogEntry(err, "load repositories")];
     }
   }
 
   async function loadSelectedRepoStructure(repoId: number, force = false) {
     isRepoLoading = true;
     loadError = "";
+    loadErrorLog = [];
     try {
       activeRepoStructure = await githubReposApi.getStructure(repoId, force);
     } catch (err: any) {
       activeRepoStructure = null;
       loadError = err.message || "Failed to read the repository structure.";
+      loadErrorLog = [toErrorLogEntry(err, `repo #${repoId}`)];
     } finally {
       isRepoLoading = false;
     }
@@ -230,6 +238,7 @@
       await loadFiles(initialProjectId);
     } catch (err: any) {
       loadError = err.message || "Failed to attach model(s) from GitHub repository.";
+      loadErrorLog = [toErrorLogEntry(err, "attach GitHub model(s)")];
     } finally {
       isAttaching = false;
     }
@@ -430,9 +439,17 @@
   </PageHeader>
 
   {#if loadError}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-      {loadError}
-    </div>
+    <Alert
+      type="error"
+      message={loadError}
+      errors={loadErrorLog}
+      logTitle="Models Error Log"
+      dismissible
+      onDismiss={() => {
+        loadError = "";
+        loadErrorLog = [];
+      }}
+    />
   {/if}
 
   <!-- VIEW 1: ATTACHED MODELS (this project's registry) -->

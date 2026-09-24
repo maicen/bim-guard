@@ -13,6 +13,8 @@
   import TablePagination from "../lib/components/TablePagination.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import type { EvaluationBimguardVerdict, EvaluationFinding, EvaluationHumanVerdict } from "../lib/types";
+  import Alert from "../lib/components/Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   interface Props {
     initialProjectId?: number | null;
@@ -31,6 +33,7 @@
   let findings: EvaluationFinding[] = $state.raw([]);
   let loading = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let isBulkDeleteModalOpen = $state(false);
   let isBulkConfirming = $state(false);
 
@@ -73,11 +76,13 @@
     }
     loading = true;
     error = "";
+    errorLog = [];
     try {
       const res = await evaluationApi.listFindings(selectedProjectId);
       findings = res.findings;
     } catch (err: any) {
       error = err.message || "Failed to load evaluation findings.";
+      errorLog = [toErrorLogEntry(err, `project #${selectedProjectId}`)];
     } finally {
       loading = false;
     }
@@ -105,6 +110,7 @@
       findings = findings.map((f) => (f.id === finding.id ? updated : f));
     } catch (err: any) {
       error = err.message || `Failed to review finding ${finding.id}.`;
+      errorLog = [toErrorLogEntry(err, `finding #${finding.id}`)];
     }
   }
 
@@ -113,6 +119,7 @@
     if (isBulkConfirming) return;
     isBulkConfirming = true;
     error = "";
+    errorLog = [];
     try {
       // A one-shot local grouping, never read reactively, so the plain
       // built-in is correct here.
@@ -131,6 +138,7 @@
       await load();
     } catch (err: any) {
       error = err.message || "Failed to confirm the selected findings.";
+      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} finding(s)`)];
     } finally {
       isBulkConfirming = false;
     }
@@ -138,12 +146,15 @@
 
   async function confirmBulkDelete() {
     const ids = table.selectedIdList;
+    error = "";
+    errorLog = [];
     try {
       await evaluationApi.bulkDelete(ids);
       table.clearSelection();
       await load();
     } catch (err: any) {
       error = err.message || "Failed to remove the selected findings.";
+      errorLog = [toErrorLogEntry(err, `${ids.length} finding(s)`)];
     } finally {
       isBulkDeleteModalOpen = false;
     }
@@ -178,7 +189,7 @@
   {:else if loading}
     <LoadingState message="Loading evaluation findings…" />
   {:else if error}
-    <div class="rounded-xl border border-critical-border bg-critical-bg p-4 text-xs text-critical">{error}</div>
+    <Alert type="error" message={error} errors={errorLog} logTitle="Evaluation Error Log" />
   {:else if findings.length === 0}
     <EmptyState
       title="Nothing captured yet"
