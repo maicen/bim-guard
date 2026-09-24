@@ -23,7 +23,7 @@ applyTo: "**"
 3. **Compute engines & pipelines**: Physics engines and compliance evaluators (`app/engines/`, `app/modules/`, `app/services/`) operating framework-agnostic, driven dynamically by database-stored rules.
 
 **Companion Repositories & Boundaries:**
-- **[maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: Dedicated repository for empirical evaluation, accuracy scoring, linguistic NLP annotation, 38-model validation sweeps, and research analysis (confusion matrices, sensitivity curves, thesis tables/figures). It analyzes `bim-guard` through Web API (`/api/*`), programmatic Python imports, or both (configurable per harness).
+- **[maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: Dedicated repository for empirical evaluation, accuracy scoring, linguistic NLP annotation, 38-model validation sweeps, and research analysis (confusion matrices, sensitivity curves, thesis tables/figures). It analyzes `bim-guard` through Web API (`/api/*`), programmatic Python imports, or both (configurable per harness). Rule-extraction correction accuracy is scored there from `GET /api/rules/drafts` (`app/api/rules.py`), comparing `RuleExtractionDraft.original_proposed_rule` vs `proposed_rule` — see that repo's `docs/rule-extraction-corrections.md`.
 - **[maicen/bimguard-analytics](https://github.com/maicen/bimguard-analytics)**: Power BI star schema data contract (`issues.csv` fact table), dimension tables, and DAX measures.
 
 **Tech stack:** FastAPI · Svelte 5 (Vite + TypeScript) · Tailwind CSS · Supabase (Postgres & Storage) · IfcOpenShell · Server-Sent Events

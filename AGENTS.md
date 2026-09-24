@@ -101,6 +101,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
   - **[maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: External evaluation, accuracy scoring, NLP annotation, and empirical research validation repository.
     - **Scope**: Conducts all linguistic NLP annotation benchmarking, ground-truth rule extraction scoring, 38-model sweeps, and academic research analysis (confusion matrices, ROC/PR curves, standards sensitivity, and thesis validation tables/figures) completely outside the production application codebase.
     - **Inter-Repository Analysis**: `bim-guard-evaluation` analyzes `bim-guard` via **Web API** (FastAPI REST & SSE endpoints on `http://127.0.0.1:8000`), **programmatic imports** (`app.engines`, `app.modules`, `app.services` via `PYTHONPATH`/`BIMGUARD_PATH`), or **both / hybrid** (to be decided per evaluation harness).
+    - **Rule-extraction correction accuracy**: scored there from live data via `GET /api/rules/drafts` — see `app/api/rules.py`'s `list_all_rule_drafts()` docstring, `RuleExtractionDraft.original_proposed_rule` in `app/modules/contracts.py`, and that repo's `docs/rule-extraction-corrections.md`.
   - **[maicen/bimguard-analytics](https://github.com/maicen/bimguard-analytics)**: Dedicated analytics repository containing Power BI data models (`.pbip`), star schema data contracts (`issues.csv` fact table + dimension tables), and DAX measures.
 
 ## Git workflow (STRICT)
