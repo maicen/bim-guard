@@ -1,8 +1,10 @@
 <script lang="ts">
   import { Loader2, Star } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Alert from "./Alert.svelte";
   import { llmProvidersApi } from "../api";
   import { formatModelMeta } from "../utils/formatModelMeta";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
   import type { LLMProviderInstance, LLMTask, LLMTaskModelAssignment, LLMProviderModel } from "../types";
 
   interface Props {
@@ -34,6 +36,7 @@
   let defaultKey = $state<string | null>(null);
   let saving = $state(false);
   let saveError = $state("");
+  let saveErrorLog: ErrorLogEntry[] = $state([]);
   let filter = $state("");
 
   $effect(() => {
@@ -115,6 +118,7 @@
   async function handleSave() {
     saving = true;
     saveError = "";
+    saveErrorLog = [];
     const chosen = merged.filter((m) => selected.has(rowKey(m.instanceId, m.id)));
     const defaultModel = chosen.find((m) => rowKey(m.instanceId, m.id) === defaultKey) ?? null;
     try {
@@ -133,6 +137,7 @@
       onSaved(result);
     } catch (err: any) {
       saveError = err.message || "Could not save this shortlist.";
+      saveErrorLog = [toErrorLogEntry(err, task.key)];
     } finally {
       saving = false;
     }
@@ -150,9 +155,12 @@
       />
 
       {#if saveError}
-        <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-          {saveError}
-        </div>
+        <Alert
+          type="error"
+          message={saveError}
+          errors={saveErrorLog}
+          logTitle="Model Shortlist Save Error Log"
+        />
       {/if}
 
       {#if instances.length === 0}

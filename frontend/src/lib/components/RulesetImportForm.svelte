@@ -2,6 +2,8 @@
   import { untrack } from "svelte";
   import { rulesApi } from "../api";
   import type { IdsImportResult } from "../types";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     defaultRulesetId?: string;
@@ -15,6 +17,7 @@
   let importRulesetId = $state(untrack(() => defaultRulesetId));
   let isImporting = $state(false);
   let importError = $state("");
+  let importErrorLog: ErrorLogEntry[] = $state([]);
 
   let detectedFormat = $derived(
     importFile?.name.toLowerCase().endsWith(".json") ? "json" : "ids",
@@ -32,6 +35,7 @@
     }
     isImporting = true;
     importError = "";
+    importErrorLog = [];
     try {
       const res =
         detectedFormat === "json"
@@ -40,6 +44,7 @@
       onImported(res);
     } catch (err: any) {
       importError = err.message || "Failed to import ruleset file.";
+      importErrorLog = [toErrorLogEntry(err, importFile.name)];
     } finally {
       isImporting = false;
     }
@@ -48,9 +53,12 @@
 
 <div class="space-y-4">
   {#if importError}
-    <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical">
-      {importError}
-    </div>
+    <Alert
+      type="error"
+      message={importError}
+      errors={importErrorLog}
+      logTitle="Ruleset Import Error Log"
+    />
   {/if}
 
   <div class="space-y-1.5">

@@ -19,6 +19,8 @@
   import BsddBadge from "./BsddBadge.svelte";
   import LiveReliability from "./LiveReliability.svelte";
   import ReliabilityLegend from "./ReliabilityLegend.svelte";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     editingRule?: Rule | null;
@@ -159,6 +161,7 @@
 
   let isSaving = $state(false);
   let saveError = $state("");
+  let saveErrorLog: ErrorLogEntry[] = $state([]);
 
   async function handleSaveRule() {
     if (!formRuleId.trim() || !formPropertyName.trim()) {
@@ -167,6 +170,7 @@
     }
     isSaving = true;
     saveError = "";
+    saveErrorLog = [];
     try {
       // Convert the authored value into millimetres — the unit the compliance
       // engine always compares length properties in (see the UNIT_TO_MM
@@ -223,6 +227,7 @@
       onSaved(saved);
     } catch (err: any) {
       saveError = `Save failed: ${err.message}`;
+      saveErrorLog = [toErrorLogEntry(err, formRuleId.trim())];
     } finally {
       isSaving = false;
     }
@@ -231,9 +236,7 @@
 
 <div class="space-y-5">
   {#if saveError}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-300">
-      {saveError}
-    </div>
+    <Alert type="error" message={saveError} errors={saveErrorLog} logTitle="Rule Save Error Log" />
   {/if}
 
   {#if compact}
