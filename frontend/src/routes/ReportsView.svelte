@@ -239,15 +239,26 @@
     }
   });
 
+  // A fast double project-switch (via the header's global switcher) fires
+  // loadReport/loadBcfTopics twice in a row; network responses aren't
+  // guaranteed to arrive in request order, so a request token per function
+  // makes a slower, stale response a no-op instead of letting it clobber a
+  // newer one that already resolved.
+  let reportLoadToken = 0;
+
   async function loadReport() {
     if (!selectedProjectId) return;
+    const token = ++reportLoadToken;
     isLoading = true;
     try {
-      result = await analyzeApi.getResults(selectedProjectId, "architecture");
+      const res = await analyzeApi.getResults(selectedProjectId, "architecture");
+      if (token !== reportLoadToken) return;
+      result = res;
     } catch {
+      if (token !== reportLoadToken) return;
       result = null;
     } finally {
-      isLoading = false;
+      if (token === reportLoadToken) isLoading = false;
     }
   }
 
@@ -273,18 +284,24 @@
     }
   }
 
+  let bcfTopicsLoadToken = 0;
+
   async function loadBcfTopics() {
     if (!selectedProjectId) {
       bcfTopics = [];
       return;
     }
+    const token = ++bcfTopicsLoadToken;
     isTopicsLoading = true;
     try {
-      bcfTopics = await bcfApi.listTopics(selectedProjectId);
+      const topics = await bcfApi.listTopics(selectedProjectId);
+      if (token !== bcfTopicsLoadToken) return;
+      bcfTopics = topics;
     } catch {
+      if (token !== bcfTopicsLoadToken) return;
       bcfTopics = [];
     } finally {
-      isTopicsLoading = false;
+      if (token === bcfTopicsLoadToken) isTopicsLoading = false;
     }
   }
 
