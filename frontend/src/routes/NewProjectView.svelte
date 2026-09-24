@@ -28,6 +28,8 @@
     partitionByUploadSize,
     describeOversizedFiles,
   } from "../lib/fileLimits";
+  import Alert from "../lib/components/Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   interface Props {
     onCancel: () => void;
@@ -39,6 +41,7 @@
   let currentStep = $state(1);
   let isSubmitting = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let submitStatusMessage = $state("");
 
   // Form State
@@ -365,6 +368,7 @@
       }
     }
     errorMessage = "";
+    errorLog = [];
     currentStep = stepNum;
   }
 
@@ -378,6 +382,7 @@
 
     isSubmitting = true;
     errorMessage = "";
+    errorLog = [];
 
     try {
       const documentIds = Array.from(selectedDocIds);
@@ -425,6 +430,7 @@
             `Project "${name}" was saved, but attaching the models failed: ` +
             `${uploadErr.message || "unknown error"}. Adjust the selection and press ` +
             `Create again — the models will attach to the project that already exists.`;
+          errorLog = [toErrorLogEntry(uploadErr, `project #${createdProject.id}, ${ifcFiles.length} model(s)`)];
           currentStep = 2;
           return;
         } finally {
@@ -449,6 +455,7 @@
       onProjectCreated(createdProject);
     } catch (err: any) {
       errorMessage = err.message || "Failed to complete project setup wizard.";
+      errorLog = [toErrorLogEntry(err, name.trim() || "new project")];
     } finally {
       isSubmitting = false;
     }
@@ -524,8 +531,13 @@
     <!-- Body -->
     <div class="flex-1 p-6">
       {#if errorMessage}
-        <div class="mb-4 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-          {errorMessage}
+        <div class="mb-4">
+          <Alert
+            type="error"
+            message={errorMessage}
+            errors={errorLog}
+            logTitle="New Project Error Log"
+          />
         </div>
       {/if}
 
@@ -959,6 +971,7 @@
               }
             }
             errorMessage = "";
+            errorLog = [];
             currentStep += 1;
           }}
           class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover"

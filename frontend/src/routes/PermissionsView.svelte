@@ -7,6 +7,8 @@
   import { permissionsApi, organizationsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import type { OrgRole, OrganizationSummary, PermissionActionInfo, RolePermission } from "../lib/types";
+  import Alert from "../lib/components/Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   const ROLE_OPTIONS: { value: OrgRole; label: string }[] = [
     { value: "member", label: "Member (and above)" },
@@ -21,6 +23,7 @@
   let matrix = $state<RolePermission[]>([]);
   let loading = $state(true);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let savingAction = $state<string | null>(null);
 
   // Empty string = platform default scope; otherwise an organization id.
@@ -32,12 +35,14 @@
       orgs = res.organizations;
     } catch (err: any) {
       error = err.message || "Failed to load organizations.";
+      errorLog = [toErrorLogEntry(err, "load organizations")];
     }
   }
 
   async function loadMatrix() {
     loading = true;
     error = "";
+    errorLog = [];
     try {
       const [actionList, matrixList] = await Promise.all([
         permissionsApi.actions(),
@@ -47,6 +52,7 @@
       matrix = matrixList;
     } catch (err: any) {
       error = err.message || "Failed to load the permission matrix.";
+      errorLog = [toErrorLogEntry(err, "load permission matrix")];
     } finally {
       loading = false;
     }
@@ -63,6 +69,7 @@
   async function handleSetMinRole(action: string, minRole: OrgRole) {
     savingAction = action;
     error = "";
+    errorLog = [];
     try {
       await permissionsApi.setMinRole(
         action as any,
@@ -72,6 +79,7 @@
       await loadMatrix();
     } catch (err: any) {
       error = err.message || "Failed to update this action's minimum role.";
+      errorLog = [toErrorLogEntry(err, action)];
     } finally {
       savingAction = null;
     }
@@ -81,11 +89,13 @@
     if (!scope) return;
     savingAction = action;
     error = "";
+    errorLog = [];
     try {
       await permissionsApi.resetToDefault(action as any, Number(scope));
       await loadMatrix();
     } catch (err: any) {
       error = err.message || "Failed to reset this action to the platform default.";
+      errorLog = [toErrorLogEntry(err, action)];
     } finally {
       savingAction = null;
     }
@@ -146,9 +156,7 @@
       </div>
 
       {#if error}
-        <div class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300">
-          {error}
-        </div>
+        <Alert type="error" message={error} errors={errorLog} logTitle="Permissions Error Log" />
       {/if}
 
       {#if loading}
