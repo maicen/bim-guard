@@ -25,6 +25,7 @@
   import type { ElementLayer, ArrowStyle } from "./PdfElementOverlay.svelte";
   import { Popover } from "bits-ui";
   import { Switch, Checkbox, Slider, Select } from "./ui";
+  import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     documentId: number;
@@ -44,6 +45,8 @@
   let textPanelEl: HTMLDivElement = $state();
   let loading = $state(true);
   let error: string | null = $state(null);
+  let errorLog: ErrorLogEntry[] = $state([]);
+  let errorLogCopied = $state(false);
   let isPdf = $state(false);
   let plainText = $state("");
   let filename = $state("");
@@ -885,6 +888,7 @@
       queueMicrotask(scrollToHighlightInText);
     } catch (err: any) {
       error = err?.message || "Failed to load document.";
+      errorLog = [toErrorLogEntry(err, `document #${documentId}`)];
       loading = false;
     }
   }
@@ -945,7 +949,10 @@
       await withTimeout(renderTask.promise, RENDER_TIMEOUT_MS, "Rendering this page took too long.");
     } catch (err: any) {
       if (err?.name === "RenderingCancelledException") return;
-      if (myGeneration === renderGeneration) error = err?.message || "Failed to render this page.";
+      if (myGeneration === renderGeneration) {
+        error = err?.message || "Failed to render this page.";
+        errorLog = [toErrorLogEntry(err, `document #${documentId}, page ${currentPage}`)];
+      }
       return;
     }
     if (myGeneration !== renderGeneration) return;
@@ -1163,7 +1170,25 @@
     </div>
   {:else if error}
     <div class="flex flex-1 items-center justify-center">
-      <EmptyState title="Couldn't load document" description={error} icon={AlertCircle} />
+      <EmptyState title="Couldn't load document" description={error} icon={AlertCircle}>
+        {#if errorLog.length > 0}
+          <button
+            type="button"
+            onclick={async () => {
+              const ok = await copyToClipboard(
+                buildIssueLog("Document Viewer Error Log", { "Document ID": documentId }, errorLog),
+              );
+              if (ok) {
+                errorLogCopied = true;
+                setTimeout(() => (errorLogCopied = false), 2000);
+              }
+            }}
+            class="mx-auto flex items-center gap-1.5 rounded-lg border border-border-default px-2.5 py-1.5 text-caption font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          >
+            <span>{errorLogCopied ? "Copied!" : "Copy issue log"}</span>
+          </button>
+        {/if}
+      </EmptyState>
     </div>
   {:else}
     {#if doclangLoadError && !doclangXml}

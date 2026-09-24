@@ -2,9 +2,10 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree, Terminal } from "lucide-svelte";
+  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree, Terminal, Copy } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
+  import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
   import { resolvedTheme } from "../theme";
   import type { Model } from "../types";
   import CollapsiblePanel from "./CollapsiblePanel.svelte";
@@ -111,6 +112,8 @@
   let loading = $state(false);
   let loadingMessage = $state("Initializing OpenBIM 3D Viewport...");
   let error: string | null = $state(null);
+  let errorLog: ErrorLogEntry[] = $state([]);
+  let errorLogCopied = $state(false);
   let loadedProjectId: number | null = $state(null);
   let loadedFileId: number | null = $state(null);
   let loadedBcfArtifactId: number | null = $state(null);
@@ -249,6 +252,7 @@
     } catch (err: any) {
       console.error("Failed to initialize 3D viewer:", err);
       error = err?.message || "Failed to initialize 3D viewer engine";
+      errorLog = [toErrorLogEntry(err, "viewer init")];
     } finally {
       loading = false;
     }
@@ -262,6 +266,7 @@
         ? `Loading ${fileName}...`
         : `Loading IFC geometry for Project #${id}...`;
       error = null;
+      errorLog = [];
 
       // This module's own fetch (in the static viewer bundle) doesn't go
       // through api.ts's apiFetch, so it doesn't get that choke point's wait
@@ -298,6 +303,7 @@
     } catch (err: any) {
       console.error("Failed to load project IFC:", err);
       error = err?.message || "Failed to load IFC geometry for this project";
+      errorLog = [toErrorLogEntry(err, `project #${id}`)];
     } finally {
       loading = false;
     }
@@ -309,12 +315,14 @@
       loading = true;
       loadingMessage = `Parsing ${file.name}...`;
       error = null;
+      errorLog = [];
       await viewerAPI.loadIfc(file);
       loadedProjectId = null;
       loadedFileId = null;
     } catch (err: any) {
       console.error("Failed to parse local IFC file:", err);
       error = err?.message || "Failed to parse local IFC model";
+      errorLog = [toErrorLogEntry(err, file.name)];
     } finally {
       loading = false;
     }
@@ -393,16 +401,36 @@
         <AlertCircle class="h-4 w-4 shrink-0 text-critical" />
         <span>{error}</span>
       </div>
-      {#if projectId}
-        <button
-          type="button"
-          onclick={() => loadProjectModel(projectId, fileId)}
-          class="flex items-center gap-1 rounded-lg bg-critical px-2.5 py-1 text-caption font-medium text-white transition-opacity hover:opacity-90"
-        >
-          <RefreshCw class="h-3 w-3" />
-          <span>Retry</span>
-        </button>
-      {/if}
+      <div class="flex items-center gap-2">
+        {#if errorLog.length > 0}
+          <button
+            type="button"
+            onclick={async () => {
+              const ok = await copyToClipboard(
+                buildIssueLog("Viewer Error Log", { "Project ID": projectId ?? undefined }, errorLog),
+              );
+              if (ok) {
+                errorLogCopied = true;
+                setTimeout(() => (errorLogCopied = false), 2000);
+              }
+            }}
+            class="flex items-center gap-1 rounded-lg border border-critical-border px-2.5 py-1 text-caption font-medium text-critical transition-opacity hover:opacity-80"
+          >
+            <Copy class="h-3 w-3" />
+            <span>{errorLogCopied ? "Copied!" : "Copy issue log"}</span>
+          </button>
+        {/if}
+        {#if projectId}
+          <button
+            type="button"
+            onclick={() => loadProjectModel(projectId, fileId)}
+            class="flex items-center gap-1 rounded-lg bg-critical px-2.5 py-1 text-caption font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <RefreshCw class="h-3 w-3" />
+            <span>Retry</span>
+          </button>
+        {/if}
+      </div>
     </div>
   {/if}
 
