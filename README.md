@@ -146,7 +146,7 @@ By default `.env` points at the team's shared hosted Supabase project for both P
 supabase start
 ```
 
-This boots a full local stack in Docker (Postgres, Auth, Storage, Studio) and replays every file in `supabase/migrations/` against it, so you get the real schema — including the Arch-only `CHECK` constraints — locally. Copy the "API URL" / "anon key" / "service_role key" it prints into the `SUPABASE_*` variables in your `.env` (and the matching `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` in `frontend/.env`, per `frontend/.env.example`). See the "Local Development Database & Storage" comment block in `example.env` for the exact variables. `supabase stop` tears it down; `supabase db reset` wipes and replays migrations for a clean slate.
+This boots a full local stack in Docker (Postgres, Auth, Storage, Studio) and replays every file in `supabase/migrations/` against it, so you get the real schema — including the Arch-only `CHECK` constraints — locally. Copy the `SUPABASE_*` values from [`example.env.local`](example.env.local) into your `.env` — these are `supabase start`'s fixed local demo keys, already filled in — and the matching `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` into `frontend/.env` per `frontend/.env.example`. `supabase stop` tears it down; `supabase db reset` wipes and replays migrations for a clean slate.
 
 If you also run `docker compose up` locally (for `neo4j`/`docling-serve`/`opencde`), see `docker-compose.override.yml` — `opencde` needs `OPENCDE_SUPABASE_URL=http://host.docker.internal:54321` to reach a local Supabase stack from inside the container network.
 

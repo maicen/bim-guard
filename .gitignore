@@ -11,6 +11,7 @@ site/
 
 # Environment variables (contains secrets — never commit)
 .env
+.env.local
 
 # Virtual environments
 .venv
