@@ -4,10 +4,21 @@ title = "gitleaks config for bim-guard"
 useDefault = true
 
 [allowlist]
-  paths = []
+  # Files with known false positives or non-secret reference values
+  paths = [
+    # Historical reference data: material keys (e.g. "brass_yellow_268") in the
+    # deleted MIL-STD-889B table in git history flagged as generic-api-key.
+    '''data/reference/mil_std_889b_table_ii\.json''',
+    # Deterministic dummy keys printed by local `supabase start` for dev CLI stack.
+    '''example\.env\.local''',
+  ]
 
-  # Historical Gemini API key committed in example.env (commit f74f892), already
-  # rotated/dead and long since replaced with a placeholder in the current file.
   regexes = [
+    # Historical Gemini API key committed in example.env (commit f74f892), already
+    # rotated/dead and long since replaced with a placeholder in the current file.
     '''AIzaSyA_nYcNlJjwiJypAOBaZE0cRcdSweav7vU''',
+    # Dummy mock API key in unit tests verifying error redaction (commit cb70074).
+    '''sk-or-v1-abcdef1234567890abcdef''',
+    # Local Supabase CLI demo JWTs (iss: supabase-demo) in example.env.local.
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI[A-Za-z0-9_\-\.]+''',
   ]
