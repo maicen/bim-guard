@@ -85,6 +85,7 @@
   let engineKinds = $state<ParsingEngineKind[]>([]);
   let enginesLoading = $state(true);
   let enginesError = $state("");
+  let enginesErrorLog: ErrorLogEntry[] = $state([]);
   let showAddEngineForm = $state(false);
   let isSavingEngine = $state(false);
   let newEngineName = $state("");
@@ -107,16 +108,19 @@
       if (!newEngineKind && engineKinds.length > 0) newEngineKind = engineKinds[0].kind;
     } catch (err: any) {
       enginesError = err.message || "Failed to load parsing engine kinds.";
+      enginesErrorLog = [toErrorLogEntry(err, "load parsing engine kinds")];
     }
   }
 
   async function loadEngines() {
     enginesLoading = true;
     enginesError = "";
+    enginesErrorLog = [];
     try {
       engines = await parsingEnginesApi.list();
     } catch (err: any) {
       enginesError = err.message || "Failed to load parsing engines.";
+      enginesErrorLog = [toErrorLogEntry(err, "load parsing engines")];
     } finally {
       enginesLoading = false;
     }
@@ -143,6 +147,7 @@
     }
     isSavingEngine = true;
     enginesError = "";
+    enginesErrorLog = [];
     try {
       await parsingEnginesApi.create({
         name: newEngineName.trim(),
@@ -158,6 +163,7 @@
       await loadEngines();
     } catch (err: any) {
       enginesError = err.message || "Failed to register parsing engine.";
+      enginesErrorLog = [toErrorLogEntry(err, newEngineName.trim())];
     } finally {
       isSavingEngine = false;
     }
@@ -169,6 +175,7 @@
       await loadEngines();
     } catch (err: any) {
       enginesError = err.message || "Failed to set default parsing engine.";
+      enginesErrorLog = [toErrorLogEntry(err, engine.name)];
     }
   }
 
@@ -178,6 +185,7 @@
       await loadEngines();
     } catch (err: any) {
       enginesError = err.message || "Failed to update parsing engine.";
+      enginesErrorLog = [toErrorLogEntry(err, engine.name)];
     }
   }
 
@@ -203,6 +211,7 @@
       engines = engines.filter((e) => e.id !== engine.id);
     } catch (err: any) {
       enginesError = err.message || "Could not delete parsing engine.";
+      enginesErrorLog = [toErrorLogEntry(err, engine.name)];
     } finally {
       enginePendingDelete = null;
     }
@@ -214,6 +223,7 @@
   let orgEngines = $state<ParsingEngineInstance[]>([]);
   let orgEnginesLoading = $state(true);
   let orgEnginesError = $state("");
+  let orgEnginesErrorLog: ErrorLogEntry[] = $state([]);
   let showAddOrgEngineForm = $state(false);
   let isSavingOrgEngine = $state(false);
   let newOrgEngineName = $state("");
@@ -229,10 +239,12 @@
   async function loadOrgEngines(orgId: number) {
     orgEnginesLoading = true;
     orgEnginesError = "";
+    orgEnginesErrorLog = [];
     try {
       orgEngines = await orgParsingEnginesApi.list(orgId);
     } catch (err: any) {
       orgEnginesError = err.message || "Failed to load parsing engines.";
+      orgEnginesErrorLog = [toErrorLogEntry(err, "load parsing engines")];
     } finally {
       orgEnginesLoading = false;
     }
@@ -260,6 +272,7 @@
     }
     isSavingOrgEngine = true;
     orgEnginesError = "";
+    orgEnginesErrorLog = [];
     try {
       await orgParsingEnginesApi.create(activeOrg.organization_id, {
         name: newOrgEngineName.trim(),
@@ -275,6 +288,7 @@
       await loadOrgEngines(activeOrg.organization_id);
     } catch (err: any) {
       orgEnginesError = err.message || "Failed to register parsing engine.";
+      orgEnginesErrorLog = [toErrorLogEntry(err, newOrgEngineName.trim())];
     } finally {
       isSavingOrgEngine = false;
     }
@@ -287,6 +301,7 @@
       await loadOrgEngines(activeOrg.organization_id);
     } catch (err: any) {
       orgEnginesError = err.message || "Failed to set default parsing engine.";
+      orgEnginesErrorLog = [toErrorLogEntry(err, engine.name)];
     }
   }
 
@@ -299,6 +314,7 @@
       await loadOrgEngines(activeOrg.organization_id);
     } catch (err: any) {
       orgEnginesError = err.message || "Failed to update parsing engine.";
+      orgEnginesErrorLog = [toErrorLogEntry(err, engine.name)];
     }
   }
 
@@ -329,6 +345,7 @@
       orgEngines = orgEngines.filter((e) => e.id !== engine.id);
     } catch (err: any) {
       orgEnginesError = err.message || "Could not delete parsing engine.";
+      orgEnginesErrorLog = [toErrorLogEntry(err, engine.name)];
     } finally {
       orgEnginePendingDelete = null;
     }
@@ -563,6 +580,7 @@
   let taskAssignments = $state<LLMTaskModelAssignment[]>([]);
   let tasksLoading = $state(true);
   let tasksError = $state("");
+  let tasksErrorLog: ErrorLogEntry[] = $state([]);
   let configuringTask = $state<LLMTask | null>(null);
 
   function assignmentsForTask(taskKey: string): LLMTaskModelAssignment[] {
@@ -572,6 +590,7 @@
   async function loadTasksAndAssignments(orgId: number) {
     tasksLoading = true;
     tasksError = "";
+    tasksErrorLog = [];
     try {
       const [tasks, assignments] = await Promise.all([
         llmProvidersApi.tasks(orgId),
@@ -581,6 +600,7 @@
       taskAssignments = assignments;
     } catch (err: any) {
       tasksError = err.message || "Failed to load task shortlists.";
+      tasksErrorLog = [toErrorLogEntry(err, `org #${orgId}`)];
     } finally {
       tasksLoading = false;
     }
@@ -793,11 +813,12 @@
         {/if}
 
         {#if orgEnginesError}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
-          >
-            {orgEnginesError}
-          </div>
+          <Alert
+            type="error"
+            message={orgEnginesError}
+            errors={orgEnginesErrorLog}
+            logTitle="Org Parsing Engines Error Log"
+          />
         {/if}
 
         {#if showAddOrgEngineForm}
@@ -900,11 +921,12 @@
         {/if}
 
         {#if enginesError}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
-          >
-            {enginesError}
-          </div>
+          <Alert
+            type="error"
+            message={enginesError}
+            errors={enginesErrorLog}
+            logTitle="Platform Parsing Engines Error Log"
+          />
         {/if}
 
         {#if showAddEngineForm}
@@ -1104,9 +1126,7 @@
         </div>
 
         {#if tasksError}
-          <div class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300">
-            {tasksError}
-          </div>
+          <Alert type="error" message={tasksError} errors={tasksErrorLog} logTitle="Task Shortlists Error Log" />
         {/if}
 
         {#if tasksLoading}
