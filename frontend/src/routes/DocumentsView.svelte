@@ -174,7 +174,14 @@
     untrack(() => loadDocuments(true));
   });
 
+  // A fast double org-switch fires loadDocuments twice in a row; network
+  // responses aren't guaranteed to arrive in request order, so a request
+  // token makes a slower, stale response a no-op instead of letting it
+  // clobber a newer one that already resolved.
+  let loadToken = 0;
+
   async function loadDocuments(force = false) {
+    const token = ++loadToken;
     if (!documents.length) {
       isLoading = true;
     } else {
@@ -183,18 +190,23 @@
     error = "";
     errorLog = [];
     try {
-      documents = await documentsApi.list({
+      const result = await documentsApi.list({
         forceRefresh: force,
         organization_id: authState.activeOrganizationId,
       });
+      if (token !== loadToken) return;
+      documents = result;
     } catch (err: any) {
+      if (token !== loadToken) return;
       if (!documents.length) {
         error = err.message || "Failed to load document specifications.";
         errorLog = [toErrorLogEntry(err, "load documents")];
       }
     } finally {
-      isLoading = false;
-      isRefreshing = false;
+      if (token === loadToken) {
+        isLoading = false;
+        isRefreshing = false;
+      }
     }
   }
 

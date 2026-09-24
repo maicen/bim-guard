@@ -222,7 +222,13 @@
     untrack(() => loadData(true));
   });
 
+  // A fast double org-switch fires loadData twice in a row; network responses
+  // aren't guaranteed to arrive in request order, so a request token makes a
+  // slower, stale response a no-op instead of letting it clobber a newer one.
+  let loadToken = 0;
+
   async function loadData(force = false) {
+    const token = ++loadToken;
     if (!rules.length) {
       isLoading = true;
     } else {
@@ -235,16 +241,20 @@
         rulesApi.list({ organization_id: authState.activeOrganizationId }, { forceRefresh: force }),
         rulesApi.folders(undefined, { forceRefresh: force, organization_id: authState.activeOrganizationId }),
       ]);
+      if (token !== loadToken) return;
       rules = rulesData;
       folders = foldersData;
     } catch (err: any) {
+      if (token !== loadToken) return;
       if (!rules.length) {
         error = err.message || "Failed to load compliance rules";
         errorLog = [toErrorLogEntry(err, "load rules")];
       }
     } finally {
-      isLoading = false;
-      isRefreshing = false;
+      if (token === loadToken) {
+        isLoading = false;
+        isRefreshing = false;
+      }
     }
   }
 
