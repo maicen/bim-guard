@@ -163,9 +163,31 @@
   let saveError = $state("");
   let saveErrorLog: ErrorLogEntry[] = $state([]);
 
+  /**
+   * The offset inputs are `type="number"`, which blocks most garbage at
+   * the keyboard, but a browser still lets through strings like "-" or "1e"
+   * that parse to NaN -- catching that here shows a clear message instead
+   * of silently sending a malformed offset into the compliance engine,
+   * where it would only surface later as a confusing evaluation result.
+   */
+  function offsetValidationError(): string {
+    if (formValueMinOffset.trim() && !Number.isFinite(Number(formValueMinOffset))) {
+      return "Min offset must be a number.";
+    }
+    if (formValueMaxOffset.trim() && !Number.isFinite(Number(formValueMaxOffset))) {
+      return "Max offset must be a number.";
+    }
+    return "";
+  }
+
   async function handleSaveRule() {
     if (!formRuleId.trim() || !formPropertyName.trim()) {
       saveError = "Rule ID and Property Name are required.";
+      return;
+    }
+    const offsetError = offsetValidationError();
+    if (offsetError) {
+      saveError = offsetError;
       return;
     }
     isSaving = true;
