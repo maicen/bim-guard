@@ -2,7 +2,9 @@
   import { Pencil } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import Alert from "../Alert.svelte";
   import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -25,12 +27,14 @@
   let mechanismScope = $state("__keep__");
   let isUpdating = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   $effect(() => {
     if (isOpen) {
       category = "__keep__";
       mechanismScope = "__keep__";
       errorMessage = "";
+      errorLog = [];
       isUpdating = false;
     }
   });
@@ -48,6 +52,7 @@
   async function handleUpdate() {
     isUpdating = true;
     errorMessage = "";
+    errorLog = [];
     try {
       const payload: { category?: string; mechanism_scope?: string } = {};
       if (category !== "__keep__") payload.category = category;
@@ -57,6 +62,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err?.message || "Failed to update selected folders.";
+      errorLog = [toErrorLogEntry(err, `${selectedCount} folder(s)`)];
     } finally {
       isUpdating = false;
     }
@@ -73,9 +79,13 @@
 >
   <div class="space-y-4 text-xs">
     {#if errorMessage}
-      <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-critical">
-        {errorMessage}
-      </div>
+      <Alert
+        type="error"
+        message={errorMessage}
+        errors={errorLog}
+        logTitle="Ruleset Folder Bulk Edit Error Log"
+        logContext={{ "Folder count": selectedCount }}
+      />
     {/if}
 
     <div class="space-y-1.5">

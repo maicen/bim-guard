@@ -2,8 +2,10 @@
   import { Pencil } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import Alert from "../Alert.svelte";
   import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
   import type { RuleFolder } from "../../types";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -34,6 +36,7 @@
   let needsReview = $state("__keep__");
   let isUpdating = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   $effect(() => {
     if (isOpen) {
@@ -43,6 +46,7 @@
       severity = "__keep__";
       needsReview = "__keep__";
       errorMessage = "";
+      errorLog = [];
       isUpdating = false;
     }
   });
@@ -82,6 +86,7 @@
   async function handleUpdate() {
     isUpdating = true;
     errorMessage = "";
+    errorLog = [];
     try {
       const payload: {
         ruleset_id?: string;
@@ -100,6 +105,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err?.message || "Failed to update selected rules.";
+      errorLog = [toErrorLogEntry(err, `${selectedCount} rule(s)`)];
     } finally {
       isUpdating = false;
     }
@@ -116,9 +122,13 @@
 >
   <div class="space-y-4 text-xs">
     {#if errorMessage}
-      <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-critical">
-        {errorMessage}
-      </div>
+      <Alert
+        type="error"
+        message={errorMessage}
+        errors={errorLog}
+        logTitle="Rule Bulk Edit Error Log"
+        logContext={{ "Rule count": selectedCount }}
+      />
     {/if}
 
     <div class="space-y-1.5">

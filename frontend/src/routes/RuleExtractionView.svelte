@@ -26,6 +26,7 @@
   import { documentsApi, ruleExtractionApi, llmProvidersApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import type {
     DocumentItem,
     DocumentSection,
@@ -140,16 +141,7 @@
   // banner -- the banner text alone only ever showed the first failure, which
   // left reviewers unable to tell a platform admin exactly what failed for a
   // bulk action that touched many drafts.
-  let draftReviewErrorLog: Array<{
-    draftId?: number;
-    ruleId?: string;
-    status?: number;
-    message: string;
-    url?: string;
-    timestamp?: string;
-  }> = $state([]);
-  let showDraftErrorDetails = $state(false);
-  let draftErrorCopied = $state(false);
+  let draftReviewErrorLog: ErrorLogEntry[] = $state([]);
   let draftReviewErrorAction = $state("review");
 
   function describeDraftFailure(err: any, fallback: string): string {
@@ -160,50 +152,8 @@
     return reason;
   }
 
-  function toFailureLogEntry(
-    err: any,
-    draft?: { id?: number; proposed_rule?: { rule_id?: string } },
-  ) {
-    return {
-      draftId: draft?.id,
-      ruleId: draft?.proposed_rule?.rule_id,
-      status: err?.status,
-      message: err?.message || String(err),
-      url: err?.url,
-      timestamp: err?.timestamp,
-    };
-  }
-
-  function buildDraftIssueLog(action: string): string {
-    const lines = [
-      `BIM Guard — Draft Review Error Log`,
-      `Action: ${action}`,
-      `Generated: ${new Date().toISOString()}`,
-      `Document ID: ${selectedDocId ?? "(none)"}`,
-      `Ruleset: ${draftRules[0]?.proposed_rule.ruleset_id ?? "(unknown)"}`,
-      `Failures: ${draftReviewErrorLog.length}`,
-      "",
-    ];
-    draftReviewErrorLog.forEach((f, i) => {
-      lines.push(
-        `[${i + 1}] draft #${f.draftId ?? "?"} (${f.ruleId ?? "unknown rule"}) — HTTP ${f.status ?? "?"}`,
-      );
-      if (f.url) lines.push(`    url: ${f.url}`);
-      if (f.timestamp) lines.push(`    at: ${f.timestamp}`);
-      lines.push(`    ${f.message}`);
-    });
-    return lines.join("\n");
-  }
-
-  async function copyDraftIssueLog(action: string) {
-    try {
-      await navigator.clipboard.writeText(buildDraftIssueLog(action));
-      draftErrorCopied = true;
-      setTimeout(() => (draftErrorCopied = false), 2000);
-    } catch {
-      // Clipboard access can be denied by the browser -- nothing useful to
-      // recover to, the details panel text is still selectable manually.
-    }
+  function draftSubject(draft?: { id?: number; proposed_rule?: { rule_id?: string } }): string {
+    return `draft #${draft?.id ?? "?"} (${draft?.proposed_rule?.rule_id ?? "unknown rule"})`;
   }
 
   $effect(() => {
@@ -265,7 +215,7 @@
         err,
         `Failed to ${status === "accepted" ? "accept" : "reject"} "${draft.proposed_rule.rule_id}".`,
       );
-      draftReviewErrorLog = [toFailureLogEntry(err, draft)];
+      draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
       draftReviewErrorAction = status === "accepted" ? "accept" : "reject";
     }
   }
@@ -297,7 +247,7 @@
       })
       .catch((err: any) => {
         draftReviewError = describeDraftFailure(err, "Failed to save draft edits.");
-        draftReviewErrorLog = [toFailureLogEntry(err, draftBeingEdited)];
+        draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draftBeingEdited))];
         draftReviewErrorAction = "edit";
       });
   }
@@ -323,7 +273,7 @@
         err,
         `Failed to promote "${draft.proposed_rule.rule_id}".`,
       );
-      draftReviewErrorLog = [toFailureLogEntry(err, draft)];
+      draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
       draftReviewErrorAction = "promote";
     }
   }
@@ -373,7 +323,7 @@
           await ruleExtractionApi.promoteDraft(draft.id!);
           promotedIds.add(draft.id);
         } catch (err: any) {
-          failures.push(toFailureLogEntry(err, draft));
+          failures.push(toErrorLogEntry(err, draftSubject(draft)));
         }
       });
     } finally {
@@ -412,7 +362,7 @@
           await reviewDraft(draft, "accepted");
           accepted += 1;
         } catch (err: any) {
-          failures.push(toFailureLogEntry(err, draft));
+          failures.push(toErrorLogEntry(err, draftSubject(draft)));
         }
       });
     } finally {
@@ -976,38 +926,18 @@
           title="Draft review failed"
           message={draftReviewError}
           dismissible
+          errors={draftReviewErrorLog}
+          logTitle="Draft Review Error Log"
+          logContext={{
+            Action: draftReviewErrorAction,
+            "Document ID": selectedDocId ?? undefined,
+            Ruleset: draftRules[0]?.proposed_rule.ruleset_id,
+          }}
           onDismiss={() => {
             draftReviewError = "";
             draftReviewErrorLog = [];
-            showDraftErrorDetails = false;
           }}
         />
-        {#if draftReviewErrorLog.length > 0}
-          <div class="rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3">
-            <div class="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                class="text-xs font-semibold text-fg-secondary hover:text-fg-primary"
-                onclick={() => (showDraftErrorDetails = !showDraftErrorDetails)}
-              >
-                {showDraftErrorDetails ? "Hide" : "Show"} technical details ({draftReviewErrorLog.length}
-                issue{draftReviewErrorLog.length === 1 ? "" : "s"})
-              </button>
-              <button
-                type="button"
-                class="rounded-lg border border-border-default px-2.5 py-1 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                onclick={() => copyDraftIssueLog(draftReviewErrorAction)}
-              >
-                {draftErrorCopied ? "Copied!" : "Copy issue log"}
-              </button>
-            </div>
-            {#if showDraftErrorDetails}
-              <pre
-                class="mt-2 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-surface-card p-3 text-[11px] leading-relaxed text-fg-muted"
-              >{buildDraftIssueLog(draftReviewErrorAction)}</pre>
-            {/if}
-          </div>
-        {/if}
       {/if}
 
       {#if isLoadingDrafts}
@@ -1609,7 +1539,14 @@
       </div>
 
       {#if draftReviewError}
-        <Alert type="error" title="Could not save changes" message={draftReviewError} />
+        <Alert
+          type="error"
+          title="Could not save changes"
+          message={draftReviewError}
+          errors={draftReviewErrorLog}
+          logTitle="Draft Edit Error Log"
+          logContext={{ Action: draftReviewErrorAction, "Document ID": selectedDocId ?? undefined }}
+        />
       {/if}
 
       <div class="space-y-3 text-xs">

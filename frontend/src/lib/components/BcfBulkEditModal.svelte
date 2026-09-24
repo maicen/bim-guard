@@ -1,10 +1,12 @@
 <script lang="ts">
   import { run } from "svelte/legacy";
 
-  import { SlidersHorizontal, AlertTriangle } from "lucide-svelte";
+  import { SlidersHorizontal } from "lucide-svelte";
   import { bcfApi } from "../api";
   import { CDE_STATE_CHOICES } from "../types";
   import Modal from "./Modal.svelte";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen?: boolean;
@@ -27,6 +29,7 @@
   let cdeState = $state("no_change");
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   run(() => {
     if (isOpen) {
@@ -34,6 +37,7 @@
       priority = "no_change";
       cdeState = "no_change";
       errorMessage = "";
+      errorLog = [];
     }
   });
 
@@ -46,22 +50,35 @@
 
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
 
-    try {
-      for (const guid of selectedTopicGuids) {
+    const failures: ErrorLogEntry[] = [];
+    let updated = 0;
+    for (const guid of selectedTopicGuids) {
+      try {
         await bcfApi.updateTopic(projectId, guid, {
           topic_status: topicStatus !== "no_change" ? topicStatus : undefined,
           priority: priority !== "no_change" ? priority : undefined,
           cde_state: cdeState !== "no_change" ? (cdeState as any) : undefined,
         });
+        updated += 1;
+      } catch (err: any) {
+        failures.push(toErrorLogEntry(err, `topic ${guid}`));
       }
+    }
+    isSaving = false;
+
+    if (failures.length === 0) {
       onBulkUpdated();
       onClose();
-    } catch (err: any) {
-      errorMessage = err.message || "Failed to apply bulk update to BCF topics.";
-    } finally {
-      isSaving = false;
+      return;
     }
+    errorLog = failures;
+    errorMessage =
+      updated > 0
+        ? `Updated ${updated} of ${selectedTopicGuids.length} topics -- ${failures.length} failed: ${failures[0].message}`
+        : failures[0].message || "Failed to apply bulk update to BCF topics.";
+    if (updated > 0) onBulkUpdated();
   }
 </script>
 
@@ -74,12 +91,13 @@
   {onClose}
 >
   {#if errorMessage}
-    <div
-      class="flex items-center gap-2 rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical"
-    >
-      <AlertTriangle class="h-4 w-4 shrink-0 text-critical" />
-      <span>{errorMessage}</span>
-    </div>
+    <Alert
+      type="error"
+      message={errorMessage}
+      errors={errorLog}
+      logTitle="BCF Bulk Edit Error Log"
+      logContext={{ "Topic count": selectedTopicGuids.length }}
+    />
   {/if}
 
   <div
