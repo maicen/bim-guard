@@ -43,7 +43,9 @@
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import TabStrip, { type TabStripItem } from "../lib/components/TabStrip.svelte";
   import { Select, type SelectOption } from "../lib/components/ui";
+  import Alert from "../lib/components/Alert.svelte";
   import { createTableState } from "../lib/tableState.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   type ArtifactType = "bcf" | "pdf" | "csv";
 
@@ -105,6 +107,7 @@
   let result: AnalysisResult | null = null;
   let isLoading = false;
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   // ARCH Report Artifacts -- BCF, PDF and CSV each get their own list, own
   // loading flag and own project filter, but share one delete-confirmation
@@ -349,6 +352,7 @@
       topicToDelete = null;
     } catch (err: any) {
       error = `Failed to delete topic: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, topicToDelete.guid)];
     }
   }
 
@@ -361,6 +365,7 @@
       isTopicBulkDeleteModalOpen = false;
     } catch (err: any) {
       error = `Failed to delete selected topics: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `${topicTable.selectedIdList.length} topic(s)`)];
     }
   }
 
@@ -428,6 +433,7 @@
       artifactToDelete = null;
     } catch (err: any) {
       error = `Failed to delete ${type.toUpperCase()} artifact: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `${type} artifact #${artifact.id}`)];
     }
   }
 
@@ -440,15 +446,23 @@
     const type = bulkDeleteType;
     const table = tableFor(type);
     if (!table.selectedCount) return;
-    try {
-      for (const id of table.selectedIdList) {
+    const targetIds = table.selectedIdList;
+    const failures: ErrorLogEntry[] = [];
+    const deletedIds = new Set<number>();
+    for (const id of targetIds) {
+      try {
         await analyzeApi.deleteReportArtifact(type, id);
+        deletedIds.add(id);
+      } catch (err: any) {
+        failures.push(toErrorLogEntry(err, `${type} artifact #${id}`));
       }
-      setArtifactsFor(type, artifactsFor(type).filter((a) => !table.selectedIds.has(a.id)));
-      table.clearSelection();
-      isBulkDeleteArtifactsModalOpen = false;
-    } catch (err: any) {
-      error = `Failed to delete selected ${type.toUpperCase()} artifacts: ${err.message}`;
+    }
+    setArtifactsFor(type, artifactsFor(type).filter((a) => !deletedIds.has(a.id)));
+    table.clearSelection();
+    isBulkDeleteArtifactsModalOpen = false;
+    if (failures.length > 0) {
+      errorLog = failures;
+      error = `Could not delete ${failures.length} of ${targetIds.length} selected ${type.toUpperCase()} artifacts: ${failures[0].message}`;
     }
   }
 
@@ -471,9 +485,17 @@
   />
 
   {#if error}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-      {error}
-    </div>
+    <Alert
+      type="error"
+      message={error}
+      errors={errorLog}
+      logTitle="Reports Error Log"
+      dismissible
+      onDismiss={() => {
+        error = "";
+        errorLog = [];
+      }}
+    />
   {/if}
 
   {#if selectedProjectId}
