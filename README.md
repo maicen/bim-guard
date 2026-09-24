@@ -138,6 +138,18 @@ Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
+### 2b. (Optional) Local Database & Storage instead of the hosted project
+
+By default `.env` points at the team's shared hosted Supabase project for both Postgres and file storage — this is also what production always uses. To develop against a disposable local database and local file storage instead:
+
+```bash
+supabase start
+```
+
+This boots a full local stack in Docker (Postgres, Auth, Storage, Studio) and replays every file in `supabase/migrations/` against it, so you get the real schema — including the Arch-only `CHECK` constraints — locally. Copy the "API URL" / "anon key" / "service_role key" it prints into the `SUPABASE_*` variables in your `.env` (and the matching `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` in `frontend/.env`, per `frontend/.env.example`). See the "Local Development Database & Storage" comment block in `example.env` for the exact variables. `supabase stop` tears it down; `supabase db reset` wipes and replays migrations for a clean slate.
+
+If you also run `docker compose up` locally (for `neo4j`/`docling-serve`/`opencde`), see `docker-compose.override.yml` — `opencde` needs `OPENCDE_SUPABASE_URL=http://host.docker.internal:54321` to reach a local Supabase stack from inside the container network.
+
 ### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
 
 You can launch both the backend and frontend concurrently using the cross-platform launcher:
@@ -254,7 +266,7 @@ The RESTful backend with interactive Swagger docs at `http://127.0.0.1:8000/api/
 docker compose up --build
 ```
 
-`docker-compose.yml` wires the Supabase environment variables from your shell or `.env` file and mounts a cache volume for downloaded artifacts.
+`docker-compose.yml` wires the Supabase environment variables from your shell or `.env` file and mounts a cache volume for downloaded artifacts. A bare `docker compose up` like this also auto-merges `docker-compose.override.yml` — local-dev-only adjustments, currently just letting `opencde` reach a local Supabase stack (see §2b). It's a safe no-op when `OPENCDE_SUPABASE_URL` isn't set, so the production commands in §5 (which don't pass `-f`) merge it too without any behavior change, since production's `.env` always points `SUPABASE_URL` at the hosted project.
 
 ### Render
 

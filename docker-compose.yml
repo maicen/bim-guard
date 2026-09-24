@@ -17,6 +17,15 @@ services:
       - "${PORT:-8000}:8000"
     environment:
       # ── Supabase Configuration (Required for database & file storage) ────────
+      # Points at the team's hosted Supabase project by default. For local
+      # development against a disposable database and local file storage
+      # instead, run `supabase start` and point these at the local stack it
+      # prints (API URL / anon key / service_role key) via your .env — see
+      # the "Local Development Database & Storage (Supabase CLI)" section in
+      # example.env and README.md. Because bim-guard normally runs on the
+      # host in dev (not in this Compose project), no service here needs to
+      # change: only `opencde`, which does run in this project, needs the
+      # docker-compose.override.yml adjustment for reaching a local stack.
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
@@ -26,12 +35,6 @@ services:
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-bim-guard-artifacts}
       - SUPABASE_STORAGE_PREFIX=${SUPABASE_STORAGE_PREFIX:-}
       - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN:-}
-
-      # ── S3 Storage Configuration ────────────────────────────────────────────
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
-      - S3_REGION=${S3_REGION:-}
 
       # ── LLM Extraction & Agent Providers ────────────────────────────────────
       - BIM_GUARD_LLM_MODEL=${BIM_GUARD_LLM_MODEL:-openrouter/auto}

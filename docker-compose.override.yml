@@ -1,0 +1,29 @@
+# ==============================================================================
+# Local-dev-only overrides — auto-merged by any `docker compose` command run
+# without an explicit `-f` file list, including the production commands in
+# README.md/CLAUDE.md. That's safe: the only override below falls back to
+# the exact value the base file already uses whenever OPENCDE_SUPABASE_URL
+# is unset, which is always true in production (its .env only ever points
+# SUPABASE_URL at the hosted project, never at a local Supabase stack).
+#
+# Local Postgres + Storage themselves come from the Supabase CLI's own local
+# stack (`supabase start`), which manages its own separate Docker project —
+# it is not defined here. Point SUPABASE_URL/SUPABASE_KEY/etc. in your .env
+# at what `supabase start` prints; see the "Local Development Database &
+# Storage" section in example.env and README.md.
+#
+# The one service in *this* Compose project that needs an override is
+# `opencde`: it runs inside this project's container network, so when your
+# .env's SUPABASE_URL points at the local Supabase stack
+# (http://127.0.0.1:54321), that address resolves to the opencde container
+# itself rather than your host machine. Docker's host-loopback alias fixes
+# that. Set OPENCDE_SUPABASE_URL=http://host.docker.internal:54321 in your
+# .env when doing this; if SUPABASE_URL still points at the hosted project,
+# leave OPENCDE_SUPABASE_URL unset and this override is a no-op (falls back
+# to the same ${SUPABASE_URL} the base file already uses).
+# ==============================================================================
+
+services:
+  opencde:
+    environment:
+      Supabase__Url: ${OPENCDE_SUPABASE_URL:-${SUPABASE_URL}}
