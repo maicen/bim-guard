@@ -1,10 +1,12 @@
 <script lang="ts">
   import { run } from "svelte/legacy";
-  import { Pencil, UploadCloud, AlertTriangle, X as XIcon } from "lucide-svelte";
+  import { Pencil, UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Alert from "./Alert.svelte";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
   import { MAX_IFC_UPLOAD_BYTES, describeOversizedFiles } from "../fileLimits";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -30,6 +32,7 @@
 
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   // Re-seed the form fields whenever a different file is opened for editing.
   run(() => {
@@ -71,6 +74,7 @@
 
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
     try {
       let updated: Model;
       if (replacement) {
@@ -91,6 +95,7 @@
       onSaved(updated);
     } catch (err: any) {
       errorMessage = err?.message || "Failed to save model.";
+      errorLog = [toErrorLogEntry(err, file?.file_name || `model #${file?.id}`)];
     } finally {
       isSaving = false;
     }
@@ -113,12 +118,7 @@
   {#if file}
     <div class="space-y-4">
       {#if errorMessage}
-        <div
-          class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-        >
-          <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
-          <span>{errorMessage}</span>
-        </div>
+        <Alert type="error" message={errorMessage} errors={errorLog} logTitle="Edit Model Error Log" />
       {/if}
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">

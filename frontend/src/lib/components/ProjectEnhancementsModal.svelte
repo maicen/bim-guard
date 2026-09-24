@@ -7,12 +7,13 @@
     Sparkles,
     Download,
     CheckCircle2,
-    AlertTriangle,
     ShieldAlert,
     Eye,
   } from "lucide-svelte";
   import { lineageApi } from "../api";
   import type { Project, ModelLineageRecord } from "../types";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen?: boolean;
@@ -25,6 +26,7 @@
   let isRunning = $state(false);
   let message = $state("");
   let messageType: "success" | "error" = $state("success");
+  let messageErrorLog: ErrorLogEntry[] = $state([]);
   let history: ModelLineageRecord[] = $state([]);
   let isLoadingHistory = $state(false);
   let selectedVersionForView: ModelLineageRecord | null = $state(null);
@@ -51,6 +53,7 @@
     if (!project) return;
     isRunning = true;
     message = "";
+    messageErrorLog = [];
 
     try {
       const res = await lineageApi.enhance(project.id);
@@ -62,6 +65,7 @@
     } catch (err: any) {
       message = err.message || "Enhancement failed. Check project IFC source.";
       messageType = "error";
+      messageErrorLog = [toErrorLogEntry(err, `project #${project.id}`)];
     } finally {
       isRunning = false;
     }
@@ -99,17 +103,18 @@
 
       <!-- Body -->
       <div class="flex-1 space-y-6 overflow-y-auto p-6">
-        {#if message}
+        {#if message && messageType === "error"}
+          <Alert
+            type="error"
+            message={message}
+            errors={messageErrorLog}
+            logTitle="Quality Improvement Error Log"
+          />
+        {:else if message}
           <div
-            class="flex items-center gap-2 rounded-xl p-3.5 text-xs {messageType === 'success'
-              ? 'border border-emerald-800 bg-emerald-950/40 text-emerald-300'
-              : 'border border-rose-800 bg-rose-950/40 text-rose-300'}"
+            class="flex items-center gap-2 rounded-xl border border-emerald-800 bg-emerald-950/40 p-3.5 text-xs text-emerald-300"
           >
-            {#if messageType === "success"}
-              <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
-            {:else}
-              <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
-            {/if}
+            <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
             <span>{message}</span>
           </div>
         {/if}

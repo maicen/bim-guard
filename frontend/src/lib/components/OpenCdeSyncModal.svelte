@@ -15,6 +15,8 @@
   } from "lucide-svelte";
   import { cdeApi, projectsApi } from "../api";
   import type { Project, CDEState } from "../types";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen?: boolean;
@@ -31,6 +33,7 @@
   let syncSuccess = $state(false);
   let syncMessage = $state("");
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   // OpenCDE Foundation info
   let cdeVersions: any = $state(null);
@@ -76,6 +79,7 @@
       cdeUser = user;
     } catch (err: any) {
       errorMessage = err.message || "Failed to query OpenCDE Foundation discovery endpoint.";
+      errorLog = [toErrorLogEntry(err, "OpenCDE discovery")];
     } finally {
       isLoadingVersions = false;
     }
@@ -88,6 +92,7 @@
     }
     isSyncing = true;
     errorMessage = "";
+    errorLog = [];
     syncSuccess = false;
     syncMessage = "";
 
@@ -106,6 +111,7 @@
       }
     } catch (err: any) {
       errorMessage = err.message || "Document sync failed via OpenCDE API.";
+      errorLog = [toErrorLogEntry(err, `project #${selectedProjectId}`)];
     } finally {
       isSyncing = false;
     }
@@ -271,12 +277,12 @@
         </div>
 
         {#if errorMessage}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800/60 bg-rose-950/40 p-3 text-xs text-rose-300"
-          >
-            <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert
+            type="error"
+            message={errorMessage}
+            errors={errorLog}
+            logTitle="OpenCDE Sync Error Log"
+          />
         {/if}
 
         {#if syncSuccess}

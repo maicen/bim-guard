@@ -1,8 +1,10 @@
 <script lang="ts">
   import { run } from "svelte/legacy";
 
-  import { X, Check, Pencil, AlertTriangle } from "lucide-svelte";
+  import { X, Check, Pencil } from "lucide-svelte";
   import { bsddApi, projectsApi } from "../api";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
   import {
     PROJECT_CODE_MAX_LENGTH,
     PROJECT_CODE_MIN_LENGTH,
@@ -33,6 +35,7 @@
   let classificationStandard = $state("");
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   let classificationStandards: BSDDDictionaryItem[] = $state([]);
 
@@ -88,6 +91,7 @@
 
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
     try {
       const updated = await projectsApi.update(project.id, {
         name: name.trim(),
@@ -104,6 +108,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err.message || "Failed to update project.";
+      errorLog = [toErrorLogEntry(err, `project #${project.id}`)];
     } finally {
       isSaving = false;
     }
@@ -142,12 +147,12 @@
       <!-- Body Form -->
       <div class="space-y-4 overflow-y-auto p-6">
         {#if errorMessage}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-          >
-            <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert
+            type="error"
+            message={errorMessage}
+            errors={errorLog}
+            logTitle="Project Edit Error Log"
+          />
         {/if}
 
         <div class="space-y-1.5">

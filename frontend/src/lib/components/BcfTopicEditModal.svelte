@@ -5,7 +5,6 @@
     X,
     Check,
     FolderArchive,
-    AlertTriangle,
     Tag,
     Shield,
     Calendar,
@@ -15,6 +14,8 @@
   import type { BCFTopicResponse, BCFTopicCreatePayload, BCFTopicUpdatePayload } from "../types";
   import { CDE_STATE_CHOICES, SUITABILITY_CODES } from "../types";
   import { DatePicker, Select, type SelectOption } from "./ui";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   const typeOptions: SelectOption[] = [
     { value: "Issue", label: "Issue" },
@@ -61,6 +62,7 @@
 
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   let isEditing = $derived(!!topicToEdit);
 
@@ -103,6 +105,7 @@
 
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
 
     const guids = componentGuidsText
       .split(",")
@@ -146,6 +149,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err.message || "Failed to save BCF topic.";
+      errorLog = [toErrorLogEntry(err, title.trim() || "BCF topic")];
     } finally {
       isSaving = false;
     }
@@ -184,12 +188,12 @@
       <!-- Form Body -->
       <div class="space-y-4 overflow-y-auto p-6">
         {#if errorMessage}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-          >
-            <AlertTriangle class="h-4 w-4 shrink-0 text-rose-400" />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert
+            type="error"
+            message={errorMessage}
+            errors={errorLog}
+            logTitle="BCF Topic Save Error Log"
+          />
         {/if}
 
         <!-- Title -->

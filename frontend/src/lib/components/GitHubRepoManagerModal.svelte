@@ -16,6 +16,8 @@
   import { githubReposApi } from "../api";
   import type { GitHubRepo } from "../types";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import Alert from "./Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen?: boolean;
@@ -29,6 +31,7 @@
   let isLoading = $state(false);
   let isSubmitting = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let successMsg = $state("");
 
   // Add Form state
@@ -45,6 +48,7 @@
       repos = await githubReposApi.list();
     } catch (err: any) {
       error = err.message || "Failed to load repositories";
+      errorLog = [toErrorLogEntry(err, "load repositories")];
     } finally {
       isLoading = false;
     }
@@ -55,6 +59,7 @@
       loadRepos();
       showAddForm = false;
       error = "";
+      errorLog = [];
       successMsg = "";
     }
   });
@@ -67,6 +72,7 @@
 
     isSubmitting = true;
     error = "";
+    errorLog = [];
     successMsg = "";
 
     try {
@@ -87,6 +93,7 @@
       onReposUpdated();
     } catch (err: any) {
       error = err.message || "Failed to register repository.";
+      errorLog = [toErrorLogEntry(err, newUrl.trim())];
     } finally {
       isSubmitting = false;
     }
@@ -109,6 +116,7 @@
       onReposUpdated();
     } catch (err: any) {
       error = err.message || "Could not delete repository.";
+      errorLog = [toErrorLogEntry(err, repo.name)];
     } finally {
       repoPendingDelete = null;
     }
@@ -149,12 +157,7 @@
       <!-- Content -->
       <div class="flex-1 space-y-4 overflow-y-auto p-6">
         {#if error}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800/80 bg-rose-950/60 p-3.5 text-xs text-rose-300"
-          >
-            <AlertCircle class="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+          <Alert type="error" message={error} errors={errorLog} logTitle="GitHub Repo Error Log" />
         {/if}
 
         {#if successMsg}
