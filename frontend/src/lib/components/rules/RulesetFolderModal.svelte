@@ -2,8 +2,10 @@
   import { Folder, Pencil } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import Alert from "../Alert.svelte";
   import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
   import type { RulesetCategory } from "../../types";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -42,6 +44,7 @@
   let formDescription = $state("");
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   $effect(() => {
     if (isOpen) {
@@ -51,6 +54,7 @@
       formMechanismScope = mechanismScope;
       formDescription = description;
       errorMessage = "";
+      errorLog = [];
       isSaving = false;
     }
   });
@@ -66,6 +70,7 @@
     }
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
     try {
       await onSave({
         ruleset_id: formRulesetId.trim(),
@@ -77,6 +82,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err?.message || "Failed to save ruleset folder.";
+      errorLog = [toErrorLogEntry(err, formRulesetId.trim())];
     } finally {
       isSaving = false;
     }
@@ -95,9 +101,12 @@
 >
   <div class="space-y-4 text-xs">
     {#if errorMessage}
-      <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-critical">
-        {errorMessage}
-      </div>
+      <Alert
+        type="error"
+        message={errorMessage}
+        errors={errorLog}
+        logTitle="Ruleset Folder Error Log"
+      />
     {/if}
 
     <div class="space-y-1.5">

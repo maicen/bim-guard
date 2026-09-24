@@ -2,7 +2,9 @@
   import { Camera } from "lucide-svelte";
   import Modal from "../Modal.svelte";
   import Select, { type SelectOption } from "../ui/Select.svelte";
+  import Alert from "../Alert.svelte";
   import type { RuleSnapshotSourceMode } from "../../types";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -22,6 +24,7 @@
   let notes = $state("");
   let isSaving = $state(false);
   let errorMessage = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
 
   $effect(() => {
     if (isOpen) {
@@ -29,6 +32,7 @@
       sourceMode = "manual";
       notes = "";
       errorMessage = "";
+      errorLog = [];
       isSaving = false;
     }
   });
@@ -47,6 +51,7 @@
     }
     isSaving = true;
     errorMessage = "";
+    errorLog = [];
     try {
       await onSave({
         name: name.trim(),
@@ -56,6 +61,7 @@
       onClose();
     } catch (err: any) {
       errorMessage = err?.message || "Failed to save rule snapshot.";
+      errorLog = [toErrorLogEntry(err, name.trim())];
     } finally {
       isSaving = false;
     }
@@ -72,9 +78,12 @@
 >
   <div class="space-y-4 text-xs">
     {#if errorMessage}
-      <div class="rounded-xl border border-critical-border bg-critical-bg p-3 text-critical">
-        {errorMessage}
-      </div>
+      <Alert
+        type="error"
+        message={errorMessage}
+        errors={errorLog}
+        logTitle="Rule Snapshot Error Log"
+      />
     {/if}
 
     <div class="space-y-1.5">
