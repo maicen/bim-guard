@@ -22,9 +22,11 @@
   import ProviderInstanceForm from "../lib/components/ProviderInstanceForm.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TaskAssignmentModal from "../lib/components/TaskAssignmentModal.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { parsingEnginesApi, orgParsingEnginesApi, llmProvidersApi, settingsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import type {
     ParsingEngineInstance,
     ParsingEngineKind,
@@ -337,6 +339,7 @@
   let llmKinds = $state<LLMProviderKind[]>([]);
   let llmLoading = $state(true);
   let llmError = $state("");
+  let llmErrorLog: ErrorLogEntry[] = $state([]);
   let showAddLlmForm = $state(false);
   let isSavingLlm = $state(false);
   let isTestingNewLlm = $state(false);
@@ -380,16 +383,19 @@
       if (!newLlmKind && llmKinds.length > 0) newLlmKind = llmKinds[0].kind;
     } catch (err: any) {
       llmError = err.message || "Failed to load LLM provider kinds.";
+      llmErrorLog = [toErrorLogEntry(err, "load LLM provider kinds")];
     }
   }
 
   async function loadLlmInstances(orgId: number) {
     llmLoading = true;
     llmError = "";
+    llmErrorLog = [];
     try {
       llmInstances = await llmProvidersApi.list(orgId);
     } catch (err: any) {
       llmError = err.message || "Failed to load LLM providers.";
+      llmErrorLog = [toErrorLogEntry(err, "load LLM providers")];
     } finally {
       llmLoading = false;
     }
@@ -461,6 +467,7 @@
     }
     isSavingLlm = true;
     llmError = "";
+    llmErrorLog = [];
     try {
       await llmProvidersApi.create(activeOrg.organization_id, {
         name: newLlmName.trim(),
@@ -475,6 +482,7 @@
       await loadLlmInstances(activeOrg.organization_id);
     } catch (err: any) {
       llmError = err.message || "Failed to register LLM provider.";
+      llmErrorLog = [toErrorLogEntry(err, newLlmName.trim())];
     } finally {
       isSavingLlm = false;
     }
@@ -589,6 +597,7 @@
   let envVars = $state<EnvVarStatusItem[]>([]);
   let envLoading = $state(false);
   let envError = $state("");
+  let envErrorLog: ErrorLogEntry[] = $state([]);
   let envLoaded = $state(false);
 
   let envCategories = $derived.by(() => {
@@ -605,12 +614,14 @@
   async function loadEnvStatus() {
     envLoading = true;
     envError = "";
+    envErrorLog = [];
     try {
       const res = await settingsApi.getEnvStatus();
       envVars = res.variables || [];
       envLoaded = true;
     } catch (err: any) {
       envError = err.message || "Failed to load environment variable status.";
+      envErrorLog = [toErrorLogEntry(err, "load environment status")];
     } finally {
       envLoading = false;
     }
@@ -674,11 +685,12 @@
           </div>
         {:else}
           {#if envError}
-            <div
-              class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
-            >
-              {envError}
-            </div>
+            <Alert
+              type="error"
+              message={envError}
+              errors={envErrorLog}
+              logTitle="Environment Status Error Log"
+            />
           {/if}
 
           {#if envLoading}
@@ -988,11 +1000,7 @@
         </div>
 
         {#if llmError}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3.5 text-xs text-rose-300"
-          >
-            {llmError}
-          </div>
+          <Alert type="error" message={llmError} errors={llmErrorLog} logTitle="LLM Provider Error Log" />
         {/if}
 
         {#if showAddLlmForm}
