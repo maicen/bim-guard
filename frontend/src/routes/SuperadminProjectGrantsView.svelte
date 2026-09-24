@@ -99,6 +99,7 @@
 
       // Cross-organization grants
       const nextGrants: Record<number, Set<number>> = {};
+      let failedGrantOrgs = 0;
       await Promise.all(
         orgs.map(async (org) => {
           try {
@@ -106,10 +107,16 @@
             nextGrants[org.id] = new SvelteSet(res.project_ids);
           } catch {
             nextGrants[org.id] = new SvelteSet();
+            failedGrantOrgs += 1;
           }
         }),
       );
       crossOrgGrants = nextGrants;
+      if (failedGrantOrgs > 0) {
+        toasts.warning(
+          `Could not load project grants for ${failedGrantOrgs} organization(s) -- they show as ungranted below but may not be.`,
+        );
+      }
 
       // Determine active organization
       let effectiveOrgId = authState.activeOrganizationId;
@@ -141,6 +148,7 @@
       }
 
       const nextGroupGrants: Record<number, Set<number>> = {};
+      let failedGrantGroups = 0;
       await Promise.all(
         groups.map(async (group) => {
           try {
@@ -148,13 +156,20 @@
             nextGroupGrants[group.id] = new SvelteSet(res.project_ids);
           } catch {
             nextGroupGrants[group.id] = new SvelteSet();
+            failedGrantGroups += 1;
           }
         }),
       );
       groupGrants = nextGroupGrants;
-    } catch {
+      if (failedGrantGroups > 0) {
+        toasts.warning(
+          `Could not load project grants for ${failedGrantGroups} group(s) -- they show as ungranted below but may not be.`,
+        );
+      }
+    } catch (err) {
       groups = [];
       groupGrants = {};
+      toasts.fromError(err, "Could not load access groups for this organization.");
     }
   }
 

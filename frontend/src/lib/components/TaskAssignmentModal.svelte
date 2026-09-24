@@ -5,6 +5,7 @@
   import { llmProvidersApi } from "../api";
   import { formatModelMeta } from "../utils/formatModelMeta";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
+  import { toasts } from "../toast.svelte";
   import type { LLMProviderInstance, LLMTask, LLMTaskModelAssignment, LLMProviderModel } from "../types";
 
   interface Props {
@@ -55,12 +56,14 @@
   $effect(() => {
     loading = true;
     loadError = "";
+    const failedInstances: string[] = [];
     Promise.all(
       instances.map(async (instance) => {
         try {
           const models = await llmProvidersApi.models(organizationId, instance.id);
           return [instance.id, models] as const;
         } catch {
+          failedInstances.push(instance.name);
           return [instance.id, []] as const;
         }
       }),
@@ -69,6 +72,10 @@
         modelsByInstance = Object.fromEntries(entries);
         if (entries.every(([, models]) => models.length === 0) && instances.length > 0) {
           loadError = "Could not load models from any enabled provider instance.";
+        } else if (failedInstances.length > 0) {
+          toasts.warning(
+            `Could not load models from: ${failedInstances.join(", ")}. Shown list may be incomplete.`,
+          );
         }
       })
       .finally(() => {

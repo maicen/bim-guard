@@ -94,6 +94,7 @@
       rulesets = folderRes;
 
       const nextGrants: Record<number, Set<string>> = {};
+      let failedGrantOrgs = 0;
       await Promise.all(
         orgs.map(async (org) => {
           try {
@@ -101,10 +102,16 @@
             nextGrants[org.id] = new SvelteSet(res.ruleset_ids);
           } catch {
             nextGrants[org.id] = new SvelteSet();
+            failedGrantOrgs += 1;
           }
         }),
       );
       grants = nextGrants;
+      if (failedGrantOrgs > 0) {
+        toasts.warning(
+          `Could not load ruleset grants for ${failedGrantOrgs} organization(s) -- they show as ungranted below but may not be.`,
+        );
+      }
       dirty.clear();
       selectedRulesetIds.clear();
 
