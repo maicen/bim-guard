@@ -10,6 +10,7 @@ from time import perf_counter
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -403,6 +404,46 @@ async def supabase_transport_error_handler(request: Request, exc: TransportError
         status_code=503,
         content={"detail": "Database temporarily unavailable. Please try again."},
     )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Flatten FastAPI's default 422 body to the app-wide ``{"detail": str}`` shape.
+
+    Every other error response in this app (``HTTPException(detail=...)``) is a
+    plain string, but a 422 raised by Pydantic validation defaults to
+    ``{"detail": [{"loc": [...], "msg": ..., "type": ...}, ...]}`` instead. The
+    frontend's ``handleResponse`` (``frontend/src/lib/api.ts``) already flattens
+    that array client-side for display, so this mirrors the exact same
+    ``"field: message"`` joining here, making the wire format consistent for
+    any other consumer (a script, another client) that only expects a string.
+    """
+    parts: list[str] = []
+    for err in exc.errors():
+        loc = err.get("loc") or ()
+        field = ".".join(str(p) for p in loc[1:])
+        msg = err.get("msg", "Invalid value")
+        parts.append(f"{field}: {msg}" if field else str(msg))
+    detail = "; ".join(parts) or "Invalid request."
+    return JSONResponse(status_code=422, content={"detail": detail})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Turn an unhandled exception into a clean 500 JSON body instead of Starlette's blank one.
+
+    Without this, an exception with no matching handler above falls through to
+    Starlette's default error response -- plain text, no JSON body, and no
+    logging -- so the frontend's ``handleResponse`` has nothing to parse and
+    the failure is invisible in the logs. This must stay registered last: more
+    specific handlers (``TransportError``, ``RequestValidationError``) are
+    matched first by FastAPI regardless of source order, but keeping this one
+    last in the file makes that precedence obvious to a reader.
+    """
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error."})
 
 
 # Register API Gateway routers directly under /api prefix
