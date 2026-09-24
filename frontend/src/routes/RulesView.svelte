@@ -60,7 +60,9 @@
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import Badge from "../lib/components/Badge.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { DropdownMenu as Menu, Tabs } from "bits-ui";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import {
     RuleDetailsModal,
     RulesetFolderModal,
@@ -141,6 +143,7 @@
   let isLoading = $state(!cachedRules);
   let isRefreshing = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let successMessage = $state("");
   let isDeleteModalOpen = $state(false);
   let ruleToDelete: { id: number; ruleId: string } | null = $state(null);
@@ -226,6 +229,7 @@
       isRefreshing = true;
     }
     error = "";
+    errorLog = [];
     try {
       const [rulesData, foldersData] = await Promise.all([
         rulesApi.list({ organization_id: authState.activeOrganizationId }, { forceRefresh: force }),
@@ -236,6 +240,7 @@
     } catch (err: any) {
       if (!rules.length) {
         error = err.message || "Failed to load compliance rules";
+        errorLog = [toErrorLogEntry(err, "load rules")];
       }
     } finally {
       isLoading = false;
@@ -350,6 +355,7 @@
       setTimeout(() => (successMessage = ""), 4000);
     } catch (err: any) {
       error = `Could not delete selected rules: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} rule(s)`)];
     }
   }
 
@@ -407,6 +413,7 @@
       setTimeout(() => (successMessage = ""), 4000);
     } catch (err: any) {
       error = `Could not delete selected folders: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `${selectedFolderRulesetIds.length} folder(s)`)];
     } finally {
       isBulkDeletingFolders = false;
     }
@@ -805,9 +812,17 @@
   </div>
 
   {#if error}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-      {error}
-    </div>
+    <Alert
+      type="error"
+      message={error}
+      errors={errorLog}
+      logTitle="Rules Error Log"
+      dismissible
+      onDismiss={() => {
+        error = "";
+        errorLog = [];
+      }}
+    />
   {/if}
 
   {#if successMessage}

@@ -41,6 +41,8 @@
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
   import DocumentUploadModal from "../lib/components/DocumentUploadModal.svelte";
   import DocumentEditModal from "../lib/components/DocumentEditModal.svelte";
+  import Alert from "../lib/components/Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   /** Icon identifier for a document's file extension, rendered as a vscode-icons SVG. */
   function fileIconFor(filename: string): string {
@@ -92,6 +94,7 @@
   let isLoading = $state(!cachedDocs);
   let isRefreshing = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let isDeleteModalOpen = $state(false);
   let isOpenCdeModalOpen = $state(false);
   let isBulkEditModalOpen = $state(false);
@@ -178,6 +181,7 @@
       isRefreshing = true;
     }
     error = "";
+    errorLog = [];
     try {
       documents = await documentsApi.list({
         forceRefresh: force,
@@ -186,6 +190,7 @@
     } catch (err: any) {
       if (!documents.length) {
         error = err.message || "Failed to load document specifications.";
+        errorLog = [toErrorLogEntry(err, "load documents")];
       }
     } finally {
       isLoading = false;
@@ -235,15 +240,25 @@
 
   async function confirmBulkDelete() {
     if (!table.selectedCount) return;
-    try {
-      for (const id of table.selectedIdList) {
+    error = "";
+    errorLog = [];
+    const targetIds = table.selectedIdList;
+    const failures: ErrorLogEntry[] = [];
+    const deletedIds = new Set<number>();
+    for (const id of targetIds) {
+      try {
         await documentsApi.delete(id);
+        deletedIds.add(id);
+      } catch (err: any) {
+        failures.push(toErrorLogEntry(err, `document #${id}`));
       }
-      documents = documents.filter((d) => !table.selectedIds.has(d.id));
-      table.clearSelection();
-      isBulkDeleteModalOpen = false;
-    } catch (err: any) {
-      error = `Could not delete selected documents: ${err.message}`;
+    }
+    documents = documents.filter((d) => !deletedIds.has(d.id));
+    table.clearSelection();
+    isBulkDeleteModalOpen = false;
+    if (failures.length > 0) {
+      errorLog = failures;
+      error = `Could not delete ${failures.length} of ${targetIds.length} selected documents: ${failures[0].message}`;
     }
   }
 
@@ -296,6 +311,7 @@
       docToDelete = null;
     } catch (err: any) {
       error = `Failed to delete document: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, docToDelete.filename)];
     }
   }
 </script>
@@ -361,9 +377,17 @@
   </div>
 
   {#if error}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-      {error}
-    </div>
+    <Alert
+      type="error"
+      message={error}
+      errors={errorLog}
+      logTitle="Documents Error Log"
+      dismissible
+      onDismiss={() => {
+        error = "";
+        errorLog = [];
+      }}
+    />
   {/if}
 
   {#if successMessage}
