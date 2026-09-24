@@ -32,6 +32,7 @@
   import Alert from "../lib/components/Alert.svelte";
   import { Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import type {
     Project,
     ArchAnalysisResult,
@@ -63,6 +64,7 @@
   });
   let isRunning = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let result: ArchAnalysisResult | null = $state(null);
 
   // Rule folder selection — '' means "All rules"
@@ -117,6 +119,7 @@
       }
     } catch (err: any) {
       error = err.message || "Failed to load projects";
+      errorLog = [toErrorLogEntry(err, "load projects")];
     }
   });
 
@@ -253,6 +256,7 @@
     if (!selectedProjectId) return;
     isRunning = true;
     error = "";
+    errorLog = [];
     reportSaveMessage = "";
     // Registers with the global pipeline tracker so a user who navigates away
     // mid-run still sees progress in the header and gets a completion toast.
@@ -272,6 +276,7 @@
       }
     } catch (err: any) {
       error = err.message || "Architectural compliance check failed.";
+      errorLog = [toErrorLogEntry(err, `project #${selectedProjectId}, ruleset ${selectedFolder || "(all)"}`)];
     } finally {
       isRunning = false;
       pipelineTracker.untrack(selectedProjectId);
@@ -680,9 +685,7 @@
   </div>
 
   {#if error}
-    <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-      {error}
-    </div>
+    <Alert type="error" message={error} errors={errorLog} logTitle="Compliance Run Error Log" />
   {/if}
 
   {#if reportSaveMessage}

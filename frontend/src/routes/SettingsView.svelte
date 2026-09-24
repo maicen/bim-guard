@@ -17,6 +17,8 @@
   import { isAuthConfigured } from "../lib/supabaseClient";
   import type { SettingItem } from "../lib/types";
   import PageHeader from "../lib/components/PageHeader.svelte";
+  import Alert from "../lib/components/Alert.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   let settings: SettingItem[] = $state([]);
   let activeLogLevel = $state("INFO");
@@ -24,6 +26,7 @@
   let isLoading = $state(true);
   let isSaving = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let successMessage = $state("");
 
   // ── Your Profile ──────────────────────────────────────────────────────────
@@ -31,6 +34,7 @@
   let profileTitle = $state("");
   let profileSaving = $state(false);
   let profileError = $state("");
+  let profileErrorLog: ErrorLogEntry[] = $state([]);
   let profileSuccess = $state("");
 
   // authState.profile loads asynchronously after sign-in, independent of this
@@ -44,12 +48,14 @@
   async function handleSaveProfile() {
     profileSaving = true;
     profileError = "";
+    profileErrorLog = [];
     profileSuccess = "";
     try {
       await authState.updateProfile({ full_name: profileFullName.trim(), title: profileTitle.trim() });
       profileSuccess = "Profile saved.";
     } catch (err: any) {
       profileError = err.message || "Failed to save profile.";
+      profileErrorLog = [toErrorLogEntry(err, "save profile")];
     } finally {
       profileSaving = false;
     }
@@ -63,6 +69,7 @@
       dbBackend = data.db_backend || "SUPABASE";
     } catch (err: any) {
       error = err.message || "Failed to load application settings.";
+      errorLog = [toErrorLogEntry(err, "load settings")];
     } finally {
       isLoading = false;
     }
@@ -71,6 +78,7 @@
   async function handleSave() {
     isSaving = true;
     error = "";
+    errorLog = [];
     successMessage = "";
 
     const payload: Record<string, string> = {};
@@ -85,6 +93,7 @@
       successMessage = "Runtime settings saved and persisted to database.";
     } catch (err: any) {
       error = err.message || "Failed to save settings.";
+      errorLog = [toErrorLogEntry(err, "save settings")];
     } finally {
       isSaving = false;
     }
@@ -115,12 +124,17 @@
   </PageHeader>
 
   {#if error}
-    <div
-      class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300"
-    >
-      <AlertCircle class="h-4 w-4 shrink-0 text-rose-400" />
-      <span>{error}</span>
-    </div>
+    <Alert
+      type="error"
+      message={error}
+      errors={errorLog}
+      logTitle="Settings Error Log"
+      dismissible
+      onDismiss={() => {
+        error = "";
+        errorLog = [];
+      }}
+    />
   {/if}
 
   {#if successMessage}
@@ -143,12 +157,12 @@
       </div>
 
       {#if profileError}
-        <div
-          class="flex items-center gap-2 rounded-xl border border-critical-border/60 bg-critical-bg/40 p-3.5 text-xs text-critical"
-        >
-          <AlertCircle class="h-4 w-4 shrink-0 text-critical" />
-          <span>{profileError}</span>
-        </div>
+        <Alert
+          type="error"
+          message={profileError}
+          errors={profileErrorLog}
+          logTitle="Profile Save Error Log"
+        />
       {/if}
       {#if profileSuccess}
         <div

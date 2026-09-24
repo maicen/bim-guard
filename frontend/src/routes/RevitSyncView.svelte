@@ -32,12 +32,15 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { createTableState } from "../lib/tableState.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   let copied = $state(false);
   let isSendingTest = $state(false);
   let testResponse: RevitSyncResponse | null = $state(null);
   let testError: string | null = $state(null);
+  let testErrorLog: ErrorLogEntry[] = $state([]);
 
   // The sync response carries no unique key — rule_ref repeats across targets
   // and properties — so rows get a stable index-based id when they arrive.
@@ -158,6 +161,7 @@ print(response.read())
   async function runSimulation() {
     isSendingTest = true;
     testError = null;
+    testErrorLog = [];
     testResponse = null;
     indexedResults = [];
     table.clearSelection();
@@ -168,6 +172,7 @@ print(response.read())
       indexedResults = (testResponse.results || []).map((r, i) => ({ ...r, rowId: i }));
     } catch (err: any) {
       testError = err.message || "Failed to communicate with Revit Sync Gateway.";
+      testErrorLog = [toErrorLogEntry(err, "Revit Sync Gateway")];
     } finally {
       isSendingTest = false;
     }
@@ -293,12 +298,12 @@ print(response.read())
 
   <!-- Test Simulation Results -->
   {#if testError}
-    <div
-      class="flex items-start gap-2.5 rounded-2xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300"
-    >
-      <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
-      <div>{testError}</div>
-    </div>
+    <Alert
+      type="error"
+      message={testError}
+      errors={testErrorLog}
+      logTitle="Revit Sync Test Error Log"
+    />
   {:else if isSendingTest}
     <LoadingState message="Auditing payload against building codes…" />
   {/if}

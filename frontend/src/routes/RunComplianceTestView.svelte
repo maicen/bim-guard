@@ -16,12 +16,14 @@
   import PageHeader from "../lib/components/PageHeader.svelte";
   import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
   import UploadModelsModal from "../lib/components/UploadModelsModal.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { projectsApi, modelsApi, rulesApi, documentsApi, analyzeApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
   import type { Project, RuleFolder, Model } from "../lib/types";
   import { formatAnalysisDomain } from "../lib/analysisDomain";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   // Step 1: project + IFC model.
   let isWizardOpen = $state(false);
@@ -45,6 +47,7 @@
   // Step 3: run.
   let isRunning = $state(false);
   let runError = $state("");
+  let runErrorLog: ErrorLogEntry[] = $state([]);
 
   const hasModel = $derived(ifcFiles.length > 0);
   const hasRuleset = $derived(!!selectedFolder);
@@ -149,6 +152,7 @@
     if (!project || !hasModel || !hasRuleset) return;
     isRunning = true;
     runError = "";
+    runErrorLog = [];
     try {
       await analyzeApi.runArch(project.id, selectedFolder);
       // A one-shot builder for a URL string, never read reactively, so the
@@ -160,6 +164,7 @@
       push(`/arch?${params.toString()}`);
     } catch (err: any) {
       runError = err?.message || "Failed to run the compliance test.";
+      runErrorLog = [toErrorLogEntry(err, `project #${project.id}, ruleset ${selectedFolder || "(all)"}`)];
     } finally {
       isRunning = false;
     }
@@ -366,12 +371,7 @@
     </div>
 
     {#if runError}
-      <div
-        class="flex items-center gap-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300"
-      >
-        <AlertCircle class="h-4 w-4 shrink-0" />
-        <span>{runError}</span>
-      </div>
+      <Alert type="error" message={runError} errors={runErrorLog} logTitle="Compliance Test Error Log" />
     {/if}
 
     <button

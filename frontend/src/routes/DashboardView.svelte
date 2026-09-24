@@ -36,7 +36,9 @@
   import TableCheckbox from "../lib/components/TableCheckbox.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
+  import Alert from "../lib/components/Alert.svelte";
   import { createTableState } from "../lib/tableState.svelte";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import {
     normalizeAnalysisDomain,
     formatAnalysisDomain,
@@ -72,6 +74,7 @@
   let isLoading = $state(!cachedStats && !cachedProjects);
   let isRefreshing = $state(false);
   let error = $state("");
+  let errorLog: ErrorLogEntry[] = $state([]);
   let unsubscribeProjects: (() => void) | null = null;
 
   // Search, filter, sort, paginate and select for the project registry table.
@@ -170,6 +173,7 @@
       projectToDelete = null;
     } catch (err: any) {
       error = `Could not delete project: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `project #${projectToDelete.id}`)];
     }
   }
 
@@ -182,6 +186,7 @@
       isBulkDeleteModalOpen = false;
     } catch (err: any) {
       error = `Could not delete selected projects: ${err.message}`;
+      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} project(s)`)];
     }
   }
 
@@ -367,9 +372,17 @@
     </div>
 
     {#if error}
-      <div class="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-xs text-rose-300">
-        {error}
-      </div>
+      <Alert
+        type="error"
+        message={error}
+        errors={errorLog}
+        logTitle="Dashboard Error Log"
+        dismissible
+        onDismiss={() => {
+          error = "";
+          errorLog = [];
+        }}
+      />
     {/if}
 
     <!-- Filters and Search Bar -->
