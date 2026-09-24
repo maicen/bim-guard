@@ -195,6 +195,69 @@ def test_import_error_raised_when_neo4j_missing():
             Neo4jDatabaseProvider(driver=None)
 
 
+class FlakySession(FakeSession):
+    """A session whose .run() raises for the first N calls, then succeeds.
+
+    Models a transient driver error (a leader election, a dropped
+    connection) that clears up on retry -- see Neo4jDatabaseProvider's
+    execute_query, which retries this same exception family the driver's own
+    managed-transaction retry would absorb.
+    """
+
+    def __init__(self, exc_factory, fail_times, run_results=None):
+        super().__init__(run_results)
+        self._exc_factory = exc_factory
+        self._fail_times = fail_times
+        self.attempts = 0
+
+    def run(self, query, parameters=None):
+        self.attempts += 1
+        if self.attempts <= self._fail_times:
+            raise self._exc_factory()
+        return super().run(query, parameters)
+
+
+def test_execute_query_retries_transient_error_then_succeeds(provider, mock_driver):
+    from neo4j.exceptions import ServiceUnavailable
+
+    flaky = FlakySession(lambda: ServiceUnavailable("no leader"), fail_times=2)
+    flaky.run_results = [FakeRecord({"ok": True})]
+    mock_driver.session_instance = flaky
+
+    with patch("app.services.neo4j_provider.time.sleep"):
+        results = provider.execute_query("MATCH (n) RETURN n")
+
+    assert results == [{"ok": True}]
+    assert flaky.attempts == 3  # failed twice, succeeded on the third
+
+
+def test_execute_query_raises_after_exhausting_retries(provider, mock_driver):
+    from neo4j.exceptions import SessionExpired
+
+    flaky = FlakySession(lambda: SessionExpired("session gone"), fail_times=10)
+    mock_driver.session_instance = flaky
+
+    with patch("app.services.neo4j_provider.time.sleep"):
+        with pytest.raises(SessionExpired):
+            provider.execute_query("MATCH (n) RETURN n")
+
+    assert flaky.attempts == 3  # bounded to _RETRY_ATTEMPTS, not retried forever
+
+
+def test_execute_query_does_not_retry_non_transient_error(provider, mock_driver):
+    from neo4j.exceptions import CypherSyntaxError
+
+    flaky = FlakySession(lambda: CypherSyntaxError("bad query"), fail_times=10)
+    mock_driver.session_instance = flaky
+
+    with patch("app.services.neo4j_provider.time.sleep") as mock_sleep:
+        with pytest.raises(CypherSyntaxError):
+            provider.execute_query("NOT VALID CYPHER")
+
+    assert flaky.attempts == 1  # no retry for a real query error
+    mock_sleep.assert_not_called()
+
+
 class TestGraphServiceWithNeo4j:
     """GraphService domain methods with Neo4jDatabaseProvider."""
 

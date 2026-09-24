@@ -8,18 +8,29 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
 try:
     import neo4j
     from neo4j import Driver, GraphDatabase
+    from neo4j.exceptions import ServiceUnavailable, SessionExpired, TransientError
 except ImportError:
     neo4j = None
     Driver = None
     GraphDatabase = None
+    ServiceUnavailable = SessionExpired = TransientError = Exception
 
 logger = logging.getLogger(__name__)
+
+#: Retried like the Neo4j driver's own managed-transaction retry (which this
+#: code doesn't get, since queries run via session.run() rather than
+#: session.execute_read/execute_write) -- a leader election, a routing table
+#: refresh, or a dropped connection is transient, not a real query failure.
+_RETRYABLE_NEO4J_EXCEPTIONS = (ServiceUnavailable, SessionExpired, TransientError)
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY_S = 0.5
 
 #: Neo4j label/property/relationship-type names are interpolated into Cypher
 #: queries, so every identifier is validated against this pattern before use.
@@ -69,7 +80,12 @@ class Neo4jDatabaseProvider:
                 )
 
             auth = (username, password) if (username and password) else None
-            self.driver = GraphDatabase.driver(uri, auth=auth)
+            # Previously unset (driver default is 30s), which meant a single
+            # unreachable server made every caller of this provider hang for
+            # 30s before finding out. Bounded explicitly so a genuinely down
+            # Neo4j fails fast enough for the retry loop in execute_query to
+            # matter, instead of one hang eating the whole retry budget.
+            self.driver = GraphDatabase.driver(uri, auth=auth, connection_timeout=10.0)
 
         self.uri = uri
         self.username = username
@@ -103,20 +119,46 @@ class Neo4jDatabaseProvider:
     def execute_query(
         self, query: str, parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """Execute a Cypher query and return the results as a list of dictionaries."""
-        results: List[Dict[str, Any]] = []
-        try:
-            with self.driver.session(database=self.database) as session:
-                records = session.run(query, parameters or {})
-                for record in records:
-                    if hasattr(record, "data"):
-                        results.append(record.data())
-                    else:
-                        results.append(dict(record))
-        except Exception as exc:
-            logger.error("Neo4j query failed: %s -> %s", query, exc)
-            raise
-        return results
+        """Execute a Cypher query and return the results as a list of dictionaries.
+
+        Retries a bounded number of times on a transient driver error
+        (``ServiceUnavailable``, ``SessionExpired``, ``TransientError``) --
+        the same class of error the driver's own managed-transaction retry
+        (``session.execute_read``/``execute_write``) would absorb, which this
+        auto-commit ``session.run()`` call doesn't get for free. A non-transient
+        error (a Cypher syntax error, a constraint violation) is not retried
+        and is raised immediately, same as before.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(_RETRY_ATTEMPTS):
+            results: List[Dict[str, Any]] = []
+            try:
+                with self.driver.session(database=self.database) as session:
+                    records = session.run(query, parameters or {})
+                    for record in records:
+                        if hasattr(record, "data"):
+                            results.append(record.data())
+                        else:
+                            results.append(dict(record))
+                return results
+            except _RETRYABLE_NEO4J_EXCEPTIONS as exc:
+                last_exc = exc
+                if attempt == _RETRY_ATTEMPTS - 1:
+                    logger.error("Neo4j query failed after %d attempts: %s -> %s", _RETRY_ATTEMPTS, query, exc)
+                    raise
+                logger.warning(
+                    "Neo4j query hit a transient error (attempt %d/%d): %s -> %s",
+                    attempt + 1,
+                    _RETRY_ATTEMPTS,
+                    query,
+                    exc,
+                )
+                time.sleep(_RETRY_BASE_DELAY_S * (2**attempt))
+            except Exception as exc:
+                logger.error("Neo4j query failed: %s -> %s", query, exc)
+                raise
+        # Unreachable: the loop either returns results or raises on the last attempt.
+        raise last_exc or RuntimeError("Neo4j query retry loop exited without result or exception")
 
     def _pick_primary_key(self, properties: Dict[str, Any]) -> str:
         """Choose or generate a primary key property for a node."""

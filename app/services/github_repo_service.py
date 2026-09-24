@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from re import match
@@ -228,18 +229,46 @@ class GitHubRepoService:
         if token:
             headers["Authorization"] = f"token {token}"
 
-        try:
-            with httpx.Client(timeout=3.0, follow_redirects=True) as client:
-                resp = client.get(tree_url, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    tree = data.get("tree", [])
-                    if tree:
-                        self._tree_cache[cache_key] = (now_ts, tree)
-                        return tree
-                logger.warning("GitHub API tree request returned status %d for %s/%s", resp.status_code, owner, name)
-        except Exception as exc:
-            logger.warning("Could not fetch GitHub tree for %s/%s: %s", owner, name, exc)
+        # A single transient timeout/connection blip used to fall straight
+        # through to the static fallback tree (or an empty one for any repo
+        # without a fallback) -- retry the transient cases a couple of times
+        # before giving up, same shape as the bsdd_client/opencde_client
+        # retry-with-backoff pattern for other external REST APIs.
+        retry_attempts = 3
+        retry_base_delay_s = 0.5
+        for attempt in range(retry_attempts):
+            try:
+                with httpx.Client(timeout=3.0, follow_redirects=True) as client:
+                    resp = client.get(tree_url, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        tree = data.get("tree", [])
+                        if tree:
+                            self._tree_cache[cache_key] = (now_ts, tree)
+                            return tree
+                    if resp.status_code in (429, 502, 503, 504) and attempt < retry_attempts - 1:
+                        logger.warning(
+                            "GitHub API tree request returned %d for %s/%s (attempt %d), retrying",
+                            resp.status_code,
+                            owner,
+                            name,
+                            attempt + 1,
+                        )
+                        time.sleep(retry_base_delay_s * (2**attempt))
+                        continue
+                    logger.warning("GitHub API tree request returned status %d for %s/%s", resp.status_code, owner, name)
+                    break
+            except httpx.TransportError as exc:
+                if attempt == retry_attempts - 1:
+                    logger.warning("Could not fetch GitHub tree for %s/%s: %s", owner, name, exc)
+                    break
+                logger.warning(
+                    "Could not fetch GitHub tree for %s/%s (attempt %d): %s", owner, name, attempt + 1, exc
+                )
+                time.sleep(retry_base_delay_s * (2**attempt))
+            except Exception as exc:
+                logger.warning("Could not fetch GitHub tree for %s/%s: %s", owner, name, exc)
+                break
 
         # Fallback tree for default bimguard-test-models if API rate limited or offline
         fallback_tree = []
