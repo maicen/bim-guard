@@ -954,6 +954,29 @@ class RuleSourceMapResponse(BaseModel):
     orphaned_rules: list[RuleSourceSummary] = Field(default_factory=list)
 
 
+class RulesetDocumentSourceMap(BaseModel):
+    """One source document's contribution to a ruleset's source map."""
+
+    document_id: int
+    filename: str
+    elements: list[DocumentElementWithRules] = Field(default_factory=list)
+    unmapped_rules: list[RuleSourceSummary] = Field(default_factory=list)
+    orphaned_rules: list[RuleSourceSummary] = Field(default_factory=list)
+
+
+class RulesetSourceMapResponse(BaseModel):
+    """Every rule in a ruleset, mapped against its exact source element, across every source document.
+
+    A ruleset's rules are not necessarily all extracted from one document
+    (``source_document_id`` and ``ruleset_id`` are independent columns), so
+    this groups by document first and reuses the same per-document
+    exact/unmapped/orphaned split as ``RuleSourceMapResponse``.
+    """
+
+    ruleset_id: str
+    documents: list[RulesetDocumentSourceMap] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Rule & Ruleset Contracts
 # ---------------------------------------------------------------------------

@@ -474,6 +474,21 @@ export interface RuleSourceMapResponse {
   orphaned_rules: RuleSourceSummary[];
 }
 
+/** One source document's contribution to a ruleset's source map. */
+export interface RulesetDocumentSourceMap {
+  document_id: number;
+  filename: string;
+  elements: DocumentElementWithRules[];
+  unmapped_rules: RuleSourceSummary[];
+  orphaned_rules: RuleSourceSummary[];
+}
+
+/** Every rule in a ruleset, mapped against its exact source element, across every source document. */
+export interface RulesetSourceMapResponse {
+  ruleset_id: string;
+  documents: RulesetDocumentSourceMap[];
+}
+
 export interface DocumentUpdatePayload {
   filename?: string;
   doc_type?: string | null;

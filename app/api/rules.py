@@ -29,6 +29,8 @@ from app.api.organizations import _require_membership, _require_superadmin
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    DocumentElementBbox,
+    DocumentElementWithRules,
     DraftRelinkRequest,
     IdsImportResponse,
     RuleBulkActionResponse,
@@ -51,10 +53,13 @@ from app.modules.contracts import (
     RuleReliabilityResponse,
     RuleResponse,
     RuleSeedResponse,
+    RulesetDocumentSourceMap,
+    RulesetSourceMapResponse,
     RuleShaclShapeResponse,
     RuleSnapshotCreateRequest,
     RuleSnapshotResponse,
     RuleSourceResponse,
+    RuleSourceSummary,
     RuleUpdateRequest,
     build_rule_reliability,
 )
@@ -296,6 +301,74 @@ def list_all_rule_drafts(
 
     rows = RuleDraftService().list_all_drafts(status=status_filter, ruleset_id=ruleset_id)
     return RuleExtractionDraftListResponse(drafts=[RuleExtractionDraft.model_validate(row) for row in rows])
+
+
+@router.get(
+    "/rulesets/{ruleset_id}/source-map",
+    response_model=RulesetSourceMapResponse,
+    summary="Every rule in this ruleset, mapped against its exact source element, across every source document",
+)
+def get_ruleset_source_map(
+    ruleset_id: str,
+    service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RulesetSourceMapResponse:
+    """Group a ruleset's rules by source document, then by exact source element within each.
+
+    A ruleset can draw from more than one uploaded document (`ruleset_id`
+    and `source_document_id` are independent columns), so this answers
+    "which documents/clauses fed this ruleset" in one call instead of
+    requiring a separate `rule-source-map` lookup per document.
+    """
+    from app.services.documents_service import DocumentService
+    from app.services.rule_source_mapping import group_rows_by_element
+
+    rows_by_document: dict[int, list[dict]] = {}
+    for row in service.list_by_ruleset(ruleset_id):
+        document_id = row.get("source_document_id")
+        if document_id:
+            rows_by_document.setdefault(int(document_id), []).append(row)
+
+    docs_service = DocumentService()
+    documents: list[RulesetDocumentSourceMap] = []
+    for document_id, rows in rows_by_document.items():
+        doc = docs_service.get_document(document_id)
+        if not doc:
+            continue
+
+        elements = [DocumentElementBbox(**record) for record in docs_service.get_element_bboxes(doc)]
+        by_element, unmapped, orphaned = group_rows_by_element(elements, rows)
+
+        def _summary(row: dict, match_status: str) -> RuleSourceSummary:
+            return RuleSourceSummary(
+                id=row["id"],
+                rule_id=row.get("reference"),
+                description=row.get("description"),
+                severity=row.get("severity"),
+                category=row.get("category"),
+                source_page_number=row.get("source_page_number"),
+                source_bbox=row.get("source_bbox"),
+                source_element_id=row.get("source_element_id"),
+                match_status=match_status,
+            )
+
+        elements_with_rules = [
+            DocumentElementWithRules(
+                **el.model_dump(),
+                rules=[_summary(row, "exact") for row in by_element.get(el.element_id, [])],
+            )
+            for el in elements
+        ]
+        documents.append(
+            RulesetDocumentSourceMap(
+                document_id=document_id,
+                filename=doc.get("filename", "document"),
+                elements=elements_with_rules,
+                unmapped_rules=[_summary(row, "unmapped") for row in unmapped],
+                orphaned_rules=[_summary(row, "orphaned") for row in orphaned],
+            )
+        )
+
+    return RulesetSourceMapResponse(ruleset_id=ruleset_id, documents=documents)
 
 
 @router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")

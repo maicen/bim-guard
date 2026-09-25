@@ -119,6 +119,7 @@ import type {
   RuleSnapshot,
   RuleSnapshotCreatePayload,
   RuleShaclShapeResponse,
+  RulesetSourceMapResponse,
   RuleSourceMapResponse,
   RuleSourceResponse,
   SparqlQueryResult,
@@ -1162,6 +1163,11 @@ export const rulesApi = {
       return `${API_BASE}/rules/export-json/${encodeURIComponent(rulesetId)}`;
     }
     return `${API_BASE}/rules/export-json`;
+  },
+
+  async getRulesetSourceMap(rulesetId: string): Promise<RulesetSourceMapResponse> {
+    const res = await apiFetch(`${API_BASE}/rules/rulesets/${encodeURIComponent(rulesetId)}/source-map`);
+    return handleResponse<RulesetSourceMapResponse>(res);
   },
 
   async importIds(file: File, rulesetId: string): Promise<IdsImportResult> {
