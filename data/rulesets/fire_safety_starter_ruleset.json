@@ -1,0 +1,102 @@
+{
+  "ruleset_id": "FIRE-SAFETY-STARTER",
+  "mechanism": "CODE",
+  "category": "Arch",
+  "rules": [
+    {
+      "reference": "FIRE-SAFETY-STARTER.001",
+      "rule_type": "property_presence",
+      "rule_category": "fire_safety",
+      "description": "STARTER — verify against your applicable code before enforcing: compartment/party walls should document a fire-resistance rating (Pset_WallCommon.FireRating).",
+      "target_ifc_class": "IfcWall",
+      "property_set": "Pset_WallCommon",
+      "property_name": "FireRating",
+      "operator": "documented",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.002",
+      "rule_type": "property_presence",
+      "rule_category": "fire_safety",
+      "description": "STARTER — verify against your applicable code before enforcing: slabs/floors forming a fire compartment boundary should document a fire-resistance rating (Pset_SlabCommon.FireRating).",
+      "target_ifc_class": "IfcSlab",
+      "property_set": "Pset_SlabCommon",
+      "property_name": "FireRating",
+      "operator": "documented",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.003",
+      "rule_type": "property_presence",
+      "rule_category": "fire_safety",
+      "description": "STARTER — verify against your applicable code before enforcing: doors on a fire-separated egress path should document a fire-resistance rating (Pset_DoorCommon.FireRating).",
+      "target_ifc_class": "IfcDoor",
+      "property_set": "Pset_DoorCommon",
+      "property_name": "FireRating",
+      "operator": "documented",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.004",
+      "rule_type": "property_presence",
+      "rule_category": "fire_safety",
+      "description": "STARTER — verify against your applicable code before enforcing: a fire-rated door should document a self-closing device (Pset_DoorCommon.SelfClosing) — a fire door without a self-closer is a common real-world defect.",
+      "target_ifc_class": "IfcDoor",
+      "property_set": "Pset_DoorCommon",
+      "property_name": "SelfClosing",
+      "operator": "documented",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.005",
+      "rule_type": "property_presence",
+      "rule_category": "fire_safety",
+      "description": "STARTER — verify against your applicable code before enforcing: doors and windows on a designated fire-exit path should be flagged as such (Pset_DoorCommon.FireExit / Pset_WindowCommon.FireExit).",
+      "target_ifc_class": "IfcDoor",
+      "property_set": "Pset_DoorCommon",
+      "property_name": "FireExit",
+      "operator": "documented",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.006",
+      "rule_type": "numeric_comparison",
+      "rule_category": "fire_safety",
+      "description": "STARTER — illustrative threshold, verify against your applicable code before enforcing: fire compartment walls — minimum 45-minute fire resistance (generalizes the party-wall rule to every wall documenting a FireRating).",
+      "target_ifc_class": "IfcWall",
+      "property_set": "Pset_WallCommon",
+      "property_name": "FireRating",
+      "operator": ">=",
+      "check_value": 45.0,
+      "unit": "min",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    },
+    {
+      "reference": "FIRE-SAFETY-STARTER.007",
+      "rule_type": "numeric_comparison",
+      "rule_category": "fire_safety",
+      "description": "STARTER — illustrative threshold, verify against your applicable code before enforcing: fire doors on a compartment boundary — minimum 20-minute fire resistance.",
+      "target_ifc_class": "IfcDoor",
+      "property_set": "Pset_DoorCommon",
+      "property_name": "FireRating",
+      "operator": ">=",
+      "check_value": 20.0,
+      "unit": "min",
+      "severity": "recommended",
+      "needs_review": true,
+      "extraction_method": "seed"
+    }
+  ]
+}

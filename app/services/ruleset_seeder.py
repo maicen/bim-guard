@@ -18,6 +18,7 @@ _RULESET_DIR = Path(__file__).resolve().parents[2] / "data" / "rulesets"
 _DEFAULT_CODE_RULESET_FILES = (
     "building_code_part9_ruleset.json",
     "building_code_part9_ext_ruleset.json",
+    "fire_safety_starter_ruleset.json",
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
