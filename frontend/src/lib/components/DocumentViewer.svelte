@@ -752,55 +752,46 @@
     })
   );
 
-  // The "rendered" DocLang tab is windowed rather than mounting every block
-  // at once -- a large specification can produce thousands of heading/
-  // paragraph/table blocks, and Svelte still has to create + diff a DOM node
-  // per block. BLOCKS_PAGE_SIZE more are appended each time the sentinel at
-  // the bottom of the rendered list scrolls into view.
-  const BLOCKS_PAGE_SIZE = 150;
-  let visibleBlockCount = $state(BLOCKS_PAGE_SIZE);
-  let visibleBlocks = $derived(readingBlocks.slice(0, visibleBlockCount));
-  let blocksSentinelEl: HTMLDivElement | undefined = $state();
-  let blocksObserver: IntersectionObserver | null = null;
-
-  $effect(() => {
-    // Re-run whenever the filtered block list itself changes (new document,
-    // tab reopened, or a layer toggle flipped) so the window resets to the
-    // first page instead of staying wherever it was left.
-    void readingBlocks;
-    visibleBlockCount = BLOCKS_PAGE_SIZE;
+  // Reading View shows one page at a time rather than a continuous scroll --
+  // split the filtered blocks into per-page groups at each "page-break"
+  // divider. readingPages[i] holds page (i + 1)'s blocks (the divider itself
+  // isn't kept in either group; the page number is shown in the shared page
+  // nav bar instead).
+  let readingPages = $derived.by(() => {
+    const pages: DoclangBlock[][] = [];
+    let current: DoclangBlock[] = [];
+    for (const block of readingBlocks) {
+      if (block.type === "page-break") {
+        pages.push(current);
+        current = [];
+      } else {
+        current.push(block);
+      }
+    }
+    pages.push(current);
+    return pages;
   });
-
-  $effect(() => {
-    blocksObserver?.disconnect();
-    if (!blocksSentinelEl || readingBlocks.length <= visibleBlockCount) return;
-    blocksObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          visibleBlockCount = Math.min(visibleBlockCount + BLOCKS_PAGE_SIZE, readingBlocks.length);
-        }
-      },
-      { rootMargin: "400px" }
-    );
-    blocksObserver.observe(blocksSentinelEl);
-    return () => blocksObserver?.disconnect();
-  });
+  let visibleBlocks = $derived(readingPages[currentPage - 1] ?? []);
 
   // Cross-pane sync: when selection changes (from the XML tree or the bbox
   // overlay, not a click inside this pane itself) and the Reading View pane
-  // is visible, scroll the matching block into view -- expanding the
-  // windowed list first if the block hasn't been rendered yet.
+  // is visible, jump to whichever page holds the matching block (Reading
+  // View only renders the current page now) and scroll it into view.
   $effect(() => {
     const id = selectedElementId;
     if (!id || !showReadingPane) return;
-    const blockIdx = readingBlocks.findIndex(
-      (b) =>
-        ("elementId" in b && b.elementId === id) ||
-        (b.type === "list" && b.items.some((item) => item.elementId === id))
+    const targetPage = readingPages.findIndex((blocks) =>
+      blocks.some(
+        (b) =>
+          ("elementId" in b && b.elementId === id) ||
+          (b.type === "list" && b.items.some((item) => item.elementId === id))
+      )
     );
-    if (blockIdx === -1) return;
-    if (blockIdx >= visibleBlockCount) {
-      visibleBlockCount = Math.min(blockIdx + BLOCKS_PAGE_SIZE, readingBlocks.length);
+    if (targetPage === -1) return;
+    const pageNum = targetPage + 1;
+    if (pageNum !== currentPage) {
+      currentPage = pageNum;
+      pageInputValue = String(pageNum);
     }
     tick().then(() => {
       document
@@ -1054,22 +1045,14 @@
     else pageInputValue = String(currentPage);
   }
 
-  /** Scroll the Reading View pane to the "Page N" divider inserted between blocks. */
+  /** Reset the Reading View pane's scroll position after navigating to a new page. */
   async function scrollReadingViewToPage(page: number) {
     if (!readingViewBodyEl) return;
-    if (page <= 1) {
-      readingViewBodyEl.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    const idx = readingBlocks.findIndex((b) => b.type === "page-break" && b.pageNumber === page);
-    if (idx === -1) return;
-    if (idx >= visibleBlockCount) {
-      visibleBlockCount = Math.min(idx + BLOCKS_PAGE_SIZE, readingBlocks.length);
-    }
+    // `currentPage` (which readingPages is indexed by) has already been
+    // updated by the caller -- wait for that to flush to the DOM before
+    // resetting scroll, or we'd jump to the top of the *previous* page.
     await tick();
-    readingViewBodyEl
-      .querySelector(`[aria-label="Page ${page}"]`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    readingViewBodyEl.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   /** Scroll the DocLang XML pane to the Nth <page_break/> line (page N's break is the (N-1)th one). */
@@ -1321,6 +1304,14 @@
             All of this document's content is furniture/background and currently hidden — turn on the Layers toggles above to show it.
           </p>
         </div>
+      {:else if visibleBlocks.length === 0}
+        <div class="flex flex-col items-center justify-center py-16 text-center text-fg-muted">
+          <FileCode class="mb-2 h-10 w-10 text-fg-muted" />
+          <p class="text-sm font-semibold text-fg-secondary">Page {currentPage} is empty</p>
+          <p class="mt-1 max-w-md text-xs text-fg-muted">
+            This page has no renderable content, or everything on it is hidden by the Layers toggles above.
+          </p>
+        </div>
       {:else}
         <div class="mx-auto max-w-3xl space-y-4">
           {#each visibleBlocks as block, bIdx (bIdx)}
@@ -1490,21 +1481,8 @@
                         ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/50'
                         : 'border-border-default bg-surface-canvas/60'}"
                     ><code>{block.code}</code></pre>
-                  {:else if block.type === "page-break"}
-                    <div class="flex items-center gap-3 py-1" role="separator" aria-label="Page {block.pageNumber}">
-                      <div class="h-px flex-1 bg-surface-overlay"></div>
-                      <span class="shrink-0 text-caption font-semibold uppercase tracking-widest text-fg-muted"
-                        >Page {block.pageNumber}</span
-                      >
-                      <div class="h-px flex-1 bg-surface-overlay"></div>
-                    </div>
                   {/if}
                 {/each}
-          {#if visibleBlockCount < readingBlocks.length}
-            <div bind:this={blocksSentinelEl} class="flex justify-center py-4">
-              <span class="text-caption text-fg-muted">Loading more…</span>
-            </div>
-          {/if}
         </div>
       {/if}
     {/snippet}
