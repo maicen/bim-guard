@@ -7,11 +7,55 @@ reimplemented here.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+from typing import TYPE_CHECKING
+
 from langchain_core.tools import tool
 
 from app.logging_config import get_logger
 
+if TYPE_CHECKING:
+    from app.modules.ifc_reader import IFCReader
+
 logger = get_logger(__name__)
+
+# project_id -> (ifc_md5_hash, IFCReader). A geometry question routed through
+# the ReAct loop typically chains 2-3 of the geometry tools below in one
+# turn (find_elements -> get_element_geometry x2 -> get_distance...); without
+# this, each call would re-parse the IFC file from disk from scratch (there
+# is no cached parsed-model instance anywhere else in the app either -- every
+# other caller, e.g. run_validation, re-parses per call too). Bounded LRU so a
+# chatty multi-project session can't grow this unbounded; invalidated
+# automatically when a project's ifc_md5_hash changes (a re-upload).
+_READER_CACHE: "OrderedDict[int, tuple[str, IFCReader]]" = OrderedDict()
+_READER_CACHE_MAX = 4
+
+
+def _get_cached_reader(project_id: int) -> "IFCReader | None":
+    """Return the project's primary-model IFCReader, parsed once and reused across tool calls."""
+    from app.bootstrap import get_container
+    from app.modules.ifc_reader import IFCReader
+
+    project = get_container().projects_service.get_project(project_id)
+    if project is None:
+        return None
+    current_hash = project.get("ifc_md5_hash") or ""
+
+    cached = _READER_CACHE.get(project_id)
+    if cached is not None and cached[0] == current_hash:
+        _READER_CACHE.move_to_end(project_id)
+        return cached[1]
+
+    path = get_container().models_service.resolve_primary_path(project_id)
+    if path is None:
+        return None
+    reader = IFCReader(path)
+
+    _READER_CACHE[project_id] = (current_hash, reader)
+    _READER_CACHE.move_to_end(project_id)
+    while len(_READER_CACHE) > _READER_CACHE_MAX:
+        _READER_CACHE.popitem(last=False)
+    return reader
 
 
 @tool
@@ -174,6 +218,104 @@ def check_cde_transition(project_id: int, target_state: str) -> dict:
     }
 
 
+@tool
+def find_elements(
+    project_id: int,
+    ifc_class: str,
+    storey_name: str | None = None,
+    name_contains: str | None = None,
+    limit: int = 20,
+) -> dict:
+    """Find elements of a given IFC class in a project, optionally filtered by storey or name.
+
+    Use this first to resolve a fuzzy reference ("the exit door on level 2")
+    to a concrete GUID before calling get_element_geometry or
+    get_distance_between_elements — those two need an exact GUID, not a
+    description.
+    """
+    reader = _get_cached_reader(project_id)
+    if reader is None or reader.ifc_file is None:
+        return {"project_id": project_id, "error": "no IFC model available for this project"}
+
+    try:
+        elements = reader.ifc_file.by_type(ifc_class)
+    except Exception as exc:
+        return {"project_id": project_id, "error": f"unknown or unparseable IFC class {ifc_class!r}: {exc}"}
+
+    name_needle = (name_contains or "").strip().lower()
+    storey_needle = (storey_name or "").strip().lower()
+    matches = []
+    for el in elements:
+        if name_needle and name_needle not in (getattr(el, "Name", None) or "").lower():
+            continue
+        location = reader.get_spatial_location(el)
+        if storey_needle and (location.get("storey_name") or "").strip().lower() != storey_needle:
+            continue
+        matches.append(
+            {
+                "guid": el.GlobalId,
+                "name": getattr(el, "Name", None),
+                "storey_name": location.get("storey_name"),
+            }
+        )
+        if len(matches) >= limit:
+            break
+
+    return {"project_id": project_id, "ifc_class": ifc_class, "match_count": len(matches), "matches": matches}
+
+
+@tool
+def get_element_geometry(project_id: int, guid: str) -> dict:
+    """Get an element's bounding box, centroid, and spatial context (storey/space/building).
+
+    Use this once you have a specific element GUID (e.g. from find_elements)
+    and need its size, position, or which storey/space it belongs to.
+    """
+    reader = _get_cached_reader(project_id)
+    if reader is None or reader.ifc_file is None:
+        return {"project_id": project_id, "guid": guid, "error": "no IFC model available for this project"}
+
+    try:
+        element = reader.ifc_file.by_guid(guid)
+    except Exception:
+        return {"project_id": project_id, "guid": guid, "error": "no element with this GUID in the model"}
+
+    bbox = reader.geometry_extractor.get_bounding_box(element) if reader.geometry_extractor else None
+    centroid = reader.geometry_extractor.get_centroid_or_none(element) if reader.geometry_extractor else None
+    location = reader.get_spatial_location(element)
+
+    return {
+        "project_id": project_id,
+        "guid": guid,
+        "name": getattr(element, "Name", None),
+        "ifc_class": element.is_a(),
+        "bounding_box_mm": bbox,
+        "centroid_mm": {"x": centroid[0], "y": centroid[1], "z": centroid[2]} if centroid else None,
+        **location,
+    }
+
+
+@tool
+def get_distance_between_elements(project_id: int, guid_a: str, guid_b: str) -> dict:
+    """Compute the shortest surface-to-surface distance (mm) between two elements.
+
+    Returns distance_mm: null (not 0) when the separation cannot be measured
+    (missing geometry on either element) -- never treat a null as "touching".
+    """
+    reader = _get_cached_reader(project_id)
+    if reader is None or reader.ifc_file is None or reader.geometry_extractor is None:
+        return {"project_id": project_id, "error": "no IFC model available for this project"}
+
+    try:
+        element_a = reader.ifc_file.by_guid(guid_a)
+        element_b = reader.ifc_file.by_guid(guid_b)
+    except Exception:
+        return {"project_id": project_id, "error": "one or both GUIDs were not found in the model"}
+
+    distance = reader.geometry_extractor.calculate_shortest_distance(element_a, element_b)
+    return {"project_id": project_id, "guid_a": guid_a, "guid_b": guid_b, "distance_mm": distance}
+
+
 DIGITAL_INSPECTOR_TOOLS = [
     query_ifc_model,
     check_db_cache,
@@ -181,4 +323,7 @@ DIGITAL_INSPECTOR_TOOLS = [
     run_validation,
     extract_rules_from_document,
     check_cde_transition,
+    find_elements,
+    get_element_geometry,
+    get_distance_between_elements,
 ]
