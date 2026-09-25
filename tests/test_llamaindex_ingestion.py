@@ -4,6 +4,7 @@ import asyncio
 
 from app.modules.contracts import ClauseMetadata, DeonticStatement, DocumentNodeContract
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
+from app.services.clause_grounding_index import ClauseGroundingIndex
 
 SAMPLE_TEXT = """9.8.2.1 Stair Width
 Every stair shall have a minimum width of 900 mm.
@@ -112,6 +113,41 @@ def test_extract_deontic_statements_empty_nodes_short_circuits(monkeypatch):
     statements = asyncio.run(LlamaIndexIngestor().extract_deontic_statements([]))
     assert statements == []
     assert called is False
+
+
+def test_extract_deontic_statements_uses_kg_hint_without_calling_llm(monkeypatch, tmp_path):
+    """A clause with an unambiguous KG-grounded deontic hint skips the LLM entirely."""
+    import json
+
+    grounding_path = tmp_path / "grounding_index.json"
+    grounding_path.write_text(
+        json.dumps({"9.8.2.1": {"classes": [], "properties": [], "deontic": {"modality": "shall", "text": "Every stair shall have a minimum width of 900 mm."}}}),
+        encoding="utf-8",
+    )
+    clause_grounding = ClauseGroundingIndex(path=grounding_path)
+
+    calls = []
+
+    async def fake_extract(clause_text, *, clause, organization_id=None):
+        calls.append(clause_text)
+        return DeonticStatement(text=clause_text.strip(), modality="must", clause=clause)
+
+    monkeypatch.setattr(
+        "app.modules.document_parsing.llamaindex_program.extract_deontic_statement",
+        fake_extract,
+    )
+
+    ingestor = LlamaIndexIngestor(clause_grounding=clause_grounding)
+    nodes = ingestor.nodes_from_text(SAMPLE_TEXT, source_document_id=1)
+    statements = asyncio.run(ingestor.extract_deontic_statements(nodes))
+
+    # "9.8.2.1" resolved from the KG hint (no LLM call); "9.8.2.2" (not
+    # covered by the index) still falls back to the LLM.
+    assert len(calls) == 1
+    assert len(statements) == 2
+    kg_resolved = next(s for s in statements if s.clause.clause_id == "9.8.2.1")
+    assert kg_resolved.modality == "shall"
+    assert kg_resolved.text == "Every stair shall have a minimum width of 900 mm."
 
 
 def test_clause_metadata_and_document_node_contract_roundtrip():

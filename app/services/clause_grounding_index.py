@@ -87,6 +87,44 @@ class ClauseGroundingIndex:
         self._ensure_loaded()
         return self._by_clause.get(clause_id, {}).get("properties", [])
 
+    def class_candidates_for(self, clause_id: Optional[str]) -> list[dict[str, Any]]:
+        """Trusted bSDD class candidates for a clause, full entries (uri/name/code/score/source).
+
+        Unlike class_uris_for (bare URIs, for the post-hoc correction path),
+        this keeps enough detail to show a human-readable candidate list
+        inside the extraction prompt itself.
+        """
+        if not clause_id:
+            return []
+        self._ensure_loaded()
+        return self._by_clause.get(clause_id, {}).get("classes", [])
+
+    def deontic_hint_for(self, clause_id: Optional[str]) -> Optional[dict[str, str]]:
+        """Look up this clause's rule-based modality (kg.grounding._deontic_hint), if unambiguous.
+
+        {"modality": "shall"|"must"|"should"|"may", "text": <clause excerpt>}
+        or None when the clause isn't covered by a promoted index, or its
+        deontic signal was ambiguous (negated/mixed operators) at KG-build
+        time -- either way, callers should fall back to the LLM-based
+        deontic extraction.
+        """
+        if not clause_id:
+            return None
+        self._ensure_loaded()
+        return self._by_clause.get(clause_id, {}).get("deontic")
+
+    def dependencies_for(self, clause_id: Optional[str]) -> list[dict[str, Any]]:
+        """Look up this clause's outgoing cross_ref/depends_on edges to other clauses in the document.
+
+        Each entry: {"edge_type", "label", "target_ref", "target_text_excerpt"}
+        -- e.g. a base threshold's edge to the sprinkler exception that
+        overrides it, with the exception's own text already resolved.
+        """
+        if not clause_id:
+            return []
+        self._ensure_loaded()
+        return self._by_clause.get(clause_id, {}).get("dependencies", [])
+
 
 _INDEX: Optional[ClauseGroundingIndex] = None
 

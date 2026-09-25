@@ -9,10 +9,15 @@ Docling parsing engine) and the existing
 LlamaIndex node carrying clause metadata (clause id, page number, parent
 section, section path).
 
-Deontic statement extraction uses a LlamaIndex Pydantic program backed by
-the same LiteLLM transport already used elsewhere in the app
+Deontic statement extraction prefers a clause's pre-computed, rule-based
+modality from a promoted knowledge-graph grounding index (see
+``ClauseGroundingIndex.deontic_hint_for`` -- built once, for free, by
+bim-guard-evaluation's ``nlp_annotation`` pass at KG-build time) over an LLM
+call. Only a node whose clause isn't covered by a promoted index, or whose
+KG signal was ambiguous, falls back to the LlamaIndex Pydantic program
+backed by the same LiteLLM transport already used elsewhere in the app
 (``app.modules.config.DEFAULT_LLM_MODEL``), so no second LLM API surface
-is introduced.
+is introduced for the fallback path either.
 
 Usage:
     from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
@@ -28,6 +33,7 @@ from app.logging_config import get_logger
 from app.modules.contracts import ClauseMetadata, DeonticStatement, DocumentNodeContract
 from app.modules.document_parsing.document_extractor import extract_document_text
 from app.modules.document_parsing.section_chunker import SectionChunker
+from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
 
 logger = get_logger(__name__)
 
@@ -41,9 +47,12 @@ _DEONTIC_KEYWORDS = ("shall", "must", "should", "may")
 class LlamaIndexIngestor:
     """Layout-aware ingestion producing clause-annotated document nodes."""
 
-    def __init__(self, *, chunker: SectionChunker | None = None) -> None:
+    def __init__(
+        self, *, chunker: SectionChunker | None = None, clause_grounding: ClauseGroundingIndex | None = None
+    ) -> None:
         """Initialize with an injectable section chunker (Dependency Inversion)."""
         self._chunker = chunker or SectionChunker()
+        self._clause_grounding = clause_grounding or get_clause_grounding_index()
 
     def ingest(
         self, filename: str, content: bytes, *, source_document_id: int, parser: str = "auto"
@@ -212,19 +221,38 @@ class LlamaIndexIngestor:
     ) -> list[DeonticStatement]:
         """Extract typed 'shall/must/should/may' obligations from each node.
 
-        Only nodes containing a deontic keyword are sent to the LLM, since
-        most clause text (definitions, examples, headings) contains none.
+        Only nodes containing a deontic keyword are considered, since most
+        clause text (definitions, examples, headings) contains none. A
+        candidate whose clause is covered by a promoted knowledge-graph
+        grounding index with an unambiguous deontic hint (see
+        ClauseGroundingIndex.deontic_hint_for) is resolved from that hint
+        directly, at no LLM cost; only the remainder falls back to the LLM.
         """
         candidates = [node for node in nodes if self._contains_deontic_keyword(node.text)]
         if not candidates:
             return []
 
+        statements: list[DeonticStatement] = []
+        llm_candidates: list[DocumentNodeContract] = []
+        for node in candidates:
+            hint = self._clause_grounding.deontic_hint_for(node.metadata.clause_id)
+            if hint is None:
+                llm_candidates.append(node)
+                continue
+            statement = DeonticStatement(
+                text=hint["text"] or node.text, modality=hint["modality"], clause=node.metadata
+            )
+            statements.append(statement)
+            node.deontic_statements.append(statement)
+
+        if not llm_candidates:
+            return statements
+
         from app.modules.document_parsing.llamaindex_program import extract_deontic_statement
         from app.services.llm_call_context import llm_call_context
 
-        statements: list[DeonticStatement] = []
         with llm_call_context(context="deontic_extraction", organization_id=organization_id):
-            for node in candidates:
+            for node in llm_candidates:
                 try:
                     statement = await extract_deontic_statement(
                         node.text, clause=node.metadata, organization_id=organization_id

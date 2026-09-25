@@ -639,7 +639,7 @@ class FakeGenerator:
         self.max_in_flight = 0
         self.calls = 0
 
-    async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+    async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
         self.calls += 1
         self.in_flight += 1
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
@@ -711,7 +711,7 @@ def test_extract_rule_drafts_bounds_concurrency():
 
 def test_extract_rule_drafts_survives_one_node_failing():
     class FlakyGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
             if node.node_id == "node-1":
                 raise RuntimeError("LLM blew up")
             return await super().generate_drafts_from_node(node, deontic=deontic, model=model)
@@ -749,7 +749,7 @@ def test_extract_rule_drafts_raises_the_models_reason_when_every_node_fails():
     from app.services.rule_extraction_service import RuleGenerationFailedError
 
     class RejectingGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
             raise RuntimeError(
                 'OpenrouterException - {"error":{"message":"No cookie auth credentials found","code":401}}'
             )
@@ -774,7 +774,7 @@ def test_extract_rule_drafts_error_never_echoes_an_api_key():
     from app.services.rule_extraction_service import RuleGenerationFailedError
 
     class LeakyGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None):
+        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
             raise RuntimeError("Incorrect API key provided: sk-or-v1-abcdef1234567890abcdef")
 
     extraction_progress.STORE.clear()

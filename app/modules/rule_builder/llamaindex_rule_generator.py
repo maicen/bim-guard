@@ -26,12 +26,25 @@ from app.modules.contracts import (
     RuleExtractionDraft,
 )
 from app.modules.document_parsing.llamaindex_program import build_llm
+from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
 
 logger = get_logger(__name__)
 
-_RULE_PROMPT = """\
+_SYSTEM_PROMPT = """\
 You are a BIM compliance rule extraction engine for building regulations.
 
+Judge each clause on its actual regulatory meaning, not on surface wording
+alone. Never invent a target_ifc_class or property_name that isn't either
+(a) one of the KNOWN-GOOD CANDIDATES you are shown for this clause, when any
+are shown, or (b) a well-known IFC entity/property you are confident about
+from the clause's own text. When candidates are shown and one plainly fits,
+prefer it over guessing a different spelling or class — record which one you
+used in kg_candidate_used (its uri), or "" if you used none of them (either
+because none fit, or none were shown). Respond with strict, valid JSON
+matching the requested schema only — no commentary, no markdown fences.
+"""
+
+_RULE_PROMPT = """\
 Read the clause text below and extract every discrete, checkable
 requirement it expresses (a numeric limit, a required property, a
 classification, a presence check, or a required count of elements) against
@@ -40,7 +53,7 @@ example a base threshold plus an exception that changes it) — extract each
 as its own entry in "rules". If the text expresses no checkable requirement
 at all (e.g. it is a definition, example, or purely descriptive text),
 return an empty "rules" array.
-
+{kg_context}
 For each rule found, fill in:
 - rule_id: a short identifier, e.g. the clause reference if present, else
   "REQ-AI-<short-slug>"
@@ -74,10 +87,44 @@ For each rule found, fill in:
 - rase_applicability: JSON object defining when the requirement applies (e.g. {{"occupancy": "residential"}}), or empty.
 - rase_selection: JSON object defining criteria for selecting specific targets, or empty.
 - rase_exception: JSON object defining conditions excusing the requirement (e.g. {{"has_sprinkler": true}}), or empty.
+- kg_candidate_used: the uri of the KNOWN-GOOD CANDIDATE (if any were shown
+  above) that target_ifc_class came from, or "" if none were shown or none
+  were used.
 
 CLAUSE TEXT:
 {clause_text}
 """
+
+
+def _format_kg_context(
+    *,
+    class_candidates: list[dict],
+    property_hints: list[dict],
+    dependencies: list[dict],
+) -> str:
+    """Render the clause's KG-grounded signal as a prompt block, or "" if there is none.
+
+    Keeping this a pure function (candidates/hints/dependencies in, string
+    out) makes the prompt-shaping logic directly unit-testable without
+    mocking ClauseGroundingIndex or the LLM program.
+    """
+    if not (class_candidates or property_hints or dependencies):
+        return ""
+
+    lines: list[str] = []
+    if class_candidates:
+        lines.append("\nKNOWN-GOOD CANDIDATES (from verified ontology grounding for this clause):")
+        for c in class_candidates[:5]:
+            lines.append(f"  - target_ifc_class candidate: {c.get('name')} ({c.get('code')}), uri={c.get('uri')}")
+    if property_hints:
+        for p in property_hints[:5]:
+            lines.append(f"  - property candidate: {p.get('name')} ({p.get('code')})")
+    if dependencies:
+        lines.append("\nRELATED CLAUSES in this document (resolve exceptions/overrides against these, not blind):")
+        for dep in dependencies[:3]:
+            lines.append(f"  - [{dep.get('edge_type')}] {dep.get('target_ref')}: \"{dep.get('target_text_excerpt')}\"")
+    lines.append("")
+    return "\n".join(lines)
 
 
 class _LLMRuleCandidate(BaseModel):
@@ -111,6 +158,15 @@ class _LLMRuleCandidate(BaseModel):
     rase_applicability: dict = Field(default_factory=dict, description="When the requirement applies")
     rase_selection: dict = Field(default_factory=dict, description="Criteria for targets")
     rase_exception: dict = Field(default_factory=dict, description="Conditions excusing the requirement")
+    kg_candidate_used: str = Field(
+        default="",
+        description=(
+            "uri of the shown KNOWN-GOOD CANDIDATE that target_ifc_class came "
+            "from, or '' if none were shown or none were used -- makes the "
+            "model's use of grounded candidates explicit and auditable, "
+            "instead of only inferable from a post-hoc string match."
+        ),
+    )
 
 
 class _LLMRuleExtractionResult(BaseModel):
@@ -119,11 +175,32 @@ class _LLMRuleExtractionResult(BaseModel):
     rules: list[_LLMRuleCandidate] = Field(default_factory=list)
 
 
+_TRUSTED_KG_TIERS = ("llm_verified", "human_verified")
+
+
+def _kg_calibrated_confidence(candidate: _LLMRuleCandidate, class_candidates: list[dict]) -> float:
+    """Nudges confidence up when the model's chosen class matches a highly-trusted KG candidate.
+
+    Only ever raises confidence, and only by a small, capped amount: this is
+    a calibration signal on top of the model's own self-reported confidence,
+    not a replacement for it, and a wrong needs_review=1 from the model is
+    never overridden by KG agreement alone.
+    """
+    used_uri = candidate.kg_candidate_used.strip()
+    if not used_uri:
+        return candidate.confidence
+    tier = next((c.get("source") for c in class_candidates if c.get("uri") == used_uri), None)
+    if tier not in _TRUSTED_KG_TIERS:
+        return candidate.confidence
+    return min(candidate.confidence + 0.05, 0.99)
+
+
 def _candidate_to_draft(
     candidate: _LLMRuleCandidate,
     node: DocumentNodeContract,
     *,
     deontic: DeonticStatement | None = None,
+    class_candidates: list[dict] | None = None,
 ) -> RuleExtractionDraft | None:
     """Map a validated LLM candidate onto a RuleExtractionDraft, or None if empty.
 
@@ -140,6 +217,8 @@ def _candidate_to_draft(
     materials = [m.strip() for m in candidate.applies_when_materials if m.strip()]
     applies_when = {"material_any_of": materials} if materials else None
 
+    confidence = _kg_calibrated_confidence(candidate, class_candidates or [])
+
     proposed_rule = RuleCreateRequest(
         rule_id=candidate.rule_id.strip() or (node.metadata.clause_id or node.node_id[:8]),
         description=candidate.description.strip(),
@@ -154,7 +233,7 @@ def _candidate_to_draft(
         value_max=candidate.value_max.strip() or None,
         unit=candidate.unit.strip() or None,
         severity=severity,
-        confidence=str(candidate.confidence),
+        confidence=str(confidence),
         extraction_method="llamaindex_pydantic",
         needs_review=candidate.needs_review,
         applies_when=applies_when,
@@ -162,6 +241,7 @@ def _candidate_to_draft(
         rase_applicability=candidate.rase_applicability or None,
         rase_selection=candidate.rase_selection or None,
         rase_exception=candidate.rase_exception or None,
+        kg_candidate_used=candidate.kg_candidate_used.strip() or None,
     )
 
     return RuleExtractionDraft(
@@ -172,7 +252,7 @@ def _candidate_to_draft(
         clause=node.metadata,
         bbox=node.metadata.bbox,
         proposed_rule=proposed_rule,
-        confidence=candidate.confidence,
+        confidence=confidence,
         extraction_method="llamaindex_pydantic",
     )
 
@@ -193,6 +273,7 @@ class LlamaIndexRuleGenerator:
         deontic: DeonticStatement | None = None,
         model: str | None = None,
         organization_id: int | None = None,
+        clause_grounding: ClauseGroundingIndex | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -205,17 +286,43 @@ class LlamaIndexRuleGenerator:
             organization_id: Resolves the API key from that org's configured
                 LLM provider instance first, falling back to the provider's
                 env var — see ``build_llm``.
+            clause_grounding: Injectable ClauseGroundingIndex -- when this
+                node's clause_id is covered by a promoted knowledge-graph
+                grounding index, its trusted bSDD class/property candidates
+                and clause-dependency edges are shown to the LLM as part of
+                the prompt (see _format_kg_context), instead of only being
+                used to correct the LLM's answer after the fact.
         """
+        from llama_index.core.llms import ChatMessage, MessageRole
         from llama_index.core.program import LLMTextCompletionProgram
+        from llama_index.core.prompts import ChatPromptTemplate
 
+        clause_grounding = clause_grounding or get_clause_grounding_index()
+        clause_id = node.metadata.clause_id if node.metadata else None
+        class_candidates = clause_grounding.class_candidates_for(clause_id)
+        kg_context = _format_kg_context(
+            class_candidates=class_candidates,
+            property_hints=clause_grounding.property_hints_for(clause_id),
+            dependencies=clause_grounding.dependencies_for(clause_id),
+        )
+
+        chat_prompt = ChatPromptTemplate(
+            message_templates=[
+                ChatMessage(role=MessageRole.SYSTEM, content=_SYSTEM_PROMPT),
+                ChatMessage(role=MessageRole.USER, content=_RULE_PROMPT),
+            ]
+        )
         program = LLMTextCompletionProgram.from_defaults(
             output_cls=_LLMRuleExtractionResult,
-            prompt_template_str=_RULE_PROMPT,
+            prompt=chat_prompt,
             llm=build_llm(model, organization_id=organization_id),
         )
-        result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text)
+        result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text, kg_context=kg_context)
 
-        drafts = [_candidate_to_draft(candidate, node, deontic=deontic) for candidate in result.rules]
+        drafts = [
+            _candidate_to_draft(candidate, node, deontic=deontic, class_candidates=class_candidates)
+            for candidate in result.rules
+        ]
         return [draft for draft in drafts if draft is not None]
 
     # ── RuleExtractionProvider conformance ──────────────────────────────────

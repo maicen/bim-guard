@@ -1083,6 +1083,16 @@ class RuleCreateRequest(BaseModel):
     rase_applicability: Optional[dict] = Field(default=None, description="Condition defining when the requirement applies")
     rase_selection: Optional[dict] = Field(default=None, description="Criteria for selecting specific targets")
     rase_exception: Optional[dict] = Field(default=None, description="Condition excusing the requirement")
+    kg_candidate_used: Optional[str] = Field(
+        default=None,
+        description=(
+            "uri of the clause-grounding knowledge-graph candidate the "
+            "extraction LLM was shown and picked for target_ifc_class, if "
+            "any -- extraction-time audit signal only (see "
+            "llamaindex_rule_generator._LLMRuleCandidate.kg_candidate_used); "
+            "not written to public.rules on promotion."
+        ),
+    )
 
 
 class RuleUpdateRequest(BaseModel):

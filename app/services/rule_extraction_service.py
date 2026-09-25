@@ -189,6 +189,7 @@ class RuleDraftGenerator(Protocol):
         deontic: contracts.DeonticStatement | None = None,
         model: str | None = None,
         organization_id: int | None = None,
+        clause_grounding: ClauseGroundingIndex | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Generate zero or more rule drafts from one clause-annotated node."""
         ...
@@ -559,6 +560,12 @@ class RuleExtractionService:
         if class_note:
             notes.append(class_note)
 
+        if (rule.kg_candidate_used or "").strip():
+            notes.append(
+                f"Extraction prompt showed KG-grounded candidates for this clause; the model "
+                f"selected {rule.kg_candidate_used}."
+            )
+
         if not (rule.target_ifc_class or "").strip():
             # Nothing above could name or infer an entity for this rule. Force
             # it into review rather than letting it carry an empty
@@ -717,6 +724,7 @@ class RuleExtractionService:
                             deontic=deontic_by_node.get(node.node_id),
                             model=model,
                             organization_id=organization_id,
+                            clause_grounding=self._clause_grounding,
                         )
                 except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                     logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)

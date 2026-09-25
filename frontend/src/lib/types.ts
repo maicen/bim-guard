@@ -978,6 +978,8 @@ export interface RuleCreateRequest {
   rase_applicability?: Record<string, unknown> | null;
   rase_selection?: Record<string, unknown> | null;
   rase_exception?: Record<string, unknown> | null;
+  /** uri of the clause-grounding KG candidate the extraction LLM was shown and picked, if any. Extraction-time audit signal only. */
+  kg_candidate_used?: string | null;
 }
 
 export interface RuleExtractionDraft {
