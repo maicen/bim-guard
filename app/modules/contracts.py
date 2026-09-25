@@ -2626,6 +2626,30 @@ class BSDDClassItem(BaseModel):
     description: Optional[str] = Field(None, description="Supplementary note from bSDD, when distinct from `definition`")
 
 
+class SemanticMatchRequest(BaseModel):
+    """A non-standard local name to resolve against the bSDD ontology via LLM disambiguation."""
+
+    query: str = Field(..., min_length=1, description="The non-standard local class or property name")
+    kind: Literal["class", "property"]
+    target_ifc_class: Optional[str] = Field(
+        default=None, description="For kind='property': the element class this property belongs to, for context only"
+    )
+    model: Optional[str] = Field(default=None, description="LLM model override; falls back to the configured default")
+    organization_id: Optional[int] = Field(
+        default=None, description="Resolves the LLM API key from this org's configured provider first"
+    )
+
+
+class SemanticMatchResponse(BaseModel):
+    """The best bSDD match for a `SemanticMatchRequest`, or none found."""
+
+    matched: bool
+    matched_uri: Optional[str] = None
+    matched_code: Optional[str] = None
+    confidence: float = 0.0
+    reasoning: Optional[str] = None
+
+
 class BSDDDictionaryItem(BaseModel):
     """bSDD dictionary catalog contract."""
 

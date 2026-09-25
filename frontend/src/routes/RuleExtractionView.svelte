@@ -23,7 +23,7 @@
     ArrowDown,
     Download,
   } from "lucide-svelte";
-  import { documentsApi, ruleExtractionApi, llmProvidersApi } from "../lib/api";
+  import { documentsApi, ruleExtractionApi, llmProvidersApi, bsddApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
@@ -232,6 +232,41 @@
   function closeEditDraftModal() {
     editingDraft = null;
     editForm = null;
+  }
+
+  let suggestingField: "target_ifc_class" | "property_name" | null = $state(null);
+
+  /** Ask the LLM-backed bSDD mapper for a better class/property match, and fill it in on a confident hit. */
+  async function suggestViaAI(field: "target_ifc_class" | "property_name") {
+    if (!editForm) return;
+    const query = field === "target_ifc_class" ? editForm.target_ifc_class : editForm.property_name;
+    if (!query?.trim()) {
+      toasts.warning(`Enter a ${field === "target_ifc_class" ? "class" : "property"} name to suggest from first.`);
+      return;
+    }
+    suggestingField = field;
+    try {
+      const result = await bsddApi.semanticMatch({
+        query,
+        kind: field === "target_ifc_class" ? "class" : "property",
+        target_ifc_class: field === "property_name" ? editForm.target_ifc_class : undefined,
+      });
+      if (!result.matched || !result.matched_code) {
+        toasts.info(`No confident bSDD match found for "${query}".`, "No suggestion");
+        return;
+      }
+      editForm = { ...editForm, [field]: result.matched_code };
+      toasts.success(
+        `Suggested "${result.matched_code}" (confidence ${(result.confidence * 100).toFixed(0)}%)${
+          result.reasoning ? ` — ${result.reasoning}` : ""
+        }`,
+        "AI suggestion applied",
+      );
+    } catch (err: any) {
+      toasts.fromError(err, "Could not get an AI suggestion.");
+    } finally {
+      suggestingField = null;
+    }
   }
 
   function saveEditedDraft() {
@@ -1581,9 +1616,20 @@
 
         <div class="grid grid-cols-2 gap-2">
           <div class="space-y-1">
-            <label for="edit-draft-target" class="block font-semibold text-fg-secondary"
-              >Target IFC Class</label
-            >
+            <div class="flex items-center justify-between gap-2">
+              <label for="edit-draft-target" class="block font-semibold text-fg-secondary"
+                >Target IFC Class</label
+              >
+              <button
+                type="button"
+                onclick={() => suggestViaAI("target_ifc_class")}
+                disabled={suggestingField !== null}
+                class="text-[10px] font-semibold text-accent hover:underline disabled:opacity-50"
+                title="Ask AI to suggest a bSDD class matching this name"
+              >
+                {suggestingField === "target_ifc_class" ? "Suggesting…" : "Suggest via AI"}
+              </button>
+            </div>
             <input
               id="edit-draft-target"
               type="text"
@@ -1603,7 +1649,18 @@
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-prop" class="block font-semibold text-fg-secondary">Property</label>
+            <div class="flex items-center justify-between gap-2">
+              <label for="edit-draft-prop" class="block font-semibold text-fg-secondary">Property</label>
+              <button
+                type="button"
+                onclick={() => suggestViaAI("property_name")}
+                disabled={suggestingField !== null}
+                class="text-[10px] font-semibold text-accent hover:underline disabled:opacity-50"
+                title="Ask AI to suggest a bSDD property matching this name"
+              >
+                {suggestingField === "property_name" ? "Suggesting…" : "Suggest via AI"}
+              </button>
+            </div>
             <input
               id="edit-draft-prop"
               type="text"

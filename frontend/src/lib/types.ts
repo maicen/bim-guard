@@ -1535,6 +1535,23 @@ export interface BSDDDictionaryItem {
   domain?: string | null;
 }
 
+/** A non-standard local name to resolve against bSDD via LLM disambiguation. */
+export interface SemanticMatchRequest {
+  query: string;
+  kind: "class" | "property";
+  target_ifc_class?: string | null;
+  model?: string | null;
+  organization_id?: number | null;
+}
+
+export interface SemanticMatchResponse {
+  matched: boolean;
+  matched_uri?: string | null;
+  matched_code?: string | null;
+  confidence: number;
+  reasoning?: string | null;
+}
+
 export interface BSDDValidationViolation {
   element_guid: string;
   element_type: string;

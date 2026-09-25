@@ -14,14 +14,18 @@ from typing import Annotated, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import get_bsdd_client, get_bsdd_ontology
+from app.auth import CurrentUser, get_current_user
 from app.modules.contracts import (
     BSDDClassItem,
     BSDDClassSearchResponse,
     BSDDDictionaryItem,
     BSDDPropertySearchResponse,
+    SemanticMatchRequest,
+    SemanticMatchResponse,
 )
 from app.services.bsdd_client import BSDDClient
 from app.services.bsdd_ontology_repository import BSDDOntologyRepository
+from app.services.bsdd_semantic_mapper import BsddSemanticMapper
 
 router = APIRouter()
 
@@ -174,6 +178,48 @@ def get_ontology_property(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"'{uri}' is not in the local ontology cache.")
     return result
+
+
+@router.post(
+    "/semantic-match",
+    response_model=SemanticMatchResponse,
+    summary="LLM-disambiguate a non-standard local name against the bSDD ontology",
+)
+async def semantic_match(
+    payload: SemanticMatchRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> SemanticMatchResponse:
+    """Resolve a non-standard local class/property name (e.g. "Fire_Resistance_Rating") to bSDD.
+
+    Unlike `/classes/search` and `/properties/search` (substring matching,
+    unauthenticated), this calls an LLM to disambiguate synonyms substring
+    search would miss -- authenticated since it costs an API call, scoped to
+    a shortlist of real bSDD candidates so it can only pick a real term, not
+    invent one.
+    """
+    del current_user  # sign-in required only to gate the LLM call; not otherwise used
+    mapper = BsddSemanticMapper()
+    if payload.kind == "class":
+        match = await mapper.suggest_class(
+            payload.query, model=payload.model, organization_id=payload.organization_id
+        )
+    else:
+        match = await mapper.suggest_property(
+            payload.query,
+            payload.target_ifc_class,
+            model=payload.model,
+            organization_id=payload.organization_id,
+        )
+
+    if match is None or not match.matched:
+        return SemanticMatchResponse(matched=False)
+    return SemanticMatchResponse(
+        matched=True,
+        matched_uri=match.matched_uri,
+        matched_code=match.matched_code,
+        confidence=match.confidence,
+        reasoning=match.reasoning,
+    )
 
 
 __all__ = ["router"]

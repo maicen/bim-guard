@@ -16,6 +16,8 @@ import type {
   BSDDOntologyClassSummary,
   BSDDOntologyPropertyDetail,
   BSDDPropertySearchResponse,
+  SemanticMatchRequest,
+  SemanticMatchResponse,
   CDEDocumentItem,
   CDESyncRequest,
   CDESyncResponse,
@@ -2616,6 +2618,23 @@ export const bsddApi = {
     const result = await handleResponse<BSDDPropertySearchResponse>(res);
     setPersistentCache(cacheKey, result);
     return result;
+  },
+
+  /**
+   * LLM-disambiguate a non-standard local class/property name against bSDD.
+   *
+   * Unlike searchClasses/searchProperties (instant substring match), this
+   * calls an LLM and costs real latency -- use it as an on-demand "suggest
+   * via AI" action, not on every keystroke, and never cache the result
+   * (the same query can get a different pick from a different model).
+   */
+  async semanticMatch(payload: SemanticMatchRequest): Promise<SemanticMatchResponse> {
+    const res = await apiFetch(`${API_BASE}/bsdd/semantic-match`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<SemanticMatchResponse>(res);
   },
 
   /** Fetch one bSDD class definition with its standardized properties. */
