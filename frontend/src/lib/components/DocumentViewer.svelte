@@ -39,6 +39,11 @@
     selectedElementId?: string | null;
     /** Called whenever the selected element changes, from either a user click or the `selectedElementId` prop. */
     onElementSelect?: ((elementId: string | null) => void) | null;
+    /** Number of rules extracted from each element, keyed by element_id -- drives the per-element overlay's
+     *  zero-rule dimming and (with `badgeMode="rule-count"`) its badge count. See PdfElementOverlay. */
+    elementRuleCounts?: Record<string, number> | null;
+    /** What the overlay's badge chip shows when badges are on: reading order (default) or `elementRuleCounts`. */
+    badgeMode?: "order" | "rule-count";
   }
 
   let {
@@ -48,6 +53,8 @@
     bbox = null,
     selectedElementId: externalSelectedElementId = null,
     onElementSelect = null,
+    elementRuleCounts = null,
+    badgeMode = "order",
   }: Props = $props();
 
   // Single-page mode DOM refs
@@ -1701,7 +1708,9 @@
                 showBoxes={showBboxOverlay}
                 showReadingOrder={showReadingOrderArrows}
                 elementLayers={elementLayerMap}
-                showBadges={showElementBadges}
+                showBadges={badgeMode === "rule-count" ? true : showElementBadges}
+                {badgeMode}
+                elementRuleCounts={elementRuleCounts ?? undefined}
                 arrowStyle={arrowStyleValue}
                 tooltipText={elementTooltipText}
               />

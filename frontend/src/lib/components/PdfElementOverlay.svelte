@@ -37,8 +37,13 @@
     showReadingOrder?: boolean;
     /** Per-element DocLang `<layer>` classification (body/furniture/background), keyed by element_id -- elements missing here default to "body". */
     elementLayers?: Map<string, ElementLayer>;
-    /** Small numbered chip at each box's corner, showing its document reading order. */
+    /** Small numbered chip at each box's corner, showing its document reading order (or rule count, see badgeMode). */
     showBadges?: boolean;
+    /** What the badge chip shows: reading order (default) or the count from `elementRuleCounts`. */
+    badgeMode?: "order" | "rule-count";
+    /** Number of rules extracted from each element, keyed by element_id. When provided, an element with a
+     *  count of 0 (or missing from this map) is rendered dimmed instead of its normal kind color. */
+    elementRuleCounts?: Record<string, number>;
     arrowStyle?: ArrowStyle;
     /** Richer per-element tooltip text (layer/caption/etc.); falls back to the kind label when omitted. */
     tooltipText?: (elementId: string) => string | null;
@@ -58,6 +63,8 @@
     showReadingOrder = false,
     elementLayers,
     showBadges = false,
+    badgeMode = "order",
+    elementRuleCounts,
     arrowStyle = DEFAULT_ARROW_STYLE,
     tooltipText,
   }: Props = $props();
@@ -229,9 +236,12 @@
         </defs>
       {/if}
       {#each boxes as box (box.elementId)}
-        {@const color = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
+        {@const kindColor = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
         {@const isSelected = box.elementId === selectedElementId}
         {@const isLayered = box.layer !== "body"}
+        {@const ruleCount = elementRuleCounts?.[box.elementId] ?? 0}
+        {@const hasNoRules = elementRuleCounts !== undefined && ruleCount === 0 && !isSelected}
+        {@const color = hasNoRules ? "var(--color-fg-muted, #94a3b8)" : kindColor}
         <rect
           x={box.left}
           y={box.top}
@@ -239,14 +249,22 @@
           height={box.boxHeight}
           rx="2"
           fill={isLayered ? `url(#layer-hatch-${pageNumber})` : color}
-          fill-opacity={isLayered ? 1 : isSelected ? 0.28 : 0.08}
+          fill-opacity={isLayered ? 1 : isSelected ? 0.28 : hasNoRules ? 0.04 : 0.08}
           stroke={color}
-          stroke-width={isSelected ? 2.5 : 1.25}
+          stroke-width={isSelected ? 2.5 : hasNoRules ? 1 : 1.25}
           stroke-dasharray={isLayered ? "3 2" : undefined}
           class="pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width] duration-100 hover:fill-opacity-20"
           onclick={() => onSelect(box.elementId)}
           onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect(box.elementId))}
-          use:cursorTooltip={{ text: [kindLabel(box.kind), tooltipText?.(box.elementId)].filter(Boolean).join("\n") }}
+          use:cursorTooltip={{
+            text: [
+              kindLabel(box.kind),
+              elementRuleCounts !== undefined ? `${ruleCount} rule${ruleCount === 1 ? "" : "s"}` : null,
+              tooltipText?.(box.elementId),
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          }}
           role="button"
           tabindex="0"
           aria-label="{kindLabel(box.kind)} element"
@@ -254,21 +272,25 @@
       {/each}
       {#if showBadges}
         {#each boxes as box (`badge-${box.elementId}`)}
-          {@const color = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
-          <g class="pointer-events-none">
-            <circle cx={box.left + 7} cy={box.top + 7} r="7" fill={color} opacity="0.92" />
-            <text
-              x={box.left + 7}
-              y={box.top + 7}
-              text-anchor="middle"
-              dominant-baseline="central"
-              font-size="8"
-              font-weight="700"
-              fill="var(--color-surface-canvas, #0f172a)"
-            >
-              {box.order + 1}
-            </text>
-          </g>
+          {@const count = elementRuleCounts?.[box.elementId] ?? 0}
+          {#if badgeMode !== "rule-count" || count > 0}
+            {@const color = KIND_COLOR[box.kind] ?? "var(--color-fg-muted, #94a3b8)"}
+            {@const label = badgeMode === "rule-count" ? count : box.order + 1}
+            <g class="pointer-events-none">
+              <circle cx={box.left + 7} cy={box.top + 7} r="7" fill={color} opacity="0.92" />
+              <text
+                x={box.left + 7}
+                y={box.top + 7}
+                text-anchor="middle"
+                dominant-baseline="central"
+                font-size="8"
+                font-weight="700"
+                fill="var(--color-surface-canvas, #0f172a)"
+              >
+                {label}
+              </text>
+            </g>
+          {/if}
         {/each}
       {/if}
     {/if}

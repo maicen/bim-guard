@@ -81,6 +81,11 @@
 
   let elementsWithRules = $derived((map?.elements ?? []).filter((el) => el.rules.length > 0));
   let totalMappedRules = $derived(elementsWithRules.reduce((n, el) => n + el.rules.length, 0));
+  // Every element (not just ones with rules) gets a count for the overlay --
+  // zero-rule elements are dimmed there instead of just hidden from the sidebar.
+  let elementRuleCounts = $derived(
+    Object.fromEntries((map?.elements ?? []).map((el) => [el.element_id, el.rules.length])),
+  );
 
   const KIND_ICON: Record<DocumentElementKind, typeof Heading> = {
     heading: Heading,
@@ -100,6 +105,8 @@
     selectedApproximate = rule;
   }
 
+  let orphanedRules = $derived(map?.orphaned_rules ?? []);
+
   function handleViewerElementSelect(elementId: string | null) {
     if (elementId) selectExact(elementId);
   }
@@ -109,7 +116,9 @@
   <PageHeader
     category="Documents"
     title={doc ? `Rule-Source Map — ${doc.filename}` : loading ? "Loading rule-source map…" : "Rule-Source Map"}
-    subtitle={map ? `${totalMappedRules} rule(s) mapped to ${elementsWithRules.length} element(s)${map.unmapped_rules.length ? `, ${map.unmapped_rules.length} approximate` : ""}` : ""}
+    subtitle={map
+      ? `${totalMappedRules} rule(s) mapped to ${elementsWithRules.length} element(s)${map.unmapped_rules.length ? `, ${map.unmapped_rules.length} approximate` : ""}${orphanedRules.length ? `, ${orphanedRules.length} need re-linking` : ""}`
+      : ""}
     icon={Route}
   >
     {#snippet actions()}
@@ -130,13 +139,34 @@
     <LoadingState message="Loading rule-source map…" />
   {:else if loadError && !map}
     <EmptyState title="Could not load rule-source map" description={loadError} />
-  {:else if map && elementsWithRules.length === 0 && map.unmapped_rules.length === 0}
+  {:else if map && elementsWithRules.length === 0 && map.unmapped_rules.length === 0 && orphanedRules.length === 0}
     <EmptyState
       icon={FileQuestion}
       title="No rules extracted from this document yet"
       description="Run Rule Extraction on this document to build its rule-source map."
     />
   {:else}
+    {#snippet ruleCard(rule: RuleSourceSummary, isSelected: boolean, onClick: () => void)}
+      <button
+        type="button"
+        onclick={onClick}
+        class={cn(
+          "flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors",
+          isSelected
+            ? "border-accent/50 bg-accent/10"
+            : "border-border-default bg-surface-overlay hover:bg-surface-hover",
+        )}
+      >
+        <div class="flex w-full items-center justify-between gap-2">
+          <span class="truncate text-xs font-semibold text-fg-primary">{rule.rule_id || `Rule #${rule.id}`}</span>
+          <SeverityBadge severity={rule.severity || "recommended"} size="xs" />
+        </div>
+        {#if rule.description}
+          <span class="line-clamp-2 text-caption text-fg-secondary">{rule.description}</span>
+        {/if}
+      </button>
+    {/snippet}
+
     <div bind:this={viewerContainerEl} style="height: {viewerHeight};" class="flex gap-4 overflow-hidden">
       <div class="flex w-[380px] shrink-0 flex-col overflow-y-auto rounded-2xl border border-border-default bg-surface-card shadow-xl">
         <div class="space-y-4 p-4">
@@ -152,24 +182,7 @@
               </div>
               <div class="space-y-1.5">
                 {#each el.rules as rule (rule.id)}
-                  <button
-                    type="button"
-                    onclick={() => selectExact(el.element_id)}
-                    class={cn(
-                      "flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors",
-                      selectedElementId === el.element_id
-                        ? "border-accent/50 bg-accent/10"
-                        : "border-border-default bg-surface-overlay hover:bg-surface-hover",
-                    )}
-                  >
-                    <div class="flex w-full items-center justify-between gap-2">
-                      <span class="truncate text-xs font-semibold text-fg-primary">{rule.rule_id || `Rule #${rule.id}`}</span>
-                      <SeverityBadge severity={rule.severity || "recommended"} size="xs" />
-                    </div>
-                    {#if rule.description}
-                      <span class="line-clamp-2 text-caption text-fg-secondary">{rule.description}</span>
-                    {/if}
-                  </button>
+                  {@render ruleCard(rule, selectedElementId === el.element_id, () => selectExact(el.element_id))}
                 {/each}
               </div>
             </div>
@@ -185,24 +198,24 @@
               </p>
               <div class="space-y-1.5">
                 {#each map.unmapped_rules as rule (rule.id)}
-                  <button
-                    type="button"
-                    onclick={() => selectApproximate(rule)}
-                    class={cn(
-                      "flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors",
-                      selectedApproximate?.id === rule.id
-                        ? "border-accent/50 bg-accent/10"
-                        : "border-border-default bg-surface-overlay hover:bg-surface-hover",
-                    )}
-                  >
-                    <div class="flex w-full items-center justify-between gap-2">
-                      <span class="truncate text-xs font-semibold text-fg-primary">{rule.rule_id || `Rule #${rule.id}`}</span>
-                      <SeverityBadge severity={rule.severity || "recommended"} size="xs" />
-                    </div>
-                    {#if rule.description}
-                      <span class="line-clamp-2 text-caption text-fg-secondary">{rule.description}</span>
-                    {/if}
-                  </button>
+                  {@render ruleCard(rule, selectedApproximate?.id === rule.id, () => selectApproximate(rule))}
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          {#if orphanedRules.length > 0}
+            <div class="space-y-1.5 border-t border-border-subtle pt-3">
+              <div class="text-micro font-semibold uppercase tracking-wider text-warning">
+                Needs re-linking ({orphanedRules.length})
+              </div>
+              <p class="text-caption text-fg-muted">
+                Linked to an element that no longer exists — the source document was likely re-parsed or
+                re-uploaded since this rule was extracted. Highlighted by page/bbox only until re-linked.
+              </p>
+              <div class="space-y-1.5">
+                {#each orphanedRules as rule (rule.id)}
+                  {@render ruleCard(rule, selectedApproximate?.id === rule.id, () => selectApproximate(rule))}
                 {/each}
               </div>
             </div>
@@ -216,6 +229,8 @@
           selectedElementId={selectedApproximate ? null : selectedElementId}
           page={selectedApproximate?.source_page_number ?? null}
           bbox={selectedApproximate?.source_bbox ?? null}
+          {elementRuleCounts}
+          badgeMode="rule-count"
           onElementSelect={handleViewerElementSelect}
         />
       </div>
