@@ -580,11 +580,10 @@ Owner: unassigned.
 
 ## Priority 12: AI Implementation Opportunities
 
-- [ ] Implement an LLM or ML classifier in `piping_producer.py` to intelligently predict `PipingSystem` and `EnvironmentClass` from raw metadata when regex matching fails (addressing the 62,000+ UNKNOWN elements).
-- [ ] Add a feedback loop in the UI (`AnalyzeView.svelte`) for users to flag false positives and train an Active Learning classifier to score new issues.
+- [ ] Add a feedback loop in the UI (`ArchAnalyzeView.svelte`) for users to flag false positives and train an Active Learning classifier to score new issues.
 - [ ] Expand the Digital Inspector agent's tools to convert natural language queries into dynamic `ifcopenshell` geometric queries (e.g., semantic spatial querying).
 - [ ] Embed a multi-modal conversational AI overlay in `IfcViewer.svelte` to query NotebookLM and explain compliance failures contextually on the 3D model.
-- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A\* pathfinding) for detected clearance or galvanic clashes.
+- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A\* pathfinding) for detected clearance clashes.
 - [ ] Utilize Vision-Language Models (VLMs) to automatically audit generated BCF clash snapshots and filter out false positives before they reach human review.
 - [ ] Apply Graph Neural Networks (GNNs) on extracted IFC spatial relationship graphs (like those in `ifc_egress.py` and `ifc_spatial.py`) to infer missing connectivity, room usages, or system topologies when metadata is absent.
 - [ ] Implement a Predictive Cost & Schedule Impact ML model in `cost_model.py` to replace static CSV lookups, dynamically forecasting remediation costs and programme delays based on issue context and historical resolution data.
@@ -753,32 +752,6 @@ Owner: unassigned.
 - **Typed BCF Contracts**: Added `BcfArtifact` schema to `frontend/src/lib/types.ts` and typed `analyzeApi.listBcfArtifacts()` in `frontend/src/lib/api.ts`.
 
 ---
-
-# Verification Plan
-
-- [ ] Navigate to http://localhost:5173
-- [ ] Inspect Sidebar under "Analysis":
-  - Verify types: "Architectural", "Piping", "Seismic"
-- [ ] Click "Architectural":
-  - Verify it opens Architectural Compliance view
-  - Verify "Category: Arch"
-  - Verify only architectural rulesets
-- [ ] Click "Piping":
-  - Verify it opens Piping System Corrosion Audit
-  - Verify "Category: Piping"
-  - Verify Piping rulesets (BIMGUARD-GC-001, CC-001, MC-001)
-- [ ] Click "Seismic":
-  - Verify it opens Seismic Buffer & Bracing Audit
-  - Verify "Category: seismic"
-  - Verify Seismic rulesets (BIMGUARD-SB-001)
-- [ ] Click "Rules Catalog" in Library:
-  - Verify category selector pills (All Categories, Arch, Piping, seismic)
-  - Verify table contains Category column
-- [ ] Take screenshots for each step
-
-## Status
-
-Verification blocked: The open_browser_url tool failed multiple times because the Playwright environment driver could not be installed (HTTP 404 from playwright.azureedge.net).
 
 ## Priority: Logging Improvements
 
