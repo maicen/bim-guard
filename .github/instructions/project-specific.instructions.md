@@ -108,6 +108,23 @@ This is a correctness fix, not just cleanup: the DB now enforces `CHECK (categor
 
 ---
 
+## Library Documentation Lookup via Context7 (MANDATORY)
+
+Always use Context7 MCP (`resolve-library-id` followed by `query-docs`, or `npx ctx7 docs <libraryId> <query>`) whenever you need API syntax, configuration, version migration, library-specific debugging, setup instructions, or code examples for any external library or framework.
+
+This is especially mandatory for core project libraries:
+- **Docling** (`docling`, `docling-core`, `docling-serve`) — layout extraction, PDF parsing, chunking, and service options.
+- **DocLang** (`doclang`) — XML document representation, schema validation (`xsd_only`, Schematron), and element structure.
+- **IfcOpenShell** (`ifcopenshell`, `ifcopenshell.geom`, `ifcopenshell.util`, `bcf`) — IFC schema parsing, geometric kernels, property sets, and spatial trees.
+- **FastAPI / Pydantic / LiteLLM** — API route decorators, dependency injection, streaming responses, Pydantic v2 validation models, and LLM completions.
+- **Svelte 5 / bits-ui / Tailwind CSS** — Svelte 5 runes (`$state`, `$derived`, `$props`, `$effect`), bits-ui headless primitives, and Tailwind styling.
+- **Supabase / PostgREST** — Supabase Auth, PostgreSQL schema, RLS policies, and storage client APIs.
+- Any other external library or dependency.
+
+Never guess or hallucinate API signatures when up-to-date documentation can be retrieved via Context7.
+
+---
+
 ## API & Backend Rules (`app/api/**`)
 
 1. **Always use Pydantic schemas**: Every route in `app/api/` must accept and return strict Pydantic models defined in `app/modules/contracts.py`. Never return raw HTML or unvalidated dictionaries.

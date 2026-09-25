@@ -257,6 +257,21 @@ uv run pytest tests/test_api_*.py -m 'not slow' -v
 
 Default rule: skip slow tests unless a task is explicitly about slow engine/pipeline behavior or a fast-path validation is not possible.
 
+## Library Documentation Lookup via Context7 (MANDATORY)
+
+Always use Context7 MCP (`resolve-library-id` followed by `query-docs`, or `npx ctx7 docs <libraryId> <query>`) whenever you need API syntax, configuration, version migration, library-specific debugging, setup instructions, or code examples for any external library or framework.
+
+This is especially mandatory for core project libraries and ecosystems:
+- **Docling** (`docling`, `docling-core`, `docling-serve`) — document layout extraction, PDF parsing, chunking, and CLI/service options.
+- **DocLang** (`doclang`) — XML document representation, schema validation (`xsd_only`, Schematron), and element structure.
+- **IfcOpenShell** (`ifcopenshell`, `ifcopenshell.geom`, `ifcopenshell.util`, `bcf`) — IFC schema parsing, geometric kernels, property sets, and spatial trees.
+- **FastAPI / Pydantic / LiteLLM** — API route decorators, dependency injection, streaming responses, Pydantic v2 validation models, and LLM completions.
+- **Svelte 5 / bits-ui / Tailwind CSS** — Svelte 5 runes (`$state`, `$derived`, `$props`, `$effect`), bits-ui headless primitives, and Tailwind styling.
+- **Supabase / PostgREST** — Supabase Auth, PostgreSQL schema, RLS policies, and storage client APIs.
+- Any other external library or dependency.
+
+Never guess or hallucinate API signatures when up-to-date documentation can be retrieved via Context7.
+
 ## Architecture & Decoupled Stack
 
 BIM-Guard uses a modern, decoupled architecture:
