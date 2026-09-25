@@ -1,5 +1,6 @@
 """FastAPI router for document management and text extraction."""
 
+import asyncio
 import hashlib
 import mimetypes
 from typing import Annotated, Optional
@@ -577,7 +578,33 @@ async def upload_document(
     try:
         # Docling extraction can take a few seconds — offload to a worker
         # thread so it doesn't block the event loop for every other
-        # in-flight request.
+        # in-flight request. If inline DocLang generation takes longer than
+        # 60s (e.g. for large multi-hundred page building codes like SBC 201),
+        # timeout safely before Cloudflare's 100s edge timeout (HTTP 524)
+        # and store the document with DocLang generation deferred.
+        row, _created = await asyncio.wait_for(
+            run_in_threadpool(
+                service.ingest_uploaded_bytes,
+                clean_filename,
+                content,
+                doc_type=doc_type,
+                project_code=project_code,
+                originator=resolved_originator,
+                suitability_code=suitability_code,
+                revision_code=revision_code,
+                parser=clean_parser,
+                instance=resolved_instance,
+                generate_doclang=generate_doclang,
+                start_page=start_page,
+                end_page=end_page,
+            ),
+            timeout=60.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "DocLang extraction for '%s' exceeded 60s inline limit; storing file with DocLang deferred to avoid Cloudflare HTTP 524 timeout.",
+            clean_filename,
+        )
         row, _created = await run_in_threadpool(
             service.ingest_uploaded_bytes,
             clean_filename,
@@ -589,7 +616,7 @@ async def upload_document(
             revision_code=revision_code,
             parser=clean_parser,
             instance=resolved_instance,
-            generate_doclang=generate_doclang,
+            generate_doclang=False,
             start_page=start_page,
             end_page=end_page,
         )
@@ -708,9 +735,22 @@ async def generate_document_doclang(
     resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", None, instances_service)
     clean_parser = (payload.parser or "auto").strip().lower()
     try:
-        updated = await run_in_threadpool(
-            service.generate_doclang_for_existing, document_id, clean_parser, resolved_instance
+        updated = await asyncio.wait_for(
+            run_in_threadpool(
+                service.generate_doclang_for_existing, document_id, clean_parser, resolved_instance
+            ),
+            timeout=75.0,
         )
+    except asyncio.TimeoutError as exc:
+        logger.warning("DocLang generation for document %d timed out after 75s", document_id)
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=(
+                "DocLang conversion for this document timed out (exceeded 75s). "
+                "Large documents like complete building codes or specifications can take "
+                "several minutes on CPU; consider extracting smaller sections or uploading with a page range."
+            ),
+        ) from exc
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

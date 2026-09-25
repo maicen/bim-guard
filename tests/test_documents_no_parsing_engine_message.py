@@ -239,3 +239,117 @@ def test_extract_drafts_route_grants_the_requesting_org_its_new_batch_ruleset():
 
     ruleset_access.add_org_grant.assert_called_once_with(1, "EXTRACTED-20260921-000000")
 
+
+class _TimingOutDocumentService:
+    """Simulates a slow inline DocLang extraction that times out and falls back to deferred storage."""
+
+    def __init__(self):
+        self.calls = []
+
+    def ingest_uploaded_bytes(self, filename, content, **kwargs):
+        self.calls.append(kwargs)
+        return {
+            "id": 123,
+            "filename": filename,
+            "doc_type": kwargs.get("doc_type", "Specification"),
+            "file_path": f"uploads/{filename}",
+            "upload_date": "2026-09-26T00:00:00Z",
+            "text": "",
+            "char_count": 0,
+            "doclang_xml": "",
+            "project_code": "",
+            "suitability_code": "S0",
+            "revision_code": "P01.01",
+            "cde_state": "WIP",
+        }, True
+
+    def get_document_text(self, doc):
+        return ""
+
+    def get_doclang_content(self, doc):
+        return ""
+
+
+def test_upload_falls_back_to_deferred_doclang_on_timeout(monkeypatch):
+    """When inline DocLang generation times out, upload_document stores the file with DocLang deferred."""
+    service = _TimingOutDocumentService()
+
+    real_wait_for = asyncio.wait_for
+    first = True
+
+    async def fake_wait_for(fut, timeout):
+        nonlocal first
+        if first:
+            first = False
+            task = asyncio.ensure_future(fut)
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+            raise asyncio.TimeoutError()
+        return await real_wait_for(fut, timeout)
+
+    monkeypatch.setattr(asyncio, "wait_for", fake_wait_for)
+
+    resp = asyncio.run(
+        upload_document(
+            file=_FakeUpload(),
+            doc_type="Specification",
+            project_code="",
+            originator="",
+            suitability_code="S0",
+            revision_code="P01.01",
+            parser="auto",
+            engine_instance="",
+            generate_doclang=True,
+            start_page=None,
+            end_page=None,
+            organization_id=None,
+            x_org_id=None,
+            service=service,
+            instances_service=_FakeInstances(),
+            document_access=object(),
+            memberships=object(),
+            profiles=object(),
+            permissions=_FakePermissions(allowed=True),
+            current_user=None,
+        )
+    )
+    assert resp.id == 123
+    assert resp.doclang_xml == ""
+    assert len(service.calls) == 1
+    assert service.calls[0]["generate_doclang"] is False
+
+
+def test_generate_doclang_returns_504_on_timeout(monkeypatch):
+    """When generate_document_doclang times out, it raises 504 Gateway Timeout."""
+    from app.api.documents import generate_document_doclang
+    from app.modules.contracts import GenerateDoclangRequest
+
+    class _DocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "filename": "big.pdf", "file_path": "uploads/big.pdf"}
+
+        def generate_doclang_for_existing(self, *args, **kwargs):
+            return {}
+
+    async def fake_wait_for(fut, timeout):
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(asyncio, "wait_for", fake_wait_for)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            generate_document_doclang(
+                document_id=456,
+                payload=GenerateDoclangRequest(parser="auto"),
+                service=_DocService(),
+                instances_service=_FakeInstances(),
+                access_checker=lambda doc_id, for_mutation=False: None,
+            )
+        )
+    assert exc_info.value.status_code == 504
+    assert "timed out" in exc_info.value.detail
+
+

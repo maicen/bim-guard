@@ -34,6 +34,7 @@
   let uploadErrorLogCopied = $state(false);
   let noParsingEngineConfigured = $state(false);
   let parsingEngineFailed = $state(false);
+  let isTimeout = $state(false);
   // Cancels the in-flight upload if the component unmounts mid-upload
   // (navigating away) -- otherwise the fetch keeps running as an orphaned
   // promise with no one left to report its result to.
@@ -57,6 +58,7 @@
     uploadFile ? /\.(doclang|dclg|dclx)$/i.test(uploadFile.name) : false
   );
   let isPdfSelected = $derived(uploadFile ? /\.pdf$/i.test(uploadFile.name) : false);
+  let isLargePdf = $derived(isPdfSelected && (uploadFile?.size ?? 0) > 2 * 1024 * 1024);
 
   let uploadLimitPages = $state(false);
   let uploadStartPage = $state("1");
@@ -101,6 +103,7 @@
     uploadErrorLog = [];
     noParsingEngineConfigured = false;
     parsingEngineFailed = false;
+    isTimeout = false;
     isUploading = false;
   }
 
@@ -117,6 +120,7 @@
     uploadErrorLog = [];
     noParsingEngineConfigured = false;
     parsingEngineFailed = false;
+    isTimeout = false;
     uploadAbortController = new AbortController();
     try {
       const usePageRange = isPdfSelected && uploadLimitPages && !uploadPageRangeError;
@@ -137,12 +141,23 @@
     } catch (err: any) {
       if (uploadAbortController?.signal.aborted) return;
       const apiErr = err as ApiError;
+      const isTimeoutErr =
+        apiErr.status === 524 ||
+        apiErr.status === 504 ||
+        apiErr.message?.includes("524") ||
+        apiErr.message?.toLowerCase().includes("timeout");
+      isTimeout = isTimeoutErr;
+      if (isTimeoutErr) {
+        generateDoclangOnUpload = false;
+      }
       // apiFetch (lib/api.ts) already normalizes a fetch()-level failure
       // (offline, unreachable backend) into this same ApiError shape with
       // isNetworkError set, instead of a raw browser-specific TypeError.
       uploadError = apiErr.isNetworkError
         ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
-        : apiErr.message || "Failed to upload document.";
+        : isTimeoutErr
+          ? "Upload timed out during inline DocLang conversion (HTTP 524). Converting large documents can exceed the network proxy limit."
+          : apiErr.message || "Failed to upload document.";
       noParsingEngineConfigured = apiErr.status === 422;
       parsingEngineFailed = apiErr.status === 502;
       uploadErrorLog = [toErrorLogEntry(err, uploadFile.name)];
@@ -161,17 +176,28 @@
 >
   <div class="space-y-4">
     {#if uploadError}
-      <div class="space-y-2 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-300">
-        <p>{uploadError}</p>
-        {#if parsingEngineFailed && generateDoclangOnUpload}
-          <p class="text-rose-200">
+      <div class="space-y-2 rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical">
+        <p class="font-medium">{uploadError}</p>
+        {#if isTimeout}
+          <div class="space-y-1 text-fg-secondary">
+            <p>
+              “Convert to DocLang now” has been automatically disabled below so you can upload and store the file immediately. Click <strong>Upload Document</strong> to proceed.
+            </p>
+            {#if isPdfSelected}
+              <p class="text-caption text-fg-muted">
+                You can also use “Limit to a page range” below to extract only the relevant chapters.
+              </p>
+            {/if}
+          </div>
+        {:else if parsingEngineFailed && generateDoclangOnUpload}
+          <p class="text-fg-secondary">
             You can also turn off “Convert to DocLang now” to store the file and convert it later.
           </p>
         {/if}
         {#if noParsingEngineConfigured && canManageParsing}
           <a
             href={`#/external-providers?tab=parsing${authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : ""}`}
-            class="inline-flex items-center gap-1.5 font-semibold text-rose-200 underline hover:text-white"
+            class="inline-flex items-center gap-1.5 font-semibold text-accent underline hover:text-accent-hover"
           >
             <Settings2 class="h-3.5 w-3.5" />
             Configure a parsing engine
@@ -189,7 +215,7 @@
                 setTimeout(() => (uploadErrorLogCopied = false), 2000);
               }
             }}
-            class="rounded-lg border border-rose-700 px-2.5 py-1 text-caption font-semibold text-rose-200 transition-colors hover:bg-rose-900/40"
+            class="rounded-lg border border-border-interactive px-2.5 py-1 text-caption font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
           >
             {uploadErrorLogCopied ? "Copied!" : "Copy issue log"}
           </button>
@@ -292,7 +318,7 @@
         </div>
       {/if}
     {:else}
-      <div class="rounded-xl border border-cyan-800/40 bg-cyan-950/20 px-3.5 py-2.5 text-xs text-cyan-300">
+      <div class="rounded-xl border border-info-border bg-info-bg px-3.5 py-2.5 text-xs text-info">
         This is a pre-converted DocLang XML file — it's stored as-is, with no parsing engine or
         conversion step needed.
       </div>
@@ -315,7 +341,16 @@
           accept=".pdf,.docx,.xlsx,.pptx,.md,.markdown,.adoc,.asciidoc,.html,.htm,.csv,.txt,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.doclang,.dclg,.dclx"
           onchange={(e) => {
             const target = e.target as HTMLInputElement;
-            if (target.files) uploadFile = target.files[0];
+            if (target.files && target.files[0]) {
+              const file = target.files[0];
+              uploadFile = file;
+              uploadError = "";
+              uploadErrorLog = [];
+              isTimeout = false;
+              if (file.name.toLowerCase().endsWith(".pdf") && file.size > 2 * 1024 * 1024) {
+                generateDoclangOnUpload = false;
+              }
+            }
           }}
           class="hidden"
         />
@@ -327,8 +362,20 @@
         class="flex items-center justify-between rounded-xl border border-border-default bg-surface-canvas p-3 text-xs"
       >
         <span class="truncate font-medium text-fg-primary">{uploadFile.name}</span>
-        <span class="text-fg-muted">{(uploadFile.size / 1024).toFixed(1)} KB</span>
+        <span class="text-fg-muted">
+          {uploadFile.size > 1024 * 1024
+            ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
+            : `${(uploadFile.size / 1024).toFixed(1)} KB`}
+        </span>
       </div>
+      {#if isLargePdf}
+        <div class="rounded-xl border border-warning-border bg-warning-bg p-2.5 text-xs text-warning">
+          <p class="font-medium">Large document detected ({(uploadFile.size / (1024 * 1024)).toFixed(1)} MB)</p>
+          <p class="text-caption text-fg-secondary mt-0.5">
+            Converting entire building codes or multi-page specifications inline can exceed the 100-second network proxy limit (HTTP 524). “Convert to DocLang now” has been turned off by default so the file uploads immediately; you can convert it later from the documents table or specify a page range.
+          </p>
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -347,7 +394,13 @@
         onclick={handleUpload}
         class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
       >
-        {isUploading ? "Extracting Text..." : "Upload & Extract"}
+        {isUploading
+          ? generateDoclangOnUpload
+            ? "Extracting Text..."
+            : "Uploading..."
+          : generateDoclangOnUpload
+            ? "Upload & Extract"
+            : "Upload Document"}
       </button>
     </div>
   {/snippet}

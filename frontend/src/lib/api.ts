@@ -222,6 +222,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
     } catch {
       // not json
     }
+    if (res.status === 524 && errorDetail.startsWith("HTTP 524")) {
+      errorDetail =
+        "Network proxy timeout (HTTP 524). The server took longer than 100 seconds to respond — this usually occurs when converting large documents (such as building codes) to DocLang. Turn off “Convert to DocLang now” to upload immediately, or use “Limit to a page range”.";
+    } else if (res.status === 504 && errorDetail.startsWith("HTTP 504")) {
+      errorDetail = "Gateway timeout (HTTP 504). The server took too long to process the request.";
+    }
     // The status rides along so a caller can tell a rejected request apart
     // from a failed one — a 422 means the query this client built was wrong,
     // which is a bug to report rather than a condition to show the user.
