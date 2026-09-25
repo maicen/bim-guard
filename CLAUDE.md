@@ -168,6 +168,10 @@ docker compose up -d --build
 # (keeps Neo4j, Docling, and Cloudflared running with zero connection disruption):
 docker compose --profile tunnel up -d --build bim-guard
 
+# Remote trigger & CI/CD deployment:
+# Push to main or trigger manually via GitHub Web/Mobile (Actions -> Deploy Production)
+# via the local background runner daemon (~/actions-runner).
+
 # Inspect container health and service logs:
 docker compose ps
 docker compose logs -f bim-guard

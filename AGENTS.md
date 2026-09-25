@@ -39,6 +39,7 @@ The platform is served in production at `https://bim-guard.xyz` via **OrbStack /
      docker compose --profile tunnel up -d --build bim-guard
      ```
    *(If `COMPOSE_PROFILES=tunnel` is set in `.env`, `docker compose up -d --build [bim-guard]` automatically includes the tunnel).*
+   - **Remote trigger & CI/CD deployment**: Triggered automatically on push to `main` or manually via GitHub Web/Mobile UI (**Actions &rarr; Deploy Production (bim-guard.xyz)**) via the host's background self-hosted runner daemon (`~/actions-runner`). See [docs/deployment_orbstack_cloudflare.md](docs/deployment_orbstack_cloudflare.md).
 
 2. **Container services in `docker-compose.yml`**:
    - **`bim-guard` (`bim-guard-app`)**: Production 4-worker FastAPI gateway on port `8000` serving the compiled Svelte 5 SPA from `frontend/dist` and `/api` REST/SSE endpoints.

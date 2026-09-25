@@ -3,6 +3,13 @@ name: Deploy Production (bim-guard.xyz)
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.agents/**'
+      - '.claude/**'
+      - '.vscode/**'
+      - '.antigravity/**'
   workflow_dispatch:
     inputs:
       target:

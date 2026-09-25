@@ -189,6 +189,24 @@ A self-hosted GitHub Actions runner is configured on the host machine (`~/action
   ./svc.sh start    # Start runner service
   ```
 
+#### Branching Strategy & Best Practices: Does Deployment Need a Separate Branch?
+
+**Recommendation: No separate branch is needed.** BIM Guard follows **Trunk-Based Development** / **Continuous Delivery** from `main`:
+
+1. **Why Deploying from `main` is Industry Standard**:
+   - `main` represents production-ready code.
+   - Eliminates "merge hell", cherry-picking overhead, and branch drift (which frequently causes silent deployment bugs when a `production` branch drifts behind `main`).
+   - Ensures immediate feedback loops when verified fixes and features land.
+
+2. **When Would a Separate Branch or Tag Be Used?**:
+   - **Git Tags / Releases (`v1.2.0`)**: Best for formal periodic releases where specific versions are milestone-tagged.
+   - **Dedicated `production` branch**: Primarily useful in multi-team organizations with long staging QA cycles before rolling to production.
+
+3. **Safeguards for `main`**:
+   - **Selective Dispatch**: To avoid automatic deployment on every small commit, deployment can be triggered manually via GitHub Actions **Run workflow** (`workflow_dispatch`).
+   - **Path Filters**: To prevent documentation and scratch updates from triggering container rebuilds, `.github/workflows/deploy.yml` can ignore paths (e.g. `paths-ignore: ['docs/**', '*.md']`).
+   - **PR Protection**: Use GitHub Branch Protection on `main` to require automated linting/tests (`ruff`, `pytest -m 'not slow'`) before merging to `main`.
+
 ---
 
 ## 4. Alternative: Host CLI-Managed Tunnel
