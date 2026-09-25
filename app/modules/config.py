@@ -1,7 +1,7 @@
 """Shared configuration for the document and rule pipeline.
 
 Shared constants for Module 1 and Module 3 pipeline components.
-Imported by rule_generator.py, rule_converter.py, and seed-rule loaders.
+Imported by rule_generator.py and seed-rule loaders.
 """
 
 import os

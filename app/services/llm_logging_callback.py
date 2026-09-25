@@ -30,6 +30,20 @@ class LLMCallLoggingCallback(CustomLogger):
     def __init__(self, llm_call_log_service: LLMCallLogService) -> None:
         self._service = llm_call_log_service
 
+    def log_success_event(self, kwargs: dict, response_obj: Any, start_time, end_time) -> None:
+        self._log(kwargs, response_obj, start_time, end_time, status="success", error=None)
+
+    def log_failure_event(self, kwargs: dict, response_obj: Any, start_time, end_time) -> None:
+        exception = kwargs.get("exception")
+        self._log(
+            kwargs,
+            response_obj,
+            start_time,
+            end_time,
+            status="error",
+            error=str(exception) if exception is not None else "unknown error",
+        )
+
     async def async_log_success_event(self, kwargs: dict, response_obj: Any, start_time, end_time) -> None:
         self._log(kwargs, response_obj, start_time, end_time, status="success", error=None)
 

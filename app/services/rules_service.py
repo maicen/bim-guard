@@ -68,6 +68,10 @@ _RICH_COLUMNS = {
     "confidence": str,
     "extraction_method": str,
     "needs_review": int,
+    "rase_requirement": str,
+    "rase_applicability": dict,
+    "rase_selection": dict,
+    "rase_exception": dict,
 }
 
 # Columns that classify a rule within the broader multi-mechanism schema.

@@ -5,7 +5,7 @@ Adapter that forwards all reads/writes to the web app's RuleService so every
 pipeline uses the same Supabase-backed rules table.
 
 Public interface is identical to the original standalone RuleStore, so
-RuleGenerator, TableRuleBuilder, RuleConverter, code_seed_rules, orchestrator,
+RuleGenerator, TableRuleBuilder, code_seed_rules, orchestrator,
 and enhanced_orchestrator need no changes.
 
 Field-name mapping (CLI → web):

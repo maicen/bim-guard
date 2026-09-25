@@ -43,10 +43,7 @@ app/modules/
 │   ├── code_extended_rules.py     — seeds extended building-code rules from DB static assets
 │   ├── ids_exporter.py            — buildingSMART IDS 1.0 export/import via ifctester.ids
 │   ├── aec3po_exporter.py         — AEC3PO export format support
-│   ├── shacl_generator.py         — generates W3C SHACL shapes from DB-authored rules
-│   ├── rule_converter.py          — legacy direct GPT-4o converter, kept only for its
-│   │                                 existing LLM test coverage; not used by the live path
-│   └── regex_rule_converter.py    — legacy free/offline regex converter, same status
+│   └── shacl_generator.py         — generates W3C SHACL shapes from DB-authored rules
 ├── ifc_reader/                  # IFC parsing, property resolution, quality gate
 │   ├── ifc_parser.py               — raw IFC element reader
 │   ├── ifc_geometry.py             — geometry-derived property extraction
@@ -111,11 +108,6 @@ This whole path is fronted by `app/services/rule_extraction_service.py`
 (`RuleExtractionService`), which any caller (API route, agent tool) depends on
 through the `RuleExtractionProvider` protocol — the extraction algorithm can be
 swapped without touching callers.
-
-`rule_converter.py` (direct GPT-4o) and `regex_rule_converter.py` (free/offline
-regex) are earlier, superseded converters. They are not wired into the live
-extraction path — they remain only because `tests/test_rule_builder.py` still
-exercises them directly.
 
 ## Seeding Baseline Rules
 
