@@ -440,6 +440,8 @@ export interface DocumentElementBboxesResponse {
   elements: DocumentElementBbox[];
 }
 
+export type RuleSourceMatchStatus = "exact" | "unmapped" | "orphaned";
+
 /** Lightweight rule shape for the rule-source map view. */
 export interface RuleSourceSummary {
   id: number;
@@ -449,6 +451,8 @@ export interface RuleSourceSummary {
   category?: string | null;
   source_page_number?: number | null;
   source_bbox?: BoundingBox | null;
+  source_element_id?: string | null;
+  match_status: RuleSourceMatchStatus;
 }
 
 /** One document element annotated with the rule(s) extracted from it. */
@@ -458,13 +462,16 @@ export interface DocumentElementWithRules extends DocumentElementBbox {
 
 /**
  * Every rule extracted from a document, mapped against its exact source element.
- * `unmapped_rules` holds rules with no `source_element_id` (extracted before that
- * linkage existed) -- only an approximate page/bbox location, not an exact match.
+ * `unmapped_rules` holds rules with no `source_element_id` at all (extracted
+ * before that linkage existed) -- only an approximate page/bbox location.
+ * `orphaned_rules` holds rules whose `source_element_id` matches no *current*
+ * element (the source document was likely re-parsed) -- these need re-linking.
  */
 export interface RuleSourceMapResponse {
   document_id: number;
   elements: DocumentElementWithRules[];
   unmapped_rules: RuleSourceSummary[];
+  orphaned_rules: RuleSourceSummary[];
 }
 
 export interface DocumentUpdatePayload {

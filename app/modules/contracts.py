@@ -927,6 +927,8 @@ class RuleSourceSummary(BaseModel):
     category: Optional[str] = None
     source_page_number: Optional[int] = None
     source_bbox: Optional[dict[str, Any]] = None
+    source_element_id: Optional[str] = None
+    match_status: Literal["exact", "unmapped", "orphaned"] = "unmapped"
 
 
 class DocumentElementWithRules(DocumentElementBbox):
@@ -938,14 +940,18 @@ class DocumentElementWithRules(DocumentElementBbox):
 class RuleSourceMapResponse(BaseModel):
     """Every rule extracted from a document, mapped against its exact source element.
 
-    ``unmapped_rules`` holds rules on this document with no ``source_element_id``
-    (extracted before that linkage existed) -- these only have an approximate
-    page/bbox location, not an exact element match.
+    ``unmapped_rules`` holds rules with no ``source_element_id`` at all
+    (extracted before that linkage existed) -- only an approximate page/bbox
+    location. ``orphaned_rules`` holds rules whose ``source_element_id`` is
+    set but matches no *current* element (the source document was likely
+    re-parsed/re-uploaded and element ids shifted) -- these need re-linking,
+    not just an approximate location.
     """
 
     document_id: int
     elements: list[DocumentElementWithRules] = Field(default_factory=list)
     unmapped_rules: list[RuleSourceSummary] = Field(default_factory=list)
+    orphaned_rules: list[RuleSourceSummary] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

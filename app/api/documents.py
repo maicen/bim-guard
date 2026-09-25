@@ -71,6 +71,7 @@ from app.services.parsing_engine_instances_service import ParsingEngineInstances
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService, RuleGenerationFailedError
+from app.services.rule_source_mapping import group_rows_by_element
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
 
@@ -1094,10 +1095,11 @@ def get_document_rule_source_map(
         )
 
     elements = [DocumentElementBbox(**record) for record in service.get_element_bboxes(doc)]
-    rules_by_element: dict[str, list[RuleSourceSummary]] = {}
-    unmapped_rules: list[RuleSourceSummary] = []
-    for row in rules_service.list_by_document(document_id):
-        summary = RuleSourceSummary(
+    rows = rules_service.list_by_document(document_id)
+    by_element, unmapped, orphaned = group_rows_by_element(elements, rows)
+
+    def _summary(row: dict, match_status: str) -> RuleSourceSummary:
+        return RuleSourceSummary(
             id=row["id"],
             rule_id=row.get("reference"),
             description=row.get("description"),
@@ -1105,19 +1107,22 @@ def get_document_rule_source_map(
             category=row.get("category"),
             source_page_number=row.get("source_page_number"),
             source_bbox=row.get("source_bbox"),
+            source_element_id=row.get("source_element_id"),
+            match_status=match_status,
         )
-        element_id = row.get("source_element_id")
-        if element_id:
-            rules_by_element.setdefault(element_id, []).append(summary)
-        else:
-            unmapped_rules.append(summary)
 
     elements_with_rules = [
-        DocumentElementWithRules(**el.model_dump(), rules=rules_by_element.get(el.element_id, []))
+        DocumentElementWithRules(
+            **el.model_dump(),
+            rules=[_summary(row, "exact") for row in by_element.get(el.element_id, [])],
+        )
         for el in elements
     ]
     return RuleSourceMapResponse(
-        document_id=document_id, elements=elements_with_rules, unmapped_rules=unmapped_rules
+        document_id=document_id,
+        elements=elements_with_rules,
+        unmapped_rules=[_summary(row, "unmapped") for row in unmapped],
+        orphaned_rules=[_summary(row, "orphaned") for row in orphaned],
     )
 
 
