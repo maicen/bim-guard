@@ -65,3 +65,38 @@ def test_batch_returns_all_none_for_empty_pages():
 
 def test_batch_returns_empty_list_for_no_snippets():
     assert DocumentPagesService.find_best_matching_pages(PAGES, []) == []
+
+
+RECURRING_HEADING_PAGES = [
+    {"page_number": 1, "text": "Chapter 2. Exceptions: none apply to this section."},
+    {"page_number": 5, "text": "Section 8.14.1 doorways required. Exceptions: see 8.14.2."},
+    {"page_number": 9, "text": "Section 8.15 travel distance. Exceptions: sprinklered spaces only."},
+]
+
+
+def test_non_sequential_batch_collapses_recurring_headings_to_first_occurrence():
+    # Without sequential=True, every "Exceptions:" snippet resolves to the
+    # same (first) page, regardless of which occurrence it actually is.
+    snippets = ["Exceptions:", "Exceptions:", "Exceptions:"]
+    batch = DocumentPagesService.find_best_matching_pages(RECURRING_HEADING_PAGES, snippets)
+    assert batch == [1, 1, 1]
+
+
+def test_sequential_batch_resolves_recurring_headings_in_document_order():
+    snippets = ["Exceptions:", "Exceptions:", "Exceptions:"]
+    batch = DocumentPagesService.find_best_matching_pages(
+        RECURRING_HEADING_PAGES, snippets, sequential=True
+    )
+    assert batch == [1, 5, 9]
+
+
+def test_sequential_batch_widens_back_to_full_document_when_bound_has_no_match():
+    # A snippet unique to page 1 shouldn't be lost just because the running
+    # cursor has already advanced past page 1 from an earlier match.
+    pages = [
+        {"page_number": 1, "text": "Unique introductory text about scope."},
+        {"page_number": 5, "text": "Exceptions: see 8.14.2."},
+    ]
+    snippets = ["Exceptions:", "Unique introductory text about scope."]
+    batch = DocumentPagesService.find_best_matching_pages(pages, snippets, sequential=True)
+    assert batch == [5, 1]

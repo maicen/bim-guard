@@ -1083,7 +1083,9 @@ async def get_document_sections_tree(
         pages = DocumentPagesService().get_pages(document_id)
         if pages:
             snippets = [flat[i]["text"][:250] for i in unresolved_indices]
-            matched_pages = DocumentPagesService.find_best_matching_pages(pages, snippets)
+            matched_pages = DocumentPagesService.find_best_matching_pages(
+                pages, snippets, sequential=True
+            )
             for idx, page_num in zip(unresolved_indices, matched_pages, strict=False):
                 flat[idx]["page_number"] = page_num
 

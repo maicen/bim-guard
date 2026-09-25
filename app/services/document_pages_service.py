@@ -82,30 +82,57 @@ class DocumentPagesService:
         return DocumentPagesService.find_best_matching_pages(pages, [snippet])[0]
 
     @staticmethod
-    def find_best_matching_pages(pages: list[dict], snippets: list[str]) -> list[Optional[int]]:
+    def find_best_matching_pages(
+        pages: list[dict],
+        snippets: list[str],
+        *,
+        sequential: bool = False,
+    ) -> list[Optional[int]]:
         """Batch form of `find_best_matching_page` — one page-normalization pass.
 
         Used when resolving many snippets against the same document (e.g. one
         per detected section), so normalizing `pages` isn't repeated once per
         snippet.
+
+        `sequential=True` asserts `snippets` are given in document order (e.g.
+        one per detected section, walked top to bottom). A snippet made of a
+        short, generic, recurring heading like "Exceptions:" has no unique
+        text to match on, so a plain substring search returns the *first*
+        page anywhere in the document containing that string — always the
+        same page, no matter which occurrence is being resolved. With
+        `sequential=True`, each snippet's search is bounded to pages at or
+        after the previously matched page, since later snippets can't
+        legitimately resolve earlier than earlier ones did; only widens back
+        to the full document when nothing matches within that bound.
         """
         normalized_pages = [
             (page.get("page_number"), _normalize_for_match(page.get("text", ""))) for page in pages
         ]
 
         results: list[Optional[int]] = []
+        cursor: Optional[int] = None
         for snippet in snippets:
             norm_snippet = _normalize_for_match(snippet)
             if not norm_snippet or not normalized_pages:
                 results.append(None)
                 continue
 
-            matched = next(
-                (number for number, text in normalized_pages if norm_snippet in text),
-                None,
-            )
+            candidates = normalized_pages
+            if sequential and cursor is not None:
+                bounded = [(n, t) for n, t in normalized_pages if n is not None and n > cursor]
+                if bounded:
+                    candidates = bounded
+
+            matched = next((number for number, text in candidates if norm_snippet in text), None)
+            if matched is None and candidates is not normalized_pages:
+                matched = next(
+                    (number for number, text in normalized_pages if norm_snippet in text),
+                    None,
+                )
             if matched is not None:
                 results.append(matched)
+                if sequential:
+                    cursor = matched
                 continue
 
             snippet_words = set(norm_snippet.split())
@@ -113,15 +140,29 @@ class DocumentPagesService:
                 results.append(None)
                 continue
 
-            best_page, best_score = None, 0.0
-            for number, text in normalized_pages:
-                page_words = set(text.split())
-                if not page_words:
-                    continue
-                overlap = len(snippet_words & page_words) / len(snippet_words)
-                if overlap > best_score:
-                    best_score, best_page = overlap, number
+            best_page, best_score = DocumentPagesService._best_overlap(candidates, snippet_words)
+            if best_page is None and candidates is not normalized_pages:
+                best_page, best_score = DocumentPagesService._best_overlap(
+                    normalized_pages, snippet_words
+                )
 
-            results.append(best_page if best_score > 0.3 else None)
+            matched_page = best_page if best_score > 0.3 else None
+            results.append(matched_page)
+            if sequential and matched_page is not None:
+                cursor = matched_page
 
         return results
+
+    @staticmethod
+    def _best_overlap(
+        normalized_pages: list[tuple[Optional[int], str]], snippet_words: set[str]
+    ) -> tuple[Optional[int], float]:
+        best_page, best_score = None, 0.0
+        for number, text in normalized_pages:
+            page_words = set(text.split())
+            if not page_words:
+                continue
+            overlap = len(snippet_words & page_words) / len(snippet_words)
+            if overlap > best_score:
+                best_score, best_page = overlap, number
+        return best_page, best_score
