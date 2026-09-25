@@ -170,6 +170,25 @@ curl -sI https://bim-guard.xyz/health
 docker compose logs -f bim-guard
 ```
 
+### Step 3c: Remote Deployment Trigger via GitHub Actions
+
+A self-hosted GitHub Actions runner is configured on the host machine (`~/actions-runner`) as a persistent macOS `launchd` background service (`actions.runner.maicen-bim-guard.Sam-Mac-Studio`).
+
+#### How it works:
+- **Outbound Polling**: The runner polls GitHub securely via outbound HTTPS long-polling. No inbound open ports or external webhooks are required.
+- **Automated Deploy on Push**: Pushes to `main` automatically trigger the `.github/workflows/deploy.yml` workflow, synchronizing the repo and running `docker compose --profile tunnel up -d --build bim-guard`.
+- **Manual Remote Trigger**:
+  1. Open the repository on **GitHub** (Web or Mobile app) &rarr; **Actions** &rarr; **Deploy Production (bim-guard.xyz)**.
+  2. Click **Run workflow**.
+  3. Select the target (`bim-guard` for fast app update, or `full-stack` for all microservices) and click **Run**.
+- **Managing the Host Runner Service**:
+  ```bash
+  cd ~/actions-runner
+  ./svc.sh status   # Check status
+  ./svc.sh stop     # Stop runner service
+  ./svc.sh start    # Start runner service
+  ```
+
 ---
 
 ## 4. Alternative: Host CLI-Managed Tunnel

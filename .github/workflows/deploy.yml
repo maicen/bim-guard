@@ -1,0 +1,77 @@
+name: Deploy Production (bim-guard.xyz)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deployment target (bim-guard for fast app rebuild, full-stack for all services)'
+        required: true
+        default: 'bim-guard'
+        type: choice
+        options:
+          - 'bim-guard'
+          - 'full-stack'
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Local OrbStack / Cloudflare Stack
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: /Users/sam/coding/bim-guard
+    steps:
+      - name: Sync Git Repository
+        run: |
+          echo "==> Fetching latest changes from origin..."
+          git fetch origin main
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Notice: Uncommitted changes detected in working tree; stashing..."
+            git stash push -u -m "Auto-stashed by deploy workflow $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          fi
+          git merge --ff-only origin/main || git reset --hard origin/main
+
+      - name: Rebuild and Restart Services
+        run: |
+          TARGET="${{ github.event.inputs.target || 'bim-guard' }}"
+          echo "==> Deployment target: $TARGET"
+          if [ "$TARGET" = "full-stack" ]; then
+            echo "==> Rebuilding and starting full Compose stack with tunnel..."
+            docker compose --profile tunnel up -d --build
+          else
+            echo "==> Rebuilding and updating bim-guard application container..."
+            docker compose --profile tunnel up -d --build bim-guard
+          fi
+
+      - name: Verify Gateway Health
+        run: |
+          echo "==> Waiting for API gateway to report healthy..."
+          HEALTHY=0
+          for i in $(seq 1 30); do
+            RES=$(curl -s http://localhost:8000/api/health || true)
+            if echo "$RES" | grep -q '"status":"ok"'; then
+              echo "Local healthcheck passed: $RES"
+              HEALTHY=1
+              break
+            fi
+            echo "Waiting for gateway bootstrap... ($i/30)"
+            sleep 2
+          done
+          if [ "$HEALTHY" -ne 1 ]; then
+            echo "ERROR: Local healthcheck timed out after 60s"
+            docker compose logs --tail 50 bim-guard
+            exit 1
+          fi
+
+      - name: Verify Public Tunnel Connectivity
+        run: |
+          echo "==> Checking public domain health (https://bim-guard.xyz/api/health)..."
+          PUBLIC_RES=$(curl -s https://bim-guard.xyz/api/health || true)
+          echo "Public endpoint response: $PUBLIC_RES"
+          echo "==> Current live frontend asset hash:"
+          curl -s https://bim-guard.xyz/ | grep -o 'assets/index-[^"]*' || true
