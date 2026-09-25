@@ -678,6 +678,30 @@
     isDraftBulkDeleteModalOpen = false;
   }
 
+  let previewingIds = $state(false);
+
+  /** Download the IDS XML the current document's extraction drafts would produce. */
+  async function previewDraftsAsIds() {
+    if (!selectedDocId || previewingIds) return;
+    previewingIds = true;
+    try {
+      const xmlText = await ruleExtractionApi.previewDraftsAsIds(selectedDocId);
+      const blob = new Blob([xmlText], { type: "application/xml;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `document_${selectedDocId}_drafts_preview.ids.xml`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toasts.fromError(err, "Could not generate an IDS preview for this document's drafts.");
+    } finally {
+      previewingIds = false;
+    }
+  }
+
   function exportDraftRulesToCsv() {
     const target = table.selectedCount ? table.selectedRows : table.sorted;
     const headers = [
@@ -1017,6 +1041,17 @@
             <option value="edited">Edited</option>
             <option value="rejected">Rejected</option>
           </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={previewDraftsAsIds}
+            loading={previewingIds}
+            disabled={!selectedDocId || draftRules.length === 0}
+            title="Generate a buildingSMART IDS XML preview from this document's current extraction drafts"
+          >
+            {#if !previewingIds}<Download class="h-3.5 w-3.5" />{/if}
+            <span>Preview as IDS XML</span>
+          </Button>
         </div>
 
         <BulkActionBar

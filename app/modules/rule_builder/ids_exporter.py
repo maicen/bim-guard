@@ -581,17 +581,16 @@ def translate_rule_drafts_to_ids(
     reviewer can preview the IDS a draft would produce without first
     promoting it into `public.rules`.
 
-    `RuleCreateRequest` carries no target-IFC-class field (a pre-existing
-    contract gap — the canonical `rules` table's `target_ifc_class` column
-    is never populated by the extraction/bulk-save path today either), so
-    drafts without one are filtered out by `filter_exportable_rules` just as
-    canonical rule rows without a target are.
+    A draft whose `target_ifc_class` was never resolved (the LLM found no
+    checkable class, or a reviewer hasn't corrected it yet) is filtered out
+    by `filter_exportable_rules`, same as a canonical rule row without one —
+    it simply produces no specification, rather than an incorrect one.
     """
     rows = [
         {
             "reference": draft.proposed_rule.rule_id,
             "rule_category": draft.proposed_rule.rule_category or "property_check",
-            "target_ifc_class": "",
+            "target_ifc_class": draft.proposed_rule.target_ifc_class or "",
             "property_set": draft.proposed_rule.property_set or "",
             "property_name": draft.proposed_rule.property_name or "",
             "operator": draft.proposed_rule.operator or "==",

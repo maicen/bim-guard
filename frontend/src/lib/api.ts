@@ -1893,6 +1893,22 @@ export const ruleExtractionApi = {
     return `${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`;
   },
 
+  /**
+   * Fetch the IDS XML a document's current extraction drafts would produce.
+   *
+   * A plain `<a href={getIdsPreviewUrl(...)}>` link can't carry the bearer
+   * token this API requires, so this goes through apiFetch (which does) and
+   * returns the XML text for the caller to Blob-download instead.
+   */
+  async previewDraftsAsIds(documentId: number): Promise<string> {
+    const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(detail || `Failed to generate IDS preview (${res.status}).`);
+    }
+    return res.text();
+  },
+
   /** Resolve a draft's source document/page for the document-viewer modal. */
   async getDraftSource(draftId: number): Promise<RuleSourceResponse> {
     const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/source`);

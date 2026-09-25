@@ -134,16 +134,50 @@ def test_translate_rule_drafts_to_ids_raises_when_none_have_a_target():
             check_value="900",
         ),
     )
-    # RuleCreateRequest carries no target-IFC-class field (a pre-existing
-    # contract gap), so every draft is filtered out and IDS 1.0 requires at
-    # least one specification -- this documents that gap rather than
-    # papering over it with an invalid empty document.
+    # This draft never had target_ifc_class resolved (LLM found no checkable
+    # class), so it's filtered out and IDS 1.0 requires at least one
+    # specification -- this documents that gap rather than papering over it
+    # with an invalid empty document.
     try:
         translate_rule_drafts_to_ids([draft])
     except ValueError:
         pass
     else:
         raise AssertionError("expected ValueError when no draft has a target IFC class")
+
+
+def test_translate_rule_drafts_to_ids_includes_a_drafts_target_ifc_class():
+    """A draft with a resolved target_ifc_class must produce a real specification.
+
+    Regression test for a bug where this function unconditionally hardcoded
+    target_ifc_class="" for every draft, so every draft was silently dropped
+    by filter_exportable_rules regardless of what the extraction actually
+    found -- this function always raised ValueError in practice, including
+    from its one live caller (GET /api/documents/{id}/rules/drafts/ids-preview).
+    """
+    draft = RuleExtractionDraft(
+        source_document_id=1,
+        proposed_rule=RuleCreateRequest(
+            rule_id="REQ-1",
+            target_ifc_class="IfcDoor",
+            property_set="Pset_DoorCommon",
+            property_name="ClearWidth",
+            operator=">=",
+            check_value="900",
+        ),
+    )
+
+    xml_text = translate_rule_drafts_to_ids([draft])
+
+    with tempfile.NamedTemporaryFile(suffix=".ids", mode="w", delete=False) as f:
+        f.write(xml_text)
+        path = Path(f.name)
+    try:
+        document = ifctester_ids.open(str(path), validate=False)
+        assert len(document.specifications) == 1
+        assert document.specifications[0].applicability[0].name == "IfcDoor"
+    finally:
+        path.unlink()
 
 
 def test_build_ids_document_raises_when_nothing_exportable():
