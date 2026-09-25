@@ -341,15 +341,33 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 self._degrade_to_memory("insert", exc)
                 return self.insert(payload)
             if self._should_retry_insert_with_pk(exc, payload):
-                retry_payload = dict(payload)
-                retry_payload[self._pk] = self._next_numeric_pk()
+                return self._insert_with_next_pk(payload, exc)
+            raise
+
+    def _insert_with_next_pk(self, payload: dict[str, Any], exc: APIError, attempts: int = 5) -> dict[str, Any]:
+        """Retry an insert with an explicit PK, re-reading max(id) on each collision.
+
+        PostgREST offers no row locking, so two concurrent fallback inserts can
+        still compute the same "next" id and collide with each other -- this
+        bounds that race to a few retries instead of failing (or silently
+        colliding) on the first one.
+        """
+        last_exc = exc
+        for _ in range(attempts):
+            retry_payload = dict(payload)
+            retry_payload[self._pk] = self._next_numeric_pk()
+            try:
                 response = execute_with_retry(
-                    lambda: self._client.table(self._table_name).insert(retry_payload)
+                    lambda retry_payload=retry_payload: self._client.table(self._table_name).insert(retry_payload)
                 )
                 rows = response.data or []
                 self._invalidate_cache()
                 return rows[0] if rows else retry_payload
-            raise
+            except APIError as retry_exc:
+                if not self._should_retry_insert_with_pk(retry_exc, payload):
+                    raise
+                last_exc = retry_exc
+        raise last_exc
 
     def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert multiple rows in as few PostgREST round-trips as possible.
