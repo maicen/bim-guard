@@ -14,6 +14,9 @@ on:
           - 'bim-guard'
           - 'full-stack'
 
+permissions:
+  contents: read
+
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -28,12 +31,18 @@ jobs:
     steps:
       - name: Sync Git Repository
         run: |
+          echo "==> Configuring safe.directory..."
+          git config --global --add safe.directory /Users/sam/coding/bim-guard || true
+
           echo "==> Fetching latest changes from origin..."
-          git fetch origin main
+          git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main:refs/remotes/origin/main
+
           if [ -n "$(git status --porcelain)" ]; then
             echo "Notice: Uncommitted changes detected in working tree; stashing..."
             git stash push -u -m "Auto-stashed by deploy workflow $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           fi
+
+          echo "==> Updating working tree..."
           git merge --ff-only origin/main || git reset --hard origin/main
 
       - name: Rebuild and Restart Services
