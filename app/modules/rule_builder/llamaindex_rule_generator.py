@@ -70,14 +70,30 @@ For each rule found, fill in:
 - operator: one of ">=", "<=", "==", "!=", "between", "exists", "matches"
 - check_value: the target value as a string (numeric values as their string form), or empty
 - value_min / value_max: string bounds for "between", or empty
+- value_min_property / value_max_property: when the bound is not a fixed
+  number but another property of the SAME element, optionally scaled and/or
+  offset (e.g. "riser height shall not exceed one-half of the tread going"
+  -> value_max_property="TreadGoing", value_max_scale="0.5"), the name of
+  that property — else empty. Only use this for a property on the SAME
+  element the rule targets; never for a property of a different element
+  (a room, the building) — leave those to needs_review instead, see below.
+- value_min_scale / value_max_scale: the multiplier on value_min_property /
+  value_max_property (e.g. "0.5" for "one-half of"), as a string — default
+  "1" (leave empty) when the clause has no multiplier, i.e. the bound is the
+  referenced property plus/minus a fixed amount only.
+- value_min_offset / value_max_offset: a fixed amount added after the scale
+  above (e.g. "25" for "...plus 25mm"), as a string — default "0" (leave
+  empty) when there is no such fixed amount.
 - unit: "mm" | "m" | "m2" | "deg" | "ratio" | "" (empty if not applicable)
 - severity: "mandatory" if the clause uses "shall"/"must", "recommended" if
   "should", else "recommended"
 - confidence: 0.0-1.0, your confidence this rule is correctly extracted
 - needs_review: 1 if the text is ambiguous, if the threshold is looked up in
   a table you cannot see in full, or if the bound is computed from a
-  building-level metric (e.g. "one-half of the diagonal dimension of the
-  area served") rather than a fixed value or a same-element property — else 0
+  metric belonging to a DIFFERENT element than the one the rule targets
+  (e.g. "one-half of the diagonal dimension of the area served" — the
+  diagonal belongs to the room/building, not to the exit door the rule
+  targets) rather than a fixed value or a property of the same element — else 0
 - applies_when_materials: if the clause narrows this rule to elements of a
   specific material (e.g. "gypsum board partitions", "steel pipework"), list
   the material keyword(s) here — else leave empty. Do not use this for
@@ -141,6 +157,12 @@ class _LLMRuleCandidate(BaseModel):
     check_value: str = ""
     value_min: str = ""
     value_max: str = ""
+    value_min_property: str = ""
+    value_max_property: str = ""
+    value_min_scale: str = ""
+    value_max_scale: str = ""
+    value_min_offset: str = ""
+    value_max_offset: str = ""
     unit: str = ""
     severity: str = "recommended"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -231,6 +253,12 @@ def _candidate_to_draft(
         check_value=candidate.check_value.strip() or None,
         value_min=candidate.value_min.strip() or None,
         value_max=candidate.value_max.strip() or None,
+        value_min_property=candidate.value_min_property.strip() or None,
+        value_max_property=candidate.value_max_property.strip() or None,
+        value_min_scale=candidate.value_min_scale.strip() or None,
+        value_max_scale=candidate.value_max_scale.strip() or None,
+        value_min_offset=candidate.value_min_offset.strip() or None,
+        value_max_offset=candidate.value_max_offset.strip() or None,
         unit=candidate.unit.strip() or None,
         severity=severity,
         confidence=str(confidence),

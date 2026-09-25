@@ -81,6 +81,38 @@ def test_empty_kg_candidate_used_becomes_none():
     assert draft.proposed_rule.kg_candidate_used is None
 
 
+def test_relative_bound_scale_and_offset_carried_onto_proposed_rule():
+    """'riser height <= 0.5x tread going' extracts as a scaled property-relative bound."""
+    candidate = _LLMRuleCandidate(
+        rule_id="REQ-RISE",
+        description="Riser height shall not exceed one-half of the tread going",
+        target_ifc_class="IfcStairFlight",
+        property_name="RiserHeight",
+        operator="<=",
+        value_max_property="TreadGoing",
+        value_max_scale="0.5",
+    )
+
+    draft = _candidate_to_draft(candidate, _node())
+
+    assert draft is not None
+    assert draft.proposed_rule.value_max_property == "TreadGoing"
+    assert draft.proposed_rule.value_max_scale == "0.5"
+    assert draft.proposed_rule.value_min_property is None
+    assert draft.proposed_rule.value_min_scale is None
+
+
+def test_no_relative_bound_leaves_scale_and_offset_none():
+    candidate = _LLMRuleCandidate(rule_id="REQ-10", description="Doors shall be wide enough", target_ifc_class="IfcDoor")
+
+    draft = _candidate_to_draft(candidate, _node())
+
+    assert draft is not None
+    assert draft.proposed_rule.value_min_property is None
+    assert draft.proposed_rule.value_min_scale is None
+    assert draft.proposed_rule.value_min_offset is None
+
+
 def test_confidence_calibrated_up_when_used_candidate_is_trusted_tier():
     candidate = _LLMRuleCandidate(
         rule_id="REQ-6", description="Doors shall be wide enough", target_ifc_class="IfcDoor",

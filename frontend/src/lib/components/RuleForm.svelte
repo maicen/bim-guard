@@ -152,6 +152,16 @@
       ? String(seed.value_max_offset)
       : "",
   );
+  let formValueMinScale = $state(
+    seed?.value_min_scale !== undefined && seed?.value_min_scale !== null
+      ? String(seed.value_min_scale)
+      : "",
+  );
+  let formValueMaxScale = $state(
+    seed?.value_max_scale !== undefined && seed?.value_max_scale !== null
+      ? String(seed.value_max_scale)
+      : "",
+  );
   let formCompareProperty = $state(seed?.compare_property || "");
   let formNamePattern = $state(seed?.name_pattern || "");
   let formUniquenessScope = $state(seed?.uniqueness_scope || "building");
@@ -176,6 +186,12 @@
     }
     if (formValueMaxOffset.trim() && !Number.isFinite(Number(formValueMaxOffset))) {
       return "Max offset must be a number.";
+    }
+    if (formValueMinScale.trim() && !Number.isFinite(Number(formValueMinScale))) {
+      return "Min scale must be a number.";
+    }
+    if (formValueMaxScale.trim() && !Number.isFinite(Number(formValueMaxScale))) {
+      return "Max scale must be a number.";
     }
     return "";
   }
@@ -230,6 +246,8 @@
         value_max_property: formValueMaxProperty || "",
         value_min_offset: formValueMinOffset || "0",
         value_max_offset: formValueMaxOffset || "0",
+        value_min_scale: formValueMinScale || "1",
+        value_max_scale: formValueMaxScale || "1",
         compare_property: formCompareProperty || "",
         name_pattern: formNamePattern || "",
         uniqueness_scope: formUniquenessScope || "building",
@@ -648,21 +666,27 @@
         <span>Dynamic Property-Relative Range (Optional)</span>
       </div>
       <p class="text-xs text-fg-muted">
-        Compare target property dynamically against other properties on the same element with
-        optional offsets (e.g. RiserHeight &lt;= 0.5 * StairHeight + 25mm).
+        Compare target property dynamically against other properties on the same element, scaled
+        and/or offset (e.g. exit separation &gt;= 0.5 * Diagonal, or RiserHeight &lt;= StairHeight + 25mm).
       </p>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label for="rule-min-prop" class="mb-1 block text-xs font-semibold text-fg-secondary"
-            >Min Dynamic Property / Offset</label
+            >Min Dynamic Property / Scale / Offset</label
           >
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <input
               id="rule-min-prop"
               type="text"
               bind:value={formValueMinProperty}
-              placeholder="e.g. TreadWidth"
+              placeholder="e.g. Diagonal"
+              class="rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
+            />
+            <input
+              type="number"
+              bind:value={formValueMinScale}
+              placeholder="Scale (1)"
               class="rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
             />
             <input
@@ -675,14 +699,20 @@
         </div>
         <div>
           <label for="rule-max-prop" class="mb-1 block text-xs font-semibold text-fg-secondary"
-            >Max Dynamic Property / Offset</label
+            >Max Dynamic Property / Scale / Offset</label
           >
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <input
               id="rule-max-prop"
               type="text"
               bind:value={formValueMaxProperty}
-              placeholder="e.g. TreadWidth"
+              placeholder="e.g. Diagonal"
+              class="rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
+            />
+            <input
+              type="number"
+              bind:value={formValueMaxScale}
+              placeholder="Scale (1)"
               class="rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
             />
             <input

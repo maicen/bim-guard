@@ -40,6 +40,13 @@ _RICH_COLUMNS = {
     "value_max_property": str,
     "value_min_offset": str,  # JSON-encoded numeric, default 0
     "value_max_offset": str,  # JSON-encoded numeric, default 0
+    # Multiplier applied to the referenced property BEFORE the offset above:
+    # resolved bound = (property * scale) + offset. Default 1 (no-op) so
+    # every rule written before this field existed keeps its offset-only
+    # behaviour. Lets "0.5x the room's diagonal" be expressed, not just
+    # "the room's diagonal plus/minus a fixed amount".
+    "value_min_scale": str,  # JSON-encoded numeric, default 1
+    "value_max_scale": str,  # JSON-encoded numeric, default 1
     # field_consistency: compare_property is a second property fetched from
     # the SAME element (like value_min/max_property above) that property_name's
     # value must match — optionally after name_pattern extracts a substring
@@ -401,6 +408,8 @@ class RuleService:
         value_max_property: str = "",
         value_min_offset=0,
         value_max_offset=0,
+        value_min_scale=1,
+        value_max_scale=1,
         compare_property: str = "",
         name_pattern: str = "",
         uniqueness_scope: str = "",
@@ -460,6 +469,8 @@ class RuleService:
             "value_max_property": value_max_property or "",
             "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
             "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+            "value_min_scale": json.dumps(self._parse_numeric(value_min_scale) or 1),
+            "value_max_scale": json.dumps(self._parse_numeric(value_max_scale) or 1),
             "compare_property": compare_property or "",
             "name_pattern": name_pattern or "",
             "uniqueness_scope": uniqueness_scope or "",
@@ -557,6 +568,8 @@ class RuleService:
         value_max_property: str = "",
         value_min_offset=0,
         value_max_offset=0,
+        value_min_scale=1,
+        value_max_scale=1,
         compare_property: str = "",
         name_pattern: str = "",
         uniqueness_scope: str = "",
@@ -603,6 +616,8 @@ class RuleService:
             "value_max_property": value_max_property or (existing or {}).get("value_max_property", ""),
             "value_min_offset": json.dumps(self._parse_numeric(value_min_offset) or 0),
             "value_max_offset": json.dumps(self._parse_numeric(value_max_offset) or 0),
+            "value_min_scale": json.dumps(self._parse_numeric(value_min_scale) or 1),
+            "value_max_scale": json.dumps(self._parse_numeric(value_max_scale) or 1),
             "compare_property": compare_property or (existing or {}).get("compare_property", ""),
             "name_pattern": name_pattern or (existing or {}).get("name_pattern", ""),
             "uniqueness_scope": uniqueness_scope or (existing or {}).get("uniqueness_scope", ""),

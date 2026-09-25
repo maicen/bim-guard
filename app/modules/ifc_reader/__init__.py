@@ -377,6 +377,18 @@ _STAIR_DERIVED_PROPERTIES: dict[str, str | tuple[str, str]] = {
 }
 
 
+def _resolve_scaled_bound(raw_value: float, scale: float, offset: float) -> float:
+    """Resolve a property-relative rule bound: (raw_value * scale) + offset, rounded to 4dp.
+
+    Pure so the arithmetic behind value_min_property/value_max_property's
+    scale+offset resolution (extract_for_compliance) is directly unit
+    testable without an IFC model fixture. scale=1, offset=0 (the defaults
+    for a rule written before value_min_scale/value_max_scale existed)
+    reproduces the property's raw value unchanged.
+    """
+    return round(raw_value * scale + offset, 4)
+
+
 class IFCReader:
     """Full IFC reader for Module 2 compliance extraction."""
 
@@ -1662,6 +1674,15 @@ class IFCReader:
             value_max_property = str(rule.get("value_max_property") or "").strip()
             value_min_offset = self._decode_json_val(rule.get("value_min_offset")) or 0.0
             value_max_offset = self._decode_json_val(rule.get("value_max_offset")) or 0.0
+            # Multiplier applied to the referenced property before the offset
+            # above -- lets a bound be expressed as "0.5x the room's
+            # diagonal", not just "the room's diagonal plus/minus a fixed
+            # amount". Defaults to 1 (no-op) so a rule written before this
+            # field existed resolves exactly as it did before.
+            value_min_scale = self._decode_json_val(rule.get("value_min_scale"))
+            value_min_scale = 1.0 if value_min_scale is None else value_min_scale
+            value_max_scale = self._decode_json_val(rule.get("value_max_scale"))
+            value_max_scale = 1.0 if value_max_scale is None else value_max_scale
 
             # field_consistency — another property on the SAME element that
             # prop_name's value (optionally transformed by name_pattern) must
@@ -1805,13 +1826,13 @@ class IFCReader:
                         el, value_min_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
                     )
                     if isinstance(min_val, (int, float)):
-                        resolved_value_min = round(min_val + value_min_offset, 4)
+                        resolved_value_min = _resolve_scaled_bound(min_val, value_min_scale, value_min_offset)
                 if value_max_property:
                     max_val, _, _ = self._resolve_element_property(
                         el, value_max_property, spatial=spatial, unit_scale_mm=_unit_scale_mm
                     )
                     if isinstance(max_val, (int, float)):
-                        resolved_value_max = round(max_val + value_max_offset, 4)
+                        resolved_value_max = _resolve_scaled_bound(max_val, value_max_scale, value_max_offset)
 
                 # field_consistency's second property, resolved per-element via
                 # the same cascade as prop_name itself (Pset -> direct attribute
@@ -1980,6 +2001,8 @@ class IFCReader:
                     "value_max_property": value_max_property,
                     "value_min_offset": value_min_offset,
                     "value_max_offset": value_max_offset,
+                    "value_min_scale": value_min_scale,
+                    "value_max_scale": value_max_scale,
                     "compare_property": compare_property,
                     "name_pattern": name_pattern,
                     "uniqueness_scope": uniqueness_scope,

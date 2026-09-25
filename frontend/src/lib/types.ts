@@ -577,6 +577,8 @@ export interface Rule extends Timestamps {
   value_max_property?: string | null;
   value_min_offset?: string | number | null;
   value_max_offset?: string | number | null;
+  value_min_scale?: string | number | null;
+  value_max_scale?: string | number | null;
   compare_property?: string | null;
   name_pattern?: string | null;
   uniqueness_scope?: string | null;
@@ -933,6 +935,8 @@ export interface ExtractedRule {
   value_max_property?: string;
   value_min_offset?: string | number;
   value_max_offset?: string | number;
+  value_min_scale?: string | number;
+  value_max_scale?: string | number;
   compare_property?: string;
   name_pattern?: string;
   uniqueness_scope?: string;
@@ -983,6 +987,8 @@ export interface RuleCreateRequest {
   value_max_property?: string | null;
   value_min_offset?: string | null;
   value_max_offset?: string | null;
+  value_min_scale?: string | null;
+  value_max_scale?: string | null;
   compare_property?: string | null;
   name_pattern?: string | null;
   uniqueness_scope?: string | null;

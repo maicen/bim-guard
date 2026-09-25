@@ -369,3 +369,41 @@ def test_promote_draft_passes_through_applies_when_and_exceptions():
     assert rule_service.created[0]["exceptions"] == [
         {"reference": "9.8.2.2-exc", "predicate": {"is_suspended": True}}
     ]
+
+
+def test_promote_draft_passes_through_value_scale_and_offset():
+    """A rule bound as 'a same-element property, scaled and offset' survives promotion."""
+    service, _, rule_service = _service()
+    draft = RuleExtractionDraft(
+        source_document_id=1,
+        proposed_rule=RuleCreateRequest(
+            rule_id="9.8.4.5",
+            description="Riser height shall not exceed one-half of the tread going",
+            target_ifc_class="IfcStairFlight",
+            property_name="RiserHeight",
+            operator="<=",
+            value_max_property="TreadGoing",
+            value_max_scale="0.5",
+            value_max_offset="0",
+        ),
+    )
+    saved = service.save_drafts([draft])
+    draft_id = saved[0].id
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    service.promote_draft(draft_id)
+
+    assert rule_service.created[0]["value_max_property"] == "TreadGoing"
+    assert rule_service.created[0]["value_max_scale"] == "0.5"
+
+
+def test_promote_draft_defaults_value_scale_to_one_when_unset():
+    service, _, rule_service = _service()
+    saved = service.save_drafts([_draft()])
+    draft_id = saved[0].id
+    service.review_draft(draft_id, RuleDraftReviewRequest(status=RuleDraftStatus.accepted))
+
+    service.promote_draft(draft_id)
+
+    assert rule_service.created[0]["value_min_scale"] == 1
+    assert rule_service.created[0]["value_max_scale"] == 1

@@ -307,6 +307,8 @@ class RuleDraftService:
             value_max_property=payload.value_max_property or "",
             value_min_offset=payload.value_min_offset or 0,
             value_max_offset=payload.value_max_offset or 0,
+            value_min_scale=payload.value_min_scale or 1,
+            value_max_scale=payload.value_max_scale or 1,
             compare_property=payload.compare_property or "",
             name_pattern=payload.name_pattern or "",
             uniqueness_scope=payload.uniqueness_scope or "",

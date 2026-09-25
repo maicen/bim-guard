@@ -1049,6 +1049,8 @@ class RuleCreateRequest(BaseModel):
     value_max_property: Optional[str] = None
     value_min_offset: Optional[str] = None
     value_max_offset: Optional[str] = None
+    value_min_scale: Optional[str] = None
+    value_max_scale: Optional[str] = None
     compare_property: Optional[str] = None
     name_pattern: Optional[str] = None
     uniqueness_scope: Optional[str] = None
@@ -1110,6 +1112,8 @@ class RuleUpdateRequest(BaseModel):
     value_max_property: Optional[str] = None
     value_min_offset: Optional[str] = None
     value_max_offset: Optional[str] = None
+    value_min_scale: Optional[str] = None
+    value_max_scale: Optional[str] = None
     compare_property: Optional[str] = None
     name_pattern: Optional[str] = None
     uniqueness_scope: Optional[str] = None
@@ -1169,6 +1173,8 @@ class RuleResponse(TimestampFields):
     value_max_property: Optional[str] = None
     value_min_offset: Optional[str] = None
     value_max_offset: Optional[str] = None
+    value_min_scale: Optional[str] = None
+    value_max_scale: Optional[str] = None
     compare_property: Optional[str] = None
     name_pattern: Optional[str] = None
     uniqueness_scope: Optional[str] = None
