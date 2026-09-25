@@ -1890,6 +1890,16 @@ export const ruleExtractionApi = {
     return handleResponse<RuleSourceResponse>(res);
   },
 
+  /** Correct which document element a draft is linked to (e.g. the LLM mis-localized it). */
+  async relinkDraftSource(draftId: number, elementId: string): Promise<RuleExtractionDraft> {
+    const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/source-element`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ element_id: elementId }),
+    });
+    return handleResponse<RuleExtractionDraft>(res);
+  },
+
   /** Poll progress of an in-flight or recent document rule-draft extraction. */
   async getExtractionProgress(documentId: number): Promise<RuleExtractionProgressResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-progress`);

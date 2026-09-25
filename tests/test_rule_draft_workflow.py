@@ -75,6 +75,22 @@ def _service() -> tuple[RuleDraftService, FakeTable, FakeRuleService]:
     return RuleDraftService(drafts_repo=table, rule_service=rule_service), table, rule_service
 
 
+class FakeDocumentService:
+    """Stand-in for DocumentService, exposing only what relink_source_element uses."""
+
+    _ELEMENTS = [
+        {"element_id": "elem-3", "kind": "paragraph", "page_number": 1, "bbox": {"l": 0, "t": 0, "r": 1, "b": 1}},
+        {"element_id": "elem-5", "kind": "paragraph", "page_number": 2, "bbox": {"l": 2, "t": 2, "r": 3, "b": 3}},
+        {"element_id": "elem-7", "kind": "table", "page_number": 3, "bbox": {"l": 4, "t": 4, "r": 5, "b": 5}},
+    ]
+
+    def get_document(self, document_id: int) -> dict:
+        return {"id": document_id, "element_bboxes": self._ELEMENTS}
+
+    def get_element_bboxes(self, doc: dict) -> list[dict]:
+        return self._ELEMENTS
+
+
 def test_save_drafts_persists_pending_review_with_ids():
     service, table, _ = _service()
 
@@ -222,6 +238,61 @@ def test_promote_draft_passes_through_source_element_id():
     service.promote_draft(draft_id)
 
     assert rule_service.created[0]["source_element_id"] == "elem-3"
+
+
+def test_relink_source_element_snapshots_original_only_once(monkeypatch):
+    """The first relink snapshots the LLM's original pick; later relinks don't overwrite it."""
+    monkeypatch.setattr("app.services.documents_service.DocumentService", FakeDocumentService)
+
+    service, _table, _rule_service = _service()
+    saved = service.save_drafts([_draft(source_element_id="elem-3")])
+    draft_id = saved[0].id
+
+    first = service.relink_source_element(draft_id, "elem-5")
+    assert first["source_element_id"] == "elem-5"
+    assert first["original_source_element_id"] == "elem-3"
+    assert first["clause"]["page_number"] == 2
+
+    second = service.relink_source_element(draft_id, "elem-7")
+    assert second["source_element_id"] == "elem-7"
+    assert second["original_source_element_id"] == "elem-3"
+    assert second["clause"]["page_number"] == 3
+
+
+def test_relink_source_element_from_never_linked_snapshots_empty_not_falsy(monkeypatch):
+    """A never-linked draft's genuine "" original must survive a second relink.
+
+    A second relink must not re-snapshot the now-current link over it, since
+    "" is a legitimate "no original link" value, not a "haven't snapshotted
+    yet" sentinel.
+    """
+    monkeypatch.setattr("app.services.documents_service.DocumentService", FakeDocumentService)
+
+    service, _table, _rule_service = _service()
+    saved = service.save_drafts([_draft(source_element_id=None)])
+    draft_id = saved[0].id
+
+    first = service.relink_source_element(draft_id, "elem-5")
+    assert first["source_element_id"] == "elem-5"
+    assert first["original_source_element_id"] == ""
+
+    second = service.relink_source_element(draft_id, "elem-7")
+    assert second["source_element_id"] == "elem-7"
+    assert second["original_source_element_id"] == ""
+
+
+def test_relink_source_element_rejects_unknown_element_id(monkeypatch):
+    monkeypatch.setattr("app.services.documents_service.DocumentService", FakeDocumentService)
+
+    service, _table, _rule_service = _service()
+    saved = service.save_drafts([_draft(source_element_id="elem-3")])
+    draft_id = saved[0].id
+
+    try:
+        service.relink_source_element(draft_id, "elem-does-not-exist")
+        raise AssertionError("expected ValueError")
+    except ValueError as exc:
+        assert "elem-does-not-exist" in str(exc)
 
 
 def test_promote_draft_refuses_to_write_an_empty_target_ifc_class():

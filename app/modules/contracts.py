@@ -1192,6 +1192,15 @@ class RuleExtractionDraft(BaseModel):
     source_element_id: Optional[str] = Field(
         default=None, description="Matches DocumentElementBbox.element_id -- the exact structural element this draft was extracted from, when known"
     )
+    original_source_element_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "The element_id the LLM originally linked this draft to, captured only when a "
+            "reviewer relinks it to a different element -- preserves what the model originally "
+            "picked so localization accuracy can be scored the same way rule-content edits are, "
+            "via original_proposed_rule. Null otherwise."
+        ),
+    )
     source_snippet: Optional[str] = Field(
         default=None, description="The originating node's text, carried forward for promotion into rules.source_text"
     )
@@ -1332,6 +1341,12 @@ class RuleDraftReviewRequest(BaseModel):
     edited_rule: Optional[RuleCreateRequest] = Field(
         default=None, description="Required when status == edited"
     )
+
+
+class DraftRelinkRequest(BaseModel):
+    """Payload for correcting which document element an extraction draft is linked to."""
+
+    element_id: str = Field(..., description="A DocumentElementBbox.element_id from the draft's source document")
 
 
 class RuleFolderResponse(BaseModel):

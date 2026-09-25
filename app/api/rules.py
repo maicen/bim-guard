@@ -29,6 +29,7 @@ from app.api.organizations import _require_membership, _require_superadmin
 from app.auth import CurrentUser, get_current_user
 from app.logging_config import get_logger
 from app.modules.contracts import (
+    DraftRelinkRequest,
     IdsImportResponse,
     RuleBulkActionResponse,
     RuleBulkCreateResponse,
@@ -1246,6 +1247,37 @@ def promote_rule_draft(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return created
+
+
+@router.patch(
+    "/drafts/{draft_id}/source-element",
+    response_model=RuleExtractionDraft,
+    summary="Correct which document element an extraction draft is linked to",
+)
+def relink_rule_draft_source_element(
+    draft_id: int,
+    payload: DraftRelinkRequest,
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+) -> RuleExtractionDraft:
+    """Relink a draft to a different element, e.g. when the LLM mis-localized it.
+
+    Snapshots the original link into `original_source_element_id` the first
+    time this is called for a draft, so the evaluation companion repo can
+    score localization accuracy the same way it scores rule-content accuracy.
+    """
+    from app.services.rule_draft_service import RuleDraftService
+
+    svc = RuleDraftService()
+    draft = svc.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Draft {draft_id} not found.")
+    prop_rule = draft.get("proposed_rule") or {}
+    ruleset_check(prop_rule.get("ruleset_id"))
+    try:
+        row = svc.relink_source_element(draft_id, payload.element_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return RuleExtractionDraft.model_validate(row)
 
 
 @router.post("/seed", response_model=RuleSeedResponse, summary="Seed rule library with engine rulesets")

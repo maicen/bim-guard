@@ -12,6 +12,7 @@
     Check,
     X,
     ArrowUpCircle,
+    Link2,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi } from "../lib/api";
   import { toasts } from "../lib/toast.svelte";
@@ -118,6 +119,7 @@
     selectedApproximate = null;
     selectedDraftElementId = null;
     selectedDraftApproximate = null;
+    relinkingDraftId = null;
     loadMaps(id).finally(() => {
       loading = false;
     });
@@ -167,10 +169,36 @@
     selectedDraftApproximate = draft;
   }
 
+  /** When set, the next overlay click relinks this draft instead of just selecting it. */
+  let relinkingDraftId: number | null = $state(null);
+
   function handleViewerElementSelect(elementId: string | null) {
     if (!elementId) return;
+    if (mode === "drafts" && relinkingDraftId != null) {
+      relinkDraft(relinkingDraftId, elementId);
+      return;
+    }
     if (mode === "rules") selectExact(elementId);
     else selectDraftExact(elementId);
+  }
+
+  function startRelink(draftId: number) {
+    relinkingDraftId = relinkingDraftId === draftId ? null : draftId;
+  }
+
+  async function relinkDraft(draftId: number, elementId: string) {
+    draftActionInFlight = draftId;
+    relinkingDraftId = null;
+    try {
+      await ruleExtractionApi.relinkDraftSource(draftId, elementId);
+      toasts.success("Draft relinked to the new element.");
+      refreshMaps();
+      selectDraftExact(elementId);
+    } catch (err: any) {
+      toasts.error(err.message || "Could not relink this draft.", "Relink failed");
+    } finally {
+      draftActionInFlight = null;
+    }
   }
 
   async function reviewDraft(draftId: number, status: "accepted" | "rejected") {
@@ -234,7 +262,10 @@
     <div class="flex gap-1.5 rounded-xl border border-border-default bg-surface-card p-1 self-start">
       <button
         type="button"
-        onclick={() => (mode = "rules")}
+        onclick={() => {
+          mode = "rules";
+          relinkingDraftId = null;
+        }}
         class={cn(
           "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
           mode === "rules" ? "bg-accent/15 text-accent" : "text-fg-secondary hover:text-fg-primary",
@@ -326,6 +357,20 @@
             <ArrowUpCircle class="h-3 w-3" /> Promote
           </button>
         {/if}
+        <button
+          type="button"
+          disabled={busy}
+          onclick={() => startRelink(draft.id)}
+          class={cn(
+            "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-micro font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+            relinkingDraftId === draft.id
+              ? "border-accent bg-accent/20 text-accent"
+              : "border-border-default text-fg-secondary hover:bg-surface-hover",
+          )}
+        >
+          <Link2 class="h-3 w-3" />
+          {relinkingDraftId === draft.id ? "Click an element to relink…" : "Relink"}
+        </button>
       </div>
     {/snippet}
 
@@ -451,7 +496,19 @@
           </div>
         </div>
 
-        <div class="flex-1 overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-xl">
+        <div class="flex flex-1 flex-col gap-2 overflow-hidden">
+          {#if relinkingDraftId != null}
+            <div class="flex items-center justify-between gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent">
+              <span class="flex items-center gap-1.5 font-semibold">
+                <Link2 class="h-3.5 w-3.5" />
+                Click the correct element on the right to relink this draft.
+              </span>
+              <button type="button" onclick={() => (relinkingDraftId = null)} class="font-semibold hover:underline">
+                Cancel
+              </button>
+            </div>
+          {/if}
+          <div class="flex-1 overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-xl">
           <DocumentViewer
             documentId={documentId!}
             selectedElementId={mode === "rules"
@@ -467,6 +524,7 @@
             badgeMode="rule-count"
             onElementSelect={handleViewerElementSelect}
           />
+          </div>
         </div>
       </div>
     {/if}

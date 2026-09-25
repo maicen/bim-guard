@@ -58,6 +58,7 @@ class RuleDraftService:
                     "source_document_id": int,
                     "source_node_id": str,
                     "source_element_id": str,
+                    "original_source_element_id": str,
                     "source_snippet": str,
                     "clause": dict,
                     "proposed_rule": dict,
@@ -159,6 +160,54 @@ class RuleDraftService:
 
         self._drafts.update(updates=updates, pk_values=draft_id)
         logger.info("Reviewed rule extraction draft draft_id=%d status=%s", draft_id, payload.status.value)
+        return self.get_draft(draft_id) or {**existing, **updates}
+
+    def relink_source_element(self, draft_id: int, element_id: str) -> dict[str, Any]:
+        """Correct which element a draft is linked to, snapshotting the original link once.
+
+        Mirrors `review_draft`'s `original_proposed_rule` snapshot: the first
+        correction preserves what the LLM originally linked to in
+        `original_source_element_id`, so the evaluation companion repo can
+        score localization accuracy the same way it scores rule-content
+        accuracy -- a second relink does not overwrite the original again.
+        Recomputes `page_number`/`bbox` from the newly-picked element so the
+        stored location stays consistent with `source_element_id`.
+        """
+        existing = self.get_draft(draft_id)
+        if existing is None:
+            raise ValueError(f"Rule extraction draft {draft_id} not found")
+
+        from app.services.documents_service import DocumentService
+
+        document_id = existing.get("source_document_id")
+        doc = DocumentService().get_document(int(document_id)) if document_id else None
+        if not doc:
+            raise ValueError(f"Source document {document_id} for draft {draft_id} no longer exists")
+
+        matched = next(
+            (el for el in DocumentService().get_element_bboxes(doc) if el.get("element_id") == element_id),
+            None,
+        )
+        if matched is None:
+            raise ValueError(f"Element {element_id!r} not found in document {document_id}")
+
+        updates: dict[str, Any] = {"source_element_id": element_id}
+        # `is None` (not falsy) on purpose: once a draft has never been linked to
+        # anything, the first relink snapshots that as "" -- a legitimate
+        # snapshot, not "no snapshot yet". Treating "" as falsy here would make
+        # every subsequent relink re-snapshot the *previous* link instead of
+        # preserving the LLM's true original one.
+        if existing.get("original_source_element_id") is None:
+            updates["original_source_element_id"] = existing.get("source_element_id") or ""
+
+        clause = dict(existing.get("clause") or {})
+        clause["page_number"] = matched.get("page_number")
+        clause["bbox"] = matched.get("bbox")
+        updates["clause"] = clause
+        updates["bbox"] = matched.get("bbox")
+
+        self._drafts.update(updates=updates, pk_values=draft_id)
+        logger.info("Relinked rule extraction draft draft_id=%d to element_id=%s", draft_id, element_id)
         return self.get_draft(draft_id) or {**existing, **updates}
 
     def promote_draft(self, draft_id: int) -> dict[str, Any]:
