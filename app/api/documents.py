@@ -470,7 +470,7 @@ async def upload_document(
     revision_code: Annotated[str, Form()] = "P01.01",
     parser: Annotated[str, Form()] = "auto",
     engine_instance: Annotated[str, Form()] = "",
-    generate_doclang: Annotated[bool, Form()] = True,
+    generate_doclang: Annotated[bool, Form()] = False,
     start_page: Annotated[Optional[int], Form()] = None,
     end_page: Annotated[Optional[int], Form()] = None,
     organization_id: Annotated[Optional[int], Form()] = None,
@@ -485,19 +485,21 @@ async def upload_document(
     permissions: Annotated[PermissionService, Depends(get_permission_service)] = None,
     current_user: Annotated[CurrentUser, Depends(get_current_user)] = None,
 ) -> DocumentDetailResponse:
-    """Upload a specification document and generate its DocLang XML.
+    """Upload a specification document to storage.
 
     Accepts every format Docling converts to DocLang (PDF, Word, Excel,
     PowerPoint, HTML, AsciiDoc, Markdown, CSV, common image formats) plus
     pre-converted DocLang files (``.dclg``, ``.dclx``, ``.doclang``) ingested
     as-is, with no source PDF/DOCX required.
 
-    When `generate_doclang` is False, the file is stored but DocLang
-    generation is deferred — call `POST /{id}/generate-doclang` later.
+    Document upload is decoupled from conversion: by default,
+    `generate_doclang` is False, so files are stored immediately with metadata
+    without triggering long-running CPU parsing or edge proxy timeouts (HTTP 524).
+    DocLang conversion can be triggered on-demand via `POST /{id}/generate-doclang`.
+    Pre-converted DocLang XML files are stored directly as DocLang ready.
 
     `start_page`/`end_page` (1-based, inclusive) optionally trim a PDF
-    upload down to that page range before anything else happens — dedup,
-    storage, and extraction all operate on the trimmed PDF. PDF-only.
+    upload down to that page range before anything else happens. PDF-only.
     """
     if service is None:
         service = DocumentService()
@@ -732,12 +734,35 @@ async def generate_document_doclang(
             detail=f"Document with ID {document_id} not found.",
         )
 
+    if payload.start_page is not None or payload.end_page is not None:
+        if payload.start_page is None or payload.end_page is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both start_page and end_page are required to limit extraction to a page range.",
+            )
+        filename = doc.get("filename", "")
+        if not filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A page range can only be applied to PDF documents.",
+            )
+        if payload.start_page < 1 or payload.end_page < payload.start_page:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_page must be 1 or greater and end_page must be >= start_page.",
+            )
+
     resolved_instance = _resolve_parsing_instance(payload.engine_instance or "", None, instances_service)
     clean_parser = (payload.parser or "auto").strip().lower()
     try:
         updated = await asyncio.wait_for(
             run_in_threadpool(
-                service.generate_doclang_for_existing, document_id, clean_parser, resolved_instance
+                service.generate_doclang_for_existing,
+                document_id,
+                clean_parser,
+                resolved_instance,
+                start_page=payload.start_page,
+                end_page=payload.end_page,
             ),
             timeout=75.0,
         )

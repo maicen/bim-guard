@@ -24,6 +24,7 @@
   import type {
     DocumentItem,
     DocumentType,
+    DocumentDetail,
     ParsingEngineInstance,
   } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -41,8 +42,10 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import GoogleDriveImportModal from "../lib/components/GoogleDriveImportModal.svelte";
   import DocumentUploadModal from "../lib/components/DocumentUploadModal.svelte";
+  import ConvertDoclangModal from "../lib/components/ConvertDoclangModal.svelte";
   import DocumentEditModal from "../lib/components/DocumentEditModal.svelte";
   import Alert from "../lib/components/Alert.svelte";
+  import { Select } from "../lib/components/ui";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   /** Icon identifier for a document's file extension, rendered as a vscode-icons SVG. */
@@ -112,6 +115,15 @@
   let parsingEngines: ParsingEngineInstance[] = $state([]);
   let generatingDoclangId: number | null = $state(null);
 
+  // Convert DocLang modal state
+  let isConvertModalOpen = $state(false);
+  let docToConvert: DocumentItem | null = $state(null);
+
+  function openConvertModal(doc: DocumentItem) {
+    docToConvert = doc;
+    isConvertModalOpen = true;
+  }
+
   // Called by the sidebar's "New Rule Document Upload" action once this view is mounted.
   export function openUploadModal() {
     isUploadModalOpen = true;
@@ -152,6 +164,17 @@
     }
   }
 
+  const docTypeFilterOptions = [
+    { value: "ALL", label: "All Types" },
+    ...DOCUMENT_TYPES.map((type) => ({ value: type, label: type })),
+  ];
+
+  const doclangFilterOptions = [
+    { value: "ALL", label: "All Conversion States" },
+    { value: "ready", label: "DocLang Ready" },
+    { value: "pending", label: "Pending Conversion" },
+  ];
+
   // Search, filter, sort, paginate and select — all owned by the shared state.
   const table = $state(
     createTableState<DocumentItem, number>({
@@ -159,7 +182,13 @@
       getId: (d) => d.id,
       searchFields: (d) => [d.filename, d.text_preview],
       filters: {
-        docType: (d, value) => (d.doc_type || "Specification") === value,
+        docType: (d, value) => !value || value === "ALL" || (d.doc_type || "Specification") === value,
+        doclangStatus: (d, value) => {
+          if (!value || value === "ALL") return true;
+          if (value === "ready") return Boolean(d.has_doclang);
+          if (value === "pending") return !d.has_doclang;
+          return true;
+        },
       },
       initialSort: { field: "id", asc: false },
     }),
@@ -440,17 +469,19 @@
       onRefresh={() => loadDocuments(true)}
     >
       {#snippet filters()}
-        <div class="flex items-center gap-1.5">
-          <select
+        <div class="flex items-center gap-2">
+          <Select
+            ariaLabel="Filter by document type"
+            options={docTypeFilterOptions}
             bind:value={table.filters.docType}
-            aria-label="Filter by document type"
-            class="rounded-xl border border-border-default bg-surface-canvas px-2.5 py-2 text-xs text-fg-secondary focus:border-accent focus:outline-hidden"
-          >
-            <option value="ALL">All Types</option>
-            {#each DOCUMENT_TYPES as type (type)}
-              <option value={type}>{type}</option>
-            {/each}
-          </select>
+            triggerClass="bg-surface-canvas text-xs min-w-[130px]"
+          />
+          <Select
+            ariaLabel="Filter by DocLang status"
+            options={doclangFilterOptions}
+            bind:value={table.filters.doclangStatus}
+            triggerClass="bg-surface-canvas text-xs min-w-[155px]"
+          />
         </div>
       {/snippet}
     </DataTableHeader>
@@ -505,6 +536,7 @@
               >
                 Type
               </SortHeader>
+              <th class="px-4 py-3 text-left">DocLang</th>
               <SortHeader
                 column="char_count"
                 sortField={table.sortField}
@@ -545,7 +577,7 @@
                       <Icon icon={fileIconFor(doc.filename)} class="h-4 w-4 shrink-0" />
                       {#if doc.has_doclang}
                         <CheckCircle2
-                          class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-surface-card text-emerald-400"
+                          class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-surface-card text-success"
                         />
                       {/if}
                     </span>
@@ -564,10 +596,33 @@
                 </td>
                 <td class="whitespace-nowrap px-4 py-3">
                   <span
-                    class="inline-flex items-center rounded-md border border-border-default bg-surface-overlay px-2 py-0.5 text-caption font-medium text-blue-300"
+                    class="inline-flex items-center rounded-md border border-border-default bg-surface-overlay px-2 py-0.5 text-caption font-medium text-fg-primary"
                   >
                     {doc.doc_type || "Specification"}
                   </span>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3">
+                  {#if doc.has_doclang}
+                    <button
+                      type="button"
+                      onclick={() => openReader(doc.id)}
+                      class="inline-flex items-center gap-1 rounded-full border border-success-border bg-success-bg px-2.5 py-0.5 text-caption font-medium text-success transition-colors hover:bg-success-bg/80"
+                      title="DocLang XML ready — click to inspect structure"
+                    >
+                      <CheckCircle2 class="h-3 w-3" />
+                      Ready
+                    </button>
+                  {:else}
+                    <button
+                      type="button"
+                      onclick={() => openConvertModal(doc)}
+                      class="inline-flex items-center gap-1 rounded-full border border-warning-border/60 bg-warning-bg/40 px-2.5 py-0.5 text-caption font-medium text-warning transition-colors hover:bg-warning-bg hover:border-warning-border"
+                      title="Not converted — click to configure and convert to DocLang"
+                    >
+                      <Sparkles class="h-3 w-3" />
+                      Convert
+                    </button>
+                  {/if}
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-fg-muted">
                   {doc.char_count.toLocaleString()}
@@ -589,19 +644,18 @@
                       type="button"
                       disabled={!doc.has_doclang}
                       onclick={() => openReader(doc.id)}
-                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-cyan-950/30 hover:text-cyan-400 disabled:cursor-not-allowed disabled:opacity-30"
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-30"
                       title={doc.has_doclang ? "Preview DocLang XML" : "No DocLang generated yet"}
                     >
                       <FileCode class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      disabled={doc.has_doclang || generatingDoclangId === doc.id}
-                      onclick={() => generateDoclangForRow(doc)}
-                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success disabled:cursor-not-allowed disabled:opacity-30"
-                      title={doc.has_doclang ? "DocLang already generated" : "Generate DocLang"}
+                      onclick={() => openConvertModal(doc)}
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
+                      title={doc.has_doclang ? "Re-convert to DocLang" : "Convert to DocLang"}
                     >
-                      <Sparkles class="h-3.5 w-3.5 {generatingDoclangId === doc.id ? 'animate-pulse' : ''}" />
+                      <Sparkles class="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -622,7 +676,7 @@
                     <button
                       type="button"
                       onclick={() => promptDelete(doc.id, doc.filename)}
-                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-critical-bg hover:text-critical"
                       title="Delete document"
                     >
                       <Trash2 class="h-3.5 w-3.5" />
@@ -666,6 +720,31 @@
         ? `"${created.filename}" was already uploaded — showing the existing document.`
         : `Uploaded "${created.filename}".`,
     );
+  }}
+/>
+
+<ConvertDoclangModal
+  isOpen={isConvertModalOpen}
+  document={docToConvert}
+  {parsingEngines}
+  onClose={() => {
+    isConvertModalOpen = false;
+    docToConvert = null;
+  }}
+  onConverted={(updated) => {
+    documents = documents.map((d) =>
+      d.id === updated.id
+        ? {
+            ...d,
+            text_preview: updated.text?.slice(0, 200) || "",
+            char_count: updated.char_count,
+            has_doclang: Boolean(updated.doclang_xml?.trim()),
+          }
+        : d,
+    );
+    isConvertModalOpen = false;
+    docToConvert = null;
+    flashSuccess(`DocLang XML generated for "${updated.filename}".`);
   }}
 />
 

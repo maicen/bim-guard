@@ -1669,7 +1669,12 @@ export const documentsApi = {
 
   async generateDoclang(
     id: number,
-    options?: { parser?: "auto"; engine_instance?: string },
+    options?: {
+      parser?: "auto";
+      engine_instance?: string;
+      start_page?: number;
+      end_page?: number;
+    },
   ): Promise<DocumentDetail> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/generate-doclang`, {
       method: "POST",
@@ -1677,6 +1682,8 @@ export const documentsApi = {
       body: JSON.stringify({
         parser: options?.parser || "auto",
         engine_instance: options?.engine_instance || "",
+        start_page: options?.start_page,
+        end_page: options?.end_page,
       }),
     });
     const updated = await handleResponse<DocumentDetail>(res);

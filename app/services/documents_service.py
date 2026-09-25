@@ -759,7 +759,12 @@ class DocumentService:
         return created, True
 
     def generate_doclang_for_existing(
-        self, document_id: int, parser: str = "auto", instance: dict | None = None
+        self,
+        document_id: int,
+        parser: str = "auto",
+        instance: dict | None = None,
+        start_page: int | None = None,
+        end_page: int | None = None,
     ) -> dict:
         """Run extraction against an already-stored file and persist its DocLang XML.
 
@@ -783,6 +788,11 @@ class DocumentService:
         content = local_path.read_bytes()
 
         suffix = Path(filename).suffix.lower()
+        if start_page is not None and end_page is not None and suffix == ".pdf":
+            from app.modules.document_parsing.pdf_page_range import slice_pdf_pages
+
+            content = slice_pdf_pages(content, start_page, end_page)
+
         pages: list = []
         doclang_xml = ""
         archive_assets: list[dict] = []

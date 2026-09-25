@@ -751,6 +751,8 @@ class GenerateDoclangRequest(BaseModel):
 
     parser: Optional[str] = Field(default="auto", description="Extraction parser (currently only 'auto' is valid)")
     engine_instance: Optional[str] = Field(default="", description="Named parsing engine instance to use")
+    start_page: Optional[int] = Field(default=None, description="1-based start page to extract (PDF only)")
+    end_page: Optional[int] = Field(default=None, description="1-based end page to extract (PDF only)")
 
 
 class GoogleDriveImportRequest(BaseModel):

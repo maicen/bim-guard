@@ -353,3 +353,88 @@ def test_generate_doclang_returns_504_on_timeout(monkeypatch):
     assert "timed out" in exc_info.value.detail
 
 
+def test_upload_document_defaults_to_generate_doclang_false():
+    """upload_document defaults generate_doclang to False, separating upload from conversion."""
+    import inspect
+
+    from app.api.documents import upload_document
+
+    sig = inspect.signature(upload_document)
+    param = sig.parameters["generate_doclang"]
+    assert param.default is False or getattr(param.default, "default", None) is False
+
+
+def test_generate_doclang_passes_page_range():
+    """generate_document_doclang passes start_page and end_page to generate_doclang_for_existing."""
+    from app.api.documents import generate_document_doclang
+    from app.modules.contracts import GenerateDoclangRequest
+
+    calls = []
+
+    class _DocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "filename": "code.pdf", "file_path": "uploads/code.pdf"}
+
+        def generate_doclang_for_existing(self, doc_id, parser, instance, start_page=None, end_page=None):
+            calls.append({"doc_id": doc_id, "parser": parser, "start_page": start_page, "end_page": end_page})
+            return {"id": doc_id, "filename": "code.pdf", "doclang_xml": "<doc/>"}
+
+        def get_document_text(self, row):
+            return "Sample text"
+
+        def get_doclang_content(self, row):
+            return "<doc/>"
+
+    resp = asyncio.run(
+        generate_document_doclang(
+            document_id=789,
+            payload=GenerateDoclangRequest(parser="auto", start_page=5, end_page=15),
+            service=_DocService(),
+            instances_service=_FakeInstances(),
+            access_checker=lambda doc_id, for_mutation=False: None,
+        )
+    )
+    assert resp.id == 789
+    assert len(calls) == 1
+    assert calls[0]["start_page"] == 5
+    assert calls[0]["end_page"] == 15
+
+
+def test_generate_doclang_rejects_invalid_page_range():
+    """generate_document_doclang rejects inverted page ranges or missing end page."""
+    from app.api.documents import generate_document_doclang
+    from app.modules.contracts import GenerateDoclangRequest
+
+    class _DocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "filename": "code.pdf", "file_path": "uploads/code.pdf"}
+
+    # Inverted range
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            generate_document_doclang(
+                document_id=789,
+                payload=GenerateDoclangRequest(parser="auto", start_page=15, end_page=5),
+                service=_DocService(),
+                instances_service=_FakeInstances(),
+                access_checker=lambda doc_id, for_mutation=False: None,
+            )
+        )
+    assert exc_info.value.status_code == 400
+    assert "start_page" in exc_info.value.detail
+
+    # Missing end page
+    with pytest.raises(HTTPException) as exc_info2:
+        asyncio.run(
+            generate_document_doclang(
+                document_id=789,
+                payload=GenerateDoclangRequest(parser="auto", start_page=5, end_page=None),
+                service=_DocService(),
+                instances_service=_FakeInstances(),
+                access_checker=lambda doc_id, for_mutation=False: None,
+            )
+        )
+    assert exc_info2.value.status_code == 400
+    assert "Both start_page and end_page" in exc_info2.value.detail
+
+
