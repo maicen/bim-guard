@@ -396,7 +396,7 @@ class DocumentService:
         try:
             from app.modules.document_parsing.docling_extractor import DoclingExtractor
 
-            if doclang_xml.strip() and not DoclingExtractor.validate_doclang(doclang_xml):
+            if doclang_xml.strip() and not DoclingExtractor.validate_doclang(doclang_xml, xsd_only=True):
                 logger.warning("Uploaded DocLang XML for %s failed XSD schema validation", filename)
         except Exception:
             logger.debug("DocLang XSD validation unavailable, skipping check for %s", filename, exc_info=True)

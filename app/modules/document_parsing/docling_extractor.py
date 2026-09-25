@@ -271,13 +271,14 @@ class DoclingExtractor:
         return bboxes
 
     @staticmethod
-    def validate_doclang(xml_content: str) -> bool:
-        """Validate DocLang XML against the bundled reference XSD + Schematron rules.
+    def validate_doclang(xml_content: str, *, xsd_only: bool = True) -> bool:
+        """Validate DocLang XML against the bundled reference schema.
 
-        Runs full validation (structural XSD plus Schematron's semantic rules --
-        e.g. a list body must start with `<ldiv>`) via the `doclang[schematron-saxon]`
-        package. Both checks are backed entirely by the bundled `doclang` package;
-        no network access or external service is involved.
+        By default, runs structural XSD validation (`xsd_only=True`) via `lxml`,
+        which is fast, memory-safe, and does not require native Saxon/C runtimes.
+        Set `xsd_only=False` to also run Schematron semantic rules via
+        `doclang[schematron-saxon]`. Both checks are backed by the bundled `doclang`
+        package; no network access or external service is involved.
         """
         if not xml_content or not xml_content.strip():
             return False
@@ -288,7 +289,7 @@ class DoclingExtractor:
             import os
 
             import doclang
-            if sys.platform == "win32":
+            if not xsd_only and sys.platform == "win32":
                 try:
                     import doclang.backends.saxonche as sc
                     if not getattr(sc.SaxoncheValidator, "_win32_patched", False):
@@ -334,7 +335,7 @@ class DoclingExtractor:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(xml_content)
             try:
-                doclang.validate(tmp_path, allow_empty_namespace=True)
+                doclang.validate(tmp_path, allow_empty_namespace=True, xsd_only=xsd_only)
                 return True
             finally:
                 Path(tmp_path).unlink(missing_ok=True)

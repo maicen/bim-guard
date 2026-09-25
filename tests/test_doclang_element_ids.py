@@ -167,6 +167,7 @@ def test_assign_element_ids_output_is_schema_valid_doclang():
 
     updated_xml, _records = assign_element_ids(LIST_DOCLANG_XML, _LIST_BBOXES)
     assert DoclingExtractor.validate_doclang(updated_xml)
+    assert DoclingExtractor.validate_doclang(updated_xml, xsd_only=False)
 
 
 TRAILING_TEXT_DOCLANG_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -200,6 +201,7 @@ def test_assign_element_ids_keeps_custom_before_trailing_text_after_locations():
 
     assert len(records) == 2
     assert DoclingExtractor.validate_doclang(updated_xml)
+    assert DoclingExtractor.validate_doclang(updated_xml, xsd_only=False)
 
     # <custom> must appear before its own element's body text -- check each
     # <text> element directly rather than raw string offsets.

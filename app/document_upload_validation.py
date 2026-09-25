@@ -91,9 +91,17 @@ def is_likely_text_content(content: bytes) -> bool:
         return False
     try:
         sample.decode("utf-8")
+        return True
     except UnicodeDecodeError:
+        # If byte 4096 cut a multi-byte sequence, slice to the last valid UTF-8 boundary
+        for trim in range(1, 4):
+            if len(sample) > trim:
+                try:
+                    sample[:-trim].decode("utf-8")
+                    return True
+                except UnicodeDecodeError:
+                    continue
         return False
-    return True
 
 
 _IMAGE_SIGNATURES: dict[str, tuple[bytes, ...]] = {
