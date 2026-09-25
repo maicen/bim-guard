@@ -587,6 +587,7 @@ export interface RuleSourceResponse {
   page_number?: number | null;
   snippet: string;
   bbox?: BoundingBox | null;
+  source_element_id?: string | null;
 }
 
 /** Mirrors RuleShaclShapeResponse in app/modules/contracts.py. */
@@ -987,6 +988,34 @@ export interface RuleExtractionDraft {
 
 export interface RuleExtractionDraftListResponse {
   drafts: RuleExtractionDraft[];
+}
+
+/** Lightweight draft shape for the rule-source map's Drafts tab. */
+export interface DraftSourceSummary {
+  id: number;
+  status: RuleDraftStatus;
+  rule_id?: string | null;
+  description?: string | null;
+  severity?: string | null;
+  confidence: number;
+  extraction_method: string;
+  source_page_number?: number | null;
+  source_bbox?: BoundingBox | null;
+  source_element_id?: string | null;
+  match_status: RuleSourceMatchStatus;
+}
+
+/** One document element annotated with the pending draft(s) extracted from it. */
+export interface DocumentElementWithDrafts extends DocumentElementBbox {
+  drafts: DraftSourceSummary[];
+}
+
+/** Same three-way split as RuleSourceMapResponse, for pending drafts instead of promoted rules. */
+export interface DraftSourceMapResponse {
+  document_id: number;
+  elements: DocumentElementWithDrafts[];
+  unmapped_drafts: DraftSourceSummary[];
+  orphaned_drafts: DraftSourceSummary[];
 }
 
 export interface RuleExtractionProgressResponse {

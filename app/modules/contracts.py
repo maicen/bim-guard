@@ -1230,6 +1230,41 @@ class RuleExtractionDraftListResponse(BaseModel):
     drafts: list[RuleExtractionDraft]
 
 
+class DraftSourceSummary(BaseModel):
+    """Lightweight draft shape for the rule-source map's Drafts tab."""
+
+    id: int
+    status: RuleDraftStatus
+    rule_id: Optional[str] = None
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    confidence: float = 0.8
+    extraction_method: str = "litellm_legacy"
+    source_page_number: Optional[int] = None
+    source_bbox: Optional[dict[str, Any]] = None
+    source_element_id: Optional[str] = None
+    match_status: Literal["exact", "unmapped", "orphaned"] = "unmapped"
+
+
+class DocumentElementWithDrafts(DocumentElementBbox):
+    """One document element annotated with the pending draft(s) extracted from it."""
+
+    drafts: list[DraftSourceSummary] = Field(default_factory=list)
+
+
+class DraftSourceMapResponse(BaseModel):
+    """Every pending extraction draft for a document, mapped against its exact source element.
+
+    Same three-way split as `RuleSourceMapResponse` (`unmapped_drafts`/`orphaned_drafts`),
+    for drafts instead of promoted rules.
+    """
+
+    document_id: int
+    elements: list[DocumentElementWithDrafts] = Field(default_factory=list)
+    unmapped_drafts: list[DraftSourceSummary] = Field(default_factory=list)
+    orphaned_drafts: list[DraftSourceSummary] = Field(default_factory=list)
+
+
 class RuleDraftExtractionRequest(BaseModel):
     """Optional body for POST .../rules/extract-drafts.
 
@@ -1266,6 +1301,9 @@ class RuleSourceResponse(BaseModel):
     snippet: str = Field(default="", description="The rule's source_text, for text-layer highlighting")
     bbox: Optional[dict[str, Any]] = Field(
         default=None, description="Bounding box coordinates on the page for visual halo highlighting: {l, t, r, b, coord_origin}"
+    )
+    source_element_id: Optional[str] = Field(
+        default=None, description="Matches DocumentElementBbox.element_id, for exact-element overlay highlighting, when known"
     )
 
 

@@ -26,6 +26,7 @@ import type {
   DocumentDetail,
   DocumentItem,
   DocumentElementBboxesResponse,
+  DraftSourceMapResponse,
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
   DocumentUpdatePayload,
@@ -1725,6 +1726,11 @@ export const documentsApi = {
   async getRuleSourceMap(id: number): Promise<RuleSourceMapResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/rule-source-map`);
     return handleResponse<RuleSourceMapResponse>(res);
+  },
+
+  async getDraftSourceMap(id: number): Promise<DraftSourceMapResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/draft-source-map`);
+    return handleResponse<DraftSourceMapResponse>(res);
   },
 
   getAssetUrl(id: number, filename: string): string {

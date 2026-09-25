@@ -943,6 +943,7 @@ def get_rule_source(
         page_number=page_number,
         snippet=snippet,
         bbox=rule.get("source_bbox"),
+        source_element_id=rule.get("source_element_id") or None,
     )
 
 
@@ -1033,6 +1034,7 @@ def get_rule_draft_source(draft_id: int) -> RuleSourceResponse:
         page_number=page_number,
         snippet=snippet,
         bbox=bbox,
+        source_element_id=draft.get("source_element_id") or None,
     )
 
 

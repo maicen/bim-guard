@@ -38,6 +38,7 @@ from app.modules.contracts import (
     DocumentDetailResponse,
     DocumentElementBbox,
     DocumentElementBboxesResponse,
+    DocumentElementWithDrafts,
     DocumentElementWithRules,
     DocumentIngestResponse,
     DocumentResponse,
@@ -45,6 +46,8 @@ from app.modules.contracts import (
     DocumentSectionsResponse,
     DocumentSectionTreeResponse,
     DocumentUpdateRequest,
+    DraftSourceMapResponse,
+    DraftSourceSummary,
     GenerateDoclangRequest,
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
@@ -1284,6 +1287,68 @@ def list_rule_drafts(
     rows = RuleDraftService().list_drafts(document_id)
     return RuleExtractionDraftListResponse(
         drafts=[RuleExtractionDraft.model_validate(row) for row in rows]
+    )
+
+
+@router.get(
+    "/{document_id}/draft-source-map",
+    response_model=DraftSourceMapResponse,
+    summary="Every pending extraction draft for this document, mapped against its exact source element",
+)
+def get_document_draft_source_map(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+) -> DraftSourceMapResponse:
+    """Group this document's pending drafts by the exact element each was extracted from.
+
+    Same shape/semantics as `GET /{document_id}/rule-source-map`, but for
+    pre-promotion drafts -- lets a reviewer see the whole document's
+    extraction coverage at once instead of one draft at a time.
+    """
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    from app.services.rule_draft_service import RuleDraftService
+
+    elements = [DocumentElementBbox(**record) for record in service.get_element_bboxes(doc)]
+    rows = RuleDraftService().list_drafts(document_id)
+    by_element, unmapped, orphaned = group_rows_by_element(elements, rows)
+
+    def _summary(row: dict, match_status: str) -> DraftSourceSummary:
+        proposed = row.get("proposed_rule") or {}
+        clause = row.get("clause") or {}
+        return DraftSourceSummary(
+            id=row["id"],
+            status=row.get("status") or "pending_review",
+            rule_id=proposed.get("rule_id"),
+            description=proposed.get("description"),
+            severity=proposed.get("severity"),
+            confidence=row.get("confidence") or 0.8,
+            extraction_method=row.get("extraction_method") or "litellm_legacy",
+            source_page_number=clause.get("page_number"),
+            source_bbox=row.get("bbox") or clause.get("bbox"),
+            source_element_id=row.get("source_element_id"),
+            match_status=match_status,
+        )
+
+    elements_with_drafts = [
+        DocumentElementWithDrafts(
+            **el.model_dump(),
+            drafts=[_summary(row, "exact") for row in by_element.get(el.element_id, [])],
+        )
+        for el in elements
+    ]
+    return DraftSourceMapResponse(
+        document_id=document_id,
+        elements=elements_with_drafts,
+        unmapped_drafts=[_summary(row, "unmapped") for row in unmapped],
+        orphaned_drafts=[_summary(row, "orphaned") for row in orphaned],
     )
 
 
