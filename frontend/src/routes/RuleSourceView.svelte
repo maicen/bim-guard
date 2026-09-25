@@ -14,14 +14,16 @@
     ArrowUpCircle,
     Link2,
   } from "lucide-svelte";
-  import { documentsApi, ruleExtractionApi } from "../lib/api";
+  import { documentsApi, ruleExtractionApi, rulesApi } from "../lib/api";
   import { toasts } from "../lib/toast.svelte";
   import { cn } from "../lib/utils/cn";
+  import { createTableState } from "../lib/tableState.svelte";
   import type {
     DocumentDetail,
     DocumentElementKind,
     DraftSourceMapResponse,
     DraftSourceSummary,
+    RuleFolder,
     RuleSourceMapResponse,
     RuleSourceSummary,
   } from "../lib/types";
@@ -30,6 +32,10 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import DocumentViewer from "../lib/components/DocumentViewer.svelte";
+  import TableCheckbox from "../lib/components/TableCheckbox.svelte";
+  import BulkActionBar from "../lib/components/BulkActionBar.svelte";
+  import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import RuleBulkEditModal from "../lib/components/rules/RuleBulkEditModal.svelte";
 
   interface Props {
     documentId: number | null;
@@ -65,9 +71,12 @@
     viewerHeight = `calc(100vh - ${Math.round(top)}px - 1.5rem)`;
   }
 
+  let folders: RuleFolder[] = $state([]);
+
   onMount(() => {
     updateViewerHeight();
     window.addEventListener("resize", updateViewerHeight);
+    rulesApi.folders().then((f) => (folders = f)).catch(() => {});
     return () => window.removeEventListener("resize", updateViewerHeight);
   });
 
@@ -133,6 +142,51 @@
   let elementRuleCounts = $derived(
     Object.fromEntries((map?.elements ?? []).map((el) => [el.element_id, el.rules.length])),
   );
+
+  // Every rule currently shown in the Rules tab (mapped + approximate + orphaned),
+  // flattened once for multi-select/bulk-edit -- the same table-state pattern
+  // RulesView.svelte uses for its own rule list.
+  let allRuleRows = $derived([
+    ...elementsWithRules.flatMap((el) => el.rules),
+    ...(map?.unmapped_rules ?? []),
+    ...orphanedRules,
+  ]);
+  const ruleTable = createTableState<RuleSourceSummary, number>({
+    rows: () => allRuleRows,
+    getId: (r) => r.id,
+  });
+
+  let isBulkEditModalOpen = $state(false);
+  let isBulkDeleteModalOpen = $state(false);
+  let bulkActionBusy = $state(false);
+
+  async function handleBulkUpdateRules(payload: {
+    ruleset_id?: string;
+    category?: string;
+    mechanism?: string;
+    severity?: string;
+    needs_review?: number;
+  }) {
+    const res = await rulesApi.bulkUpdate({ rule_ids: ruleTable.selectedIdList, ...payload });
+    toasts.success(`Updated ${res.success_count} rule(s).`);
+    ruleTable.clearSelection();
+    refreshMaps();
+  }
+
+  async function confirmBulkDeleteRules() {
+    bulkActionBusy = true;
+    try {
+      const res = await rulesApi.bulkDelete(ruleTable.selectedIdList);
+      toasts.success(`Deleted ${res.success_count} rule(s).`);
+      ruleTable.clearSelection();
+      isBulkDeleteModalOpen = false;
+      refreshMaps();
+    } catch (err: any) {
+      toasts.error(err.message || "Could not delete selected rules.", "Bulk delete failed");
+    } finally {
+      bulkActionBusy = false;
+    }
+  }
 
   let elementsWithDrafts = $derived((draftMap?.elements ?? []).filter((el) => el.drafts.length > 0));
   let totalMappedDrafts = $derived(elementsWithDrafts.reduce((n, el) => n + el.drafts.length, 0));
@@ -285,25 +339,42 @@
       </button>
     </div>
 
+    {#if mode === "rules" && ruleTable.selectedCount > 0}
+      <BulkActionBar
+        selectedCount={ruleTable.selectedCount}
+        itemLabel="rule"
+        onClearSelection={() => ruleTable.clearSelection()}
+        onBulkEdit={() => (isBulkEditModalOpen = true)}
+        onBulkDelete={() => (isBulkDeleteModalOpen = true)}
+      />
+    {/if}
+
     {#snippet ruleCard(rule: RuleSourceSummary, isSelected: boolean, onClick: () => void)}
-      <button
-        type="button"
-        onclick={onClick}
+      <div
         class={cn(
-          "flex w-full flex-col items-start gap-1 rounded-xl border px-3 py-2 text-left transition-colors",
+          "flex w-full items-start gap-2 rounded-xl border px-3 py-2 transition-colors",
           isSelected
             ? "border-accent/50 bg-accent/10"
             : "border-border-default bg-surface-overlay hover:bg-surface-hover",
         )}
       >
-        <div class="flex w-full items-center justify-between gap-2">
-          <span class="truncate text-xs font-semibold text-fg-primary">{rule.rule_id || `Rule #${rule.id}`}</span>
-          <SeverityBadge severity={rule.severity || "recommended"} size="xs" />
+        <div class="pt-0.5">
+          <TableCheckbox
+            checked={ruleTable.isSelected(rule.id)}
+            onchange={() => ruleTable.toggleSelect(rule.id)}
+            ariaLabel={`Select ${rule.rule_id || `rule #${rule.id}`}`}
+          />
         </div>
-        {#if rule.description}
-          <span class="line-clamp-2 text-caption text-fg-secondary">{rule.description}</span>
-        {/if}
-      </button>
+        <button type="button" onclick={onClick} class="flex flex-1 flex-col items-start gap-1 text-left">
+          <div class="flex w-full items-center justify-between gap-2">
+            <span class="truncate text-xs font-semibold text-fg-primary">{rule.rule_id || `Rule #${rule.id}`}</span>
+            <SeverityBadge severity={rule.severity || "recommended"} size="xs" />
+          </div>
+          {#if rule.description}
+            <span class="line-clamp-2 text-caption text-fg-secondary">{rule.description}</span>
+          {/if}
+        </button>
+      </div>
     {/snippet}
 
     {#snippet draftCard(draft: DraftSourceSummary, isSelected: boolean, onClick: () => void)}
@@ -391,6 +462,17 @@
         <div class="flex w-[380px] shrink-0 flex-col overflow-y-auto rounded-2xl border border-border-default bg-surface-card shadow-xl">
           <div class="space-y-4 p-4">
             {#if mode === "rules"}
+              {#if allRuleRows.length > 0}
+                <div class="flex items-center gap-2 border-b border-border-subtle pb-2 text-micro text-fg-muted">
+                  <TableCheckbox
+                    checked={ruleTable.allFilteredSelected}
+                    indeterminate={ruleTable.someFilteredSelected}
+                    onchange={() => ruleTable.toggleSelectAll()}
+                    ariaLabel="Select all rules"
+                  />
+                  <span>Select all ({allRuleRows.length})</span>
+                </div>
+              {/if}
               {#each elementsWithRules as el (el.element_id)}
                 {@const Icon = KIND_ICON[el.kind]}
                 <div class="space-y-1.5">
@@ -530,3 +612,20 @@
     {/if}
   {/if}
 </div>
+
+<RuleBulkEditModal
+  isOpen={isBulkEditModalOpen}
+  selectedCount={ruleTable.selectedCount}
+  {folders}
+  onClose={() => (isBulkEditModalOpen = false)}
+  onUpdate={handleBulkUpdateRules}
+/>
+
+<ConfirmModal
+  bind:isOpen={isBulkDeleteModalOpen}
+  title={`Delete ${ruleTable.selectedCount} Rules`}
+  message={`This will permanently delete ${ruleTable.selectedCount} selected rule(s). This action cannot be undone.`}
+  confirmText={bulkActionBusy ? "Deleting…" : "Delete"}
+  onConfirm={confirmBulkDeleteRules}
+  onCancel={() => (isBulkDeleteModalOpen = false)}
+/>
