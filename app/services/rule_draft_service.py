@@ -15,6 +15,10 @@ from typing import Any
 from app.logging_config import get_logger
 from app.modules.contracts import RuleCreateRequest, RuleDraftReviewRequest, RuleExtractionDraft
 from app.services.persistence import PersistenceService
+from app.services.rule_semantic_alignment_service import (
+    AlignmentResult,
+    RuleSemanticAlignmentService,
+)
 from app.services.rules_service import RuleService
 from app.utils import now_iso_utc
 
@@ -46,7 +50,13 @@ def _duplicate_key(payload: RuleCreateRequest) -> tuple:
 class RuleDraftService:
     """CRUD + review workflow for `rule_extraction_drafts`."""
 
-    def __init__(self, *, drafts_repo=None, rule_service: RuleService | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        drafts_repo=None,
+        rule_service: RuleService | None = None,
+        alignment_service: RuleSemanticAlignmentService | None = None,
+    ) -> None:
         """Initialize the drafts table adapter and rule service with dependency injection."""
         self._drafts = (
             drafts_repo
@@ -76,6 +86,11 @@ class RuleDraftService:
             )
         )
         self._rule_service = rule_service if rule_service is not None else RuleService()
+        self._alignment_service = (
+            alignment_service
+            if alignment_service is not None
+            else RuleSemanticAlignmentService(rule_service=self._rule_service)
+        )
 
     def save_drafts(self, drafts: list[RuleExtractionDraft]) -> list[RuleExtractionDraft]:
         """Persist a batch of extraction drafts as `pending_review`, returning them with DB ids."""
@@ -220,7 +235,12 @@ class RuleDraftService:
         Refuses to promote a draft whose `target_ifc_class` is empty: such a
         rule can never match an IFC element, so writing it would silently
         reproduce the bug this same field's own promotion wiring had (fixed
-        alongside this guard).
+        alongside this guard). Also refuses a draft whose `target_ifc_class`
+        doesn't match any known bSDD/IFC entity (see
+        RuleSemanticAlignmentService); non-blocking ontology-vocabulary
+        warnings and cross-rule conflicts are attached to the returned dict
+        as `alignment_issues`/`conflicts` and force `needs_review=1` on the
+        created rule instead of blocking.
         """
         row = self.get_draft(draft_id)
         if row is None:
@@ -241,6 +261,11 @@ class RuleDraftService:
                 "in practice). Edit the draft to set an IFC entity type before accepting."
             )
 
+        alignment: AlignmentResult = self._alignment_service.check(payload)
+        if alignment.blocks_promotion:
+            messages = "; ".join(issue.message for issue in alignment.issues if issue.severity == "blocking")
+            raise ValueError(f"Draft {draft_id} failed ontology validation: {messages}")
+
         existing_duplicate = self._find_existing_duplicate(payload)
         if existing_duplicate is not None:
             self._drafts.update(updates={"promoted_rule_id": existing_duplicate.get("id")}, pk_values=draft_id)
@@ -251,7 +276,15 @@ class RuleDraftService:
                 payload.ruleset_id,
                 existing_duplicate.get("id"),
             )
-            return existing_duplicate
+            return {**existing_duplicate, "alignment_issues": [], "conflicts": []}
+
+        # A non-blocking alignment issue or a detected conflict doesn't stop
+        # promotion (the reviewer already accepted/edited this draft), but it
+        # does mean the resulting rule shouldn't look identical to a clean
+        # one -- force needs_review so it surfaces the same way any other
+        # uncertain extraction does.
+        if alignment.issues or alignment.conflicts:
+            payload.needs_review = 1
 
         clause_meta = row.get("clause") or {}
         created = self._rule_service.create_rule(
@@ -296,7 +329,11 @@ class RuleDraftService:
 
         self._drafts.update(updates={"promoted_rule_id": created.get("id")}, pk_values=draft_id)
         logger.info("Promoted rule extraction draft draft_id=%d rule_id=%s", draft_id, created.get("id"))
-        return created
+        return {
+            **created,
+            "alignment_issues": [issue.model_dump() for issue in alignment.issues],
+            "conflicts": [conflict.model_dump() for conflict in alignment.conflicts],
+        }
 
     def _find_existing_duplicate(self, payload: RuleCreateRequest) -> dict[str, Any] | None:
         """Find an existing rule in the same ruleset with the same check content, if any.

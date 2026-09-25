@@ -112,6 +112,7 @@ import type {
   RuleDraftReviewRequest,
   RuleExtractionDraft,
   RuleExtractionDraftListResponse,
+  RulePromotionResponse,
   RuleReliability,
   RuleReliabilityRequest,
   RuleExtractionProgressResponse,
@@ -1877,11 +1878,11 @@ export const ruleExtractionApi = {
     return handleResponse<RuleExtractionDraft>(res);
   },
 
-  async promoteDraft(draftId: number): Promise<any> {
+  async promoteDraft(draftId: number): Promise<RulePromotionResponse> {
     const res = await apiFetch(`${API_BASE}/rules/drafts/${draftId}/promote`, {
       method: "POST",
     });
-    const result = await handleResponse<any>(res);
+    const result = await handleResponse<RulePromotionResponse>(res);
     _ruleFoldersStore.clear();
     return result;
   },

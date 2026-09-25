@@ -596,6 +596,27 @@ export interface Rule extends Timestamps {
   applies_when?: Record<string, unknown> | null;
 }
 
+/** One ontology-vocabulary mismatch found on a rule's target class/property. */
+export interface RuleAlignmentIssue {
+  field: "target_ifc_class" | "property_name" | "property_set";
+  severity: "blocking" | "warning";
+  message: string;
+  suggestion?: string | null;
+}
+
+/** An existing rule whose constraint is jointly unsatisfiable with a just-promoted rule's. */
+export interface RuleConflictWarning {
+  conflicting_rule_id: number;
+  conflicting_reference: string;
+  message: string;
+}
+
+/** `Rule` plus the semantic-alignment outcome of promoting it -- non-persisted. */
+export interface RulePromotionResponse extends Rule {
+  alignment_issues: RuleAlignmentIssue[];
+  conflicts: RuleConflictWarning[];
+}
+
 export interface RuleSourceResponse {
   document_id: number;
   filename: string;

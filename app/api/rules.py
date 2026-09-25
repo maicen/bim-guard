@@ -49,6 +49,7 @@ from app.modules.contracts import (
     RuleFolderDeleteResponse,
     RuleFolderResponse,
     RuleFolderUpdateRequest,
+    RulePromotionResponse,
     RuleReliabilityRequest,
     RuleReliabilityResponse,
     RuleResponse,
@@ -1299,7 +1300,7 @@ def review_rule_draft(
 
 @router.post(
     "/drafts/{draft_id}/promote",
-    response_model=RuleResponse,
+    response_model=RulePromotionResponse,
     summary="Promote an accepted/edited rule extraction draft into the rule library",
 )
 def promote_rule_draft(

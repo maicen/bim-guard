@@ -270,8 +270,17 @@
   async function promoteDraftRow(draftId: number) {
     draftActionInFlight = draftId;
     try {
-      await ruleExtractionApi.promoteDraft(draftId);
-      toasts.success("Draft promoted to the rules library.");
+      const result = await ruleExtractionApi.promoteDraft(draftId);
+      const issueCount = result.alignment_issues?.length ?? 0;
+      const conflictCount = result.conflicts?.length ?? 0;
+      if (issueCount === 0 && conflictCount === 0) {
+        toasts.success("Draft promoted to the rules library.");
+      } else {
+        toasts.warning(
+          `Draft promoted, flagged for review (${issueCount} ontology warning(s), ${conflictCount} conflicting rule(s)).`,
+          "Promoted with warnings",
+        );
+      }
       refreshMaps();
     } catch (err: any) {
       toasts.error(err.message || "Could not promote this draft.", "Promotion failed");

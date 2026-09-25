@@ -27,6 +27,7 @@
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
+  import { toasts } from "../lib/toast.svelte";
   import type {
     DocumentItem,
     DocumentSection,
@@ -261,13 +262,28 @@
     }
   }
 
+  /** Toast a promoted rule's ontology-alignment warnings/conflicts, if any -- promotion itself never blocks on these. */
+  function warnAboutAlignment(result: { alignment_issues?: unknown[]; conflicts?: unknown[] }, ruleId: string) {
+    const issueCount = result.alignment_issues?.length ?? 0;
+    const conflictCount = result.conflicts?.length ?? 0;
+    if (issueCount === 0 && conflictCount === 0) return;
+    const parts = [];
+    if (issueCount > 0) parts.push(`${issueCount} ontology warning${issueCount === 1 ? "" : "s"}`);
+    if (conflictCount > 0) parts.push(`${conflictCount} conflicting rule${conflictCount === 1 ? "" : "s"}`);
+    toasts.warning(
+      `"${ruleId}" was promoted with ${parts.join(" and ")} -- flagged for review.`,
+      "Promoted with warnings",
+    );
+  }
+
   async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
     draftReviewError = "";
     draftReviewErrorLog = [];
     try {
-      await ruleExtractionApi.promoteDraft(draft.id!);
+      const result = await ruleExtractionApi.promoteDraft(draft.id!);
       draftRules = draftRules.filter((d) => d.id !== draft.id);
       successMessage = `Promoted "${draft.proposed_rule.rule_id}" into the compliance rule library.`;
+      warnAboutAlignment(result, draft.proposed_rule.rule_id);
     } catch (err: any) {
       draftReviewError = describeDraftFailure(
         err,
@@ -320,8 +336,9 @@
       // One at a time: each promote inserts into the rule library.
       await runBulk(toPromote, 1, async (draft) => {
         try {
-          await ruleExtractionApi.promoteDraft(draft.id!);
+          const result = await ruleExtractionApi.promoteDraft(draft.id!);
           promotedIds.add(draft.id);
+          warnAboutAlignment(result, draft.proposed_rule.rule_id);
         } catch (err: any) {
           failures.push(toErrorLogEntry(err, draftSubject(draft)));
         }

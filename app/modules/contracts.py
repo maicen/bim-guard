@@ -1272,6 +1272,40 @@ class RuleExtractionDraftListResponse(BaseModel):
     drafts: list[RuleExtractionDraft]
 
 
+class RuleAlignmentIssue(BaseModel):
+    """One ontology-vocabulary mismatch found on a rule's target class/property.
+
+    See app.services.rule_semantic_alignment_service.AlignmentIssue.
+    """
+
+    field: str = Field(description="'target_ifc_class' | 'property_name' | 'property_set'")
+    severity: str = Field(description="'blocking' | 'warning'")
+    message: str
+    suggestion: Optional[str] = None
+
+
+class RuleConflictWarning(BaseModel):
+    """An existing rule whose constraint is jointly unsatisfiable with a just-promoted rule's.
+
+    See app.services.rule_semantic_alignment_service.ConflictWarning.
+    """
+
+    conflicting_rule_id: int
+    conflicting_reference: str
+    message: str
+
+
+class RulePromotionResponse(RuleResponse):
+    """`RuleResponse` plus the semantic-alignment outcome of promoting it.
+
+    Non-persisted: `alignment_issues`/`conflicts` are only ever populated on
+    the promote-draft response, never read back off `public.rules`.
+    """
+
+    alignment_issues: list[RuleAlignmentIssue] = Field(default_factory=list)
+    conflicts: list[RuleConflictWarning] = Field(default_factory=list)
+
+
 class DraftSourceSummary(BaseModel):
     """Lightweight draft shape for the rule-source map's Drafts tab."""
 
