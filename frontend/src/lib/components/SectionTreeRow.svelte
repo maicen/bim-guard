@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, ChevronDown, Eye, Table2 } from "lucide-svelte";
+  import { ChevronRight, ChevronDown, Eye, Table2, Box, Link2, FileText } from "lucide-svelte";
   import type { SectionTreeNode } from "../types";
   import TableCheckbox from "./TableCheckbox.svelte";
   import SectionTree from "./SectionTree.svelte";
@@ -79,7 +79,40 @@
       ariaLabel={`Select section ${node.section_number || node.id}`}
     />
     <span class="font-mono text-fg-muted">{node.section_number || "—"}</span>
-    <span class="flex-1 truncate">{node.section_name || "Untitled section"}</span>
+    <span class="flex-1 truncate" title={node.section_name || ""}>{node.section_name || "Untitled section"}</span>
+
+    {#if node.summary}
+      <span
+        class="shrink-0 text-fg-muted hover:text-fg-primary cursor-help"
+        title={`Summary: ${node.summary}${node.key_topics?.length ? `\nTopics: ${node.key_topics.join(", ")}` : ""}`}
+      >
+        <FileText class="h-3 w-3" />
+      </span>
+    {/if}
+
+    {#if node.target_ifc_classes && node.target_ifc_classes.length > 0}
+      <span
+        class="inline-flex items-center gap-0.5 rounded bg-surface-overlay border border-border-subtle px-1 py-0.5 text-[10px] font-mono text-accent shrink-0"
+        title={`Target IFC: ${node.target_ifc_classes.join(", ")}`}
+      >
+        <Box class="h-2.5 w-2.5" />
+        <span>{node.target_ifc_classes[0]}</span>
+        {#if node.target_ifc_classes.length > 1}
+          <span class="text-fg-muted">+{node.target_ifc_classes.length - 1}</span>
+        {/if}
+      </span>
+    {/if}
+
+    {#if node.citations && node.citations.length > 0}
+      <span
+        class="inline-flex items-center gap-0.5 rounded bg-surface-canvas border border-border-default px-1 py-0.5 text-[10px] text-fg-muted shrink-0"
+        title={`Citations: ${node.citations.join(", ")}`}
+      >
+        <Link2 class="h-2.5 w-2.5" />
+        <span>{node.citations.length}</span>
+      </span>
+    {/if}
+
     {#if node.node_type === "table"}
       <span
         class="inline-flex items-center gap-1 rounded bg-doc-table/15 border border-doc-table/40 px-1.5 py-0.5 text-[10px] font-semibold text-doc-table shrink-0"
@@ -90,7 +123,13 @@
       </span>
     {/if}
     {#if node.page_number}
-      <span class="shrink-0 rounded border border-border-default px-1 text-fg-muted">p. {node.page_number}</span>
+      <span class="shrink-0 rounded border border-border-default px-1 text-[11px] text-fg-muted">
+        {#if node.end_page_number && node.end_page_number > node.page_number}
+          pp. {node.page_number}–{node.end_page_number}
+        {:else}
+          p. {node.page_number}
+        {/if}
+      </span>
     {/if}
     <span class="shrink-0 text-fg-muted">{node.char_count.toLocaleString()} chars</span>
     {#if onViewSource && (node.page_number || node.bbox)}

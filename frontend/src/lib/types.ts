@@ -399,6 +399,11 @@ export interface DocumentSection {
   page_number?: number | null;
   node_type?: string;
   bbox?: BoundingBox | null;
+  summary?: string | null;
+  end_page_number?: number | null;
+  key_topics?: string[];
+  citations?: string[];
+  target_ifc_classes?: string[];
 }
 
 export interface DocumentSectionsResponse {
@@ -414,6 +419,11 @@ export interface SectionTreeNode {
   page_number?: number | null;
   node_type?: string;
   bbox?: BoundingBox | null;
+  summary?: string | null;
+  end_page_number?: number | null;
+  key_topics?: string[];
+  citations?: string[];
+  target_ifc_classes?: string[];
   children: SectionTreeNode[];
 }
 
@@ -422,6 +432,13 @@ export interface DocumentSectionTreeResponse {
   tree: SectionTreeNode[];
   sections: DocumentSection[];
   enhanced: boolean;
+}
+
+export interface SectionGraphResponse {
+  document_id: number;
+  section_id?: string | null;
+  records: Record<string, unknown>[];
+  available: boolean;
 }
 
 export type DocumentElementKind = "heading" | "paragraph" | "list" | "table" | "picture";

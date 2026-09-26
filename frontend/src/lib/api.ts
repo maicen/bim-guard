@@ -31,6 +31,7 @@ import type {
   DraftSourceMapResponse,
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
+  SectionGraphResponse,
   DocumentUpdatePayload,
   DecisionCausalChainResponse,
   RuleImpactResponse,
@@ -1742,6 +1743,14 @@ export const documentsApi = {
   async getSectionsTree(id: number): Promise<DocumentSectionTreeResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree`);
     return handleResponse<DocumentSectionTreeResponse>(res);
+  },
+
+  async getSectionsGraph(id: number, sectionId?: string): Promise<SectionGraphResponse> {
+    const url = sectionId
+      ? `${API_BASE}/documents/${id}/sections-graph?section_id=${encodeURIComponent(sectionId)}`
+      : `${API_BASE}/documents/${id}/sections-graph`;
+    const res = await apiFetch(url);
+    return handleResponse<SectionGraphResponse>(res);
   },
 
   async getElementBboxes(id: number): Promise<DocumentElementBboxesResponse> {

@@ -24,6 +24,7 @@ from app.api.dependencies import (
     get_audit_log_service,
     get_document_access_service,
     get_documents_service,
+    get_graph_service,
     get_membership_service,
     get_parsing_engine_instances_service,
     get_permission_service,
@@ -60,18 +61,21 @@ from app.modules.contracts import (
     RuleExtractionProgressResponse,
     RuleSourceMapResponse,
     RuleSourceSummary,
+    SectionGraphResponse,
 )
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
-from app.modules.document_parsing.section_tree import build_section_tree
 from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
+from app.modules.document_parsing.smart_toc_generator import build_smart_toc, resolve_page_ranges
 from app.modules.permissions import Action
 from app.services.audit_log_service import AuditLogService
 from app.services.cache import cache_service
 from app.services.cde_state_machine import CDEStateMachine
 from app.services.document_access_service import DocumentAccessService
+from app.services.document_graph_service import DocumentGraphService
 from app.services.document_pages_service import DocumentPagesService
 from app.services.documents_service import DocumentService
+from app.services.graph_database import GraphService
 from app.services.membership_service import MembershipService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
 from app.services.permission_service import PermissionService
@@ -1050,11 +1054,12 @@ async def get_document_sections_tree(
     document_id: int,
     service: Annotated[DocumentService, Depends(get_documents_service)],
     access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
 ) -> DocumentSectionTreeResponse:
     """Nest a document's detected sections into a tree for the scope picker.
 
     The tree *structure* is derived deterministically from each DocLang
-    section's number/heading (see ``build_section_tree``). Heading *labels*
+    section's number/heading (see ``build_smart_toc``). Heading *labels*
     then get one optional, cheap AI cleanup pass (see
     ``section_tree_enhancer``) that only fixes garbled/duplicate titles —
     never adds, removes, or reparents nodes — so the response is fully
@@ -1084,7 +1089,7 @@ async def get_document_sections_tree(
 
     doclang_xml = service.get_doclang_content(doc).strip()
     chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
-    tree, flat = build_section_tree(chunks)
+    tree, flat = build_smart_toc(chunks)
 
     # Optional, one-shot AI label-cleanup pass (see section_tree_enhancer's
     # module docstring) — cheap by design: it only ever sees a compact
@@ -1131,6 +1136,18 @@ async def get_document_sections_tree(
                         _sync_page(n["children"])
 
             _sync_page(tree)
+            # Recompute bounded page spans with resolved page numbers
+            resolve_page_ranges(tree, flat)
+
+    # Ingest Smart TOC into graph database for Graph RAG (best-effort, non-blocking failure)
+    if graph_service:
+        try:
+            doc_title = getattr(doc, "name", None) or getattr(doc, "title", None) or f"Document {document_id}"
+            DocumentGraphService(graph_service).ingest_document_tree(
+                document_id, tree, flat, document_title=doc_title
+            )
+        except Exception as exc:
+            logger.warning("Graph RAG tree ingestion failed for doc %d: %s", document_id, exc)
 
     response = DocumentSectionTreeResponse(
         document_id=document_id,
@@ -1140,6 +1157,50 @@ async def get_document_sections_tree(
     )
     cache_service.set(cache_key, response.model_dump())
     return response
+
+
+@router.get(
+    "/{document_id}/sections-graph",
+    response_model=SectionGraphResponse,
+    summary="Graph RAG context (hierarchy, citations, IFC mapping) for a document's sections",
+)
+def get_document_sections_graph(
+    document_id: int,
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+    section_id: Optional[str] = None,
+) -> SectionGraphResponse:
+    """Retrieve Graph RAG context for a document's sections."""
+    access_checker(document_id)
+    doc_graph = DocumentGraphService(graph_service)
+    if not doc_graph.is_available():
+        return SectionGraphResponse(document_id=document_id, section_id=section_id, available=False)
+
+    if section_id:
+        subgraph = doc_graph.get_section_subgraph(document_id, section_id)
+        records = subgraph.get("records", [])
+    else:
+        cypher = """
+        MATCH (s:DocumentSection {document_id: $doc_id})
+        OPTIONAL MATCH (s)-[:CITES]->(cited:DocumentSection)
+        OPTIONAL MATCH (s)-[:APPLIES_TO]->(ifc:IfcClass)
+        RETURN s.id as section_id, s.section_number as number, s.section_name as name,
+               s.summary as summary, collect(DISTINCT cited.id) as citations,
+               collect(DISTINCT ifc.id) as ifc_classes
+        LIMIT 200
+        """
+        try:
+            records = graph_service.execute(cypher, {"doc_id": document_id})
+        except Exception as exc:
+            logger.warning("sections-graph query failed: %s", exc)
+            records = []
+
+    return SectionGraphResponse(
+        document_id=document_id,
+        section_id=section_id,
+        records=records,
+        available=True,
+    )
 
 
 @router.get(

@@ -21,10 +21,14 @@
   } = $props();
 
   function nodeMatches(node: SectionTreeNode, q: string): boolean {
-    return (
+    const textMatch =
       (node.section_number ?? "").toLowerCase().includes(q) ||
-      (node.section_name ?? "").toLowerCase().includes(q)
-    );
+      (node.section_name ?? "").toLowerCase().includes(q) ||
+      (node.summary ?? "").toLowerCase().includes(q);
+    const topicMatch = node.key_topics?.some((t) => t.toLowerCase().includes(q)) ?? false;
+    const ifcMatch = node.target_ifc_classes?.some((c) => c.toLowerCase().includes(q)) ?? false;
+    const citationMatch = node.citations?.some((c) => c.toLowerCase().includes(q)) ?? false;
+    return Boolean(textMatch || topicMatch || ifcMatch || citationMatch);
   }
 
   function pruneTree(list: SectionTreeNode[], q: string): SectionTreeNode[] {
@@ -50,7 +54,7 @@
     <input
       type="text"
       bind:value={query}
-      placeholder="Filter sections by number or title…"
+      placeholder="Filter sections by number, title, IFC class, or topic…"
       class="w-full rounded-lg border border-border-default bg-surface-canvas py-1.5 pl-8 pr-3 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
     />
   </label>

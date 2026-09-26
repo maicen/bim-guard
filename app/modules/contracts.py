@@ -868,6 +868,11 @@ class DocumentSection(BaseModel):
     )
     node_type: str = Field(default="section", description="Type of node: 'section', 'heading', 'table', 'paragraph'")
     bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")
+    summary: Optional[str] = Field(default=None, description="Semantic summary of section provisions and requirements")
+    end_page_number: Optional[int] = Field(default=None, description="Resolved source-document page this section ends on")
+    key_topics: list[str] = Field(default_factory=list, description="Key architectural topics and domain concepts")
+    citations: list[str] = Field(default_factory=list, description="Referenced sections, tables, or standards")
+    target_ifc_classes: list[str] = Field(default_factory=list, description="Target IFC entity classes mentioned or governed")
 
 
 class DocumentSectionsResponse(BaseModel):
@@ -889,6 +894,11 @@ class SectionTreeNode(BaseModel):
     )
     node_type: str = Field(default="section", description="Type of outline node: 'section', 'heading', 'table'")
     bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")
+    summary: Optional[str] = Field(default=None, description="Semantic summary of section provisions and requirements")
+    end_page_number: Optional[int] = Field(default=None, description="Resolved source-document page this section ends on")
+    key_topics: list[str] = Field(default_factory=list, description="Key architectural topics and domain concepts")
+    citations: list[str] = Field(default_factory=list, description="Referenced sections, tables, or standards")
+    target_ifc_classes: list[str] = Field(default_factory=list, description="Target IFC entity classes mentioned or governed")
     children: list["SectionTreeNode"] = Field(default_factory=list)
 
 
@@ -909,6 +919,15 @@ class DocumentSectionTreeResponse(BaseModel):
     tree: list[SectionTreeNode] = Field(default_factory=list)
     sections: list[DocumentSection] = Field(default_factory=list)
     enhanced: bool = False
+
+
+class SectionGraphResponse(BaseModel):
+    """Graph RAG structural and relational context for a document's sections."""
+
+    document_id: int
+    section_id: Optional[str] = None
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    available: bool = False
 
 
 class DocumentElementBbox(BaseModel):
