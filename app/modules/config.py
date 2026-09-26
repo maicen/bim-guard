@@ -6,9 +6,22 @@ Imported by rule_generator.py and seed-rule loaders.
 
 import os
 
+import litellm
+
 from app.environment import load_env_file
 
 load_env_file()
+
+# GPT-5-family models (including DEFAULT_LLM_MODEL below) reject any
+# `temperature` other than 1.0 outright — every call site here always sends
+# one (see COMPLIANCE_TEMPERATURE), so without this every completion against
+# such a model would raise litellm.UnsupportedParamsError. This makes litellm
+# silently drop params a given model doesn't support instead of erroring.
+# Trade-off: COMPLIANCE_TEMPERATURE's "same document -> same rule set"
+# reproducibility guarantee (see the note below) no longer holds for models
+# in this family, since their actual sampling temperature is then whatever
+# the provider defaults to, not the value this app requested.
+litellm.drop_params = True
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Supabase is the sole runtime database backend.
@@ -21,12 +34,15 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 # Unified LLM configuration for all extraction, rule building, and compliance work.
 # All modules use these constants instead of hardcoded values.
 
-# Default model: OpenRouter Auto (via LiteLLM).
-# The "openrouter/" prefix is the LiteLLM provider route. Precedence matches
-# the API-key block above:
-# Environment variable > literal default.
+# Default model: OpenAI GPT-5.6 Luna Pro, routed via OpenRouter/LiteLLM.
+# The "openrouter/" prefix is the LiteLLM provider route (same as the old
+# "openrouter/auto" default); "openai/gpt-5.6-luna-pro" beneath it is
+# OpenRouter's own model slug, not a second LiteLLM provider route — a bare
+# "openai/gpt-5.6-luna-pro" would make litellm call OpenAI's API directly
+# (and fail: OPENAI_API_KEY isn't configured, only OPENROUTER_API_KEY is).
+# Precedence matches the API-key block above: env var > literal default.
 DEFAULT_LLM_MODEL = os.environ.get(
-    "BIM_GUARD_LLM_MODEL", "openrouter/auto"
+    "BIM_GUARD_LLM_MODEL", "openrouter/openai/gpt-5.6-luna-pro"
 )
 
 # Temperature by use case

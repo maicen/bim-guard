@@ -12,7 +12,7 @@ DEFAULT_COUNTRY: str = "UK"
 DEFAULT_ANALYSIS_TYPE: str = "Arch"
 
 #: LLM extraction defaults
-DEFAULT_LLM_MODEL: str = "openrouter/auto"
+DEFAULT_LLM_MODEL: str = "openrouter/openai/gpt-5.6-luna-pro"
 COMPLIANCE_TEMPERATURE: float = 0.2
 MAX_TOKENS_RULE_EXTRACTION: int = 4096
 
