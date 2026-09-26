@@ -46,9 +46,11 @@ MAX_NODES_FOR_ENHANCEMENT = 4000
 _ENHANCE_PROMPT = """\
 You are cleaning up the outline of a building-code/specification document \
 for display as a collapsible tree. Below is a skeleton of every detected \
-section: its id, outline depth (0 = top-level), reference number, and \
-current heading text, in document order (so each node's context is the \
-lines immediately around it).
+section: its id, outline depth (0 = top-level), reference number, page \
+number, and current heading text, in document order (so each node's \
+context is the lines immediately around it). Page numbers are a strong \
+signal — two nodes with the same generic label but far-apart page numbers \
+are almost certainly distinct sections, not duplicates.
 
 Two kinds of fixes are allowed:
 
@@ -74,7 +76,7 @@ Do NOT invent new sections, change reference numbers, or merge a node \
 into anything other than its immediate parent. Only return entries for \
 ids you are actually changing — omit anything you are leaving as-is.
 
-SECTIONS (id | depth | number | name):
+SECTIONS (id | depth | number | page | name):
 {skeleton}
 """
 
@@ -140,7 +142,9 @@ def _build_skeleton(flat: list[dict]) -> str:
         depth = compute_depth(chunk.get("section_number"), chunk.get("section_name"))
         number = chunk.get("section_number") or "—"
         name = (chunk.get("section_name") or "").strip() or "—"
-        lines.append(f"{chunk['id']} | {depth} | {number} | {name}")
+        page = chunk.get("page_number")
+        page_str = str(page) if page is not None else "—"
+        lines.append(f"{chunk['id']} | {depth} | {number} | {page_str} | {name}")
     return "\n".join(lines)
 
 
