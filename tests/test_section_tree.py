@@ -14,6 +14,8 @@ from app.modules.document_parsing.section_tree import (
 )
 from app.modules.document_parsing.section_tree_enhancer import (
     MAX_NODES_FOR_ENHANCEMENT,
+    SNIPPET_CHARS,
+    _build_skeleton,
     enhance_section_tree,
 )
 
@@ -213,6 +215,25 @@ def test_enhance_section_tree_applies_only_known_id_overrides(monkeypatch):
     # Structure is unchanged — same number of roots/children as before.
     assert len(new_tree) == 1
     assert len(new_tree[0]["children"]) == 1
+
+
+def test_build_skeleton_includes_capped_single_line_snippet():
+    long_text = "Every stair flight shall have a clear width\nof not less than 900 mm " + "x" * 40
+    chunks = [_chunk("1", "CHAPTER 1", text=long_text), _chunk("1.1", "Empty", text="   \n  ")]
+    _, flat = build_section_tree(chunks)
+
+    skeleton = _build_skeleton(flat)
+    lines = skeleton.splitlines()
+
+    # Snippet is collapsed to one line, hard-capped, and ends with an ellipsis marker.
+    first_snippet = lines[0].split(" | ")[4]
+    assert "\n" not in first_snippet
+    assert len(first_snippet) <= SNIPPET_CHARS + 1  # +1 for the trailing "…"
+    assert first_snippet.endswith("…")
+
+    # Whitespace-only body text renders as the placeholder, not an empty field.
+    second_snippet = lines[1].split(" | ")[4]
+    assert second_snippet == "—"
 
 
 def test_enhance_section_tree_merges_node_into_parent(monkeypatch):

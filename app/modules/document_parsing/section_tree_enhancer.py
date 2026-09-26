@@ -14,8 +14,11 @@ one-line entries cluttering the outline. This is the only way the tree's
 
 Kept deliberately cheap:
   - The LLM only ever sees a compact one-line-per-node skeleton (id, depth,
-    number, name) — never section body text — so the prompt size scales
-    with node *count*, not document size.
+    number, page, a short extractive snippet, and name) — never the full
+    section body — so the prompt size scales with node *count*, not
+    document size. The snippet is a hard-capped prefix of text already
+    parsed and held in memory (see ``SNIPPET_CHARS``); no extra parsing,
+    model, or network call is needed to produce it.
   - The LLM may only return label overrides for the ids it wants to
     rename, plus a list of ids to merge into their parent. It cannot add
     nodes, reparent arbitrary subtrees, or rename/merge an id that doesn't
@@ -43,25 +46,34 @@ logger = get_logger(__name__)
 # prompt — the deterministic tree is still fully usable on its own.
 MAX_NODES_FOR_ENHANCEMENT = 4000
 
+# Hard cap on the extractive snippet shown per node — keeps the prompt
+# bounded per node regardless of how long the underlying section body is.
+SNIPPET_CHARS = 60
+
 _ENHANCE_PROMPT = """\
 You are cleaning up the outline of a building-code/specification document \
 for display as a collapsible tree. Below is a skeleton of every detected \
 section: its id, outline depth (0 = top-level), reference number, page \
-number, and current heading text, in document order (so each node's \
-context is the lines immediately around it). Page numbers are a strong \
-signal — two nodes with the same generic label but far-apart page numbers \
-are almost certainly distinct sections, not duplicates.
+number, a short snippet of its opening body text (may be cut off \
+mid-word — that's expected, it's only a hint), and current heading text, \
+in document order (so each node's context is the lines immediately \
+around it). Page numbers are a strong signal — two nodes with the same \
+generic label but far-apart page numbers are almost certainly distinct \
+sections, not duplicates. The snippet is your main source for what a \
+generic-labeled node is actually about — use it to write the disambiguated \
+label, not just the ancestor's own heading.
 
 Two kinds of fixes are allowed:
 
 1. RELABEL — fix a heading that is clearly broken, OR disambiguate a \
 generic label that repeats verbatim across unrelated parts of the \
 document (e.g. many separate "Exceptions:" or "GENERAL" nodes). For a \
-repeated generic label, fold in short context from its nearest ancestor \
-so it reads uniquely, e.g. "Exceptions: (2.7 High-Hazard Group H)" or \
-"GENERAL (Section 2.1)" — keep it short, do not paraphrase the ancestor's \
-own heading, just reference it. Leave a heading alone if you are not \
-reasonably confident what context to add.
+repeated generic label, prefer using the node's own snippet to write a \
+short topical suffix, e.g. "Exceptions: (fire-rated corridor walls)"; \
+fall back to its nearest ancestor's number/name only when the snippet \
+isn't informative enough, e.g. "GENERAL (Section 2.1)". Keep it short — a \
+few words — and leave a heading alone if you are not reasonably confident \
+what to add.
 
 2. MERGE — if a node's content is negligible (near-empty, a stray \
 fragment, a table continuation, or otherwise not worth its own outline \
@@ -76,7 +88,7 @@ Do NOT invent new sections, change reference numbers, or merge a node \
 into anything other than its immediate parent. Only return entries for \
 ids you are actually changing — omit anything you are leaving as-is.
 
-SECTIONS (id | depth | number | page | name):
+SECTIONS (id | depth | number | page | snippet | name):
 {skeleton}
 """
 
@@ -136,6 +148,16 @@ def _apply_merges(tree: list[dict], merge_ids: list[str]) -> None:
         container[index : index + 1] = node.get("children") or []
 
 
+def _snippet(text: str | None) -> str:
+    """Hard-capped, single-line extractive snippet of a chunk's body text."""
+    collapsed = " ".join((text or "").split()).replace("|", "/")
+    if not collapsed:
+        return "—"
+    if len(collapsed) <= SNIPPET_CHARS:
+        return collapsed
+    return collapsed[:SNIPPET_CHARS].rstrip() + "…"
+
+
 def _build_skeleton(flat: list[dict]) -> str:
     lines = []
     for chunk in flat:
@@ -144,7 +166,8 @@ def _build_skeleton(flat: list[dict]) -> str:
         name = (chunk.get("section_name") or "").strip() or "—"
         page = chunk.get("page_number")
         page_str = str(page) if page is not None else "—"
-        lines.append(f"{chunk['id']} | {depth} | {number} | {page_str} | {name}")
+        snippet = _snippet(chunk.get("text"))
+        lines.append(f"{chunk['id']} | {depth} | {number} | {page_str} | {snippet} | {name}")
     return "\n".join(lines)
 
 
