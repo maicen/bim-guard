@@ -21,11 +21,7 @@
     onCloseMobile?: () => void;
   }
 
-  let {
-    activeView = "dashboard",
-    mobileOpen = false,
-    onCloseMobile = () => {},
-  }: Props = $props();
+  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
 
   let collapsed = $state(false);
 
@@ -49,22 +45,20 @@
       title: "My Home",
       items: [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { id: "run-compliance-test", label: "Run Compliance Audit", icon: PlayCircle, highlight: true },
+        {
+          id: "run-compliance-test",
+          label: "Run Compliance Audit",
+          icon: PlayCircle,
+          highlight: true,
+        },
       ],
     },
     {
       title: "Rules & Standards",
       items: [
-        { id: "documents", label: "New Rule Documents", icon: Plus },
+        { id: "documents", label: "Documents", icon: Plus },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
-        { id: "rules", label: "Rule Catalog Edit", icon: ListChecks },
-      ],
-    },
-    {
-      title: "Manuals",
-      items: [
-        { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
-        { id: "modeling-manual", label: "Modeling Manual", icon: Box },
+        { id: "rules", label: "Rule Catalog", icon: ListChecks },
       ],
     },
   ];
@@ -82,32 +76,32 @@
 <aside
   id="app-sidebar"
   aria-label="Primary"
-  class="apple-blur fixed inset-y-0 z-50 flex h-screen w-64 select-none flex-col border-r border-border-default bg-surface-canvas/90 transition-[left] duration-300
-    md:sticky md:left-0 md:top-0 md:z-40 md:transition-all
+  class="apple-blur border-border-default bg-surface-canvas/90 fixed inset-y-0 z-50 flex h-screen w-64 flex-col border-r transition-[left] duration-300 select-none
+    md:sticky md:top-0 md:left-0 md:z-40 md:transition-all
     {mobileOpen ? 'left-0' : '-left-64'}
     {collapsed ? 'md:w-16' : 'md:w-64'}"
 >
   <!-- Brand Header -->
-  <div class="flex h-16 items-center justify-between border-b border-border-default px-3.5">
+  <div class="border-border-default flex h-16 items-center justify-between border-b px-3.5">
     {#if !collapsed}
       <div class="flex items-center gap-2.5 overflow-hidden">
         <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+          class="from-accent flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
         >
           BG
         </div>
         <div class="flex flex-col truncate">
-          <span class="text-base font-bold leading-none tracking-tight text-fg-primary"
+          <span class="text-fg-primary text-base leading-none font-bold tracking-tight"
             >BIM Guard</span
           >
-          <span class="mt-1 text-micro font-semibold uppercase tracking-widest text-fg-muted"
+          <span class="text-micro text-fg-muted mt-1 font-semibold tracking-widest uppercase"
             >OpenBIM Compliance</span
           >
         </div>
       </div>
     {:else}
       <div
-        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+        class="from-accent mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
       >
         BG
       </div>
@@ -116,7 +110,7 @@
     <button
       type="button"
       onclick={onCloseMobile}
-      class="shrink-0 rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden"
+      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary shrink-0 rounded-lg p-2 transition-colors md:hidden"
       aria-label="Close navigation"
     >
       <ChevronLeft class="h-5 w-5" />
@@ -125,7 +119,7 @@
     <button
       type="button"
       onclick={() => (collapsed = !collapsed)}
-      class="hidden shrink-0 rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:block"
+      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary hidden shrink-0 rounded-lg p-1 transition-colors md:block"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
     >
       {#if collapsed}
@@ -142,7 +136,7 @@
       <div class="space-y-1">
         {#if !collapsed}
           <div
-            class="rounded-lg bg-surface-overlay px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-fg-muted"
+            class="bg-surface-overlay text-fg-muted rounded-lg px-2.5 py-1 text-sm font-bold tracking-wider uppercase"
           >
             {section.title}
           </div>
@@ -197,7 +191,7 @@
             {/if}
 
             {#if collapsed && isActive}
-              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
+              <span class="absolute top-2 bottom-2 left-0 w-1 rounded-r-md bg-white"></span>
             {/if}
           </a>
         {/each}
@@ -206,7 +200,7 @@
   </div>
 
   <!-- Sidebar Footer: Settings -->
-  <div class="space-y-1 border-t border-border-default bg-surface-canvas/60 p-2">
+  <div class="border-border-default bg-surface-canvas/60 space-y-1 border-t p-2">
     <!-- Settings Link -->
     <a
       href={authState.activeOrganizationId
