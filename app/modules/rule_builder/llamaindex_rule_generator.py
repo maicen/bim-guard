@@ -13,6 +13,10 @@ SectionChunker) commonly expresses more than one checkable requirement
 (e.g. a table-driven threshold plus its sprinkler exception), so the
 program's output schema is a `rules` array, not a single candidate —
 generate_drafts_from_node() returns zero or more drafts per node.
+
+Prompt content lives in the sibling module ``_extraction_prompts``.
+Keeping prompts as Python (not external text files) preserves format-string
+escaping semantics and lets the schema/prompt contract be reviewed together.
 """
 
 from pydantic import BaseModel, Field
@@ -26,121 +30,14 @@ from app.modules.contracts import (
     RuleExtractionDraft,
 )
 from app.modules.document_parsing.llamaindex_program import build_llm
+from app.modules.rule_builder._extraction_prompts import (
+    RULE_PROMPT,
+    SYSTEM_PROMPT,
+    format_kg_context,
+)
 from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
 
 logger = get_logger(__name__)
-
-_SYSTEM_PROMPT = """\
-You are a BIM compliance rule extraction engine for building regulations.
-
-Judge each clause on its actual regulatory meaning, not on surface wording
-alone. Never invent a target_ifc_class or property_name that isn't either
-(a) one of the KNOWN-GOOD CANDIDATES you are shown for this clause, when any
-are shown, or (b) a well-known IFC entity/property you are confident about
-from the clause's own text. When candidates are shown and one plainly fits,
-prefer it over guessing a different spelling or class — record which one you
-used in kg_candidate_used (its uri), or "" if you used none of them (either
-because none fit, or none were shown). Respond with strict, valid JSON
-matching the requested schema only — no commentary, no markdown fences.
-"""
-
-_RULE_PROMPT = """\
-Read the clause text below and extract every discrete, checkable
-requirement it expresses (a numeric limit, a required property, a
-classification, a presence check, or a required count of elements) against
-an IFC element. A single clause commonly expresses more than one rule (for
-example a base threshold plus an exception that changes it) — extract each
-as its own entry in "rules". If the text expresses no checkable requirement
-at all (e.g. it is a definition, example, or purely descriptive text),
-return an empty "rules" array.
-{kg_context}
-For each rule found, fill in:
-- rule_id: a short identifier, e.g. the clause reference if present, else
-  "REQ-AI-<short-slug>"
-- description: short plain-English rule description
-- mechanism: "CODE"
-- target_ifc_class: the IFC entity type the rule applies to, e.g. "IfcDoor",
-  "IfcSpace", "IfcStairFlight" — required for every rule, since it is what
-  lets a rule be checked against a model and exported to IDS
-- property_set: IFC Pset name, e.g. "Pset_StairFlightCommon", or empty
-- property_name: IFC property to measure, e.g. "TreadLength", or empty
-- rule_type: "numeric_range" | "exists_check" | "count_check" | "classification"
-  — use "count_check" for requirements on how many of an element are present
-  (e.g. "two exits shall be provided"), not "numeric_range"
-- operator: one of ">=", "<=", "==", "!=", "between", "exists", "matches"
-- check_value: the target value as a string (numeric values as their string form), or empty
-- value_min / value_max: string bounds for "between", or empty
-- value_min_property / value_max_property: when the bound is not a fixed
-  number but another property of the SAME element, optionally scaled and/or
-  offset (e.g. "riser height shall not exceed one-half of the tread going"
-  -> value_max_property="TreadGoing", value_max_scale="0.5"), the name of
-  that property — else empty. Only use this for a property on the SAME
-  element the rule targets; never for a property of a different element
-  (a room, the building) — leave those to needs_review instead, see below.
-- value_min_scale / value_max_scale: the multiplier on value_min_property /
-  value_max_property (e.g. "0.5" for "one-half of"), as a string — default
-  "1" (leave empty) when the clause has no multiplier, i.e. the bound is the
-  referenced property plus/minus a fixed amount only.
-- value_min_offset / value_max_offset: a fixed amount added after the scale
-  above (e.g. "25" for "...plus 25mm"), as a string — default "0" (leave
-  empty) when there is no such fixed amount.
-- unit: "mm" | "m" | "m2" | "deg" | "ratio" | "" (empty if not applicable)
-- severity: "mandatory" if the clause uses "shall"/"must", "recommended" if
-  "should", else "recommended"
-- confidence: 0.0-1.0, your confidence this rule is correctly extracted
-- needs_review: 1 if the text is ambiguous, if the threshold is looked up in
-  a table you cannot see in full, or if the bound is computed from a
-  metric belonging to a DIFFERENT element than the one the rule targets
-  (e.g. "one-half of the diagonal dimension of the area served" — the
-  diagonal belongs to the room/building, not to the exit door the rule
-  targets) rather than a fixed value or a property of the same element — else 0
-- applies_when_materials: if the clause narrows this rule to elements of a
-  specific material (e.g. "gypsum board partitions", "steel pipework"), list
-  the material keyword(s) here — else leave empty. Do not use this for
-  conditions you cannot express this way (e.g. sprinkler exceptions, table
-  lookups by occupancy) — leave those to needs_review instead of guessing.
-- rase_requirement: the exact regulatory text representing the core obligation (e.g. "Doors shall have a clear width").
-- rase_applicability: JSON object defining when the requirement applies (e.g. {{"occupancy": "residential"}}), or empty.
-- rase_selection: JSON object defining criteria for selecting specific targets, or empty.
-- rase_exception: JSON object defining conditions excusing the requirement (e.g. {{"has_sprinkler": true}}), or empty.
-- kg_candidate_used: the uri of the KNOWN-GOOD CANDIDATE (if any were shown
-  above) that target_ifc_class came from, or "" if none were shown or none
-  were used.
-
-CLAUSE TEXT:
-{clause_text}
-"""
-
-
-def _format_kg_context(
-    *,
-    class_candidates: list[dict],
-    property_hints: list[dict],
-    dependencies: list[dict],
-) -> str:
-    """Render the clause's KG-grounded signal as a prompt block, or "" if there is none.
-
-    Keeping this a pure function (candidates/hints/dependencies in, string
-    out) makes the prompt-shaping logic directly unit-testable without
-    mocking ClauseGroundingIndex or the LLM program.
-    """
-    if not (class_candidates or property_hints or dependencies):
-        return ""
-
-    lines: list[str] = []
-    if class_candidates:
-        lines.append("\nKNOWN-GOOD CANDIDATES (from verified ontology grounding for this clause):")
-        for c in class_candidates[:5]:
-            lines.append(f"  - target_ifc_class candidate: {c.get('name')} ({c.get('code')}), uri={c.get('uri')}")
-    if property_hints:
-        for p in property_hints[:5]:
-            lines.append(f"  - property candidate: {p.get('name')} ({p.get('code')})")
-    if dependencies:
-        lines.append("\nRELATED CLAUSES in this document (resolve exceptions/overrides against these, not blind):")
-        for dep in dependencies[:3]:
-            lines.append(f"  - [{dep.get('edge_type')}] {dep.get('target_ref')}: \"{dep.get('target_text_excerpt')}\"")
-    lines.append("")
-    return "\n".join(lines)
 
 
 class _LLMRuleCandidate(BaseModel):
@@ -177,7 +74,15 @@ class _LLMRuleCandidate(BaseModel):
         ),
     )
     rase_requirement: str = Field(default="", description="Core obligation text")
-    rase_applicability: dict = Field(default_factory=dict, description="When the requirement applies")
+    rase_applicability: dict = Field(
+        default_factory=dict,
+        description=(
+            "Conditions that activate this rule. Building-code tables express tiered ranges, "
+            "not exact point values. Always use range-bound keys ending in _min / _max "
+            "(e.g. {\"projection_mm_min\": 305, \"projection_mm_max\": 610}). "
+            "Never use bare exact-match keys like {\"projection_mm\": 1520}."
+        ),
+    )
     rase_selection: dict = Field(default_factory=dict, description="Criteria for targets")
     rase_exception: dict = Field(default_factory=dict, description="Conditions excusing the requirement")
     kg_candidate_used: str = Field(
@@ -328,7 +233,7 @@ class LlamaIndexRuleGenerator:
         clause_grounding = clause_grounding or get_clause_grounding_index()
         clause_id = node.metadata.clause_id if node.metadata else None
         class_candidates = clause_grounding.class_candidates_for(clause_id)
-        kg_context = _format_kg_context(
+        kg_context = format_kg_context(
             class_candidates=class_candidates,
             property_hints=clause_grounding.property_hints_for(clause_id),
             dependencies=clause_grounding.dependencies_for(clause_id),
@@ -336,8 +241,8 @@ class LlamaIndexRuleGenerator:
 
         chat_prompt = ChatPromptTemplate(
             message_templates=[
-                ChatMessage(role=MessageRole.SYSTEM, content=_SYSTEM_PROMPT),
-                ChatMessage(role=MessageRole.USER, content=_RULE_PROMPT),
+                ChatMessage(role=MessageRole.SYSTEM, content=SYSTEM_PROMPT),
+                ChatMessage(role=MessageRole.USER, content=RULE_PROMPT),
             ]
         )
         program = LLMTextCompletionProgram.from_defaults(

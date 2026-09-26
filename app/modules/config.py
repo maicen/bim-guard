@@ -212,6 +212,11 @@ CODE_TO_IFC_MAP = {
     "diffuser": "IfcFlowTerminal",
     "pipe": "IfcPipeSegment",
     "duct": "IfcDuctSegment",
+    # Signs & signage
+    "sign": "IfcSign",
+    "signage": "IfcSign",
+    "projection sign": "IfcSign",
+    "glass sign": "IfcSign",
 }
 
 # ── IFC class → default Pset mapping ─────────────────────────────────────────
@@ -237,6 +242,7 @@ IFC_PROPERTY_SET_MAP = {
     "IfcAlarm": "Pset_AlarmCommon",
     "IfcSensor": "Pset_SensorCommon",
     "IfcFlowTerminal": "Pset_FlowTerminalCommon",
+    "IfcSign": "Pset_SignCommon",
 }
 
 # ── Rule type → minimum required fields ──────────────────────────────────────
