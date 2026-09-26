@@ -1047,6 +1047,8 @@ export interface DraftSourceSummary {
   source_bbox?: BoundingBox | null;
   source_element_id?: string | null;
   match_status: RuleSourceMatchStatus;
+  /** Full proposed rule, rendered as a structured panel side by side with the source document. */
+  proposed_rule?: RuleCreateRequest | null;
 }
 
 /** One document element annotated with the pending draft(s) extracted from it. */

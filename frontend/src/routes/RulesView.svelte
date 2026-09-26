@@ -42,7 +42,6 @@
     RuleSnapshotSourceMode,
     IdsImportResult,
     RuleSourceResponse,
-    RulesetSourceMapResponse,
   } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TablePagination from "../lib/components/TablePagination.svelte";
@@ -127,36 +126,16 @@
     push(`/rule-source?${params.toString()}`);
   }
 
-  // Ruleset-level source map modal: which documents/clauses fed a ruleset,
-  // across every source document it draws from (not just one).
-  let rulesetSourceMapFolder: RuleFolder | null = $state(null);
-  let rulesetSourceMap: RulesetSourceMapResponse | null = $state(null);
-  let rulesetSourceMapLoading = $state(false);
-  let rulesetSourceMapError = $state("");
-
-  async function openRulesetSourceMap(folder: RuleFolder, e?: Event) {
+  // Ruleset-level source map: which documents/clauses fed a ruleset, across
+  // every source document it draws from (not just one) -- its own page.
+  function openRulesetSourceMap(folder: RuleFolder, e?: Event) {
     e?.stopPropagation();
-    rulesetSourceMapFolder = folder;
-    rulesetSourceMap = null;
-    rulesetSourceMapError = "";
-    rulesetSourceMapLoading = true;
-    try {
-      rulesetSourceMap = await rulesApi.getRulesetSourceMap(folder.ruleset_id);
-    } catch (err: any) {
-      rulesetSourceMapError = err?.message || "Could not load this ruleset's source map.";
-    } finally {
-      rulesetSourceMapLoading = false;
+    const params = new URLSearchParams();
+    params.set("ruleset_id", folder.ruleset_id);
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
     }
-  }
-
-  function closeRulesetSourceMap() {
-    rulesetSourceMapFolder = null;
-    rulesetSourceMap = null;
-  }
-
-  function openDocumentFromRulesetMap(documentId: number) {
-    closeRulesetSourceMap();
-    openRuleSourceMap(documentId);
+    push(`/ruleset-source-map?${params.toString()}`);
   }
 
   // Snapshots tab state
@@ -1855,46 +1834,6 @@
   onConfirm={confirmBulkDeleteSnapshots}
   onCancel={() => (isBulkDeleteSnapshotsModalOpen = false)}
 />
-
-<!-- Ruleset Source Map Modal: which documents/clauses fed this ruleset -->
-<Modal
-  isOpen={rulesetSourceMapFolder !== null}
-  title={rulesetSourceMapFolder ? `Source Map — ${rulesetSourceMapFolder.display_name}` : "Source Map"}
-  subtitle="Documents this ruleset's rules were extracted from"
-  icon={Route}
-  maxWidth="max-w-lg"
-  onClose={closeRulesetSourceMap}
->
-  {#if rulesetSourceMapLoading}
-    <LoadingState message="Loading source map…" />
-  {:else if rulesetSourceMapError}
-    <EmptyState title="Could not load source map" description={rulesetSourceMapError} />
-  {:else if rulesetSourceMap && rulesetSourceMap.documents.length === 0}
-    <EmptyState
-      title="No source documents"
-      description="None of this ruleset's rules are linked back to a source document yet."
-    />
-  {:else if rulesetSourceMap}
-    <div class="space-y-2">
-      {#each rulesetSourceMap.documents as doc (doc.document_id)}
-        {@const mapped = doc.elements.reduce((n, el) => n + el.rules.length, 0)}
-        <button
-          type="button"
-          onclick={() => openDocumentFromRulesetMap(doc.document_id)}
-          class="flex w-full items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-overlay px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
-        >
-          <div class="flex min-w-0 items-center gap-2">
-            <BookOpen class="h-3.5 w-3.5 shrink-0 text-accent" />
-            <span class="truncate text-xs font-semibold text-fg-primary">{doc.filename}</span>
-          </div>
-          <span class="shrink-0 text-micro text-fg-muted">
-            {mapped} mapped{doc.unmapped_rules.length ? `, ${doc.unmapped_rules.length} approximate` : ""}{doc.orphaned_rules.length ? `, ${doc.orphaned_rules.length} need re-linking` : ""}
-          </span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-</Modal>
 
 <!-- Rule Source Annotation Modal: jumps to and highlights the page/snippet a rule was traced back to -->
 {#if viewingSource}

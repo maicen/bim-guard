@@ -1315,7 +1315,12 @@ class RulePromotionResponse(RuleResponse):
 
 
 class DraftSourceSummary(BaseModel):
-    """Lightweight draft shape for the rule-source map's Drafts tab."""
+    """Draft shape for the rule-source map's Drafts tab.
+
+    Carries the full ``proposed_rule`` (not just a description) so the map
+    can render it as a structured panel side by side with the rendered
+    source document, without a second per-draft fetch.
+    """
 
     id: int
     status: RuleDraftStatus
@@ -1328,6 +1333,7 @@ class DraftSourceSummary(BaseModel):
     source_bbox: Optional[dict[str, Any]] = None
     source_element_id: Optional[str] = None
     match_status: Literal["exact", "unmapped", "orphaned"] = "unmapped"
+    proposed_rule: Optional[RuleCreateRequest] = None
 
 
 class DocumentElementWithDrafts(DocumentElementBbox):

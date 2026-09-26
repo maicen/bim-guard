@@ -53,6 +53,7 @@ from app.modules.contracts import (
     GoogleDriveImportRequest,
     GoogleDriveImportResponse,
     GoogleDriveImportResult,
+    RuleCreateRequest,
     RuleDraftExtractionRequest,
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
@@ -63,6 +64,7 @@ from app.modules.contracts import (
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
 from app.modules.document_parsing.section_tree import build_section_tree
+from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
 from app.modules.permissions import Action
 from app.services.audit_log_service import AuditLogService
 from app.services.cache import cache_service
@@ -1051,13 +1053,21 @@ async def get_document_sections_tree(
 ) -> DocumentSectionTreeResponse:
     """Nest a document's detected sections into a tree for the scope picker.
 
-    The tree structure is derived deterministically from each DocLang
-    section's number/heading. Returns an empty tree when the document has no
-    DocLang XML yet (generation deferred or failed) — the caller should fall
-    back to a manual excerpt. Each section's starting page is resolved
-    (free — snippet matching, not an LLM call) against ``document_pages``,
-    when that table has rows for this document; older documents uploaded
-    before that table existed just get ``page_number: null`` everywhere.
+    The tree *structure* is derived deterministically from each DocLang
+    section's number/heading (see ``build_section_tree``). Heading *labels*
+    then get one optional, cheap AI cleanup pass (see
+    ``section_tree_enhancer``) that only fixes garbled/duplicate titles —
+    never adds, removes, or reparents nodes — so the response is fully
+    usable even when that pass fails or is skipped; ``enhanced`` reports
+    whether it actually ran. The whole response is cached per document, so
+    the AI pass runs at most once per document rather than once per view.
+
+    Returns an empty tree when the document has no DocLang XML yet
+    (generation deferred or failed) — the caller should fall back to a
+    manual excerpt. Each section's starting page is resolved (free —
+    snippet matching, not an LLM call) against ``document_pages``, when that
+    table has rows for this document; older documents uploaded before that
+    table existed just get ``page_number: null`` everywhere.
     """
     access_checker(document_id)
     doc = service.get_document(document_id)
@@ -1075,7 +1085,29 @@ async def get_document_sections_tree(
     doclang_xml = service.get_doclang_content(doc).strip()
     chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
     tree, flat = build_section_tree(chunks)
-    enhanced = False
+
+    # Optional, one-shot AI label-cleanup pass (see section_tree_enhancer's
+    # module docstring) — cheap by design: it only ever sees a compact
+    # id/depth/number/name skeleton, never section body text, and the result
+    # is cached below so it runs once per document rather than once per
+    # view. Any failure (LLM error, oversized tree) is swallowed internally
+    # and returns the deterministic tree unchanged with enhanced=False.
+    tree, enhanced = await enhance_section_tree(tree, flat)
+    if enhanced:
+        # The enhancer only relabels `tree` nodes (see its docstring) —
+        # mirror those labels onto `flat` so the "sections" list the scope
+        # picker's filter box searches doesn't show stale titles.
+        id_to_name: dict[str, str] = {}
+
+        def _collect_names(nodes: list[dict]) -> None:
+            for n in nodes:
+                id_to_name[n["id"]] = n["section_name"]
+                if n.get("children"):
+                    _collect_names(n["children"])
+
+        _collect_names(tree)
+        for chunk in flat:
+            chunk["section_name"] = id_to_name.get(chunk["id"], chunk["section_name"])
 
     # Attach page numbers for any chunks where not already resolved
     unresolved_indices = [i for i, chunk in enumerate(flat) if chunk.get("page_number") is None]
@@ -1402,6 +1434,7 @@ def get_document_draft_source_map(
             source_bbox=row.get("bbox") or clause.get("bbox"),
             source_element_id=row.get("source_element_id"),
             match_status=match_status,
+            proposed_rule=RuleCreateRequest.model_validate(proposed) if proposed else None,
         )
 
     elements_with_drafts = [

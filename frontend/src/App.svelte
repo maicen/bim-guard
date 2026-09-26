@@ -26,6 +26,7 @@
   import DocumentsView from "./routes/DocumentsView.svelte";
   import DocumentView from "./routes/DocumentView.svelte";
   import RuleSourceView from "./routes/RuleSourceView.svelte";
+  import RulesetSourceMapView from "./routes/RulesetSourceMapView.svelte";
   import RuleExtractionView from "./routes/RuleExtractionView.svelte";
   import EvaluationView from "./routes/EvaluationView.svelte";
   import RulesView from "./routes/RulesView.svelte";
@@ -74,6 +75,7 @@
     return raw && /^\d+$/.test(raw) ? Number(raw) : null;
   });
   let fromQuickTest = $derived(queryParams.get("from") === "quick-test");
+  let targetRulesetId: string | null = $derived(queryParams.get("ruleset_id"));
   // Signing in is required once Supabase Auth is actually configured (see
   // supabaseClient.ts) -- everything the app does reads through /api/projects
   // or /api/rules, both of which now require a bearer token. Left ungated
@@ -611,6 +613,8 @@
           <DocumentView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
         {:else if activeView === "rule-source"}
           <RuleSourceView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
+        {:else if activeView === "ruleset-source-map"}
+          <RulesetSourceMapView rulesetId={targetRulesetId} onBack={() => push("/rules")} />
         {:else if activeView === "extract"}
           <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}

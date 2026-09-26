@@ -58,6 +58,8 @@
   let selectedApproximate: RuleSourceSummary | null = $state(null);
   let selectedDraftElementId: string | null = $state(null);
   let selectedDraftApproximate: DraftSourceSummary | null = $state(null);
+  /** The specific draft card selected in the Drafts tab, rendered as the proposed-rule panel next to the viewer. */
+  let selectedDraft: DraftSourceSummary | null = $state(null);
 
   // Same fixed-height, self-measuring viewer pane pattern as DocumentView.svelte
   // -- the app shell's <main> grows to fit content rather than being
@@ -101,13 +103,27 @@
   }
 
   /** Reload just the draft map after a review/promote action -- promoting also changes the rule map. */
-  function refreshMaps() {
-    if (documentId == null) return;
-    Promise.all([documentsApi.getRuleSourceMap(documentId), documentsApi.getDraftSourceMap(documentId)]).then(
+  function refreshMaps(): Promise<void> {
+    if (documentId == null) return Promise.resolve();
+    return Promise.all([documentsApi.getRuleSourceMap(documentId), documentsApi.getDraftSourceMap(documentId)]).then(
       ([sourceMap, draftSourceMap]) => {
         map = sourceMap;
         draftMap = draftSourceMap;
       },
+    );
+  }
+
+  /** Find one draft by id across every bucket of the current draft map (mapped/unmapped/orphaned). */
+  function findDraftById(draftId: number): DraftSourceSummary | null {
+    if (!draftMap) return null;
+    for (const el of draftMap.elements) {
+      const hit = el.drafts.find((d) => d.id === draftId);
+      if (hit) return hit;
+    }
+    return (
+      draftMap.unmapped_drafts.find((d) => d.id === draftId) ??
+      draftMap.orphaned_drafts.find((d) => d.id === draftId) ??
+      null
     );
   }
 
@@ -128,6 +144,7 @@
     selectedApproximate = null;
     selectedDraftElementId = null;
     selectedDraftApproximate = null;
+    selectedDraft = null;
     relinkingDraftId = null;
     loadMaps(id).finally(() => {
       loading = false;
@@ -213,14 +230,16 @@
     selectedApproximate = rule;
   }
 
-  function selectDraftExact(elementId: string) {
-    selectedDraftApproximate = null;
-    selectedDraftElementId = elementId;
-  }
-
-  function selectDraftApproximate(draft: DraftSourceSummary) {
-    selectedDraftElementId = null;
-    selectedDraftApproximate = draft;
+  /** Select one draft card: `elementId` set for an exact match, null for an approximate/orphaned one. */
+  function selectDraft(draft: DraftSourceSummary, elementId: string | null) {
+    selectedDraft = draft;
+    if (elementId) {
+      selectedDraftElementId = elementId;
+      selectedDraftApproximate = null;
+    } else {
+      selectedDraftElementId = null;
+      selectedDraftApproximate = draft;
+    }
   }
 
   /** When set, the next overlay click relinks this draft instead of just selecting it. */
@@ -232,8 +251,19 @@
       relinkDraft(relinkingDraftId, elementId);
       return;
     }
-    if (mode === "rules") selectExact(elementId);
-    else selectDraftExact(elementId);
+    if (mode === "rules") {
+      selectExact(elementId);
+      return;
+    }
+    // Clicking the overlay directly (not a card) selects the first draft at that element, if any.
+    const el = elementsWithDrafts.find((e) => e.element_id === elementId);
+    if (el && el.drafts.length > 0) {
+      selectDraft(el.drafts[0], elementId);
+    } else {
+      selectedDraft = null;
+      selectedDraftApproximate = null;
+      selectedDraftElementId = elementId;
+    }
   }
 
   function startRelink(draftId: number) {
@@ -246,8 +276,9 @@
     try {
       await ruleExtractionApi.relinkDraftSource(draftId, elementId);
       toasts.success("Draft relinked to the new element.");
-      refreshMaps();
-      selectDraftExact(elementId);
+      await refreshMaps();
+      const relinked = findDraftById(draftId);
+      if (relinked) selectDraft(relinked, elementId);
     } catch (err: any) {
       toasts.error(err.message || "Could not relink this draft.", "Relink failed");
     } finally {
@@ -545,7 +576,7 @@
                   </div>
                   <div class="space-y-1.5">
                     {#each el.drafts as draft (draft.id)}
-                      {@render draftCard(draft, selectedDraftElementId === el.element_id, () => selectDraftExact(el.element_id))}
+                      {@render draftCard(draft, selectedDraft?.id === draft.id, () => selectDraft(draft, el.element_id))}
                     {/each}
                   </div>
                 </div>
@@ -561,7 +592,7 @@
                   </p>
                   <div class="space-y-1.5">
                     {#each draftMap.unmapped_drafts as draft (draft.id)}
-                      {@render draftCard(draft, selectedDraftApproximate?.id === draft.id, () => selectDraftApproximate(draft))}
+                      {@render draftCard(draft, selectedDraft?.id === draft.id, () => selectDraft(draft, null))}
                     {/each}
                   </div>
                 </div>
@@ -578,7 +609,7 @@
                   </p>
                   <div class="space-y-1.5">
                     {#each orphanedDrafts as draft (draft.id)}
-                      {@render draftCard(draft, selectedDraftApproximate?.id === draft.id, () => selectDraftApproximate(draft))}
+                      {@render draftCard(draft, selectedDraft?.id === draft.id, () => selectDraft(draft, null))}
                     {/each}
                   </div>
                 </div>
@@ -586,6 +617,61 @@
             {/if}
           </div>
         </div>
+
+        {#if mode === "drafts"}
+          <div class="flex w-[340px] shrink-0 flex-col overflow-y-auto rounded-2xl border border-border-default bg-surface-card shadow-xl">
+            <div class="space-y-4 p-4">
+              <div class="text-micro font-semibold uppercase tracking-wider text-fg-muted">Proposed Rule</div>
+              {#if !selectedDraft}
+                <EmptyState
+                  title="No draft selected"
+                  description="Select a draft on the left to see its proposed rule here, next to the source it was extracted from."
+                />
+              {:else}
+                {@const pr = selectedDraft.proposed_rule}
+                <div class="space-y-1.5">
+                  <div class="flex items-start justify-between gap-2">
+                    <h3 class="text-sm font-bold text-fg-primary">{selectedDraft.rule_id || `Draft #${selectedDraft.id}`}</h3>
+                    <SeverityBadge severity={selectedDraft.severity || "recommended"} size="xs" />
+                  </div>
+                  {#if selectedDraft.description}
+                    <p class="text-xs leading-relaxed text-fg-secondary">{selectedDraft.description}</p>
+                  {/if}
+                </div>
+
+                {#if pr}
+                  <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-micro">
+                    <dt class="uppercase tracking-wider text-fg-muted">Target class</dt>
+                    <dd class="wrap-break-word font-mono text-fg-secondary">{pr.target_ifc_class || "—"}</dd>
+                    <dt class="uppercase tracking-wider text-fg-muted">Property</dt>
+                    <dd class="wrap-break-word font-mono text-fg-secondary">
+                      {pr.property_set || "Pset_Compliance"}.{pr.property_name || "—"}
+                    </dd>
+                    <dt class="uppercase tracking-wider text-fg-muted">Check</dt>
+                    <dd class="wrap-break-word font-mono text-fg-secondary">
+                      {pr.operator || "=="}
+                      {pr.check_value ?? [pr.value_min, pr.value_max].filter((v) => v != null && v !== "").join(" – ")}
+                      {pr.unit || ""}
+                    </dd>
+                    <dt class="uppercase tracking-wider text-fg-muted">Mechanism</dt>
+                    <dd class="font-mono text-fg-secondary">{pr.mechanism || "—"}</dd>
+                    <dt class="uppercase tracking-wider text-fg-muted">Confidence</dt>
+                    <dd class="font-mono text-fg-secondary">{selectedDraft.confidence.toFixed(2)}</dd>
+                    <dt class="uppercase tracking-wider text-fg-muted">Method</dt>
+                    <dd class="wrap-break-word font-mono text-fg-secondary">{selectedDraft.extraction_method}</dd>
+                  </dl>
+
+                  {#if pr.rase_requirement}
+                    <div class="space-y-1 border-t border-border-subtle pt-3">
+                      <div class="text-micro font-semibold uppercase tracking-wider text-fg-muted">Requirement</div>
+                      <p class="text-caption italic leading-relaxed text-fg-secondary">"{pr.rase_requirement}"</p>
+                    </div>
+                  {/if}
+                {/if}
+              {/if}
+            </div>
+          </div>
+        {/if}
 
         <div class="flex flex-1 flex-col gap-2 overflow-hidden">
           {#if relinkingDraftId != null}
