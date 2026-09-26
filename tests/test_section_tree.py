@@ -163,8 +163,9 @@ class _FakeOverride:
 
 
 class _FakeOverridesResult:
-    def __init__(self, overrides):
+    def __init__(self, overrides, merges=None):
         self.overrides = overrides
+        self.merges = merges or []
 
 
 class _FakeProgram:
@@ -212,6 +213,41 @@ def test_enhance_section_tree_applies_only_known_id_overrides(monkeypatch):
     # Structure is unchanged — same number of roots/children as before.
     assert len(new_tree) == 1
     assert len(new_tree[0]["children"]) == 1
+
+
+def test_enhance_section_tree_merges_node_into_parent(monkeypatch):
+    chunks = [_chunk("1", "CHAPTER 1"), _chunk("1.1", "Exceptions:"), _chunk("1.1.1", "Detail")]
+    tree, flat = build_section_tree(chunks)
+
+    _patch_program(
+        monkeypatch,
+        _FakeProgram(result=_FakeOverridesResult(overrides=[], merges=["s1"])),
+    )
+
+    new_tree, enhanced = asyncio.run(enhance_section_tree(tree, flat))
+
+    assert enhanced is True
+    # s1 ("Exceptions:") is gone; its child ("Detail") is reattached to s1's
+    # former parent (the chapter) in its place.
+    assert len(new_tree) == 1
+    assert new_tree[0]["section_name"] == "CHAPTER 1"
+    assert [c["id"] for c in new_tree[0]["children"]] == ["s2"]
+    assert new_tree[0]["children"][0]["section_name"] == "Detail"
+
+
+def test_enhance_section_tree_ignores_unknown_merge_id(monkeypatch):
+    chunks = [_chunk("1", "CHAPTER 1")]
+    tree, flat = build_section_tree(chunks)
+
+    _patch_program(
+        monkeypatch,
+        _FakeProgram(result=_FakeOverridesResult(overrides=[], merges=["s-does-not-exist"])),
+    )
+
+    new_tree, enhanced = asyncio.run(enhance_section_tree(tree, flat))
+
+    assert enhanced is True
+    assert new_tree == tree
 
 
 def test_enhance_section_tree_falls_back_on_llm_failure(monkeypatch):

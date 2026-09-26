@@ -2,17 +2,26 @@
 
 Fixes cosmetic labeling problems that the regex-based ``SectionChunker``
 can produce (duplicate generic titles, truncated/garbled headings like
-"Section 101.2 — , and R-4") without touching the tree's structure — see
-``section_tree.build_section_tree`` for the structure itself.
+"Section 101.2 — , and R-4"), and disambiguates generic-but-legitimate
+labels that repeat verbatim across the document (e.g. many "Exceptions:"
+or "GENERAL" nodes) by folding in parent context — see
+``section_tree.build_section_tree`` for the tree structure itself.
+
+The LLM may also request a small, constrained structural edit: merging a
+node with negligible content into its parent, to cut down on trivial
+one-line entries cluttering the outline. This is the only way the tree's
+*shape* can change; renames never touch structure.
 
 Kept deliberately cheap:
   - The LLM only ever sees a compact one-line-per-node skeleton (id, depth,
     number, name) — never section body text — so the prompt size scales
     with node *count*, not document size.
   - The LLM may only return label overrides for the ids it wants to
-    rename; it cannot add, remove, or reparent nodes, so a partial or
-    malformed response can't corrupt the tree — unfixed labels are simply
-    left as the deterministic chunker produced them.
+    rename, plus a list of ids to merge into their parent. It cannot add
+    nodes, reparent arbitrary subtrees, or rename/merge an id that doesn't
+    exist, so a partial or malformed response can't corrupt the tree —
+    unfixed labels are simply left as the deterministic chunker produced
+    them, and unresolvable merge ids are silently skipped.
   - Callers are expected to cache the result (see the ``/sections-tree``
     endpoint), so this runs once per document rather than once per view.
 
@@ -38,18 +47,32 @@ _ENHANCE_PROMPT = """\
 You are cleaning up the outline of a building-code/specification document \
 for display as a collapsible tree. Below is a skeleton of every detected \
 section: its id, outline depth (0 = top-level), reference number, and \
-current heading text.
+current heading text, in document order (so each node's context is the \
+lines immediately around it).
 
-Some headings were extracted by a regex heuristic and may be garbled, \
-truncated mid-sentence, cut off with a trailing "—", or duplicated across \
-unrelated sections (a generic placeholder title reused verbatim). Fix ONLY \
-headings that are clearly broken in one of those ways — write a short, \
-accurate title from context (the surrounding depth/numbering), or leave \
-ambiguous ones alone.
+Two kinds of fixes are allowed:
 
-Do NOT invent new sections, remove sections, or change reference numbers. \
-Only return entries for ids whose heading you are changing — omit anything \
-you are leaving as-is.
+1. RELABEL — fix a heading that is clearly broken, OR disambiguate a \
+generic label that repeats verbatim across unrelated parts of the \
+document (e.g. many separate "Exceptions:" or "GENERAL" nodes). For a \
+repeated generic label, fold in short context from its nearest ancestor \
+so it reads uniquely, e.g. "Exceptions: (2.7 High-Hazard Group H)" or \
+"GENERAL (Section 2.1)" — keep it short, do not paraphrase the ancestor's \
+own heading, just reference it. Leave a heading alone if you are not \
+reasonably confident what context to add.
+
+2. MERGE — if a node's content is negligible (near-empty, a stray \
+fragment, a table continuation, or otherwise not worth its own outline \
+entry) and it would read fine folded into its parent, list its id to \
+merge. A merged node is removed from the tree and its own children (if \
+any) are reattached to its former parent in its place; nothing is \
+deleted from the document. Only merge nodes with a parent (depth > 0 or \
+a shallower sibling exists above them) and be conservative — most nodes \
+should stay as their own entry.
+
+Do NOT invent new sections, change reference numbers, or merge a node \
+into anything other than its immediate parent. Only return entries for \
+ids you are actually changing — omit anything you are leaving as-is.
 
 SECTIONS (id | depth | number | name):
 {skeleton}
@@ -63,6 +86,7 @@ class _LabelOverride(BaseModel):
 
 class _LabelOverrides(BaseModel):
     overrides: list[_LabelOverride] = Field(default_factory=list)
+    merges: list[str] = Field(default_factory=list)
 
 
 def _index_by_id(tree: list[dict]) -> dict[str, dict]:
@@ -75,6 +99,39 @@ def _index_by_id(tree: list[dict]) -> dict[str, dict]:
 
     _walk(tree)
     return index
+
+
+def _find_container(tree: list[dict], node_id: str) -> list[dict] | None:
+    """Return the list (root list or some node's ``children``) holding ``node_id``."""
+
+    def _walk(nodes: list[dict]) -> list[dict] | None:
+        for node in nodes:
+            if node["id"] == node_id:
+                return nodes
+            found = _walk(node.get("children") or [])
+            if found is not None:
+                return found
+        return None
+
+    return _walk(tree)
+
+
+def _apply_merges(tree: list[dict], merge_ids: list[str]) -> None:
+    """Remove each listed node from the tree, splicing its children in place.
+
+    Children are reattached to the former parent's children list (or the
+    root list, for a top-level node) at the same position. Unknown ids are
+    silently skipped — the tree is always left in a valid state.
+    """
+    for node_id in merge_ids:
+        container = _find_container(tree, node_id)
+        if container is None:
+            continue
+        index = next((i for i, n in enumerate(container) if n["id"] == node_id), None)
+        if index is None:
+            continue
+        node = container[index]
+        container[index : index + 1] = node.get("children") or []
 
 
 def _build_skeleton(flat: list[dict]) -> str:
@@ -132,6 +189,9 @@ async def enhance_section_tree(
         new_name = (override.section_name or "").strip()
         if node is not None and new_name:
             node["section_name"] = new_name
+
+    if result.merges:
+        _apply_merges(tree, result.merges)
 
     # The AI pass ran and returned a valid response — mark as enhanced
     # regardless of how many labels it actually chose to change.

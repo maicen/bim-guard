@@ -52,8 +52,9 @@ class _FakeOverride:
 
 
 class _FakeOverridesResult:
-    def __init__(self, overrides):
+    def __init__(self, overrides, merges=None):
         self.overrides = overrides
+        self.merges = merges or []
 
 
 class _FakeProgram:
