@@ -111,6 +111,29 @@ class IssueProofGraphContract(BaseModel):
     explanation: str = Field(..., description="Concise textual derivation summary")
 
 
+class DecisionCausalChainResponse(BaseModel):
+    """Causal ancestry and decision lineage for a compliance finding."""
+
+    project_id: int
+    issue_id: str
+    verdict: dict[str, Any] = Field(default_factory=dict)
+    rule: dict[str, Any] = Field(default_factory=dict)
+    element: dict[str, Any] = Field(default_factory=dict)
+    lineage_nodes: list[dict[str, Any]] = Field(default_factory=list)
+    lineage_edges: list[dict[str, Any]] = Field(default_factory=list)
+    prov_summary: str = ""
+
+
+class RuleImpactResponse(BaseModel):
+    """Impact analysis showing all elements and verdicts governed by a building code rule."""
+
+    project_id: int
+    rule_id: str
+    total_elements_evaluated: int = 0
+    total_findings: int = 0
+    impacted_elements: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class GraphStatusContract(BaseModel):
     """Operational status and intelligence metrics for a project's graph."""
 

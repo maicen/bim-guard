@@ -22,8 +22,10 @@
     ArrowUp,
     ArrowDown,
     Search,
+    Network,
   } from "lucide-svelte";
-  import { projectsApi, analyzeApi, bcfApi, rulesApi } from "../lib/api";
+  import { projectsApi, analyzeApi, bcfApi, rulesApi, graphApi } from "../lib/api";
+  import Button from "../lib/components/ui/Button.svelte";
   import { authState } from "../lib/auth.svelte";
   import type { Project, AnalysisResult, BcfArtifact, BCFTopicResponse } from "../lib/types";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
@@ -497,9 +499,25 @@
   <PageHeader
     category="Reports"
     title="Compliance Reports & Exports"
-    subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, JSON, and PDF."
+    subtitle="Generate, track, and download OpenBIM compliance audit deliverables in BCF 2.1, CSV, JSON, PDF, and W3C PROV-O RDF."
     icon={FolderArchive}
-  />
+  >
+    {#snippet actions()}
+      {#if selectedProjectId}
+        <Button
+          variant="secondary"
+          size="sm"
+          class="flex items-center gap-2 border-border-interactive bg-surface-overlay text-xs font-medium text-fg-primary hover:bg-surface-hover"
+          onclick={() => {
+            window.open(graphApi.getProvOExportUrl(selectedProjectId), '_blank');
+          }}
+        >
+          <Network class="h-4 w-4 text-accent" />
+          <span>Export W3C PROV-O (.ttl)</span>
+        </Button>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   {#if error}
     <Alert

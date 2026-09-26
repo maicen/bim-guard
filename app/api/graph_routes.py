@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 
 from app.api.dependencies import get_graph_service, get_models_service, get_rules_service
 from app.api.projects import ProjectAccessChecker, get_project_access_checker
@@ -13,6 +13,7 @@ from app.modules.comparator.issue_schema import build_issue_proof_graph
 from app.modules.contracts import (
     CodeToIfcTraceEntry,
     CodeToIfcTraceResponse,
+    DecisionCausalChainResponse,
     ElementRelationshipsResponse,
     GraphHealResponse,
     GraphQueryPresetListResponse,
@@ -20,6 +21,7 @@ from app.modules.contracts import (
     GraphQueryResultResponse,
     GraphStatusContract,
     IssueProofGraphContract,
+    RuleImpactResponse,
     SpatialTreeResponse,
 )
 from app.modules.ifc_reader.bot_graph import build_bot_graph, get_element_relationships
@@ -439,4 +441,99 @@ def get_issue_proof(
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"No issue {issue_id!r} found for project {project_id}.",
+    )
+
+
+@router.get(
+    "/{project_id}/decisions/trace/{issue_id}",
+    response_model=DecisionCausalChainResponse,
+    summary="Trace full causal decision ancestry for a compliance finding in Neo4j",
+)
+def get_decision_causal_chain(
+    project_id: int,
+    issue_id: str,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> DecisionCausalChainResponse:
+    """Traverse upstream causal ancestry from an issue finding across Verdict, Rule, and Element nodes."""
+    project_access(project_id)
+    from app.services.compliance_decision_graph import trace_decision_causal_chain
+
+    result = trace_decision_causal_chain(graph_service, str(project_id), issue_id)
+    return DecisionCausalChainResponse(**result)
+
+
+@router.get(
+    "/{project_id}/rules/{rule_id}/impact",
+    response_model=RuleImpactResponse,
+    summary="Analyze downstream compliance impact and model elements governed by a rule",
+)
+def get_rule_impact(
+    project_id: int,
+    rule_id: str,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> RuleImpactResponse:
+    """Find all IFC products and compliance verdicts impacted by a specific building code rule."""
+    project_access(project_id)
+    from app.services.compliance_decision_graph import analyze_rule_impact
+
+    result = analyze_rule_impact(graph_service, str(project_id), rule_id)
+    return RuleImpactResponse(**result)
+
+
+@router.post(
+    "/{project_id}/decisions/ingest",
+    summary="Ingest all compliance audit verdicts for this project into Neo4j decision graph",
+)
+def ingest_project_compliance_decisions(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> dict[str, Any]:
+    """Extract cached or evaluated findings and project them into the Neo4j compliance decision graph."""
+    project_access(project_id)
+    from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+    from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+    from app.services.compliance_decision_graph import ingest_compliance_verdicts
+
+    all_issues: list[dict[str, Any]] = []
+    for slug in RUNNABLE_SLUGS:
+        res = run_analysis(slug, project_id, use_cache=True)
+        for issue in res.get("audit_issues", []):
+            all_issues.append(issue_to_dict(issue) if hasattr(issue, "__dataclass_fields__") else dict(issue))
+
+    stats = ingest_compliance_verdicts(graph_service, str(project_id), all_issues)
+    return {
+        "project_id": project_id,
+        "total_issues_processed": len(all_issues),
+        "ingest_stats": stats,
+    }
+
+
+@router.get(
+    "/{project_id}/prov-o",
+    summary="Export compliance decisions as standardized W3C PROV-O Turtle RDF",
+)
+def export_prov_o_route(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+) -> Response:
+    """Serialize compliance decision lineage and audit trail into W3C PROV-O Turtle (.ttl) format."""
+    project_access(project_id)
+    from app.modules.comparator.issue_schema import to_dict as issue_to_dict
+    from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
+    from app.services.compliance_decision_graph import export_w3c_prov_rdf
+
+    all_issues: list[dict[str, Any]] = []
+    for slug in RUNNABLE_SLUGS:
+        res = run_analysis(slug, project_id, use_cache=True)
+        for issue in res.get("audit_issues", []):
+            all_issues.append(issue_to_dict(issue) if hasattr(issue, "__dataclass_fields__") else dict(issue))
+
+    turtle_text = export_w3c_prov_rdf(str(project_id), all_issues)
+    return Response(
+        content=turtle_text,
+        media_type="text/turtle",
+        headers={"Content-Disposition": f'attachment; filename="bimguard_prov_{project_id}.ttl"'},
     )

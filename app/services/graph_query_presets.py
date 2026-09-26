@@ -82,6 +82,31 @@ GRAPH_QUERY_PRESETS: tuple[GraphQueryPreset, ...] = (
         ),
         params=("guid",),
     ),
+    GraphQueryPreset(
+        key="decision-causal-lineage",
+        label="Decision causal lineage",
+        description="Trace the upstream building code standard, rule, and evaluated element for a compliance finding.",
+        cypher=(
+            "MATCH (v:ComplianceVerdict {project_id: $project_id, issue_id: $issue_id}) "
+            "OPTIONAL MATCH (v)-[:TRIGGERED_BY]->(r:Rule) "
+            "OPTIONAL MATCH (v)-[:EVALUATED_ELEMENT]->(e) "
+            "RETURN v.id AS verdict_id, v.outcome AS outcome, v.risk_band AS risk_band, "
+            "v.score AS score, r.rule_id AS rule_id, r.standard AS standard, "
+            "r.clause AS clause, e.guid AS element_guid, e.name AS element_name, e.ifc_type AS element_type"
+        ),
+        params=("issue_id",),
+    ),
+    GraphQueryPreset(
+        key="compliance-findings-by-rule",
+        label="Findings grouped by building code rule",
+        description="Aggregate compliance failures by building code rule and clause.",
+        cypher=(
+            "MATCH (v:ComplianceVerdict {project_id: $project_id})-[:TRIGGERED_BY]->(r:Rule) "
+            "RETURN r.rule_id AS rule_id, r.standard AS standard, r.clause AS clause, "
+            "count(v) AS failure_count "
+            "ORDER BY failure_count DESC"
+        ),
+    ),
 )
 
 _PRESETS_BY_KEY = {preset.key: preset for preset in GRAPH_QUERY_PRESETS}

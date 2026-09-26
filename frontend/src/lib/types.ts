@@ -2133,6 +2133,46 @@ export interface IssueProofGraphContract {
   explanation: string;
 }
 
+/** Causal decision lineage graph response. */
+export interface DecisionCausalChainResponse {
+  project_id: number;
+  issue_id: string;
+  verdict: Record<string, any>;
+  rule: Record<string, any>;
+  element: Record<string, any>;
+  lineage_nodes: Array<{
+    id: string;
+    label: string;
+    node_type: string;
+    properties?: Record<string, any>;
+  }>;
+  lineage_edges: Array<{
+    source: string;
+    target: string;
+    label: string;
+  }>;
+  prov_summary: string;
+}
+
+/** Rule compliance impact analysis response. */
+export interface RuleImpactResponse {
+  project_id: number;
+  rule_id: string;
+  total_elements_evaluated: number;
+  total_findings: number;
+  impacted_elements: Array<{
+    verdict_id?: string;
+    issue_id?: string;
+    element_id: string;
+    element_name?: string;
+    ifc_type?: string;
+    outcome: string;
+    risk_band: string;
+    score: number;
+    title?: string;
+  }>;
+}
+
 /** Mirrors GraphStatusContract in app/modules/contracts.py. */
 export interface GraphStatusContract {
   project_id: number;

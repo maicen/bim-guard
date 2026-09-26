@@ -32,6 +32,8 @@ import type {
   DocumentSectionsResponse,
   DocumentSectionTreeResponse,
   DocumentUpdatePayload,
+  DecisionCausalChainResponse,
+  RuleImpactResponse,
   ElementRelationshipsResponse,
   EnvVarStatusResponse,
   EvaluationBulkReviewRequest,
@@ -2777,6 +2779,37 @@ export const graphApi = {
   async getCodeToIfcTrace(projectId: number): Promise<CodeToIfcTraceResponse> {
     const res = await apiFetch(`${API_BASE}/graph/${projectId}/code-to-ifc-trace`);
     return handleResponse<CodeToIfcTraceResponse>(res);
+  },
+
+  /** Trace full causal decision lineage from an issue finding across Verdict, Rule, and Element nodes. */
+  async traceDecision(projectId: number, issueId: string): Promise<DecisionCausalChainResponse> {
+    const res = await apiFetch(
+      `${API_BASE}/graph/${projectId}/decisions/trace/${encodeURIComponent(issueId)}`,
+    );
+    return handleResponse<DecisionCausalChainResponse>(res);
+  },
+
+  /** Analyze downstream compliance impact and model elements governed by a rule. */
+  async getRuleImpact(projectId: number, ruleId: string): Promise<RuleImpactResponse> {
+    const res = await apiFetch(
+      `${API_BASE}/graph/${projectId}/rules/${encodeURIComponent(ruleId)}/impact`,
+    );
+    return handleResponse<RuleImpactResponse>(res);
+  },
+
+  /** Ingest all compliance audit verdicts for this project into Neo4j decision graph. */
+  async ingestDecisions(
+    projectId: number,
+  ): Promise<{ project_id: number; total_issues_processed: number; ingest_stats: Record<string, number> }> {
+    const res = await apiFetch(`${API_BASE}/graph/${projectId}/decisions/ingest`, {
+      method: "POST",
+    });
+    return handleResponse(res);
+  },
+
+  /** Get URL for downloading the W3C PROV-O Turtle RDF compliance decision audit trail. */
+  getProvOExportUrl(projectId: number): string {
+    return `${API_BASE}/graph/${projectId}/prov-o`;
   },
 };
 
