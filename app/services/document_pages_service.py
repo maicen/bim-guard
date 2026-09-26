@@ -13,6 +13,12 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip().lower()
 
 
+# Minimum overlap score for a fuzzy (non-substring) match to advance the
+# sequential cursor — stricter than the 0.3 floor used to accept a match at
+# all, since a weak match must not be trusted to bound every later lookup.
+_MIN_OVERLAP_TO_ADVANCE_CURSOR = 0.6
+
+
 class DocumentPagesService:
     """CRUD for `document_pages` — independent of clause/section chunking."""
 
@@ -117,6 +123,7 @@ class DocumentPagesService:
                 results.append(None)
                 continue
 
+            snippet_words = norm_snippet.split()
             candidates = normalized_pages
             if sequential and cursor is not None:
                 bounded = [(n, t) for n, t in normalized_pages if n is not None and n > cursor]
@@ -135,20 +142,26 @@ class DocumentPagesService:
                     cursor = matched
                 continue
 
-            snippet_words = set(norm_snippet.split())
             if not snippet_words:
                 results.append(None)
                 continue
 
-            best_page, best_score = DocumentPagesService._best_overlap(candidates, snippet_words)
-            if best_page is None and candidates is not normalized_pages:
-                best_page, best_score = DocumentPagesService._best_overlap(
-                    normalized_pages, snippet_words
+            snippet_word_set = set(snippet_words)
+            best_page, best_score = DocumentPagesService._best_overlap(candidates, snippet_word_set)
+            if candidates is not normalized_pages:
+                # A weak bounded match must never beat a stronger match that
+                # exists earlier in the document (outside the bound) — and
+                # if it's the better one, that's also a sign the bound
+                # itself was already wrong.
+                full_page, full_score = DocumentPagesService._best_overlap(
+                    normalized_pages, snippet_word_set
                 )
+                if full_score > best_score:
+                    best_page, best_score = full_page, full_score
 
             matched_page = best_page if best_score > 0.3 else None
             results.append(matched_page)
-            if sequential and matched_page is not None:
+            if sequential and matched_page is not None and best_score >= _MIN_OVERLAP_TO_ADVANCE_CURSOR:
                 cursor = matched_page
 
         return results

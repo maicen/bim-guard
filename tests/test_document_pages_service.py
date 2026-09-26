@@ -90,6 +90,30 @@ def test_sequential_batch_resolves_recurring_headings_in_document_order():
     assert batch == [1, 5, 9]
 
 
+def test_sequential_batch_does_not_let_a_weak_bounded_match_beat_a_strong_full_doc_one():
+    # A prior snippet's weak fuzzy match pushed the cursor to page 50. The
+    # current snippet has a much stronger match on page 3 (before the
+    # cursor) than the merely-adequate one it also weakly matches on page
+    # 60 (after the cursor) — the stronger match must win, not whichever
+    # one happens to fall inside the bound.
+    pages = [
+        {"page_number": 3, "text": "corridor fire resistance rating exceptions apply here fully"},
+        {"page_number": 50, "text": "unrelated boilerplate text used only to seed a bad cursor"},
+        {"page_number": 60, "text": "corridor rating"},
+    ]
+
+    batch = DocumentPagesService.find_best_matching_pages(
+        pages,
+        [
+            "unrelated boilerplate text used only to seed a bad cursor",
+            "corridor fire resistance rating exceptions apply here fully",
+        ],
+        sequential=True,
+    )
+
+    assert batch == [50, 3]
+
+
 def test_sequential_batch_widens_back_to_full_document_when_bound_has_no_match():
     # A snippet unique to page 1 shouldn't be lost just because the running
     # cursor has already advanced past page 1 from an earlier match.
