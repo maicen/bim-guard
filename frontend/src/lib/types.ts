@@ -606,11 +606,33 @@ export interface RuleAlignmentIssue {
   suggestion?: string | null;
 }
 
-/** An existing rule whose constraint is jointly unsatisfiable with a just-promoted rule's. */
+/** A rule or draft whose constraint is jointly unsatisfiable or in discrepancy with candidate's. */
 export interface RuleConflictWarning {
-  conflicting_rule_id: number;
+  conflicting_rule_id?: number | null;
+  conflicting_draft_id?: number | null;
   conflicting_reference: string;
+  conflict_type?:
+    | "mutually_exclusive_range"
+    | "threshold_mismatch"
+    | "exact_value_mismatch"
+    | "scope_precedence_clash";
+  severity?: "critical" | "warning" | "caution";
   message: string;
+  resolution_suggestion?: string | null;
+  conflicting_details?: Record<string, any> | null;
+}
+
+export interface RuleDraftConflictDetectionRequest {
+  draft_ids?: number[];
+  document_id?: number;
+  ruleset_id?: string;
+  include_threshold_discrepancies?: boolean;
+}
+
+export interface RuleDraftConflictDetectionResponse {
+  total_drafts_analyzed: number;
+  total_conflicts_found: number;
+  drafts_with_conflicts: RuleExtractionDraft[];
 }
 
 /** `Rule` plus the semantic-alignment outcome of promoting it -- non-persisted. */
@@ -1028,6 +1050,8 @@ export interface RuleExtractionDraft {
   created_at?: string | null;
   /** Reliability of `proposed_rule`; follows a reviewer's edits. Null when it names no property. */
   reliability?: RuleReliability | null;
+  /** Cross-rule or cross-draft conflicts detected for this candidate. */
+  conflicts?: RuleConflictWarning[];
 }
 
 export interface RuleExtractionDraftListResponse {

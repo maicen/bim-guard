@@ -124,7 +124,12 @@ class RuleDraftService:
             for row in self._drafts.rows
             if int(row.get("source_document_id") or 0) == document_id
         ]
-        return sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+        sorted_rows = sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+        try:
+            existing_rules = self._rule_service.list_rules()
+        except Exception:
+            existing_rules = []
+        return self._alignment_service.detect_conflicts_batch(sorted_rows, existing_rules=existing_rules)
 
     def list_all_drafts(
         self, status: str | None = None, ruleset_id: str | None = None
@@ -144,11 +149,24 @@ class RuleDraftService:
                 for row in rows
                 if (row.get("proposed_rule") or {}).get("ruleset_id") == ruleset_id
             ]
-        return sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+        sorted_rows = sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+        try:
+            existing_rules = (
+                self._rule_service.rows_for_ruleset(ruleset_id)
+                if ruleset_id
+                else self._rule_service.list_rules()
+            )
+        except Exception:
+            existing_rules = []
+        return self._alignment_service.detect_conflicts_batch(sorted_rows, existing_rules=existing_rules)
 
     def get_draft(self, draft_id: int) -> dict[str, Any] | None:
         """Return one draft row by primary key."""
-        return self._drafts.get(draft_id)
+        row = self._drafts.get(draft_id)
+        if row is None:
+            return None
+        enriched = self._alignment_service.detect_conflicts_batch([row])
+        return enriched[0] if enriched else row
 
     def review_draft(self, draft_id: int, payload: RuleDraftReviewRequest) -> dict[str, Any]:
         """Record an accept/reject/edit review decision on one draft."""

@@ -1266,6 +1266,10 @@ class RuleExtractionDraft(BaseModel):
     reviewed_at: Optional[str] = None
     review_notes: Optional[str] = None
     created_at: Optional[str] = None
+    conflicts: list[RuleConflictWarning] = Field(
+        default_factory=list,
+        description="Cross-rule or cross-draft conflicts detected for this candidate.",
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -1293,14 +1297,41 @@ class RuleAlignmentIssue(BaseModel):
 
 
 class RuleConflictWarning(BaseModel):
-    """An existing rule whose constraint is jointly unsatisfiable with a just-promoted rule's.
+    """A rule or draft whose constraint is jointly unsatisfiable or in discrepancy with candidate's.
 
     See app.services.rule_semantic_alignment_service.ConflictWarning.
     """
 
-    conflicting_rule_id: int
+    conflicting_rule_id: Optional[int] = None
+    conflicting_draft_id: Optional[int] = None
     conflicting_reference: str
+    conflict_type: Literal[
+        "mutually_exclusive_range",
+        "threshold_mismatch",
+        "exact_value_mismatch",
+        "scope_precedence_clash",
+    ] = "mutually_exclusive_range"
+    severity: Literal["critical", "warning", "caution"] = "warning"
     message: str
+    resolution_suggestion: Optional[str] = None
+    conflicting_details: Optional[dict[str, Any]] = None
+
+
+class RuleDraftConflictDetectionRequest(BaseModel):
+    """Request to analyze conflicts across a set of rule drafts or an entire document/ruleset."""
+
+    draft_ids: Optional[list[int]] = None
+    document_id: Optional[int] = None
+    ruleset_id: Optional[str] = None
+    include_threshold_discrepancies: bool = True
+
+
+class RuleDraftConflictDetectionResponse(BaseModel):
+    """Response summarizing detected cross-rule or cross-draft conflicts."""
+
+    total_drafts_analyzed: int
+    total_conflicts_found: int
+    drafts_with_conflicts: list[RuleExtractionDraft]
 
 
 class RulePromotionResponse(RuleResponse):

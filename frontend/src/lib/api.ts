@@ -111,6 +111,8 @@ import type {
   RuleFolderBulkUpdatePayload,
   RuleFolderCreatePayload,
   RuleFolderUpdatePayload,
+  RuleDraftConflictDetectionRequest,
+  RuleDraftConflictDetectionResponse,
   RuleDraftReviewRequest,
   RuleExtractionDraft,
   RuleExtractionDraftListResponse,
@@ -1882,6 +1884,17 @@ export const ruleExtractionApi = {
   async listDrafts(documentId: number): Promise<RuleExtractionDraftListResponse> {
     const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/drafts`);
     return handleResponse<RuleExtractionDraftListResponse>(res);
+  },
+
+  async detectConflicts(
+    payload: RuleDraftConflictDetectionRequest = {},
+  ): Promise<RuleDraftConflictDetectionResponse> {
+    const res = await apiFetch(`${API_BASE}/rules/drafts/detect-conflicts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<RuleDraftConflictDetectionResponse>(res);
   },
 
   async reviewDraft(draftId: number, payload: RuleDraftReviewRequest): Promise<RuleExtractionDraft> {

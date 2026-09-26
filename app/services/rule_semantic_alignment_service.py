@@ -17,7 +17,7 @@ Automation in Construction 142.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -48,11 +48,21 @@ class AlignmentIssue(BaseModel):
 
 
 class ConflictWarning(BaseModel):
-    """A rule already in the ruleset whose constraint is jointly unsatisfiable with the candidate's."""
+    """A rule or draft whose constraint is jointly unsatisfiable or in discrepancy with candidate's."""
 
-    conflicting_rule_id: int
+    conflicting_rule_id: Optional[int] = None
+    conflicting_draft_id: Optional[int] = None
     conflicting_reference: str
+    conflict_type: Literal[
+        "mutually_exclusive_range",
+        "threshold_mismatch",
+        "exact_value_mismatch",
+        "scope_precedence_clash",
+    ] = "mutually_exclusive_range"
+    severity: Literal["critical", "warning", "caution"] = "warning"
     message: str
+    resolution_suggestion: Optional[str] = None
+    conflicting_details: Optional[dict[str, Any]] = None
 
 
 class AlignmentResult(BaseModel):
@@ -257,8 +267,131 @@ class RuleSemanticAlignmentService:
 
     # ── Cross-rule conflict detection ───────────────────────────────────────
 
+    def detect_pair_conflict(
+        self,
+        candidate: dict[str, Any],
+        other: dict[str, Any],
+        *,
+        include_threshold_discrepancies: bool = True,
+    ) -> ConflictWarning | None:
+        """Compare two rules or drafts and return a ConflictWarning if contradictory, else None."""
+        target_a = _normalize(candidate.get("target_ifc_class"))
+        target_b = _normalize(other.get("target_ifc_class"))
+        if not target_a or not target_b or target_a != target_b:
+            return None
+
+        prop_a = _normalize(candidate.get("property_name"))
+        prop_b = _normalize(other.get("property_name"))
+        if not prop_a or not prop_b or prop_a != prop_b:
+            return None
+
+        cand_id_str = str(candidate.get("rule_id") or candidate.get("id") or "")
+        other_ref = str(other.get("reference") or other.get("rule_id") or other.get("id") or "")
+        if _references_other(other, cand_id_str) or _references_other(candidate, other_ref):
+            return None
+
+        if not _scopes_can_overlap(candidate.get("applies_when"), other.get("applies_when")):
+            return None
+
+        other_rule_id = int(other.get("id") or 0) if not other.get("is_draft") else None
+        other_draft_id = int(other.get("id") or 0) if other.get("is_draft") else None
+
+        bounds_a = _bounds(candidate)
+        bounds_b = _bounds(other)
+
+        # 1. Numeric bounds check
+        if bounds_a is not None and bounds_b is not None:
+            if not _ranges_intersect(bounds_a, bounds_b):
+                val_a = candidate.get("check_value") or (candidate.get("value_min"), candidate.get("value_max"))
+                val_b = other.get("check_value") or (other.get("value_min"), other.get("value_max"))
+                return ConflictWarning(
+                    conflicting_rule_id=other_rule_id,
+                    conflicting_draft_id=other_draft_id,
+                    conflicting_reference=other_ref,
+                    conflict_type="mutually_exclusive_range",
+                    severity="critical",
+                    message=(
+                        f"{cand_id_str!r} requires {candidate.get('operator')} {val_a} on "
+                        f"{candidate.get('target_ifc_class')}.{candidate.get('property_name')}, which cannot "
+                        f"both hold with {other_ref!r}'s {other.get('operator')} {val_b}."
+                    ),
+                    resolution_suggestion=(
+                        "Ranges are mutually exclusive and cannot be jointly satisfied. "
+                        "Determine which code standard has legal precedence or scope one rule to an exception."
+                    ),
+                    conflicting_details={
+                        "candidate_operator": str(candidate.get("operator") or ""),
+                        "candidate_value": val_a,
+                        "conflicting_operator": str(other.get("operator") or ""),
+                        "conflicting_value": val_b,
+                    },
+                )
+            elif include_threshold_discrepancies:
+                op_a = str(candidate.get("operator") or "")
+                op_b = str(other.get("operator") or "")
+                val_a = candidate.get("check_value")
+                val_b = other.get("check_value")
+                if op_a == op_b and op_a in (">=", ">", "<=", "<") and val_a is not None and val_b is not None:
+                    try:
+                        fa, fb = float(val_a), float(val_b)
+                        if abs(fa - fb) > 1e-6:
+                            stricter_val = max(fa, fb) if op_a in (">=", ">") else min(fa, fb)
+                            return ConflictWarning(
+                                conflicting_rule_id=other_rule_id,
+                                conflicting_draft_id=other_draft_id,
+                                conflicting_reference=other_ref,
+                                conflict_type="threshold_mismatch",
+                                severity="warning",
+                                message=(
+                                    f"{cand_id_str!r} requires {op_a} {val_a} on "
+                                    f"{candidate.get('target_ifc_class')}.{candidate.get('property_name')}, "
+                                    f"while {other_ref!r} specifies {op_b} {val_b}. "
+                                    f"The stricter threshold ({op_a} {stricter_val}) will govern unless scoped."
+                                ),
+                                resolution_suggestion=(
+                                    f"Align differing building code thresholds between {cand_id_str} and {other_ref}, "
+                                    f"or specify an `applies_when` condition to distinguish occupancy types."
+                                ),
+                                conflicting_details={
+                                    "candidate_operator": op_a,
+                                    "candidate_value": val_a,
+                                    "conflicting_operator": op_b,
+                                    "conflicting_value": val_b,
+                                    "stricter_value": stricter_val,
+                                },
+                            )
+                    except (TypeError, ValueError):
+                        pass
+
+        # 2. Exact equality / boolean clash
+        op_a = str(candidate.get("operator") or "")
+        op_b = str(other.get("operator") or "")
+        if op_a in ("==", "equals") and op_b in ("==", "equals"):
+            val_a = str(candidate.get("check_value") or "").strip().lower()
+            val_b = str(other.get("check_value") or "").strip().lower()
+            if val_a and val_b and val_a != val_b:
+                return ConflictWarning(
+                    conflicting_rule_id=other_rule_id,
+                    conflicting_draft_id=other_draft_id,
+                    conflicting_reference=other_ref,
+                    conflict_type="exact_value_mismatch",
+                    severity="critical",
+                    message=(
+                        f"{cand_id_str!r} requires {candidate.get('target_ifc_class')}.{candidate.get('property_name')} "
+                        f"== {val_a!r}, which directly contradicts {other_ref!r}'s requirement of {val_b!r}."
+                    ),
+                    resolution_suggestion="Ensure element properties are not assigned contradictory required values across specifications.",
+                    conflicting_details={"candidate_value": val_a, "conflicting_value": val_b},
+                )
+
+        return None
+
     def detect_conflicts(
-        self, candidate: RuleCreateRequest, existing_rules: list[dict[str, Any]]
+        self,
+        candidate: RuleCreateRequest,
+        existing_rules: list[dict[str, Any]],
+        *,
+        include_threshold_discrepancies: bool = False,
     ) -> list[ConflictWarning]:
         """Flag existing rules in the ruleset whose constraint cannot be jointly satisfied with `candidate`'s.
 
@@ -266,57 +399,80 @@ class RuleSemanticAlignmentService:
         rule, and only a formal `exceptions`/`rase_exception` link is treated
         as "not a conflict" -- everything else is surfaced for a human to
         judge, never auto-resolved or blocked.
-
-        `existing_rules` are raw `rules` table rows, not `RuleCreateRequest`
-        shapes -- normalized through `rule_row_to_shacl_input` (the same
-        decode `shacl_generator` uses) since `check_value`/`value_min`/
-        `value_max`/`applies_when` are stored JSON-encoded as TEXT.
         """
-        existing_rules = [rule_row_to_shacl_input(row) for row in existing_rules]
-        candidate_bounds = _bounds(candidate.model_dump())
-        if candidate_bounds is None:
-            return []
-
-        candidate_target = _normalize(candidate.target_ifc_class)
-        candidate_property = _normalize(candidate.property_name)
-        candidate_scope = candidate.applies_when
-
+        candidate_dict = candidate.model_dump()
         conflicts: list[ConflictWarning] = []
-        for row in existing_rules:
-            if _normalize(row.get("target_ifc_class")) != candidate_target:
-                continue
-            if _normalize(row.get("property_name")) != candidate_property:
-                continue
-
-            other_bounds = _bounds(row)
-            if other_bounds is None:
-                continue
-            if _ranges_intersect(candidate_bounds, other_bounds):
-                continue
-
-            other_reference = str(row.get("reference") or row.get("rule_id") or "")
-            if _references_other(row, candidate.rule_id) or _references_other(
-                candidate.model_dump(), other_reference
-            ):
-                continue
-            if not _scopes_can_overlap(candidate_scope, row.get("applies_when")):
-                continue
-
-            conflicts.append(
-                ConflictWarning(
-                    conflicting_rule_id=int(row.get("id") or 0),
-                    conflicting_reference=other_reference,
-                    message=(
-                        f"{candidate.rule_id!r} requires {candidate.operator} "
-                        f"{candidate.check_value or (candidate.value_min, candidate.value_max)} on "
-                        f"{candidate.target_ifc_class}.{candidate.property_name}, which cannot "
-                        f"both hold with {other_reference!r}'s {row.get('operator')} "
-                        f"{row.get('check_value') or (row.get('value_min'), row.get('value_max'))}."
-                    ),
-                )
+        for raw_row in existing_rules:
+            normalized_row = rule_row_to_shacl_input(raw_row)
+            normalized_row["id"] = raw_row.get("id")
+            normalized_row["is_draft"] = False
+            warn = self.detect_pair_conflict(
+                candidate_dict,
+                normalized_row,
+                include_threshold_discrepancies=include_threshold_discrepancies,
             )
-
+            if warn is not None:
+                conflicts.append(warn)
         return conflicts
+
+    def detect_conflicts_batch(
+        self,
+        drafts: list[dict[str, Any]],
+        existing_rules: list[dict[str, Any]] | None = None,
+        *,
+        include_threshold_discrepancies: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Run cross-draft and draft-vs-rule conflict detection across a batch of drafts.
+
+        Enriches each draft dict in `drafts` with a `conflicts` list of
+        serialized `ConflictWarning` dicts.
+        """
+        normalized_existing: list[dict[str, Any]] = []
+        if existing_rules:
+            for r in existing_rules:
+                row_norm = rule_row_to_shacl_input(r)
+                row_norm["id"] = r.get("id")
+                row_norm["is_draft"] = False
+                normalized_existing.append(row_norm)
+
+        candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for draft in drafts:
+            rule_data = draft.get("proposed_rule") or draft
+            if hasattr(rule_data, "model_dump"):
+                rule_dict = rule_data.model_dump()
+            elif isinstance(rule_data, dict):
+                rule_dict = dict(rule_data)
+            else:
+                rule_dict = {}
+            rule_dict["id"] = draft.get("id")
+            rule_dict["rule_id"] = rule_dict.get("rule_id") or f"Draft-{draft.get('id')}"
+            rule_dict["is_draft"] = True
+            candidates.append((draft, rule_dict))
+
+        for i, (draft_a, shape_a) in enumerate(candidates):
+            conflicts: list[dict[str, Any]] = []
+
+            # 1. Draft vs Draft
+            for j, (_, shape_b) in enumerate(candidates):
+                if i == j:
+                    continue
+                warn = self.detect_pair_conflict(
+                    shape_a, shape_b, include_threshold_discrepancies=include_threshold_discrepancies
+                )
+                if warn is not None:
+                    conflicts.append(warn.model_dump())
+
+            # 2. Draft vs Existing Rules
+            for ex in normalized_existing:
+                warn = self.detect_pair_conflict(
+                    shape_a, ex, include_threshold_discrepancies=include_threshold_discrepancies
+                )
+                if warn is not None:
+                    conflicts.append(warn.model_dump())
+
+            draft_a["conflicts"] = conflicts
+
+        return drafts
 
     def check(self, candidate: RuleCreateRequest) -> AlignmentResult:
         """Run both checks for a candidate about to be promoted."""

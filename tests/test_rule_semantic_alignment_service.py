@@ -243,3 +243,72 @@ def test_check_skips_conflict_detection_without_ruleset_id():
     result = service.check(candidate)
 
     assert result.conflicts == []
+
+
+def test_detect_pair_conflict_mutually_exclusive():
+    service = _service()
+    cand = {"rule_id": "DRAFT-1", "target_ifc_class": "IfcDoor", "property_name": "OverallWidth", "operator": ">=", "check_value": "900"}
+    other = {"id": 10, "rule_id": "RULE-OLD", "reference": "RULE-OLD", "target_ifc_class": "IfcDoor", "property_name": "OverallWidth", "operator": "<=", "check_value": "800"}
+
+    warn = service.detect_pair_conflict(cand, other)
+    assert warn is not None
+    assert warn.conflict_type == "mutually_exclusive_range"
+    assert warn.severity == "critical"
+    assert "mutually exclusive" in warn.resolution_suggestion.lower()
+
+
+def test_detect_pair_conflict_threshold_mismatch():
+    service = _service()
+    cand = {"rule_id": "IBC-1", "target_ifc_class": "IfcDoor", "property_name": "OverallWidth", "operator": ">=", "check_value": "900"}
+    other = {"rule_id": "NFPA-1", "reference": "NFPA-1", "target_ifc_class": "IfcDoor", "property_name": "OverallWidth", "operator": ">=", "check_value": "1000"}
+
+    warn = service.detect_pair_conflict(cand, other, include_threshold_discrepancies=True)
+    assert warn is not None
+    assert warn.conflict_type == "threshold_mismatch"
+    assert warn.severity == "warning"
+    assert warn.conflicting_details["stricter_value"] == 1000.0
+
+
+def test_detect_pair_conflict_exact_value_mismatch():
+    service = _service()
+    cand = {"rule_id": "R-1", "target_ifc_class": "IfcWall", "property_name": "FireRating", "operator": "==", "check_value": "1HR"}
+    other = {"rule_id": "R-2", "reference": "R-2", "target_ifc_class": "IfcWall", "property_name": "FireRating", "operator": "==", "check_value": "2HR"}
+
+    warn = service.detect_pair_conflict(cand, other)
+    assert warn is not None
+    assert warn.conflict_type == "exact_value_mismatch"
+    assert warn.severity == "critical"
+
+
+def test_detect_conflicts_batch_cross_drafts():
+    service = _service()
+    drafts = [
+        {
+            "id": 101,
+            "proposed_rule": {
+                "rule_id": "DRAFT-IBC",
+                "target_ifc_class": "IfcDoor",
+                "property_name": "OverallWidth",
+                "operator": ">=",
+                "check_value": "900",
+            },
+        },
+        {
+            "id": 102,
+            "proposed_rule": {
+                "rule_id": "DRAFT-LOCAL",
+                "target_ifc_class": "IfcDoor",
+                "property_name": "OverallWidth",
+                "operator": "<=",
+                "check_value": "850",
+            },
+        },
+    ]
+
+    enriched = service.detect_conflicts_batch(drafts)
+    assert len(enriched) == 2
+    assert len(enriched[0]["conflicts"]) == 1
+    assert len(enriched[1]["conflicts"]) == 1
+    assert enriched[0]["conflicts"][0]["conflict_type"] == "mutually_exclusive_range"
+    assert enriched[0]["conflicts"][0]["conflicting_draft_id"] == 102
+    assert enriched[1]["conflicts"][0]["conflicting_draft_id"] == 101

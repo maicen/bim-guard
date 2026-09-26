@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import (
     APIRouter,
@@ -38,6 +38,8 @@ from app.modules.contracts import (
     RuleBulkDeleteRequest,
     RuleBulkUpdateRequest,
     RuleCreateRequest,
+    RuleDraftConflictDetectionRequest,
+    RuleDraftConflictDetectionResponse,
     RuleDraftReviewRequest,
     RuleExtractionDraft,
     RuleExtractionDraftListResponse,
@@ -302,6 +304,62 @@ def list_all_rule_drafts(
 
     rows = RuleDraftService().list_all_drafts(status=status_filter, ruleset_id=ruleset_id)
     return RuleExtractionDraftListResponse(drafts=[RuleExtractionDraft.model_validate(row) for row in rows])
+
+
+@router.post(
+    "/drafts/detect-conflicts",
+    response_model=RuleDraftConflictDetectionResponse,
+    summary="Detect cross-rule and cross-draft conflicts for extraction candidates",
+)
+def detect_draft_conflicts(
+    payload: RuleDraftConflictDetectionRequest,
+    rules_service: Annotated[RuleService, Depends(get_rules_service)],
+) -> RuleDraftConflictDetectionResponse:
+    """Analyze a batch of drafts for mutually exclusive bounds or threshold discrepancies.
+
+    Compares candidates pairwise (draft vs draft) and against active rules in the database.
+    """
+    from app.services.rule_draft_service import RuleDraftService
+    from app.services.rule_semantic_alignment_service import RuleSemanticAlignmentService
+
+    draft_service = RuleDraftService(rule_service=rules_service)
+    alignment_service = RuleSemanticAlignmentService(rule_service=rules_service)
+
+    rows: list[dict[str, Any]] = []
+    if payload.draft_ids:
+        for did in payload.draft_ids:
+            row = draft_service.get_draft(did)
+            if row:
+                rows.append(row)
+    elif payload.document_id:
+        rows = draft_service.list_drafts(payload.document_id)
+    else:
+        rows = draft_service.list_all_drafts(ruleset_id=payload.ruleset_id)
+
+    try:
+        existing_rules = (
+            rules_service.rows_for_ruleset(payload.ruleset_id)
+            if payload.ruleset_id
+            else rules_service.list_rules()
+        )
+    except Exception:
+        existing_rules = []
+
+    enriched = alignment_service.detect_conflicts_batch(
+        rows,
+        existing_rules=existing_rules,
+        include_threshold_discrepancies=payload.include_threshold_discrepancies,
+    )
+
+    validated_drafts = [RuleExtractionDraft.model_validate(r) for r in enriched]
+    drafts_with_conflicts = [d for d in validated_drafts if d.conflicts]
+    total_conflicts = sum(len(d.conflicts) for d in drafts_with_conflicts)
+
+    return RuleDraftConflictDetectionResponse(
+        total_drafts_analyzed=len(validated_drafts),
+        total_conflicts_found=total_conflicts,
+        drafts_with_conflicts=drafts_with_conflicts,
+    )
 
 
 @router.get(

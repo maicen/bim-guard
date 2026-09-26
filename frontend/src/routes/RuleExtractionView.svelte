@@ -22,6 +22,7 @@
     ArrowUp,
     ArrowDown,
     Download,
+    AlertTriangle,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi, llmProvidersApi, bsddApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -144,6 +145,37 @@
   // bulk action that touched many drafts.
   let draftReviewErrorLog: ErrorLogEntry[] = $state([]);
   let draftReviewErrorAction = $state("review");
+  let inspectingConflictDraft: RuleExtractionDraft | null = $state(null);
+  let isCheckingConflicts = $state(false);
+
+  async function scanDraftConflicts(): Promise<void> {
+    if (!selectedDocId || draftRules.length === 0) return;
+    isCheckingConflicts = true;
+    try {
+      const resp = await ruleExtractionApi.detectConflicts({
+        document_id: selectedDocId,
+        include_threshold_discrepancies: true,
+      });
+      const conflictMap = new Map(
+        resp.drafts_with_conflicts.map((d) => [d.id, d.conflicts || []])
+      );
+      draftRules = draftRules.map((d) => ({
+        ...d,
+        conflicts: conflictMap.get(d.id) || [],
+      }));
+      if (resp.total_conflicts_found > 0) {
+        toasts.warning(
+          `Detected ${resp.total_conflicts_found} conflict(s) across ${resp.drafts_with_conflicts.length} rule draft(s).`
+        );
+      } else {
+        toasts.success("No cross-rule or cross-draft building code contradictions detected.");
+      }
+    } catch (err: any) {
+      toasts.error(err?.message || "Failed to scan draft conflicts.");
+    } finally {
+      isCheckingConflicts = false;
+    }
+  }
 
   function describeDraftFailure(err: any, fallback: string): string {
     const reason = err?.message || fallback;
@@ -1052,6 +1084,17 @@
             {#if !previewingIds}<Download class="h-3.5 w-3.5" />{/if}
             <span>Preview as IDS XML</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={scanDraftConflicts}
+            loading={isCheckingConflicts}
+            disabled={!selectedDocId || draftRules.length === 0}
+            title="Scan for cross-rule and cross-draft building code contradictions"
+          >
+            {#if !isCheckingConflicts}<AlertTriangle class="h-3.5 w-3.5 text-warning" />{/if}
+            <span>Scan Conflicts</span>
+          </Button>
         </div>
 
         <BulkActionBar
@@ -1136,17 +1179,30 @@
                       <span
                         class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider
                           {draft.status === 'accepted' || draft.status === 'edited'
-                          ? 'border-emerald-800 bg-emerald-950/50 text-emerald-300'
+                          ? 'border-success-border bg-success-bg text-success'
                           : draft.status === 'rejected'
-                            ? 'border-rose-800 bg-rose-950/50 text-rose-300'
-                            : 'border-amber-800 bg-amber-950/50 text-amber-300'}"
+                            ? 'border-critical-border bg-critical-bg text-critical'
+                            : 'border-warning-border bg-warning-bg text-warning'}"
                       >
                         {draft.status.replace("_", " ")}
                       </span>
                     </td>
-                    <td class="px-3 py-3 font-mono font-bold text-fg-primary"
-                      >{draft.proposed_rule.rule_id}</td
-                    >
+                    <td class="px-3 py-3 font-mono font-bold text-fg-primary">
+                      <div class="flex items-center gap-1.5">
+                        <span>{draft.proposed_rule.rule_id}</span>
+                        {#if draft.conflicts && draft.conflicts.length > 0}
+                          <button
+                            type="button"
+                            onclick={() => (inspectingConflictDraft = draft)}
+                            class="inline-flex items-center gap-1 rounded-md border border-warning-border bg-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-warning transition-transform hover:scale-105"
+                            title={`${draft.conflicts.length} conflicting specification(s) detected. Click to inspect.`}
+                          >
+                            <AlertTriangle class="size-3 text-warning" />
+                            <span>{draft.conflicts.length} conflict{draft.conflicts.length === 1 ? '' : 's'}</span>
+                          </button>
+                        {/if}
+                      </div>
+                    </td>
                     <td class="max-w-xs truncate px-3 py-3" title={draft.proposed_rule.description}>
                       <div class="flex items-center gap-1.5">
                         <span class="truncate">{draft.proposed_rule.description}</span>
@@ -1946,3 +2002,116 @@
   onConfirm={confirmBulkDeleteDrafts}
   onCancel={() => (isDraftBulkDeleteModalOpen = false)}
 />
+
+<!-- Building Code Conflict Inspector Modal -->
+{#if inspectingConflictDraft}
+  <Modal
+    isOpen={!!inspectingConflictDraft}
+    title="Building Code Conflict Inspector"
+    subtitle={`Detected ${inspectingConflictDraft.conflicts?.length || 0} contradictory specification(s) for ${inspectingConflictDraft.proposed_rule.rule_id}`}
+    icon={AlertTriangle}
+    maxWidth="max-w-2xl"
+    onClose={() => (inspectingConflictDraft = null)}
+  >
+    <div class="space-y-4 text-xs text-fg-secondary">
+      <!-- Candidate rule summary card -->
+      <div class="rounded-xl border border-border-default bg-surface-canvas p-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-fg-primary">Candidate Extracted Rule</span>
+          <span class="font-mono text-micro text-fg-muted">Draft #{inspectingConflictDraft.id}</span>
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-micro">
+          <div>
+            <span class="text-fg-muted">Target Entity:</span>
+            <span class="font-mono font-semibold text-fg-primary ml-1">{inspectingConflictDraft.proposed_rule.target_ifc_class}</span>
+          </div>
+          <div>
+            <span class="text-fg-muted">Property:</span>
+            <span class="font-mono text-fg-primary ml-1">{inspectingConflictDraft.proposed_rule.property_set || "—"} / {inspectingConflictDraft.proposed_rule.property_name}</span>
+          </div>
+          <div>
+            <span class="text-fg-muted">Constraint:</span>
+            <span class="font-mono font-bold text-accent ml-1">
+              {inspectingConflictDraft.proposed_rule.operator} {inspectingConflictDraft.proposed_rule.check_value || `${inspectingConflictDraft.proposed_rule.value_min}..${inspectingConflictDraft.proposed_rule.value_max}`}
+            </span>
+          </div>
+          <div>
+            <span class="text-fg-muted">Standard / Section:</span>
+            <span class="text-fg-primary ml-1">{inspectingConflictDraft.clause?.parent_section || inspectingConflictDraft.proposed_rule.ruleset_id || "Unspecified"}</span>
+          </div>
+        </div>
+        {#if inspectingConflictDraft.proposed_rule.description}
+          <p class="mt-2 text-micro italic text-fg-muted">{inspectingConflictDraft.proposed_rule.description}</p>
+        {/if}
+      </div>
+
+      <!-- Conflicts list -->
+      <div class="space-y-3">
+        <h4 class="font-semibold text-fg-primary">Contradictory Specifications & Standards</h4>
+        {#each inspectingConflictDraft.conflicts || [] as conflict, idx (idx)}
+          <div class="rounded-xl border border-warning-border/80 bg-warning-bg/20 p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-fg-primary flex items-center gap-1.5">
+                <AlertTriangle class="size-3.5 text-warning" />
+                <span>Conflicting Standard: {conflict.conflicting_reference}</span>
+              </span>
+              <span
+                class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider
+                  {conflict.severity === 'critical'
+                    ? 'border-critical-border bg-critical-bg text-critical'
+                    : 'border-warning-border bg-warning-bg text-warning'}"
+              >
+                {conflict.conflict_type === 'mutually_exclusive_range' ? 'Mutually Exclusive' : 'Threshold Discrepancy'}
+              </span>
+            </div>
+
+            <p class="text-xs text-fg-secondary leading-relaxed">{conflict.message}</p>
+
+            {#if conflict.resolution_suggestion}
+              <div class="rounded-lg border border-border-default/60 bg-surface-card/60 p-2 text-micro text-fg-muted">
+                <strong class="text-fg-primary">Recommendation:</strong> {conflict.resolution_suggestion}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </div>
+
+    {#snippet footer()}
+      <div class="flex items-center justify-between w-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            const draftToReject = inspectingConflictDraft;
+            inspectingConflictDraft = null;
+            if (draftToReject) reviewDraftRow(draftToReject, "rejected");
+          }}
+          class="border-critical-border text-critical hover:bg-critical-bg"
+        >
+          Reject Draft
+        </Button>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={() => {
+              const draftToEdit = inspectingConflictDraft;
+              inspectingConflictDraft = null;
+              if (draftToEdit) openEditDraftModal(draftToEdit);
+            }}
+          >
+            Edit Candidate Rule
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onclick={() => (inspectingConflictDraft = null)}
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    {/snippet}
+  </Modal>
+{/if}
