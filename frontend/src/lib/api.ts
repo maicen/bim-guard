@@ -1756,7 +1756,16 @@ export const documentsApi = {
   },
 
   getExportSectionsTreeUrl(id: number, format: "json" | "csv" = "json"): string {
-    return `${API_BASE}/documents/${id}/sections-tree/export?format=${format}`;
+    return withAuthToken(`${API_BASE}/documents/${id}/sections-tree/export?format=${format}`);
+  },
+
+  async exportSectionsTree(id: number, format: "json" | "csv" = "json"): Promise<Blob> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree/export?format=${format}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Export failed" }));
+      throw new Error(err.detail || "Failed to export TOC");
+    }
+    return res.blob();
   },
 
   async importSectionsTree(id: number, file: File): Promise<DocumentSectionTreeResponse> {

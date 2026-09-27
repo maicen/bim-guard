@@ -116,11 +116,24 @@
     }
   }
 
-  function handleExportToc(format: "json" | "csv") {
+  async function handleExportToc(format: "json" | "csv") {
     if (!selectedDocId) return;
-    const url = documentsApi.getExportSectionsTreeUrl(selectedDocId, format);
-    window.open(url, "_blank");
     isExportMenuOpen = false;
+    try {
+      toasts.info(`Exporting TOC as ${format.toUpperCase()}…`);
+      const blob = await documentsApi.exportSectionsTree(selectedDocId, format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `document_${selectedDocId}_toc.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toasts.success(`Downloaded TOC as ${format.toUpperCase()}.`);
+    } catch (err: any) {
+      toasts.error(err?.message || "Failed to export TOC.");
+    }
   }
 
   async function handleImportTocFile(event: Event) {
