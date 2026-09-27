@@ -6,6 +6,7 @@
     BookOpen,
     CheckCircle2,
     Database,
+    ExternalLink,
     Info,
     Play,
     RefreshCw,
@@ -13,6 +14,7 @@
     ShieldAlert,
     XCircle,
   } from "lucide-svelte";
+  import { push } from "svelte-spa-router";
   import { graphApi, sparqlApi } from "../../api";
   import type {
     CodeToIfcTraceResponse,
@@ -208,45 +210,61 @@
 </script>
 
 <div class="p-2 text-xs">
-  <Tabs.Root value={activeTab} onValueChange={(v) => (activeTab = v)}>
-    <Tabs.List
-      class="flex flex-wrap items-center gap-1 rounded-xl border border-border-default bg-surface-canvas/60 p-1"
+  <div class="flex items-center justify-between gap-1 mb-1.5">
+    <Tabs.Root value={activeTab} onValueChange={(v) => (activeTab = v)} class="flex-1 min-w-0">
+      <Tabs.List
+        class="flex flex-wrap items-center gap-1 rounded-xl border border-border-default bg-surface-canvas/60 p-1"
+      >
+        <Tabs.Trigger
+          value="health"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <Activity class="h-3 w-3" />
+          Model Health
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="regulatory"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <BookOpen class="h-3 w-3" />
+          Regulatory GraphRAG
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="cypher"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <Database class="h-3 w-3" />
+          Cypher Presets
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="sparql"
+          class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          SPARQL
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="trace"
+          class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          Code-to-BIM Trace
+        </Tabs.Trigger>
+      </Tabs.List>
+    </Tabs.Root>
+
+    <button
+      type="button"
+      onclick={() => {
+        const params = new URLSearchParams();
+        if (projectId) params.set("project_id", String(projectId));
+        push(`/query-console?${params.toString()}`);
+      }}
+      class="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-canvas/60 px-2 py-1 text-[11px] font-semibold text-fg-muted hover:bg-surface-hover hover:text-accent transition-colors shrink-0 cursor-pointer"
+      title="Open dedicated full-page Query Console"
     >
-      <Tabs.Trigger
-        value="health"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-      >
-        <Activity class="h-3 w-3" />
-        Model Health
-      </Tabs.Trigger>
-      <Tabs.Trigger
-        value="regulatory"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-      >
-        <BookOpen class="h-3 w-3" />
-        Regulatory GraphRAG
-      </Tabs.Trigger>
-      <Tabs.Trigger
-        value="cypher"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-      >
-        <Database class="h-3 w-3" />
-        Cypher Presets
-      </Tabs.Trigger>
-      <Tabs.Trigger
-        value="sparql"
-        class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-      >
-        SPARQL
-      </Tabs.Trigger>
-      <Tabs.Trigger
-        value="trace"
-        class="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
-      >
-        Code-to-BIM Trace
-      </Tabs.Trigger>
-    </Tabs.List>
-  </Tabs.Root>
+      <ExternalLink class="h-3 w-3" />
+      <span>Full Page</span>
+    </button>
+  </div>
 
   <!-- TAB 1: MODEL HEALTH AUDIT -->
   {#if activeTab === "health"}

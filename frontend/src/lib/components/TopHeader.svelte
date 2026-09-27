@@ -56,6 +56,7 @@
     workflow: { section: "Analysis", title: "Live Pipeline Tracker" },
     reports: { section: "Analysis", title: "Compliance Reports & Exports" },
     evaluation: { section: "Analysis", title: "Compliance Evaluation" },
+    "query-console": { section: "Coordination", title: "Graph Query Console" },
     "revit-sync": { section: "Integrations", title: "Autodesk Revit Direct Sync" },
     "ifc-export-setting": { section: "Integrations", title: "IFC Export Setting for Architectural Model" },
     "user-manual": { section: "Manuals", title: "User Workflow Manual" },

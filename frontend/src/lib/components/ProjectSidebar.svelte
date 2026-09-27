@@ -10,6 +10,7 @@
     ChevronRight,
     ArrowLeft,
     ClipboardCheck,
+    Terminal,
   } from "lucide-svelte";
   import { link, push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -79,6 +80,7 @@
       title: "Coordination",
       items: [
         { id: "viewer", label: "3D Viewer", icon: ScanEye },
+        { id: "query-console", label: "Query Console", icon: Terminal },
         { id: "workflow", label: "Live Pipeline", icon: Activity },
       ],
     },

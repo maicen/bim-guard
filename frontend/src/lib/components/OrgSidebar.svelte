@@ -7,6 +7,7 @@
     ChevronRight,
     PlayCircle,
     Plus,
+    Terminal,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -53,6 +54,12 @@
         { id: "documents", label: "Documents", icon: Plus },
         { id: "extract", label: "Rule Extraction Studio", icon: Sparkles },
         { id: "rules", label: "Rule Catalog", icon: ListChecks },
+      ],
+    },
+    {
+      title: "Coordination & Graph",
+      items: [
+        { id: "query-console", label: "Query Console", icon: Terminal },
       ],
     },
   ];
