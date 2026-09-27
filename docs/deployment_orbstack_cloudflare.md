@@ -209,7 +209,87 @@ A self-hosted GitHub Actions runner is configured on the host machine (`~/action
 
 ---
 
-## 4. Alternative: Host CLI-Managed Tunnel
+## 4. Cross-Device Development Access (Remote PCs / Internet)
+
+When developing from a machine on a different network, use Cloudflare Tunnel to expose your local Vite dev server over HTTPS.
+
+`cloudflared` is already installed on your Mac and the production `TUNNEL_TOKEN` is in your `.env`, so the same tunnel can serve a dev subdomain alongside `bim-guard.xyz`.
+
+### Option A — Named Dev Tunnel (Permanent URL, Recommended)
+
+Add a second public hostname to the existing tunnel in the Zero Trust dashboard, then run the dev tunnel script.
+
+#### Step 1 — Add `dev.bim-guard.xyz` in the Zero Trust Dashboard
+
+1. Open [Cloudflare Zero Trust → Networks → Tunnels](https://one.dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/networks/tunnels).
+2. Click the `bim-guard` tunnel → **Edit** → **Public Hostnames** tab.
+3. Click **Add a public hostname**:
+   - **Subdomain**: `dev`
+   - **Domain**: `bim-guard.xyz`
+   - **Type**: `HTTP`
+   - **URL**: `localhost:5173`
+4. Click **Save**.
+
+Cloudflare provisions the DNS record automatically. `https://dev.bim-guard.xyz` will route to the Vite dev server on your Mac.
+
+#### Step 2 — Set env vars
+
+Add to your `.env`:
+
+```env
+# Allow Vite to serve any external hostname (tunnel hostnames are arbitrary)
+BIMGUARD_ALLOWED_HOSTS=*
+
+# Allow the backend to accept API requests from the dev tunnel origin
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz,https://dev.bim-guard.xyz
+```
+
+#### Step 3 — Start the dev stack and the tunnel
+
+**Terminal 1** — Normal dev servers:
+```bash
+./run_server.sh
+```
+
+**Terminal 2** — Named tunnel (reads `TUNNEL_TOKEN` from `.env`):
+```bash
+./scripts/dev_tunnel.sh
+```
+
+`https://dev.bim-guard.xyz` is now live and accessible from any machine with an internet connection.
+
+> [!NOTE]
+> Google OAuth works at `dev.bim-guard.xyz` because it's a proper domain. Add `https://dev.bim-guard.xyz/**` to your Supabase **Redirect URLs** in Authentication → URL Configuration if you want Google login on the dev tunnel too.
+
+---
+
+### Option B — Quick Anonymous Tunnel (Temporary, No Dashboard Config)
+
+If you just need a one-off URL to share quickly, use the TryCloudflare quick tunnel — no account or config required:
+
+```bash
+./scripts/dev_tunnel.sh --quick
+```
+
+This prints a random `https://xxxx.trycloudflare.com` URL. Share it with your colleague. Because the hostname changes every restart, you cannot pre-register it as a CORS origin — use `*` temporarily:
+
+```bash
+# Terminal 1 — backend with wildcard CORS (dev only)
+BIM_GUARD_ALLOWED_ORIGINS=* uv run uvicorn main:app --reload
+
+# Terminal 2 — Vite frontend (host-check disabled)
+BIMGUARD_ALLOWED_HOSTS=* cd frontend && npm run dev
+
+# Terminal 3 — quick tunnel
+./scripts/dev_tunnel.sh --quick
+```
+
+> [!CAUTION]
+> Never commit `BIM_GUARD_ALLOWED_ORIGINS=*` to `.env`. It's wildcard CORS — only pass it inline on the command line for quick one-off sessions.
+
+---
+
+## 5. Alternative: Host CLI-Managed Named Tunnel (Production)
 
 If you prefer running `cloudflared` directly on your Mac using Homebrew (`brew install cloudflared`):
 
