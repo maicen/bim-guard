@@ -168,3 +168,5 @@ export {
   NavigationMenuIndicator,
   NavigationMenuViewport,
 } from "./NavigationMenu.svelte";
+
+export * from "./sidebar";
