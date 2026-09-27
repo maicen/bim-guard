@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Activity, Menu, Shield } from "lucide-svelte";
+  import { Activity, Shield } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
@@ -7,6 +7,7 @@
   import ResourcesMenu from "./ResourcesMenu.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
+  import { SidebarTrigger, Separator } from "./ui";
   import {
     Breadcrumb,
     BreadcrumbList,
@@ -24,6 +25,8 @@
     selectedProject?: Project | null;
     /** Opens the navigation drawer; only rendered below `md`. */
     onOpenMobileNav?: () => void;
+    /** Toggles desktop sidebar collapse. */
+    onToggleSidebar?: () => void;
     /** Navigate to the Live Workflow view for a tracked project's pipeline. */
     onOpenPipeline?: (projectId: number) => void;
     /** Leave project view and return to the organization dashboard. */
@@ -35,6 +38,7 @@
     isProjectView = false,
     selectedProject = null,
     onOpenMobileNav = () => {},
+    onToggleSidebar,
     onOpenPipeline,
     onExitProject,
   }: Props = $props();
@@ -80,15 +84,17 @@
   class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border-default bg-surface-canvas/60 px-4 md:px-6"
 >
   <div class="flex min-w-0 items-center gap-2">
-    <button
-      type="button"
-      onclick={onOpenMobileNav}
-      class="-ml-1 rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden"
-      aria-label="Open navigation"
-      aria-controls="app-sidebar"
-    >
-      <Menu class="h-5 w-5" />
-    </button>
+    <SidebarTrigger
+      class="-ml-1"
+      onclick={() => {
+        if (window.innerWidth < 768) {
+          onOpenMobileNav();
+        } else if (onToggleSidebar) {
+          onToggleSidebar();
+        }
+      }}
+    />
+    <Separator orientation="vertical" class="mr-2 h-4 hidden sm:block" />
     <Breadcrumb class="min-w-0">
       <BreadcrumbList>
         {#if isProjectView && selectedProject}

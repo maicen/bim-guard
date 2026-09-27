@@ -116,6 +116,7 @@
   });
   // Navigation drawer state; only meaningful below the md breakpoint.
   let isMobileNavOpen = $state(false);
+  let isSidebarCollapsed = $state(false);
 
   const SELECTED_PROJECT_STORAGE_KEY = "bimguard_selected_project_id";
 
@@ -537,6 +538,7 @@
       {activeView}
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
     />
   {:else if isProjectView && targetProjectId}
     <ProjectSidebar
@@ -545,12 +547,14 @@
       selectedProjectId={targetProjectId}
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
     />
   {:else}
     <OrgSidebar
       {activeView}
       mobileOpen={isMobileNavOpen}
       onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
     />
   {/if}
 
@@ -562,6 +566,7 @@
       {isProjectView}
       {selectedProject}
       onOpenMobileNav={() => (isMobileNavOpen = true)}
+      onToggleSidebar={() => (isSidebarCollapsed = !isSidebarCollapsed)}
       onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
       onExitProject={handleExitProject}
     />

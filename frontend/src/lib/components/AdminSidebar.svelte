@@ -19,11 +19,15 @@
     activeView?: string;
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
+    collapsed?: boolean;
   }
 
-  let { activeView = "org-settings", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
-
-  let collapsed = $state(false);
+  let {
+    activeView = "org-settings",
+    mobileOpen = false,
+    onCloseMobile = () => {},
+    collapsed = $bindable(false),
+  }: Props = $props();
 
   const ADMIN_NAV_ITEMS = [
     {

@@ -25,6 +25,7 @@
     /** Drawer visibility below `md`. Above it the sidebar is always shown. */
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
+    collapsed?: boolean;
   }
 
   let {
@@ -33,9 +34,8 @@
     selectedProjectId,
     mobileOpen = false,
     onCloseMobile = () => {},
+    collapsed = $bindable(false),
   }: Props = $props();
-
-  let collapsed = $state(false);
 
   // Views that all fall under the single "Compliance Audit" destination
   const AUDIT_VIEW_IDS = new Set(["arch"]);

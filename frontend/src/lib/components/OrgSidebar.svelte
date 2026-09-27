@@ -19,11 +19,15 @@
     /** Drawer visibility below `md`. Above it the sidebar is always shown. */
     mobileOpen?: boolean;
     onCloseMobile?: () => void;
+    collapsed?: boolean;
   }
 
-  let { activeView = "dashboard", mobileOpen = false, onCloseMobile = () => {} }: Props = $props();
-
-  let collapsed = $state(false);
+  let {
+    activeView = "dashboard",
+    mobileOpen = false,
+    onCloseMobile = () => {},
+    collapsed = $bindable(false),
+  }: Props = $props();
 
   function getNavHref(itemId: string): string {
     if (!authState.activeOrganizationId) return `/${itemId}`;
