@@ -14,6 +14,7 @@
   import { createTableState } from "../lib/tableState.svelte";
   import type { EvaluationBimguardVerdict, EvaluationFinding, EvaluationHumanVerdict } from "../lib/types";
   import Alert from "../lib/components/Alert.svelte";
+  import { toasts } from "../lib/toast.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
   interface Props {
@@ -105,59 +106,83 @@
   });
 
   async function reviewOne(finding: EvaluationFinding, verdict: EvaluationHumanVerdict) {
-    try {
-      const updated = await evaluationApi.reviewFinding(finding.id, { human_verdict: verdict });
-      findings = findings.map((f) => (f.id === finding.id ? updated : f));
-    } catch (err: any) {
-      error = err.message || `Failed to review finding ${finding.id}.`;
-      errorLog = [toErrorLogEntry(err, `finding #${finding.id}`)];
-    }
+    await table.optimisticUpdate({
+      ids: finding.id,
+      patch: { human_verdict: verdict },
+      action: () => evaluationApi.reviewFinding(finding.id, { human_verdict: verdict }),
+      onSuccess: (updated) => {
+        findings = findings.map((f) => (f.id === finding.id ? updated : f));
+        toasts.success(`Recorded review for finding #${finding.id}.`);
+      },
+      onError: (err) => {
+        error = err.message || `Failed to review finding ${finding.id}.`;
+        errorLog = [toErrorLogEntry(err, `finding #${finding.id}`)];
+        toasts.fromError(err, `Could not review finding #${finding.id}`);
+      },
+    });
   }
 
   /** Each selected row is confirmed against its own BIM-Guard verdict, not one shared value. */
   async function confirmSelectedAsCorrect() {
-    if (isBulkConfirming) return;
+    if (isBulkConfirming || !table.selectedCount) return;
+    const targetIds = [...table.selectedIdList];
+    const prevFindings = [...findings];
     isBulkConfirming = true;
     error = "";
     errorLog = [];
+
+    // Optimistically assign human_verdict = BIMGUARD_TO_HUMAN[f.bimguard_verdict]
+    findings = findings.map((f) =>
+      targetIds.includes(f.id)
+        ? { ...f, human_verdict: BIMGUARD_TO_HUMAN[f.bimguard_verdict] }
+        : f,
+    );
+    table.clearSelection();
+
     try {
-      // A one-shot local grouping, never read reactively, so the plain
-      // built-in is correct here.
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const groups = new Map<EvaluationHumanVerdict, number[]>();
-      for (const row of table.selectedRows) {
-        const verdict = BIMGUARD_TO_HUMAN[row.bimguard_verdict];
-        groups.set(verdict, [...(groups.get(verdict) ?? []), row.id]);
+      for (const id of targetIds) {
+        const item = prevFindings.find((f) => f.id === id);
+        if (!item) continue;
+        const verdict = BIMGUARD_TO_HUMAN[item.bimguard_verdict];
+        groups.set(verdict, [...(groups.get(verdict) ?? []), id]);
       }
       await Promise.all(
         [...groups.entries()].map(([human_verdict, finding_ids]) =>
           evaluationApi.bulkReview({ finding_ids, human_verdict }),
         ),
       );
-      table.clearSelection();
-      await load();
+      toasts.success(`Confirmed ${targetIds.length} finding(s) as correct.`);
     } catch (err: any) {
+      findings = prevFindings;
       error = err.message || "Failed to confirm the selected findings.";
-      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} finding(s)`)];
+      errorLog = [toErrorLogEntry(err, `${targetIds.length} finding(s)`)];
+      toasts.fromError(err, "Failed to confirm selected findings");
     } finally {
       isBulkConfirming = false;
     }
   }
 
   async function confirmBulkDelete() {
-    const ids = table.selectedIdList;
+    const ids = [...table.selectedIdList];
+    if (ids.length === 0) return;
     error = "";
     errorLog = [];
-    try {
-      await evaluationApi.bulkDelete(ids);
-      table.clearSelection();
-      await load();
-    } catch (err: any) {
-      error = err.message || "Failed to remove the selected findings.";
-      errorLog = [toErrorLogEntry(err, `${ids.length} finding(s)`)];
-    } finally {
-      isBulkDeleteModalOpen = false;
-    }
+    isBulkDeleteModalOpen = false;
+
+    await table.optimisticDelete({
+      ids,
+      action: () => evaluationApi.bulkDelete(ids),
+      onSuccess: () => {
+        findings = findings.filter((f) => !ids.includes(f.id));
+        toasts.success(`Removed ${ids.length} finding(s).`);
+      },
+      onError: (err) => {
+        error = err.message || "Failed to remove the selected findings.";
+        errorLog = [toErrorLogEntry(err, `${ids.length} finding(s)`)];
+        toasts.fromError(err, "Failed to delete findings");
+      },
+    });
   }
 </script>
 
@@ -270,7 +295,7 @@
         <tbody class="divide-y divide-border-subtle">
           {#each table.paginated as finding (finding.id)}
             {@const disagrees = !!finding.human_verdict && finding.human_verdict !== BIMGUARD_TO_HUMAN[finding.bimguard_verdict]}
-            <tr class="hover:bg-surface-hover {table.isSelected(finding.id) ? 'bg-surface-selected' : ''}">
+            <tr class="hover:bg-surface-hover {table.isSelected(finding.id) ? 'bg-surface-selected' : ''} {table.isPending(finding.id) ? 'opacity-50 pointer-events-none' : ''}">
               <td class="px-4 py-3">
                 <TableCheckbox
                   checked={table.isSelected(finding.id)}
@@ -335,6 +360,7 @@
   message={`Remove ${table.selectedCount} selected finding(s) from the evaluation set? This does not affect the underlying compliance rules or results.`}
   confirmText="Remove"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => (isBulkDeleteModalOpen = false)}
 />

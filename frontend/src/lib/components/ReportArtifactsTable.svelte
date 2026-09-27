@@ -163,7 +163,7 @@
       </thead>
       <tbody class="divide-y divide-border-subtle">
         {#each tableState.paginated as artifact (artifact.id)}
-          <tr class="transition-colors hover:bg-surface-hover {tableState.isSelected(artifact.id) ? 'bg-surface-selected' : ''}">
+          <tr class="transition-colors hover:bg-surface-hover {tableState.isSelected(artifact.id) ? 'bg-surface-selected' : ''} {tableState.isPending(artifact.id) ? 'opacity-50 pointer-events-none' : ''}">
             <td class="w-10 px-4 py-3">
               <TableCheckbox
                 checked={tableState.isSelected(artifact.id)}

@@ -184,25 +184,43 @@
     severity?: string;
     needs_review?: number;
   }) {
-    const res = await rulesApi.bulkUpdate({ rule_ids: ruleTable.selectedIdList, ...payload });
-    toasts.success(`Updated ${res.success_count} rule(s).`);
-    ruleTable.clearSelection();
-    refreshMaps();
+    const targetIds = [...ruleTable.selectedIdList];
+    isBulkEditModalOpen = false;
+
+    const patch: Partial<RuleSourceSummary> = {};
+    if (payload.severity !== undefined) patch.severity = payload.severity;
+    if (payload.category !== undefined) patch.category = payload.category;
+
+    await ruleTable.optimisticUpdate({
+      ids: targetIds,
+      patch,
+      action: () => rulesApi.bulkUpdate({ rule_ids: targetIds, ...payload }),
+      onSuccess: (res) => {
+        toasts.success(`Updated ${res.success_count} rule(s).`);
+        ruleTable.clearSelection();
+        refreshMaps();
+      },
+      onError: (err) => {
+        toasts.fromError(err, "Failed to bulk update rules");
+      },
+    });
   }
 
   async function confirmBulkDeleteRules() {
-    bulkActionBusy = true;
-    try {
-      const res = await rulesApi.bulkDelete(ruleTable.selectedIdList);
-      toasts.success(`Deleted ${res.success_count} rule(s).`);
-      ruleTable.clearSelection();
-      isBulkDeleteModalOpen = false;
-      refreshMaps();
-    } catch (err: any) {
-      toasts.error(err.message || "Could not delete selected rules.", "Bulk delete failed");
-    } finally {
-      bulkActionBusy = false;
-    }
+    const targetIds = [...ruleTable.selectedIdList];
+    isBulkDeleteModalOpen = false;
+
+    await ruleTable.optimisticDelete({
+      ids: targetIds,
+      action: () => rulesApi.bulkDelete(targetIds),
+      onSuccess: (res) => {
+        toasts.success(`Deleted ${res.success_count} rule(s).`);
+        refreshMaps();
+      },
+      onError: (err) => {
+        toasts.error(err.message || "Could not delete selected rules.", "Bulk delete failed");
+      },
+    });
   }
 
   let elementsWithDrafts = $derived((draftMap?.elements ?? []).filter((el) => el.drafts.length > 0));
@@ -720,7 +738,9 @@
   bind:isOpen={isBulkDeleteModalOpen}
   title={`Delete ${ruleTable.selectedCount} Rules`}
   message={`This will permanently delete ${ruleTable.selectedCount} selected rule(s). This action cannot be undone.`}
-  confirmText={bulkActionBusy ? "Deleting…" : "Delete"}
+  confirmText="Delete"
+  danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDeleteRules}
   onCancel={() => (isBulkDeleteModalOpen = false)}
 />

@@ -74,6 +74,7 @@
     RulesetImportModal,
   } from "../lib/components/rules";
   import { describeMechanism } from "../lib/glossary";
+  import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
 
   interface Props {
@@ -365,31 +366,58 @@
     needs_review?: number;
   }) {
     if (!table.selectedCount) return;
-    const res = await rulesApi.bulkUpdate({
-      rule_ids: table.selectedIdList,
-      ...payload,
-    });
-    successMessage = `Successfully updated ${res.success_count} rule(s).`;
+    const targetIds = [...table.selectedIdList];
     isBulkEditRulesModalOpen = false;
-    table.clearSelection();
-    await loadData(true);
-    setTimeout(() => (successMessage = ""), 4000);
+
+    const patch: Partial<Rule> = {};
+    if (payload.ruleset_id !== undefined) patch.ruleset_id = payload.ruleset_id;
+    if (payload.category !== undefined) patch.category = payload.category as any;
+    if (payload.mechanism !== undefined) patch.mechanism = payload.mechanism;
+    if (payload.severity !== undefined) patch.severity = payload.severity as any;
+    if (payload.needs_review !== undefined) patch.needs_review = payload.needs_review;
+
+    await table.optimisticUpdate({
+      ids: targetIds,
+      patch,
+      action: () =>
+        rulesApi.bulkUpdate({
+          rule_ids: targetIds,
+          ...payload,
+        }),
+      onSuccess: (res) => {
+        rules = rules.map((r) => (targetIds.includes(r.id) ? { ...r, ...patch } : r));
+        successMessage = `Successfully updated ${res.success_count} rule(s).`;
+        toasts.success(`Successfully updated ${res.success_count} rule(s).`);
+        table.clearSelection();
+        setTimeout(() => (successMessage = ""), 4000);
+      },
+      onError: (err) => {
+        error = `Could not update selected rules: ${err.message}`;
+        toasts.fromError(err, "Failed to bulk update rules");
+      },
+    });
   }
 
   async function confirmBulkDelete() {
     if (!table.selectedCount) return;
-    try {
-      const res = await rulesApi.bulkDelete(table.selectedIdList);
-      rules = rules.filter((r) => !table.selectedIds.has(r.id));
-      table.clearSelection();
-      isBulkDeleteModalOpen = false;
-      successMessage = `Successfully deleted ${res.success_count} rule(s).`;
-      await loadData(true);
-      setTimeout(() => (successMessage = ""), 4000);
-    } catch (err: any) {
-      error = `Could not delete selected rules: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} rule(s)`)];
-    }
+    const targetIds = [...table.selectedIdList];
+    const count = targetIds.length;
+
+    await table.optimisticDelete({
+      ids: targetIds,
+      action: () => rulesApi.bulkDelete(targetIds),
+      onSuccess: (res) => {
+        rules = rules.filter((r) => !targetIds.includes(r.id));
+        successMessage = `Successfully deleted ${res.success_count} rule(s).`;
+        toasts.success(`Successfully deleted ${res.success_count} rule(s).`);
+        setTimeout(() => (successMessage = ""), 4000);
+      },
+      onError: (err) => {
+        error = `Could not delete selected rules: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, `${count} rule(s)`)];
+        toasts.fromError(err, `Could not delete ${count} rules`);
+      },
+    });
   }
 
   // ── Bulk Folder Handlers ──────────────────────────────────────────────────
@@ -433,22 +461,30 @@
 
   async function confirmBulkDeleteFolders() {
     if (!selectedFolderRulesetIds.length) return;
-    isBulkDeletingFolders = true;
+    const targetFolderIds = [...selectedFolderRulesetIds];
+    const previousFolders = [...folders];
+    const previousRules = [...rules];
+
+    // Optimistically remove folders and their rules
+    folders = folders.filter((f) => !targetFolderIds.includes(f.ruleset_id));
+    rules = rules.filter((r) => !targetFolderIds.includes(r.ruleset_id));
+    if (selectedFolderId && targetFolderIds.includes(selectedFolderId)) {
+      selectedFolderId = null;
+    }
+    selectedFolderRulesetIds = [];
+    isBulkDeleteFoldersModalOpen = false;
+
     try {
-      const res = await rulesApi.bulkDeleteFolders(selectedFolderRulesetIds);
-      if (selectedFolderId && selectedFolderRulesetIds.includes(selectedFolderId)) {
-        selectedFolderId = null;
-      }
+      const res = await rulesApi.bulkDeleteFolders(targetFolderIds);
       successMessage = `Successfully deleted ${res.success_count} folder(s) and ${res.deleted_rules_count} member rule(s).`;
-      selectedFolderRulesetIds = [];
-      isBulkDeleteFoldersModalOpen = false;
-      await loadData(true);
+      toasts.success(`Successfully deleted ${res.success_count} folder(s).`);
       setTimeout(() => (successMessage = ""), 4000);
     } catch (err: any) {
+      folders = previousFolders;
+      rules = previousRules;
       error = `Could not delete selected folders: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `${selectedFolderRulesetIds.length} folder(s)`)];
-    } finally {
-      isBulkDeletingFolders = false;
+      errorLog = [toErrorLogEntry(err, `${targetFolderIds.length} folder(s)`)];
+      toasts.fromError(err, "Could not delete selected folders");
     }
   }
 
@@ -517,35 +553,47 @@
     setTimeout(() => (successMessage = ""), 4000);
   }
 
-  function confirmDeleteSnapshot() {
+  async function confirmDeleteSnapshot() {
     if (!snapshotToDelete) return;
-    const id = snapshotToDelete.id;
-    rulesApi
-      .deleteSnapshot(id)
-      .then(() => {
-        snapshots = snapshots.filter((s) => s.id !== id);
-        snapshotTable.selectedIds.delete(id);
-      })
-      .catch((err: any) => {
+    const target = snapshotToDelete;
+    snapshotToDelete = null;
+
+    await snapshotTable.optimisticDelete({
+      ids: target.id,
+      action: () => rulesApi.deleteSnapshot(target.id),
+      onSuccess: () => {
+        snapshots = snapshots.filter((s) => s.id !== target.id);
+        toasts.success(`Deleted snapshot "${target.name}".`);
+      },
+      onError: (err) => {
         snapshotsError = err.message || "Failed to delete snapshot.";
-      })
-      .finally(() => {
-        snapshotToDelete = null;
-      });
+        toasts.fromError(err, `Could not delete snapshot "${target.name}"`);
+      },
+    });
   }
 
   async function confirmBulkDeleteSnapshots() {
-    const ids = snapshotTable.selectedIdList;
-    for (const id of ids) {
-      try {
-        await rulesApi.deleteSnapshot(id);
-      } catch (err: any) {
-        snapshotsError = err.message || `Failed to delete snapshot ${id}.`;
-      }
-    }
-    snapshots = snapshots.filter((s) => !snapshotTable.selectedIds.has(s.id));
-    snapshotTable.clearSelection();
+    const ids = [...snapshotTable.selectedIdList];
+    if (ids.length === 0) return;
+    const count = ids.length;
     isBulkDeleteSnapshotsModalOpen = false;
+
+    await snapshotTable.optimisticDelete({
+      ids,
+      action: async () => {
+        for (const id of ids) {
+          await rulesApi.deleteSnapshot(id);
+        }
+      },
+      onSuccess: () => {
+        snapshots = snapshots.filter((s) => !ids.includes(s.id));
+        toasts.success(`Deleted ${count} snapshot(s).`);
+      },
+      onError: (err) => {
+        snapshotsError = err.message || "Failed to delete snapshots.";
+        toasts.fromError(err, "Failed to delete snapshots");
+      },
+    });
   }
 
   function openCreateModal() {
@@ -576,13 +624,21 @@
 
   async function confirmDelete() {
     if (!ruleToDelete) return;
-    try {
-      await rulesApi.delete(ruleToDelete.id);
-      rules = rules.filter((r) => r.id !== ruleToDelete!.id);
-      ruleToDelete = null;
-    } catch (err: any) {
-      error = `Delete failed: ${err.message}`;
-    }
+    const target = ruleToDelete;
+    ruleToDelete = null;
+
+    await table.optimisticDelete({
+      ids: target.id,
+      action: () => rulesApi.delete(target.id),
+      onSuccess: () => {
+        rules = rules.filter((r) => r.id !== target.id);
+        toasts.success(`Deleted rule "${target.ruleId}".`);
+      },
+      onError: (err) => {
+        error = `Delete failed: ${err.message}`;
+        toasts.fromError(err, `Could not delete rule "${target.ruleId}"`);
+      },
+    });
   }
 
   // ── Folder CRUD & Resizer Handlers ──────────────────────────────────────────
@@ -641,21 +697,29 @@
 
   async function confirmDeleteFolder() {
     if (!folderToDelete) return;
-    isDeletingFolder = true;
+    const target = folderToDelete;
+    const previousFolders = [...folders];
+    const previousRules = [...rules];
+    folderToDelete = null;
+    isDeleteFolderModalOpen = false;
+
+    // Optimistically remove folder and its rules
+    folders = folders.filter((f) => f.ruleset_id !== target.ruleset_id);
+    rules = rules.filter((r) => r.ruleset_id !== target.ruleset_id);
+    if (selectedFolderId === target.ruleset_id) {
+      selectedFolderId = null;
+    }
+
     try {
-      await rulesApi.deleteFolder(folderToDelete.ruleset_id);
-      if (selectedFolderId === folderToDelete.ruleset_id) {
-        selectedFolderId = null;
-      }
-      successMessage = `Deleted folder "${folderToDelete.display_name || folderToDelete.ruleset_id}"`;
-      isDeleteFolderModalOpen = false;
-      folderToDelete = null;
-      await loadData(true);
+      await rulesApi.deleteFolder(target.ruleset_id);
+      successMessage = `Deleted folder "${target.display_name || target.ruleset_id}"`;
+      toasts.success(`Deleted folder "${target.display_name || target.ruleset_id}"`);
       setTimeout(() => (successMessage = ""), 4000);
     } catch (err: any) {
+      folders = previousFolders;
+      rules = previousRules;
       error = `Failed to delete folder: ${err.message}`;
-    } finally {
-      isDeletingFolder = false;
+      toasts.fromError(err, "Failed to delete folder");
     }
   }
 
@@ -1278,7 +1342,7 @@
                     <tr
                       class="transition-colors hover:bg-surface-hover {table.isSelected(rule.id)
                         ? 'bg-surface-selected'
-                        : ''}"
+                        : ''} {table.isPending(rule.id) ? 'opacity-50 pointer-events-none' : ''}"
                     >
                       <td class="w-10 px-4 py-3">
                         <TableCheckbox
@@ -1638,7 +1702,7 @@
             </thead>
             <tbody>
               {#each snapshotTable.paginated as snap (snap.id)}
-                <tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
+                <tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover {snapshotTable.isPending(snap.id) ? 'opacity-50 pointer-events-none' : ''}">
                   <td class="px-4 py-3">
                     <TableCheckbox
                       checked={snapshotTable.isSelected(snap.id)}
@@ -1723,6 +1787,7 @@
   message={`Are you sure you want to delete rule "${ruleToDelete?.ruleId || ""}"? This action cannot be undone.`}
   confirmText="Delete Rule"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDelete}
   onCancel={() => (ruleToDelete = null)}
 />
@@ -1741,6 +1806,7 @@
   message={`Are you sure you want to delete ${table.selectedCount} selected compliance rule(s)? This action cannot be undone.`}
   confirmText="Delete Selected Rules"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => table.clearSelection()}
 />
@@ -1765,6 +1831,7 @@
   message={`Are you sure you want to delete folder "${folderToDelete?.display_name || folderToDelete?.ruleset_id || ""}"? This will delete the folder and all of its ${folderToDelete?.rules?.length ?? 0} member rules.`}
   confirmText="Delete Folder & Rules"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDeleteFolder}
   onCancel={() => (folderToDelete = null)}
 />
@@ -1793,6 +1860,7 @@
   message={`Are you sure you want to delete ${selectedFolderRulesetIds.length} selected ruleset folder(s) and all of their member rules? This action cannot be undone.`}
   confirmText="Delete Folders & Rules"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDeleteFolders}
   onCancel={() => (isBulkDeleteFoldersModalOpen = false)}
 />
@@ -1820,6 +1888,7 @@
   message={`Are you sure you want to delete snapshot "${snapshotToDelete?.name || ""}"? This cannot be undone.`}
   confirmText="Delete Snapshot"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDeleteSnapshot}
   onCancel={() => (snapshotToDelete = null)}
 />
@@ -1831,6 +1900,7 @@
   message={`Are you sure you want to delete ${snapshotTable.selectedCount} selected snapshot(s)? This cannot be undone.`}
   confirmText="Delete Snapshots"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDeleteSnapshots}
   onCancel={() => (isBulkDeleteSnapshotsModalOpen = false)}
 />

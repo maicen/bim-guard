@@ -61,14 +61,21 @@
 
   async function confirmDeleteRuleset() {
     if (!deletingRuleset) return;
+    const target = deletingRuleset;
+    const prevRulesets = [...rulesets];
+    deletingRuleset = null;
+
+    // Optimistic removal
+    rulesets = rulesets.filter((r) => r.ruleset_id !== target.ruleset_id);
+    selectedRulesetIds.delete(target.ruleset_id);
+
     try {
-      await rulesApi.deleteFolder(deletingRuleset.ruleset_id);
-      toasts.success(`Ruleset "${deletingRuleset.display_name}" deleted.`);
-      rulesets = rulesets.filter((r) => r.ruleset_id !== deletingRuleset!.ruleset_id);
+      await rulesApi.deleteFolder(target.ruleset_id);
+      toasts.success(`Ruleset "${target.display_name}" deleted.`);
     } catch (err) {
+      rulesets = prevRulesets;
+      selectedRulesetIds.add(target.ruleset_id);
       toasts.fromError(err, "Could not delete ruleset.");
-    } finally {
-      deletingRuleset = null;
     }
   }
 
@@ -754,6 +761,8 @@
       ? `This permanently deletes "${deletingRuleset.display_name}" and every rule in it, for every organization. This cannot be undone.`
       : ""}
     confirmText="Delete Ruleset"
+    danger={true}
+    optimistic={true}
     onConfirm={confirmDeleteRuleset}
     onCancel={() => (deletingRuleset = null)}
   />

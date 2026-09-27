@@ -65,14 +65,21 @@
 
   async function confirmDeleteProject() {
     if (!deletingProject) return;
+    const target = deletingProject;
+    const prevProjects = [...projects];
+    deletingProject = null;
+
+    // Optimistic removal
+    projects = projects.filter((p) => p.id !== target.id);
+    selectedProjectIds.delete(target.id);
+
     try {
-      await projectsApi.delete(deletingProject.id);
-      toasts.success(`Project "${deletingProject.name}" deleted.`);
-      projects = projects.filter((p) => p.id !== deletingProject!.id);
+      await projectsApi.delete(target.id);
+      toasts.success(`Project "${target.name}" deleted.`);
     } catch (err) {
+      projects = prevProjects;
+      selectedProjectIds.add(target.id);
       toasts.fromError(err, "Could not delete project.");
-    } finally {
-      deletingProject = null;
     }
   }
 
@@ -771,6 +778,8 @@
       ? `This permanently deletes "${deletingProject.name}" and everything analyzed under it. This cannot be undone.`
       : ""}
     confirmText="Delete Project"
+    danger={true}
+    optimistic={true}
     onConfirm={confirmDeleteProject}
     onCancel={() => (deletingProject = null)}
   />

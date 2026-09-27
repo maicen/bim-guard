@@ -278,11 +278,19 @@
 
   async function handleSetPrimary(file: Model) {
     if (!initialProjectId || file.id == null || file.is_primary) return;
-    pendingActionId = file.id;
+    const targetId = file.id;
+    const projId = initialProjectId;
+    const prevFiles = [...files];
+
+    // Optimistic switch: set is_primary = true for targetId, false for others
+    files = files.map((f) => ({ ...f, is_primary: f.id === targetId }));
+    pendingActionId = targetId;
+
     try {
-      await modelsApi.setPrimary(initialProjectId, file.id);
-      files = await modelsApi.list(initialProjectId);
+      await modelsApi.setPrimary(projId, targetId);
+      toasts.success(`Set "${file.file_name}" as primary model.`);
     } catch (err) {
+      files = prevFiles;
       toasts.fromError(err, "Could not set this model as primary.");
     } finally {
       pendingActionId = null;
@@ -321,33 +329,46 @@
 
   async function confirmDelete() {
     if (!initialProjectId || fileToDelete?.id == null) return;
-    try {
-      await modelsApi.delete(initialProjectId, fileToDelete.id);
-      files = files.filter((f) => f.id !== fileToDelete!.id);
-      table.selectedIds.delete(fileToDelete.id);
-      toasts.success(`Removed "${fileToDelete.file_name}".`);
-    } catch (err) {
-      toasts.fromError(err, "Could not delete this model.");
-    } finally {
-      fileToDelete = null;
-    }
+    const target = fileToDelete;
+    const projId = initialProjectId;
+    fileToDelete = null;
+
+    await table.optimisticDelete({
+      ids: target.id,
+      action: () => modelsApi.delete(projId, target.id!),
+      onSuccess: () => {
+        files = files.filter((f) => f.id !== target.id);
+        toasts.success(`Removed "${target.file_name}".`);
+      },
+      onError: (err) => {
+        toasts.fromError(err, `Could not delete "${target.file_name}"`);
+      },
+    });
   }
 
   async function confirmBulkDelete() {
     if (!initialProjectId || !table.selectedCount) return;
+    const projId = initialProjectId;
     const ids = table.selectedIdList.filter((id): id is number => typeof id === "number");
-    const results = await Promise.allSettled(
-      ids.map((id) => modelsApi.delete(initialProjectId!, id)),
-    );
-    const failed = results.filter((r) => r.status === "rejected").length;
-    files = files.filter((f) => f.id == null || !ids.includes(f.id));
-    table.clearSelection();
-    isBulkDeleteModalOpen = false;
-    if (failed > 0) {
-      toasts.error(`${failed} model(s) could not be deleted.`);
-    } else {
-      toasts.success(`Deleted ${ids.length} model(s).`);
-    }
+    const count = ids.length;
+
+    await table.optimisticDelete({
+      ids,
+      action: async () => {
+        const results = await Promise.allSettled(ids.map((id) => modelsApi.delete(projId, id)));
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          throw new Error(`${failed} of ${count} model(s) could not be deleted.`);
+        }
+      },
+      onSuccess: () => {
+        files = files.filter((f) => f.id == null || !ids.includes(f.id));
+        toasts.success(`Deleted ${count} model(s).`);
+      },
+      onError: (err) => {
+        toasts.fromError(err, "Failed to delete selected models");
+      },
+    });
   }
 </script>
 
@@ -558,7 +579,7 @@
                     file.id ?? file.file_path,
                   )
                     ? 'bg-surface-selected'
-                    : ''}"
+                    : ''} {table.isPending(file.id ?? file.file_path) ? 'opacity-50 pointer-events-none' : ''}"
                 >
                   <td class="w-10 px-4 py-3">
                     <TableCheckbox
@@ -947,6 +968,7 @@
   }`}
   confirmText="Delete Model"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDelete}
   onCancel={() => (fileToDelete = null)}
 />
@@ -957,6 +979,7 @@
   message={`Are you sure you want to delete ${table.selectedCount} model(s)? This cannot be undone.`}
   confirmText={`Delete ${table.selectedCount} Model(s)`}
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => (isBulkDeleteModalOpen = false)}
 />

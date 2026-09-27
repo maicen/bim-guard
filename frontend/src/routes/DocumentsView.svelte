@@ -276,24 +276,35 @@
     if (!table.selectedCount) return;
     error = "";
     errorLog = [];
-    const targetIds = table.selectedIdList;
-    const failures: ErrorLogEntry[] = [];
-    const deletedIds = new Set<number>();
-    for (const id of targetIds) {
-      try {
-        await documentsApi.delete(id);
-        deletedIds.add(id);
-      } catch (err: any) {
-        failures.push(toErrorLogEntry(err, `document #${id}`));
-      }
-    }
-    documents = documents.filter((d) => !deletedIds.has(d.id));
-    table.clearSelection();
-    isBulkDeleteModalOpen = false;
-    if (failures.length > 0) {
-      errorLog = failures;
-      error = `Could not delete ${failures.length} of ${targetIds.length} selected documents: ${failures[0].message}`;
-    }
+    const targetIds = [...table.selectedIdList];
+    const count = targetIds.length;
+
+    await table.optimisticDelete({
+      ids: targetIds,
+      action: async () => {
+        const failures: ErrorLogEntry[] = [];
+        for (const id of targetIds) {
+          try {
+            await documentsApi.delete(id);
+          } catch (err: any) {
+            failures.push(toErrorLogEntry(err, `document #${id}`));
+          }
+        }
+        if (failures.length > 0) {
+          errorLog = failures;
+          throw new Error(`Could not delete ${failures.length} of ${targetIds.length} documents.`);
+        }
+      },
+      onSuccess: () => {
+        documents = documents.filter((d) => !targetIds.includes(d.id));
+        flashSuccess(`Deleted ${count} document(s).`);
+        toasts.success(`Deleted ${count} document(s).`);
+      },
+      onError: (err) => {
+        error = err.message || "Failed to delete documents.";
+        toasts.fromError(err, "Failed to delete selected documents");
+      },
+    });
   }
 
   function openReader(id: number) {
@@ -316,24 +327,29 @@
 
   async function generateDoclangForRow(doc: DocumentItem) {
     generatingDoclangId = doc.id;
-    try {
-      const updated = await documentsApi.generateDoclang(doc.id);
-      documents = documents.map((d) =>
-        d.id === updated.id
-          ? {
-              ...d,
-              text_preview: updated.text?.slice(0, 200) || "",
-              char_count: updated.char_count,
-              has_doclang: Boolean(updated.doclang_xml?.trim()),
-            }
-          : d,
-      );
-      flashSuccess(`DocLang generated for "${doc.filename}".`);
-    } catch (err: any) {
-      toasts.error(err.message || "Unknown error", "Could not generate DocLang");
-    } finally {
-      generatingDoclangId = null;
-    }
+    await table.optimisticUpdate({
+      ids: doc.id,
+      patch: { has_doclang: true },
+      action: () => documentsApi.generateDoclang(doc.id),
+      onSuccess: (updated) => {
+        documents = documents.map((d) =>
+          d.id === updated.id
+            ? {
+                ...d,
+                text_preview: updated.text?.slice(0, 200) || "",
+                char_count: updated.char_count,
+                has_doclang: Boolean(updated.doclang_xml?.trim()),
+              }
+            : d,
+        );
+        flashSuccess(`DocLang generated for "${doc.filename}".`);
+        toasts.success(`DocLang generated for "${doc.filename}".`);
+      },
+      onError: (err) => {
+        toasts.error(err.message || "Unknown error", "Could not generate DocLang");
+      },
+    });
+    generatingDoclangId = null;
   }
 
   function openEdit(doc: DocumentItem) {
@@ -348,14 +364,23 @@
 
   async function confirmDelete() {
     if (!docToDelete) return;
-    try {
-      await documentsApi.delete(docToDelete.id);
-      documents = documents.filter((d) => d.id !== docToDelete!.id);
-      docToDelete = null;
-    } catch (err: any) {
-      error = `Failed to delete document: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, docToDelete.filename)];
-    }
+    const target = docToDelete;
+    docToDelete = null;
+
+    await table.optimisticDelete({
+      ids: target.id,
+      action: () => documentsApi.delete(target.id),
+      onSuccess: () => {
+        documents = documents.filter((d) => d.id !== target.id);
+        flashSuccess(`Deleted document "${target.filename}".`);
+        toasts.success(`Deleted document "${target.filename}".`);
+      },
+      onError: (err) => {
+        error = `Failed to delete document: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, target.filename)];
+        toasts.fromError(err, `Could not delete "${target.filename}"`);
+      },
+    });
   }
 </script>
 
@@ -553,7 +578,7 @@
               <tr
                 class="transition-colors hover:bg-surface-hover {table.isSelected(doc.id)
                   ? 'bg-surface-selected'
-                  : ''}"
+                  : ''} {table.isPending(doc.id) ? 'opacity-50 pointer-events-none' : ''}"
               >
                 <td class="w-10 px-4 py-3">
                   <TableCheckbox
@@ -766,6 +791,7 @@
   message={`Are you sure you want to delete "${docToDelete?.filename || ""}" and its extracted text? This cannot be undone.`}
   confirmText="Delete Document"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDelete}
   onCancel={() => (docToDelete = null)}
 />
@@ -776,6 +802,7 @@
   message={`Are you sure you want to delete ${table.selectedCount} selected document specification(s)? This action cannot be undone.`}
   confirmText="Delete Selected Documents"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => table.clearSelection()}
 />

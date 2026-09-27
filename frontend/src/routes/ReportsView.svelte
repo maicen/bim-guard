@@ -47,6 +47,7 @@
   import TabStrip, { type TabStripItem } from "../lib/components/TabStrip.svelte";
   import { Select, type SelectOption } from "../lib/components/ui";
   import Alert from "../lib/components/Alert.svelte";
+  import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
@@ -356,28 +357,44 @@
 
   async function confirmDeleteTopic() {
     if (!topicToDelete || !selectedProjectId) return;
-    try {
-      await bcfApi.deleteTopic(selectedProjectId, topicToDelete.guid);
-      bcfTopics = bcfTopics.filter((t) => t.guid !== topicToDelete!.guid);
-      topicTable.selectedIds.delete(topicToDelete!.guid);
-      topicToDelete = null;
-    } catch (err: any) {
-      error = `Failed to delete topic: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, topicToDelete.guid)];
-    }
+    const target = topicToDelete;
+    const projId = selectedProjectId;
+    topicToDelete = null;
+
+    await topicTable.optimisticDelete({
+      ids: target.guid,
+      action: () => bcfApi.deleteTopic(projId, target.guid),
+      onSuccess: () => {
+        bcfTopics = bcfTopics.filter((t) => t.guid !== target.guid);
+        toasts.success(`Deleted topic "${target.title}".`);
+      },
+      onError: (err) => {
+        error = `Failed to delete topic: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, target.guid)];
+        toasts.fromError(err, `Could not delete "${target.title}"`);
+      },
+    });
   }
 
   async function confirmBulkDeleteTopics() {
     if (!topicTable.selectedCount || !selectedProjectId) return;
-    try {
-      await bcfApi.bulkDeleteTopics(selectedProjectId, topicTable.selectedIdList);
-      bcfTopics = bcfTopics.filter((t) => !topicTable.selectedIds.has(t.guid));
-      topicTable.clearSelection();
-      isTopicBulkDeleteModalOpen = false;
-    } catch (err: any) {
-      error = `Failed to delete selected topics: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `${topicTable.selectedIdList.length} topic(s)`)];
-    }
+    const targetIds = [...topicTable.selectedIdList];
+    const projId = selectedProjectId;
+    const count = targetIds.length;
+
+    await topicTable.optimisticDelete({
+      ids: targetIds,
+      action: () => bcfApi.bulkDeleteTopics(projId, targetIds),
+      onSuccess: () => {
+        bcfTopics = bcfTopics.filter((t) => !targetIds.includes(t.guid));
+        toasts.success(`Deleted ${count} topic(s).`);
+      },
+      onError: (err) => {
+        error = `Failed to delete selected topics: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, `${count} topic(s)`)];
+        toasts.fromError(err, `Could not delete ${count} topics`);
+      },
+    });
   }
 
   function exportArtifactsToCsv(type: ArtifactType) {
@@ -428,15 +445,22 @@
   async function confirmDeleteArtifact() {
     if (!artifactToDelete) return;
     const { type, artifact } = artifactToDelete;
-    try {
-      await analyzeApi.deleteReportArtifact(type, artifact.id);
-      setArtifactsFor(type, artifactsFor(type).filter((a) => a.id !== artifact.id));
-      tableFor(type).selectedIds.delete(artifact.id);
-      artifactToDelete = null;
-    } catch (err: any) {
-      error = `Failed to delete ${type.toUpperCase()} artifact: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `${type} artifact #${artifact.id}`)];
-    }
+    const table = tableFor(type);
+    artifactToDelete = null;
+
+    await table.optimisticDelete({
+      ids: artifact.id,
+      action: () => analyzeApi.deleteReportArtifact(type, artifact.id),
+      onSuccess: () => {
+        setArtifactsFor(type, artifactsFor(type).filter((a) => a.id !== artifact.id));
+        toasts.success(`Deleted ${type.toUpperCase()} artifact.`);
+      },
+      onError: (err) => {
+        error = `Failed to delete ${type.toUpperCase()} artifact: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, `${type} artifact #${artifact.id}`)];
+        toasts.fromError(err, `Could not delete ${type.toUpperCase()} artifact`);
+      },
+    });
   }
 
   function promptBulkDeleteArtifacts(type: ArtifactType) {
@@ -448,24 +472,34 @@
     const type = bulkDeleteType;
     const table = tableFor(type);
     if (!table.selectedCount) return;
-    const targetIds = table.selectedIdList;
-    const failures: ErrorLogEntry[] = [];
-    const deletedIds = new Set<number>();
-    for (const id of targetIds) {
-      try {
-        await analyzeApi.deleteReportArtifact(type, id);
-        deletedIds.add(id);
-      } catch (err: any) {
-        failures.push(toErrorLogEntry(err, `${type} artifact #${id}`));
-      }
-    }
-    setArtifactsFor(type, artifactsFor(type).filter((a) => !deletedIds.has(a.id)));
-    table.clearSelection();
-    isBulkDeleteArtifactsModalOpen = false;
-    if (failures.length > 0) {
-      errorLog = failures;
-      error = `Could not delete ${failures.length} of ${targetIds.length} selected ${type.toUpperCase()} artifacts: ${failures[0].message}`;
-    }
+    const targetIds = [...table.selectedIdList];
+    const count = targetIds.length;
+
+    await table.optimisticDelete({
+      ids: targetIds,
+      action: async () => {
+        const failures: ErrorLogEntry[] = [];
+        for (const id of targetIds) {
+          try {
+            await analyzeApi.deleteReportArtifact(type, id);
+          } catch (err: any) {
+            failures.push(toErrorLogEntry(err, `${type} artifact #${id}`));
+          }
+        }
+        if (failures.length > 0) {
+          errorLog = failures;
+          throw new Error(`Could not delete ${failures.length} of ${targetIds.length} artifacts.`);
+        }
+      },
+      onSuccess: () => {
+        setArtifactsFor(type, artifactsFor(type).filter((a) => !targetIds.includes(a.id)));
+        toasts.success(`Deleted ${count} ${type.toUpperCase()} artifact(s).`);
+      },
+      onError: (err) => {
+        error = err.message || `Failed to delete ${type.toUpperCase()} artifacts.`;
+        toasts.fromError(err, `Could not delete ${count} artifacts`);
+      },
+    });
   }
 
   function getProjectName(projId: number): string {
@@ -703,7 +737,7 @@
                       topic.guid,
                     )
                       ? 'bg-surface-selected'
-                      : ''}"
+                      : ''} {topicTable.isPending(topic.guid) ? 'opacity-50 pointer-events-none' : ''}"
                   >
                     <td class="w-10 px-4 py-3">
                       <TableCheckbox
@@ -956,6 +990,7 @@
     message={`Are you sure you want to delete topic "${topicToDelete?.title || ""}"? This will also remove all associated viewpoints and discussion history.`}
     confirmText="Delete Topic"
     danger={true}
+    optimistic={true}
     onConfirm={confirmDeleteTopic}
     onCancel={() => (topicToDelete = null)}
   />
@@ -967,6 +1002,7 @@
     message={`Are you sure you want to delete ${topicTable.selectedCount} selected BCF topic(s)? This cannot be undone.`}
     confirmText="Delete Selected Topics"
     danger={true}
+    optimistic={true}
     onConfirm={confirmBulkDeleteTopics}
     onCancel={() => topicTable.clearSelection()}
   />
@@ -979,6 +1015,7 @@
   message={`Are you sure you want to delete ${artifactToDelete?.type.toUpperCase() || ""} report "${artifactToDelete?.artifact.filename || ""}"?`}
   confirmText="Delete Report"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDeleteArtifact}
   onCancel={() => (artifactToDelete = null)}
 />
@@ -990,6 +1027,7 @@
   message={`Are you sure you want to delete ${tableFor(bulkDeleteType).selectedCount} selected ${bulkDeleteType.toUpperCase()} report(s)?`}
   confirmText="Delete Selected Reports"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDeleteArtifacts}
   onCancel={() => tableFor(bulkDeleteType).clearSelection()}
 />

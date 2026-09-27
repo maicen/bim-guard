@@ -10,6 +10,7 @@
     confirmText = "Delete",
     cancelText = "Cancel",
     danger = true,
+    optimistic = false,
     onConfirm,
     onCancel,
   }: {
@@ -19,6 +20,7 @@
     confirmText?: string;
     cancelText?: string;
     danger?: boolean;
+    optimistic?: boolean;
     onConfirm: () => void | Promise<void>;
     onCancel: () => void;
   } = $props();
@@ -26,6 +28,15 @@
   let isSubmitting = $state(false);
 
   async function handleConfirm() {
+    if (optimistic) {
+      isOpen = false;
+      try {
+        await onConfirm();
+      } catch (err) {
+        console.error("Optimistic confirm failed:", err);
+      }
+      return;
+    }
     isSubmitting = true;
     try {
       await onConfirm();

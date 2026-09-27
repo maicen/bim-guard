@@ -37,6 +37,7 @@
   import EmptyState from "../lib/components/EmptyState.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import Alert from "../lib/components/Alert.svelte";
+  import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import {
@@ -166,28 +167,42 @@
 
   async function confirmDelete() {
     if (!projectToDelete) return;
-    try {
-      await projectsApi.delete(projectToDelete.id);
-      projects = projects.filter((p) => p.id !== projectToDelete!.id);
-      table.selectedIds.delete(projectToDelete!.id);
-      projectToDelete = null;
-    } catch (err: any) {
-      error = `Could not delete project: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `project #${projectToDelete.id}`)];
-    }
+    const target = projectToDelete;
+    projectToDelete = null;
+
+    await table.optimisticDelete({
+      ids: target.id,
+      action: () => projectsApi.delete(target.id),
+      onSuccess: () => {
+        projects = projects.filter((p) => p.id !== target.id);
+        toasts.success(`Deleted project "${target.name}".`);
+      },
+      onError: (err) => {
+        error = `Could not delete project: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, `project #${target.id}`)];
+        toasts.fromError(err, `Could not delete "${target.name}"`);
+      },
+    });
   }
 
   async function confirmBulkDelete() {
     if (!table.selectedCount) return;
-    try {
-      await projectsApi.bulkDelete(table.selectedIdList);
-      projects = projects.filter((p) => !table.selectedIds.has(p.id));
-      table.clearSelection();
-      isBulkDeleteModalOpen = false;
-    } catch (err: any) {
-      error = `Could not delete selected projects: ${err.message}`;
-      errorLog = [toErrorLogEntry(err, `${table.selectedIdList.length} project(s)`)];
-    }
+    const targetIds = [...table.selectedIdList];
+    const count = targetIds.length;
+
+    await table.optimisticDelete({
+      ids: targetIds,
+      action: () => projectsApi.bulkDelete(targetIds),
+      onSuccess: () => {
+        projects = projects.filter((p) => !targetIds.includes(p.id));
+        toasts.success(`Deleted ${count} project(s).`);
+      },
+      onError: (err) => {
+        error = `Could not delete selected projects: ${err.message}`;
+        errorLog = [toErrorLogEntry(err, `${count} project(s)`)];
+        toasts.fromError(err, `Could not delete ${count} projects`);
+      },
+    });
   }
 
   async function handleBulkUpdated() {
@@ -508,7 +523,7 @@
                 <tr
                   class="transition-colors hover:bg-surface-hover {table.isSelected(project.id)
                     ? 'bg-surface-selected'
-                    : ''}"
+                    : ''} {table.isPending(project.id) ? 'opacity-50 pointer-events-none' : ''}"
                 >
                   <td class="w-10 px-4 py-3">
                     <TableCheckbox
@@ -721,6 +736,7 @@
   message={`Are you sure you want to delete project "${projectToDelete?.name || ""}" and its associated artifacts? This cannot be undone.`}
   confirmText="Delete Project"
   danger={true}
+  optimistic={true}
   onConfirm={confirmDelete}
   onCancel={() => (projectToDelete = null)}
 />
@@ -751,6 +767,7 @@
   message={`Are you sure you want to delete ${table.selectedCount} project(s) and their associated artifacts? This cannot be undone.`}
   confirmText={`Delete ${table.selectedCount} Project(s)`}
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDelete}
   onCancel={() => (isBulkDeleteModalOpen = false)}
 />

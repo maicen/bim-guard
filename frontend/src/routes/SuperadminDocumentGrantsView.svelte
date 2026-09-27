@@ -61,14 +61,21 @@
 
   async function confirmDeleteDocument() {
     if (!deletingDoc) return;
+    const target = deletingDoc;
+    const prevDocs = [...documents];
+    deletingDoc = null;
+
+    // Optimistic removal
+    documents = documents.filter((d) => d.id !== target.id);
+    selectedDocIds.delete(target.id);
+
     try {
-      await documentsApi.delete(deletingDoc.id);
-      toasts.success(`Document "${deletingDoc.filename}" deleted.`);
-      documents = documents.filter((d) => d.id !== deletingDoc!.id);
+      await documentsApi.delete(target.id);
+      toasts.success(`Document "${target.filename}" deleted.`);
     } catch (err) {
+      documents = prevDocs;
+      selectedDocIds.add(target.id);
       toasts.fromError(err, "Could not delete document.");
-    } finally {
-      deletingDoc = null;
     }
   }
 
@@ -706,6 +713,8 @@
       ? `This permanently deletes "${deletingDoc.filename}" and its extracted text for every organization. This cannot be undone.`
       : ""}
     confirmText="Delete Document"
+    danger={true}
+    optimistic={true}
     onConfirm={confirmDeleteDocument}
     onCancel={() => (deletingDoc = null)}
   />

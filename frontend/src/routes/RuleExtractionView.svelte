@@ -297,16 +297,24 @@
     draftReviewError = "";
     draftReviewErrorLog = [];
     successMessage = "";
-    try {
-      await reviewDraft(draft, status);
-    } catch (err: any) {
-      draftReviewError = describeDraftFailure(
-        err,
-        `Failed to ${status === "accepted" ? "accept" : "reject"} "${draft.proposed_rule.rule_id}".`,
-      );
-      draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
-      draftReviewErrorAction = status === "accepted" ? "accept" : "reject";
-    }
+
+    await draftTable.optimisticUpdate({
+      ids: draft.id!,
+      patch: { status },
+      action: () => ruleExtractionApi.reviewDraft(draft.id!, { status }),
+      onSuccess: (updated) => {
+        draftRules = draftRules.map((d) => (d.id === draft.id ? updated : d));
+        toasts.success(`Marked "${draft.proposed_rule.rule_id}" as ${status}.`);
+      },
+      onError: (err) => {
+        draftReviewError = describeDraftFailure(
+          err,
+          `Failed to ${status === "accepted" ? "accept" : "reject"} "${draft.proposed_rule.rule_id}".`,
+        );
+        draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
+        draftReviewErrorAction = status === "accepted" ? "accept" : "reject";
+      },
+    });
   }
 
   function openEditDraftModal(draft: RuleExtractionDraft) {
@@ -402,19 +410,25 @@
   async function promoteDraft(draft: RuleExtractionDraft): Promise<void> {
     draftReviewError = "";
     draftReviewErrorLog = [];
-    try {
-      const result = await ruleExtractionApi.promoteDraft(draft.id!);
-      draftRules = draftRules.filter((d) => d.id !== draft.id);
-      successMessage = `Promoted "${draft.proposed_rule.rule_id}" into the compliance rule library.`;
-      warnAboutAlignment(result, draft.proposed_rule.rule_id);
-    } catch (err: any) {
-      draftReviewError = describeDraftFailure(
-        err,
-        `Failed to promote "${draft.proposed_rule.rule_id}".`,
-      );
-      draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
-      draftReviewErrorAction = "promote";
-    }
+
+    await draftTable.optimisticDelete({
+      ids: draft.id!,
+      action: () => ruleExtractionApi.promoteDraft(draft.id!),
+      onSuccess: (result) => {
+        draftRules = draftRules.filter((d) => d.id !== draft.id);
+        successMessage = `Promoted "${draft.proposed_rule.rule_id}" into the compliance rule library.`;
+        toasts.success(`Promoted "${draft.proposed_rule.rule_id}".`);
+        warnAboutAlignment(result, draft.proposed_rule.rule_id);
+      },
+      onError: (err) => {
+        draftReviewError = describeDraftFailure(
+          err,
+          `Failed to promote "${draft.proposed_rule.rule_id}".`,
+        );
+        draftReviewErrorLog = [toErrorLogEntry(err, draftSubject(draft))];
+        draftReviewErrorAction = "promote";
+      },
+    });
   }
 
   // Which bulk action is in flight (drives the loading buttons) and how far along it is.
@@ -1294,7 +1308,7 @@
                   <tr
                     class="transition-colors hover:bg-surface-hover {draftTable.isSelected(draft.id!)
                       ? 'bg-surface-selected'
-                      : ''}"
+                      : ''} {draftTable.isPending(draft.id!) ? 'opacity-50 pointer-events-none' : ''}"
                   >
                     <td class="px-3 py-3 text-center">
                       <TableCheckbox
@@ -1612,7 +1626,7 @@
                 <tr
                   class="transition-colors hover:bg-surface-hover {table.isSelected(rule.rowId)
                     ? 'bg-surface-selected'
-                    : ''}"
+                    : ''} {table.isPending(rule.rowId) ? 'opacity-50 pointer-events-none' : ''}"
                 >
                   <td class="px-3 py-3 text-center">
                     <TableCheckbox
@@ -2127,6 +2141,7 @@
   message={`Are you sure you want to remove ${table.selectedCount} selected draft rule(s) from this extraction batch?`}
   confirmText="Delete Draft Rules"
   danger={true}
+  optimistic={true}
   onConfirm={confirmBulkDeleteDrafts}
   onCancel={() => (isDraftBulkDeleteModalOpen = false)}
 />

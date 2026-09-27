@@ -1,7 +1,8 @@
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteSet, SvelteMap } from "svelte/reactivity";
+import { toasts } from "./toast.svelte";
 
 /**
- * Search / filter / sort / paginate / select state for a data table.
+ * Search / filter / sort / paginate / select / optimistic state for a data table.
  *
  * Eight route files each re-implemented these four concerns, and they had
  * already drifted: two views sorted the same column differently because one
@@ -24,6 +25,34 @@ import { SvelteSet } from "svelte/reactivity";
 export type SortDirection = "asc" | "desc";
 
 export type RowId = string | number;
+
+export interface OptimisticDeleteOptions<Id, R = unknown> {
+  /** Target row ID or array of IDs to optimistically remove */
+  ids: Id | Id[];
+  /** Server action promise to perform */
+  action: () => Promise<R>;
+  /** Callback called immediately after server succeeds */
+  onSuccess?: (result: R) => void;
+  /** Callback called if server action fails (defaults to toast notification) */
+  onError?: (error: any) => void;
+  /** Optional rollback hook */
+  rollback?: () => void;
+}
+
+export interface OptimisticUpdateOptions<T, Id, R = unknown> {
+  /** Target row ID or array of IDs to optimistically patch */
+  ids: Id | Id[];
+  /** Patch object or callback returning patch per row */
+  patch: Partial<T> | ((row: T) => Partial<T>);
+  /** Server action promise to perform */
+  action: () => Promise<R>;
+  /** Callback called immediately after server succeeds */
+  onSuccess?: (result: R) => void;
+  /** Callback called if server action fails (defaults to toast notification) */
+  onError?: (error: any) => void;
+  /** Optional rollback hook */
+  rollback?: () => void;
+}
 
 export interface TableStateOptions<T, Id extends RowId = RowId> {
   /** Getter for the full row set; called inside a $derived so it stays live. */
@@ -66,6 +95,12 @@ export class TableState<T, Id extends RowId = RowId> {
   requestedPage = $state(1);
   selectedIds = new SvelteSet<Id>();
 
+  /** Optimistically pending deletions (hidden from table derived views). */
+  pendingDeletions = new SvelteSet<Id>();
+
+  /** Optimistically pending updates/patches (merged into table derived views). */
+  pendingUpdates = new SvelteMap<Id, Partial<T>>();
+
   constructor(options: TableStateOptions<T, Id>) {
     this.#options = options;
     this.sortField = options.initialSort?.field ?? "";
@@ -96,7 +131,16 @@ export class TableState<T, Id extends RowId = RowId> {
     const { rows, searchFields, filters } = this.#options;
     const needle = this.search.trim().toLowerCase();
 
-    return rows().filter((row) => {
+    // 1. Exclude rows optimistically marked for deletion
+    // 2. Overlay any optimistic in-flight field patches
+    const activeRows = rows()
+      .filter((row) => !this.pendingDeletions.has(this.#options.getId(row)))
+      .map((row) => {
+        const patch = this.pendingUpdates.get(this.#options.getId(row));
+        return patch ? { ...row, ...patch } : row;
+      });
+
+    return activeRows.filter((row) => {
       if (needle && searchFields) {
         const hit = searchFields(row).some((field) =>
           (field ?? "").toString().toLowerCase().includes(needle),
@@ -218,6 +262,164 @@ export class TableState<T, Id extends RowId = RowId> {
       this.search.trim() !== "" ||
       Object.values(this.filters).some((v) => v && v.toLowerCase() !== "all")
     );
+  }
+
+  // --- optimistic mutation & status helpers ---------------------------------
+
+  /** Returns true if the row has any in-flight optimistic operation (deletion or update). */
+  isPending(id: Id): boolean {
+    return this.pendingDeletions.has(id) || this.pendingUpdates.has(id);
+  }
+
+  /** Returns true if the row is currently undergoing optimistic deletion. */
+  isPendingDeletion(id: Id): boolean {
+    return this.pendingDeletions.has(id);
+  }
+
+  /** Returns true if the row has an active optimistic patch applied. */
+  isPendingUpdate(id: Id): boolean {
+    return this.pendingUpdates.has(id);
+  }
+
+  /** Returns the active optimistic patch for the specified row, if any. */
+  getPendingUpdate(id: Id): Partial<T> | undefined {
+    return this.pendingUpdates.get(id);
+  }
+
+  /** Helper to generate accessible optimistic pending CSS classes for table rows. */
+  rowClass(id: Id, baseClass = ""): string {
+    const isPending = this.isPending(id);
+    if (!isPending) return baseClass;
+    return baseClass
+      ? `${baseClass} opacity-50 pointer-events-none transition-opacity duration-200`
+      : "opacity-50 pointer-events-none transition-opacity duration-200";
+  }
+
+  /**
+   * Perform an optimistic deletion on one or multiple rows.
+   *
+   * 1. Instantly removes the rows from selection and table derived views (`filtered`, `sorted`, `paginated`).
+   * 2. Executes the server action promise.
+   * 3. On success: calls `onSuccess`, cleans up pending state, and returns `{ success: true, result }`.
+   * 4. On failure: rolls back row visibility, restores previous selection, calls `rollback` and `onError`,
+   *    and returns `{ success: false, error }`.
+   */
+  async optimisticDelete<R = unknown>(
+    options: OptimisticDeleteOptions<Id, R>,
+  ): Promise<{ success: boolean; result?: R; error?: any }> {
+    const targetIds = Array.isArray(options.ids) ? options.ids : [options.ids];
+    if (targetIds.length === 0) return { success: true };
+
+    // Remember which rows were selected so selection can be restored on failure
+    const selectedToRestore = targetIds.filter((id) => this.selectedIds.has(id));
+
+    // Optimistically hide rows and remove from selection
+    for (const id of targetIds) {
+      this.selectedIds.delete(id);
+      this.pendingDeletions.add(id);
+    }
+
+    try {
+      const result = await options.action();
+      options.onSuccess?.(result);
+      for (const id of targetIds) {
+        this.pendingDeletions.delete(id);
+      }
+      return { success: true, result };
+    } catch (err: any) {
+      // Roll back
+      for (const id of targetIds) {
+        this.pendingDeletions.delete(id);
+      }
+      for (const id of selectedToRestore) {
+        this.selectedIds.add(id);
+      }
+      options.rollback?.();
+      if (options.onError) {
+        options.onError(err);
+      } else {
+        toasts.fromError(err, "Failed to complete deletion. Changes were reverted.");
+      }
+      return { success: false, error: err };
+    }
+  }
+
+  /**
+   * Perform an optimistic update/patch on one or multiple rows.
+   *
+   * 1. Instantly applies `patch` to the target rows in all derived views.
+   * 2. Executes the server action promise.
+   * 3. On success: calls `onSuccess`, cleans up pending patch, and returns `{ success: true, result }`.
+   * 4. On failure: rolls back patches, calls `rollback` and `onError`, and returns `{ success: false, error }`.
+   */
+  async optimisticUpdate<R = unknown>(
+    options: OptimisticUpdateOptions<T, Id, R>,
+  ): Promise<{ success: boolean; result?: R; error?: any }> {
+    const targetIds = Array.isArray(options.ids) ? options.ids : [options.ids];
+    if (targetIds.length === 0) return { success: true };
+
+    const rowMap = new Map<Id, T>();
+    for (const row of this.#options.rows()) {
+      rowMap.set(this.#options.getId(row), row);
+    }
+
+    // Apply optimistic in-memory patches
+    for (const id of targetIds) {
+      const row = rowMap.get(id);
+      const patch =
+        typeof options.patch === "function" && row
+          ? options.patch(row)
+          : (options.patch as Partial<T>);
+      this.pendingUpdates.set(id, patch);
+    }
+
+    try {
+      const result = await options.action();
+      options.onSuccess?.(result);
+      for (const id of targetIds) {
+        this.pendingUpdates.delete(id);
+      }
+      return { success: true, result };
+    } catch (err: any) {
+      // Roll back patches
+      for (const id of targetIds) {
+        this.pendingUpdates.delete(id);
+      }
+      options.rollback?.();
+      if (options.onError) {
+        options.onError(err);
+      } else {
+        toasts.fromError(err, "Failed to update item. Changes were reverted.");
+      }
+      return { success: false, error: err };
+    }
+  }
+
+  /**
+   * General-purpose optimistic action runner for custom state changes.
+   * Immediately calls `apply()`, runs `action()`, and on error calls `rollback()`.
+   */
+  async runOptimistic<R = unknown>(options: {
+    apply: () => void;
+    rollback: () => void;
+    action: () => Promise<R>;
+    onSuccess?: (result: R) => void;
+    onError?: (error: any) => void;
+  }): Promise<{ success: boolean; result?: R; error?: any }> {
+    options.apply();
+    try {
+      const result = await options.action();
+      options.onSuccess?.(result);
+      return { success: true, result };
+    } catch (err: any) {
+      options.rollback();
+      if (options.onError) {
+        options.onError(err);
+      } else {
+        toasts.fromError(err, "Action failed. Changes were reverted.");
+      }
+      return { success: false, error: err };
+    }
   }
 }
 
