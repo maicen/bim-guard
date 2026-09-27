@@ -3,7 +3,7 @@
 
   export function navigationMenuTriggerStyle(className?: string): string {
     return cn(
-      "group inline-flex h-9 w-max items-center justify-center rounded-lg bg-transparent px-3 py-2 text-xs font-medium text-fg-secondary transition-colors outline-hidden select-none hover:bg-surface-hover hover:text-fg-primary focus:bg-surface-hover focus:text-fg-primary focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-surface-hover data-[state=open]:text-fg-primary",
+      "group inline-flex h-9.5 w-max items-center justify-center rounded-xl bg-transparent px-3.5 py-2 text-sm font-medium text-fg-secondary transition-colors outline-hidden select-none hover:bg-surface-hover hover:text-fg-primary focus:bg-surface-hover focus:text-fg-primary focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-surface-hover data-[state=open]:text-fg-primary",
       className,
     );
   }

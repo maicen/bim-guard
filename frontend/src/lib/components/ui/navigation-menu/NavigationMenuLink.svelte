@@ -17,7 +17,7 @@
   bind:ref
   data-slot="navigation-menu-link"
   class={cn(
-    "flex flex-col gap-1 rounded-lg p-2.5 text-xs text-fg-secondary outline-hidden transition-colors hover:bg-surface-hover hover:text-fg-primary focus:bg-surface-hover focus:text-fg-primary focus-visible:ring-2 focus-visible:ring-accent data-[active=true]:bg-surface-selected data-[active=true]:text-fg-primary [&_svg:not([class*='text-'])]:text-fg-muted [&_svg:not([class*='size-'])]:h-4 [&_svg:not([class*='size-'])]:w-4",
+    "flex flex-col gap-1 rounded-xl p-3 text-sm text-fg-secondary outline-hidden transition-colors hover:bg-surface-hover hover:text-fg-primary focus:bg-surface-hover focus:text-fg-primary focus-visible:ring-2 focus-visible:ring-accent data-[active=true]:bg-surface-selected data-[active=true]:text-fg-primary [&_svg:not([class*='text-'])]:text-fg-muted",
     className,
   )}
   {...restProps}
