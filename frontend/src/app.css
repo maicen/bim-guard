@@ -577,11 +577,41 @@ html:not(.dark) .bg-accent-hover *,
 html:not(.dark) button.bg-blue-600 *,
 html:not(.dark) button.bg-emerald-600 *,
 html:not(.dark) button.bg-rose-600 *,
+html.light .keep-white,
+html.light .keep-white *,
+html.light .bg-gradient-to-tr *,
+html.light .bg-gradient-to-r *,
 html:not(.dark) .keep-white,
 html:not(.dark) .keep-white *,
 html:not(.dark) .bg-gradient-to-tr *,
 html:not(.dark) .bg-gradient-to-r * {
   color: #ffffff;
+}
+
+/* Animation utilities for marketing and pipeline blocks */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes beam-flow {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.animate-beam {
+  stroke-dasharray: 6 6;
+  animation: beam-flow 1.5s linear infinite;
 }
 
 /* Light mode card elevation & shadows */
