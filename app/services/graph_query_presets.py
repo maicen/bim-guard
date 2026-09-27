@@ -107,6 +107,99 @@ GRAPH_QUERY_PRESETS: tuple[GraphQueryPreset, ...] = (
             "ORDER BY failure_count DESC"
         ),
     ),
+    # -------------------------------------------------------------------------
+    # Pre-Flight Model Health & Data Quality Checks (Cypher Audit Presets)
+    # -------------------------------------------------------------------------
+    GraphQueryPreset(
+        key="model-health-doors-missing-fire-rating",
+        label="Doors missing fire rating",
+        description="Doors without a defined fire rating property (critical egress safety requirement).",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id AND (n.ifc_type = 'IfcDoor' OR n:IfcDoor) "
+            "AND (n.fire_rating IS NULL OR n.fire_rating = '' OR NOT EXISTS(n.fire_rating)) "
+            "RETURN n.guid AS guid, n.name AS name, n.ifc_type AS type LIMIT 100"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-unassigned-storeys",
+        label="Elements without storey assignment",
+        description="Physical elements not contained within any building storey (spatial hierarchy defect).",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "AND NOT n.ifc_type IN ['IfcProject', 'IfcSite', 'IfcBuilding', 'IfcBuildingStorey', 'IfcSpace'] "
+            "OPTIONAL MATCH (s)-[:CONTAINS]-(n) WHERE s.project_id = $project_id AND s.ifc_type = 'IfcBuildingStorey' "
+            "WITH n, count(s) AS storeys "
+            "WHERE storeys = 0 "
+            "RETURN n.guid AS guid, n.name AS name, n.ifc_type AS type LIMIT 100"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-spaces-missing-attributes",
+        label="Spaces missing name or number",
+        description="Spaces lacking required identification attributes for zone and occupancy checking.",
+        cypher=(
+            "MATCH (s) WHERE s.project_id = $project_id AND s.ifc_type = 'IfcSpace' "
+            "AND (s.name IS NULL OR s.name = '' OR s.name = 'IfcSpace') "
+            "RETURN s.guid AS guid, s.name AS name, s.ifc_type AS type LIMIT 100"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-elements-without-psets",
+        label="Elements without property sets",
+        description="Physical building elements missing property sets (metadata completeness).",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "AND NOT n.ifc_type IN ['IfcProject', 'IfcSite', 'IfcBuilding', 'IfcBuildingStorey'] "
+            "AND (n.has_psets = false OR n.pset_count = 0) "
+            "RETURN n.guid AS guid, n.name AS name, n.ifc_type AS type LIMIT 100"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-empty-property-values",
+        label="Elements with blank or empty names",
+        description="Elements where essential identifier or name properties are empty whitespace.",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id AND (n.name IS NULL OR trim(n.name) = '') "
+            "RETURN n.guid AS guid, n.ifc_type AS type LIMIT 100"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-categories-with-most-incomplete-data",
+        label="Categories with most uncontained elements",
+        description="Aggregated count of elements lacking storey containment grouped by IFC class.",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "AND NOT n.ifc_type IN ['IfcProject', 'IfcSite', 'IfcBuilding', 'IfcBuildingStorey', 'IfcSpace'] "
+            "OPTIONAL MATCH (s)-[:CONTAINS]-(n) WHERE s.project_id = $project_id AND s.ifc_type = 'IfcBuildingStorey' "
+            "WITH n.ifc_type AS type, count(n) AS total, count(s) AS with_storey "
+            "RETURN type, total, (total - with_storey) AS unassigned_count "
+            "ORDER BY unassigned_count DESC"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-possible-duplicates",
+        label="Possible duplicate elements",
+        description="Elements sharing identical names and IFC types, indicating potential duplicate geometry.",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id AND n.name IS NOT NULL AND n.name <> '' "
+            "WITH n.name AS name, n.ifc_type AS type, collect(n.guid) AS guids, count(n) AS instances "
+            "WHERE instances > 1 AND NOT type IN ['IfcProject', 'IfcSite', 'IfcBuilding', 'IfcBuildingStorey', 'IfcOpeningElement'] "
+            "RETURN name, type, instances, guids LIMIT 50"
+        ),
+    ),
+    GraphQueryPreset(
+        key="model-health-isolated-elements",
+        label="Isolated / unconnected elements",
+        description="Physical elements with zero graph edges (disconnected floating elements).",
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "AND NOT n.ifc_type IN ['IfcProject', 'IfcSite', 'IfcBuilding', 'IfcBuildingStorey'] "
+            "OPTIONAL MATCH (n)-[r]-() "
+            "WITH n, count(r) AS degree "
+            "WHERE degree = 0 "
+            "RETURN n.guid AS guid, n.name AS name, n.ifc_type AS type LIMIT 100"
+        ),
+    ),
 )
 
 _PRESETS_BY_KEY = {preset.key: preset for preset in GRAPH_QUERY_PRESETS}

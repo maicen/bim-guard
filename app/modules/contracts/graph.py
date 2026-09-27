@@ -6,7 +6,35 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-__all__ = ['ProofNodeType', 'ProofEdgeType', 'ProofNodeContract', 'ProofEdgeContract', 'IssueProofGraphContract', 'DecisionCausalChainResponse', 'RuleImpactResponse', 'GraphStatusContract', 'SpatialTreeNodeContract', 'SpatialTreeResponse', 'ElementRelationEdge', 'ElementRelationshipsResponse', 'GraphQueryPresetSummary', 'GraphQueryPresetListResponse', 'GraphQueryResultResponse', 'CodeToIfcTraceEntry', 'CodeToIfcTraceResponse', 'GraphHealResponse', 'InspectorQueryRequest', 'InspectorToolCallContract', 'InspectorResponse']
+__all__ = [
+    'ProofNodeType',
+    'ProofEdgeType',
+    'ProofNodeContract',
+    'ProofEdgeContract',
+    'IssueProofGraphContract',
+    'DecisionCausalChainResponse',
+    'RuleImpactResponse',
+    'GraphStatusContract',
+    'SpatialTreeNodeContract',
+    'SpatialTreeResponse',
+    'ElementRelationEdge',
+    'ElementRelationshipsResponse',
+    'GraphQueryPresetSummary',
+    'GraphQueryPresetListResponse',
+    'GraphQueryResultResponse',
+    'CodeToIfcTraceEntry',
+    'CodeToIfcTraceResponse',
+    'GraphHealResponse',
+    'InspectorQueryRequest',
+    'InspectorToolCallContract',
+    'InspectorResponse',
+    'ModelHealthCheckItem',
+    'ModelHealthAuditReport',
+    'RegulatoryClauseNode',
+    'RegulatoryRequirementItem',
+    'RegulatoryGraphContextResponse',
+    'GoverningRequirementsResponse',
+]
 
 # ---------------------------------------------------------------------------
 # Explainability Proof Graph & Graph Intelligence Contracts
@@ -208,3 +236,99 @@ class InspectorResponse(BaseModel):
     project_id: int
     answer: str
     tool_calls: list[InspectorToolCallContract] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Pre-Flight Model Health Audit Contracts (Data Quality via Cypher)
+# ---------------------------------------------------------------------------
+
+class ModelHealthCheckItem(BaseModel):
+    """One automated IFC data-quality audit check result."""
+
+    key: str = Field(..., description="Unique check identifier (e.g. doors-missing-fire-rating)")
+    name: str = Field(..., description="Human-readable title of the quality check")
+    description: str = Field(..., description="Description of the quality rule being evaluated")
+    severity: Literal["info", "warning", "critical"] = Field(
+        "warning", description="Severity classification of the audit finding"
+    )
+    passed: bool = Field(..., description="True if no elements violated the quality rule")
+    violation_count: int = Field(0, description="Number of elements failing this check")
+    details: list[dict[str, Any]] = Field(
+        default_factory=list, description="Sample of violating elements with GUID, Name, and issue context"
+    )
+    recommendation: str = Field(
+        "", description="Actionable remediation advice for the BIM author or coordinator"
+    )
+
+
+class ModelHealthAuditReport(BaseModel):
+    """Comprehensive Model Data Health & Hygiene Audit Report."""
+
+    project_id: int = Field(..., description="Project database ID")
+    health_score: float = Field(
+        ..., description="Overall model health completeness score (0.0 to 100.0)"
+    )
+    grade: Literal["A", "B", "C", "D", "F"] = Field(
+        ..., description="Letter grade reflecting model readiness for downstream compliance engines"
+    )
+    total_elements_audited: int = Field(0, description="Total physical elements inspected")
+    total_violations: int = Field(0, description="Total violation instances across all checks")
+    checks: list[ModelHealthCheckItem] = Field(
+        default_factory=list, description="Individual quality checks evaluated"
+    )
+    evaluated_at: str = Field(..., description="ISO 8601 timestamp of evaluation")
+
+
+# ---------------------------------------------------------------------------
+# Regulatory Knowledge Graph Contracts (GraphRAG for Building Standards)
+# ---------------------------------------------------------------------------
+
+class RegulatoryClauseNode(BaseModel):
+    """A clause node in the regulatory knowledge graph."""
+
+    clause_id: str = Field(..., description="Standard-scoped clause identifier, e.g. IBC-1017.2")
+    standard: str = Field(..., description="Building code standard, e.g. IBC 2024, NFPA 101, ADA 2010")
+    section: str = Field(..., description="Parent section number or title")
+    title: str = Field(..., description="Descriptive title of the regulatory requirement")
+    text: str = Field("", description="Full or excerpted regulatory text")
+    target_ifc_types: list[str] = Field(
+        default_factory=list, description="IFC entity classes governed by this clause"
+    )
+    cross_references: list[str] = Field(
+        default_factory=list, description="Referenced clause IDs cited in text"
+    )
+
+
+class RegulatoryRequirementItem(BaseModel):
+    """An atomic measurable requirement extracted from a regulatory standard."""
+
+    rule_id: Optional[int] = None
+    standard: str
+    clause: str
+    target_ifc_type: str
+    parameter: str
+    operator: str
+    value: Any
+    unit: Optional[str] = None
+    severity: str = "critical"
+    description: str = ""
+
+
+class RegulatoryGraphContextResponse(BaseModel):
+    """Full regulatory graph context for a specific clause or standard."""
+
+    clause: RegulatoryClauseNode
+    parent_section: Optional[str] = None
+    cross_referenced_clauses: list[RegulatoryClauseNode] = Field(default_factory=list)
+    governed_ifc_types: list[str] = Field(default_factory=list)
+    extracted_requirements: list[RegulatoryRequirementItem] = Field(default_factory=list)
+
+
+class GoverningRequirementsResponse(BaseModel):
+    """All regulatory requirements governing a given IFC class across standards."""
+
+    ifc_type: str
+    total_requirements: int = 0
+    standards_covered: list[str] = Field(default_factory=list)
+    requirements: list[RegulatoryRequirementItem] = Field(default_factory=list)
+

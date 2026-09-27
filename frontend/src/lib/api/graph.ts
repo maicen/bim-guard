@@ -2,8 +2,11 @@ import type {
   CodeToIfcTraceResponse,
   DecisionCausalChainResponse,
   ElementRelationshipsResponse,
+  GoverningRequirementsResponse,
   GraphQueryPresetListResponse,
   GraphQueryResultResponse,
+  ModelHealthAuditReport,
+  RegulatoryGraphContextResponse,
   RuleImpactResponse,
   SparqlQueryResult,
   SpatialTreeResponse,
@@ -12,6 +15,31 @@ import { withAuthToken } from "../authToken";
 import { API_BASE, apiFetch, handleResponse } from "./client";
 
 export const graphApi = {
+  /** Run automated pre-flight model data health and quality audit checks (inspired by ifc-to-graph-assignment). */
+  async getModelHealth(projectId: number): Promise<ModelHealthAuditReport> {
+    const res = await apiFetch(`${API_BASE}/graph/${projectId}/model-health`);
+    return handleResponse<ModelHealthAuditReport>(res);
+  },
+
+  /** Retrieve full contextual knowledge graph neighborhood for a regulatory clause. */
+  async getRegulatoryClauseContext(clauseRef: string): Promise<RegulatoryGraphContextResponse> {
+    const res = await apiFetch(`${API_BASE}/graph/regulations/clauses/${encodeURIComponent(clauseRef)}`);
+    return handleResponse<RegulatoryGraphContextResponse>(res);
+  },
+
+  /** Get all regulatory requirements governing an IFC entity class across standards. */
+  async getGoverningRequirements(ifcType: string = "IfcDoor"): Promise<GoverningRequirementsResponse> {
+    const res = await apiFetch(`${API_BASE}/graph/regulations/requirements?ifc_type=${encodeURIComponent(ifcType)}`);
+    return handleResponse<GoverningRequirementsResponse>(res);
+  },
+
+  /** Ingest regulatory standards and catalog rules into the graph database. */
+  async ingestRegulatoryGraph(): Promise<Record<string, any>> {
+    const res = await apiFetch(`${API_BASE}/graph/regulations/ingest`, {
+      method: "POST",
+    });
+    return handleResponse<Record<string, any>>(res);
+  },
   /** The project's IFC spatial containment tree (Project->Site->Building->Storey->Space->Element). */
   async getSpatialTree(projectId: number): Promise<SpatialTreeResponse> {
     const res = await apiFetch(`${API_BASE}/graph/${projectId}/spatial-tree`);

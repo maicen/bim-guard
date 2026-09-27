@@ -23,6 +23,7 @@ from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
 from app.services.membership_service import MembershipService
+from app.services.model_health_service import ModelHealthService
 from app.services.models_service import ModelsService
 from app.services.naming_config_service import NamingConfigService
 from app.services.parsing_engine_instances_service import ParsingEngineInstancesService
@@ -30,6 +31,7 @@ from app.services.permission_service import PermissionService
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.regulatory_graph_service import RegulatoryGraphService
 from app.services.report_service import ReportService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
@@ -123,6 +125,19 @@ def get_digital_inspector_service() -> DigitalInspectorService:
 def get_graph_service() -> GraphService:
     """Return the configured GraphService instance."""
     return get_container().graph_service
+
+
+def get_model_health_service() -> ModelHealthService:
+    """Return the configured ModelHealthService instance."""
+    return ModelHealthService(get_container().graph_service)
+
+
+def get_regulatory_graph_service() -> RegulatoryGraphService:
+    """Return the configured RegulatoryGraphService instance."""
+    return RegulatoryGraphService(
+        rules_service=get_container().rules_service,
+        graph_service=get_container().graph_service,
+    )
 
 
 def get_parsing_engine_instances_service() -> ParsingEngineInstancesService:

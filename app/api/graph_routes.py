@@ -7,7 +7,13 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 
-from app.api.dependencies import get_graph_service, get_models_service, get_rules_service
+from app.api.dependencies import (
+    get_graph_service,
+    get_model_health_service,
+    get_models_service,
+    get_regulatory_graph_service,
+    get_rules_service,
+)
 from app.api.projects import (
     ProjectAccessChecker,
     get_project_access_checker,
@@ -19,12 +25,15 @@ from app.modules.contracts import (
     CodeToIfcTraceResponse,
     DecisionCausalChainResponse,
     ElementRelationshipsResponse,
+    GoverningRequirementsResponse,
     GraphHealResponse,
     GraphQueryPresetListResponse,
     GraphQueryPresetSummary,
     GraphQueryResultResponse,
     GraphStatusContract,
     IssueProofGraphContract,
+    ModelHealthAuditReport,
+    RegulatoryGraphContextResponse,
     RuleImpactResponse,
     SpatialTreeResponse,
 )
@@ -541,3 +550,76 @@ def export_prov_o_route(
         media_type="text/turtle",
         headers={"Content-Disposition": f'attachment; filename="bimguard_prov_{project_id}.ttl"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Pre-Flight Model Health Audit Endpoints (Data Quality via Cypher)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{project_id}/model-health",
+    response_model=ModelHealthAuditReport,
+    summary="Run pre-flight model health and data-quality audit checks",
+)
+def get_model_health_audit(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    model_health_service: Annotated[Any, Depends(get_model_health_service)],
+    models_service: Annotated[ModelsService, Depends(get_models_service)],
+) -> ModelHealthAuditReport:
+    """Evaluate 8 core data-quality and metadata hygiene checks across the project's IFC model graph."""
+    project_access(project_id)
+
+    path = models_service.resolve_primary_path(project_id)
+    total_elements = 0
+    if path and path.exists():
+        try:
+            import ifcopenshell
+            model = ifcopenshell.open(str(path))
+            total_elements = len(model.by_type("IfcProduct"))
+        except Exception:
+            total_elements = 0
+
+    return model_health_service.audit_project(project_id=project_id, total_elements=total_elements)
+
+
+# ---------------------------------------------------------------------------
+# Regulatory Knowledge Graph Endpoints (GraphRAG for Building Codes)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/regulations/clauses/{clause_ref:path}",
+    response_model=RegulatoryGraphContextResponse,
+    summary="Retrieve full knowledge graph neighborhood for a regulatory clause",
+)
+def get_regulatory_clause_context(
+    clause_ref: str,
+    regulatory_service: Annotated[Any, Depends(get_regulatory_graph_service)],
+) -> RegulatoryGraphContextResponse:
+    """Retrieve clause text, parent section, cross-references, and governed IFC types."""
+    return regulatory_service.get_clause_context(clause_ref=clause_ref)
+
+
+@router.get(
+    "/regulations/requirements",
+    response_model=GoverningRequirementsResponse,
+    summary="Get all regulatory requirements governing an IFC entity class",
+)
+def get_governing_requirements_by_ifc(
+    regulatory_service: Annotated[Any, Depends(get_regulatory_graph_service)],
+    ifc_type: str = Query("IfcDoor", description="IFC entity class to query (e.g. IfcDoor, IfcWall)"),
+) -> GoverningRequirementsResponse:
+    """Find all building code provisions mandating measurable parameters for an IFC type."""
+    return regulatory_service.get_governing_requirements(ifc_type=ifc_type)
+
+
+@router.post(
+    "/regulations/ingest",
+    summary="Ingest regulatory standards and rule catalog into the graph database",
+)
+def ingest_regulatory_graph(
+    regulatory_service: Annotated[Any, Depends(get_regulatory_graph_service)],
+) -> dict[str, Any]:
+    """Build and persist the connected regulatory knowledge graph in Neo4j."""
+    return regulatory_service.ingest_regulatory_graph()
+

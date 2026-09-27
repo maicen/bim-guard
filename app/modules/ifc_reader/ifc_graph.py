@@ -350,6 +350,7 @@ def ingest_ifc_to_graph(
     *,
     project_id: str | None = None,
     include_psets: bool = False,
+    reify_psets: bool = False,
     graph: nx.DiGraph | None = None,
 ) -> dict[str, int]:
     """Extract IFC entities and relationships and ingest them in batch into GraphService.
@@ -359,11 +360,9 @@ def ingest_ifc_to_graph(
         graph_service: An active GraphService instance connected to Neo4j or KùzuDB.
         project_id: Optional project identifier to associate with all ingested nodes.
         include_psets: Whether to flatten and attach property set values to element nodes.
+        reify_psets: Whether to create explicit PropertySet nodes and HAS_PROPERTY_SET edges.
         graph: An already-built graph for ``model_or_path`` (from
-            ``build_ifc_graph``), reused instead of building a second one --
-            for a caller (e.g. the orchestrator's graph intelligence
-            side-channel) that already built the graph for its own summary or
-            engine pass over the same model.
+            ``build_ifc_graph``), reused instead of building a second one.
 
     Returns:
         Dict with total counts of ingested nodes and relationships.
@@ -381,20 +380,64 @@ def ingest_ifc_to_graph(
 
     # Group nodes by label (ifc_type)
     nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
     for node_id, attrs in graph.nodes(data=True):
         ifc_type = attrs.get("ifc_type", "IfcProduct")
+        psets = attrs.get("psets") or {}
+        has_psets = bool(psets)
+        pset_count = len(psets)
+
         node_props: dict[str, Any] = {
             "id": node_id,
             "guid": node_id,
             "name": attrs.get("label", node_id),
             "ifc_type": ifc_type,
+            "has_psets": has_psets,
+            "pset_count": pset_count,
         }
         if project_id:
             node_props["project_id"] = project_id
 
-        if include_psets and attrs.get("psets"):
+        # Extract common quality & compliance attributes across property sets
+        for pset_name, pset_vals in psets.items():
+            if not isinstance(pset_vals, dict):
+                continue
+            for prop_key, prop_val in pset_vals.items():
+                if prop_val is None:
+                    continue
+                k_lower = prop_key.lower()
+                if ("firerating" in k_lower or "fire_rating" in k_lower) and "fire_rating" not in node_props:
+                    node_props["fire_rating"] = str(prop_val)
+                elif "isexternal" in k_lower and "is_external" not in node_props:
+                    node_props["is_external"] = str(prop_val)
+                elif "loadbearing" in k_lower and "load_bearing" not in node_props:
+                    node_props["load_bearing"] = str(prop_val)
+
+            # Reify property sets as distinct graph nodes and edges if requested
+            if reify_psets:
+                pset_node_id = f"{node_id}_{pset_name}"
+                pset_node_props = {
+                    "id": pset_node_id,
+                    "guid": pset_node_id,
+                    "name": pset_name,
+                    "ifc_type": "IfcPropertySet",
+                    "element_guid": node_id,
+                }
+                if project_id:
+                    pset_node_props["project_id"] = project_id
+                nodes_by_label["PropertySet"].append(pset_node_props)
+                edges_by_type["HAS_PROPERTY_SET"].append(
+                    {
+                        "source_id": node_id,
+                        "target_id": pset_node_id,
+                        "properties": {"project_id": project_id} if project_id else {},
+                    }
+                )
+
+        if include_psets and psets:
             # Flatten top property set keys if requested
-            for pset_name, pset_vals in attrs["psets"].items():
+            for pset_name, pset_vals in psets.items():
                 if isinstance(pset_vals, dict):
                     for k, v in list(pset_vals.items())[:10]:
                         safe_key = f"pset_{pset_name}_{k}".replace(" ", "_")
@@ -408,8 +451,7 @@ def ingest_ifc_to_graph(
         graph_service.add_nodes_batch(label, nodes)
         total_nodes += len(nodes)
 
-    # Group edges by rel_type
-    edges_by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    # Group graph edges by rel_type
     for source_id, target_id, attrs in graph.edges(data=True):
         rel_type = attrs.get("rel_type", "CONNECTS").upper()
         # Normalise relationship names to standard Cypher convention

@@ -166,3 +166,69 @@ export interface SparqlQueryResult {
   results?: { bindings: Record<string, { type: string; value: string }>[] };
   boolean?: boolean;
 }
+
+/** One automated IFC data-quality audit check result. */
+export interface ModelHealthCheckItem {
+  key: string;
+  name: string;
+  description: string;
+  severity: "info" | "warning" | "critical";
+  passed: boolean;
+  violation_count: number;
+  details: Record<string, any>[];
+  recommendation: string;
+}
+
+/** Comprehensive Model Data Health & Hygiene Audit Report. */
+export interface ModelHealthAuditReport {
+  project_id: number;
+  health_score: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  total_elements_audited: number;
+  total_violations: number;
+  checks: ModelHealthCheckItem[];
+  evaluated_at: string;
+}
+
+/** A clause node in the regulatory knowledge graph. */
+export interface RegulatoryClauseNode {
+  clause_id: string;
+  standard: string;
+  section: string;
+  title: string;
+  text: string;
+  target_ifc_types: string[];
+  cross_references: string[];
+}
+
+/** An atomic measurable requirement extracted from a regulatory standard. */
+export interface RegulatoryRequirementItem {
+  rule_id?: number | null;
+  standard: string;
+  clause: string;
+  target_ifc_type: string;
+  parameter: string;
+  operator: string;
+  value: any;
+  unit?: string | null;
+  severity: string;
+  description: string;
+}
+
+/** Full regulatory graph context for a specific clause or standard. */
+export interface RegulatoryGraphContextResponse {
+  clause: RegulatoryClauseNode;
+  parent_section?: string | null;
+  cross_referenced_clauses: RegulatoryClauseNode[];
+  governed_ifc_types: string[];
+  extracted_requirements: RegulatoryRequirementItem[];
+}
+
+/** All regulatory requirements governing a given IFC class across standards. */
+export interface GoverningRequirementsResponse {
+  ifc_type: string;
+  total_requirements: number;
+  standards_covered: string[];
+  requirements: RegulatoryRequirementItem[];
+}
+
