@@ -246,6 +246,9 @@ export interface GraphRagCitation {
   element_guid?: string | null;
   ifc_type?: string | null;
   properties?: Record<string, any>;
+  score?: number | null;
+  retrieval_method?: "vector" | "bm25" | "graph" | "hybrid_rrf" | null;
+  rrf_score?: number | null;
 }
 
 /** An analytical tool or graph traversal action recorded during Graph-RAG. */
@@ -290,6 +293,8 @@ export interface GraphRagQueryResponse {
     nodes?: Array<{ id: string; label: string; type: string }>;
     edges?: Array<{ source: string; target: string; label?: string }>;
   };
+  retrieval_mode?: string | null;
+  rrf_metrics?: Record<string, any> | null;
 }
 
 /** Available document and IFC model entities available for Graph-RAG in a project. */

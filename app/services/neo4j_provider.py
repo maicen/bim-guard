@@ -329,6 +329,50 @@ class Neo4jDatabaseProvider:
         query = f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{property_name})"
         self.execute_query(query)
 
+    def ensure_vector_index(
+        self,
+        index_name: str,
+        label: str,
+        property_name: str,
+        dimensions: int = 1536,
+        similarity_function: str = "cosine",
+    ) -> bool:
+        """Create a native Neo4j 5.x HNSW vector index if it does not already exist."""
+        self._validate_identifier(index_name)
+        self._validate_identifier(label)
+        self._validate_identifier(property_name)
+        query = (
+            f"CREATE VECTOR INDEX {index_name} IF NOT EXISTS "
+            f"FOR (m:{label}) ON (m.{property_name}) "
+            f"OPTIONS {{ indexConfig: {{ `vector.dimensions`: {dimensions}, `vector.similarity_function`: '{similarity_function}' }} }}"
+        )
+        try:
+            self.execute_query(query)
+            return True
+        except Exception as exc:
+            logger.warning("Failed creating vector index %s: %s", index_name, exc)
+            return False
+
+    def ensure_fulltext_index(
+        self,
+        index_name: str,
+        label: str,
+        properties: List[str],
+    ) -> bool:
+        """Create a native Neo4j fulltext index (Apache Lucene) if it does not already exist."""
+        self._validate_identifier(index_name)
+        self._validate_identifier(label)
+        for p in properties:
+            self._validate_identifier(p)
+        props_str = ", ".join(f"n.{p}" for p in properties)
+        query = f"CREATE FULLTEXT INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON EACH [{props_str}]"
+        try:
+            self.execute_query(query)
+            return True
+        except Exception as exc:
+            logger.warning("Failed creating fulltext index %s: %s", index_name, exc)
+            return False
+
     def clear(self) -> None:
         """Clear all nodes and relationships from the database."""
         self.execute_query("MATCH (n) DETACH DELETE n")

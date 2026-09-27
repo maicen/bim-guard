@@ -68,11 +68,19 @@
                 {/if}
               </span>
 
-              {#if citation.page_number}
-                <span class="text-fg-muted font-mono text-[10px]">p. {citation.page_number}</span>
-              {:else if citation.ifc_type}
-                <span class="text-fg-muted font-mono text-[10px] truncate max-w-[80px]">{citation.ifc_type}</span>
-              {/if}
+              <div class="flex items-center gap-1">
+                {#if citation.retrieval_method}
+                  <span class="px-1 py-0.2 rounded text-[9px] font-mono uppercase {citation.retrieval_method === 'hybrid_rrf' ? 'bg-accent/10 text-accent font-bold' : citation.retrieval_method === 'vector' ? 'bg-info/10 text-info' : 'bg-surface-hover text-fg-muted'}">
+                    {citation.retrieval_method === 'hybrid_rrf' ? 'RRF' : citation.retrieval_method}
+                  </span>
+                {/if}
+
+                {#if citation.page_number}
+                  <span class="text-fg-muted font-mono text-[10px]">p. {citation.page_number}</span>
+                {:else if citation.ifc_type}
+                  <span class="text-fg-muted font-mono text-[10px] truncate max-w-[80px]">{citation.ifc_type}</span>
+                {/if}
+              </div>
             </div>
 
             <p class="font-medium text-fg-primary line-clamp-1 group-hover:text-accent transition-colors">

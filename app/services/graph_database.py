@@ -183,4 +183,31 @@ class GraphService:
             return
         self.provider.delete_by_project(project_id)
 
+    def ensure_vector_index(
+        self,
+        index_name: str,
+        label: str,
+        property_name: str,
+        dimensions: int = 1536,
+        similarity_function: str = "cosine",
+    ) -> bool:
+        """Ensure native vector index exists on provider."""
+        if self.provider and hasattr(self.provider, "ensure_vector_index"):
+            return self.provider.ensure_vector_index(
+                index_name, label, property_name, dimensions, similarity_function
+            )
+        return False
+
+    def ensure_fulltext_index(
+        self,
+        index_name: str,
+        label: str,
+        properties: List[str],
+    ) -> bool:
+        """Ensure native fulltext index exists on provider."""
+        if self.provider and hasattr(self.provider, "ensure_fulltext_index"):
+            return self.provider.ensure_fulltext_index(index_name, label, properties)
+        return False
+
+
 

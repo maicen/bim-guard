@@ -363,6 +363,11 @@ class GraphRagCitation(BaseModel):
     properties: dict[str, Any] = Field(
         default_factory=dict, description="Supporting properties or attributes"
     )
+    score: Optional[float] = Field(None, description="Relevance or similarity score")
+    retrieval_method: Optional[Literal["vector", "bm25", "graph", "hybrid_rrf"]] = Field(
+        None, description="Primary retrieval stream that surfaced this citation"
+    )
+    rrf_score: Optional[float] = Field(None, description="Composite Reciprocal Rank Fusion score")
 
 
 class GraphRagToolCall(BaseModel):
@@ -439,6 +444,12 @@ class GraphRagQueryResponse(BaseModel):
     )
     subgraph_data: dict[str, Any] = Field(
         default_factory=dict, description="Nodes and edges for visual artifact display"
+    )
+    retrieval_mode: Optional[str] = Field(
+        "hybrid_rrf", description="Retrieval mode used: local, global, or hybrid_rrf"
+    )
+    rrf_metrics: Optional[dict[str, Any]] = Field(
+        default_factory=dict, description="Diagnostic RRF scoring metrics"
     )
 
 

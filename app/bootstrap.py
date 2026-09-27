@@ -793,6 +793,12 @@ def build_default_container() -> ApplicationContainer:
             # through to Kùzu below, the way every other init failure here does.
             if neo4j_provider.verify_connectivity():
                 graph_service = GraphService(provider=neo4j_provider)
+                try:
+                    neo4j_provider.ensure_vector_index("document_section_vector", "DocumentSection", "embedding", 1536)
+                    neo4j_provider.ensure_fulltext_index("document_section_fulltext", "DocumentSection", ["section_number", "section_name", "summary"])
+                    neo4j_provider.ensure_fulltext_index("ifc_product_fulltext", "IfcProduct", ["name", "guid", "ifc_type", "tag"])
+                except Exception as index_err:
+                    logger.debug("Neo4j GraphRAG index setup note: %s", index_err)
                 logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)
             else:
                 logger.warning("Neo4j at %s is unreachable; falling back to Kùzu", neo4j_uri)
