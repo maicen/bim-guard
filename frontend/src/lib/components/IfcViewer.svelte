@@ -2,7 +2,7 @@
   import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, PenTool, ListTree, Terminal, Copy } from "lucide-svelte";
+  import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, ListTree, Copy } from "lucide-svelte";
   import { projectsApi, modelsApi, analyzeApi } from "../api";
   import { authHeaders, authReady } from "../authToken";
   import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
@@ -11,9 +11,7 @@
   import CollapsiblePanel from "./CollapsiblePanel.svelte";
   import ViewerRibbon from "./viewer/ViewerRibbon.svelte";
   import LayersPanel from "./viewer/LayersPanel.svelte";
-  import DrawingsPanel from "./viewer/DrawingsPanel.svelte";
   import SpatialTreePanel from "./viewer/SpatialTreePanel.svelte";
-  import QueryConsolePanel from "./viewer/QueryConsolePanel.svelte";
   import PropertiesSection from "./viewer/PropertiesSection.svelte";
   import { AccordionRoot } from "./ui";
 
@@ -70,7 +68,6 @@
 
   let viewportHost: HTMLDivElement = $state();
   let detailsHost: HTMLDivElement = $state();
-  let drawingsSheetBoardHost: HTMLDivElement | undefined = $state();
 
   const RIGHT_DOCK_SECTIONS_KEY = "bimguard-collapsible-panel:viewer-right-dock:open-sections";
   function loadOpenRightSections(): string[] {
@@ -93,9 +90,7 @@
   const RIGHT_DOCK_SECTION_ICONS = [
     { id: "bcf-topics", label: "BCF Topics", icon: ClipboardList },
     { id: "spatial-tree", label: "Spatial Hierarchy", icon: ListTree },
-    { id: "query-console", label: "Query Console", icon: Terminal },
     { id: "layers", label: "Layers", icon: LayoutGrid },
-    { id: "drawings", label: "Drawings", icon: PenTool },
   ];
 
   // Historically BCF Topics lived in its own always-open left panel; default
@@ -220,7 +215,7 @@
       const mounts = Object.assign(viewportHost, {
         viewport: viewportHost,
         details: detailsHost,
-        drawings: drawingsSheetBoardHost,
+        drawings: null,
       });
 
       // A bundle that exports no mounts-API version predates the contract.
@@ -446,7 +441,7 @@
     />
   {/if}
 
-  <!-- Docked workspace: one collapsible Properties dock (BCF/Spatial/Layers/Drawings) around the 3D viewport -->
+  <!-- Docked workspace: one collapsible Properties dock (BCF/Spatial/Layers) around the 3D viewport -->
   <div class="flex min-h-0 flex-1">
     <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
 
@@ -489,14 +484,8 @@
         <PropertiesSection value="spatial-tree" title="Spatial Hierarchy" icon={ListTree}>
           <SpatialTreePanel {projectId} />
         </PropertiesSection>
-        <PropertiesSection value="query-console" title="Query Console" icon={Terminal}>
-          <QueryConsolePanel {projectId} />
-        </PropertiesSection>
         <PropertiesSection value="layers" title="Layers" icon={LayoutGrid}>
           <LayersPanel {viewerAPI} />
-        </PropertiesSection>
-        <PropertiesSection value="drawings" title="Drawings" icon={PenTool}>
-          <DrawingsPanel {viewerAPI} bind:sheetBoardHost={drawingsSheetBoardHost} />
         </PropertiesSection>
       </AccordionRoot>
     </CollapsiblePanel>

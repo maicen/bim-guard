@@ -21,7 +21,6 @@
     FilePlus2,
     Download,
     MousePointer2,
-    SquarePlus,
     ChevronDown,
     UploadCloud,
   } from "lucide-svelte";
@@ -60,7 +59,6 @@
   const TABS: TabStripItem[] = [
     { id: "view", label: "View" },
     { id: "layers", label: "Layers" },
-    { id: "drawings", label: "Drawings" },
     { id: "bcf", label: "BCF" },
   ];
   let activeTab = $state("view");
@@ -83,7 +81,6 @@
   let plans: { id: string; label: string }[] = $state([]);
   let elevations: { id: string; label: string }[] = $state([]);
   let layers: { name: string; visible: boolean }[] = $state([]);
-  let drawingCount = $state(0);
   let selectedTopic: any = $state(null);
 
   function refreshCamera() {
@@ -117,10 +114,6 @@
     if (!viewerAPI) return;
     layers = viewerAPI.layers.list();
   }
-  function refreshDrawings() {
-    if (!viewerAPI) return;
-    drawingCount = viewerAPI.drawings.list().length;
-  }
 
   const unsubscribers: Array<() => void> = [];
   $effect(() => {
@@ -131,12 +124,10 @@
     refreshIsolate();
     refreshViews();
     refreshLayers();
-    refreshDrawings();
 
     unsubscribers.push(viewerAPI.isolate.onSelectionChange(refreshIsolate));
     unsubscribers.push(viewerAPI.views.onChange(refreshViews));
     unsubscribers.push(viewerAPI.layers.onChange(refreshLayers));
-    unsubscribers.push(viewerAPI.drawings.onChange(refreshDrawings));
     unsubscribers.push(
       viewerAPI.topics.onSelectionChange((topic: any) => (selectedTopic = topic)),
     );
@@ -204,12 +195,6 @@
   }
   function hideAllLayers() {
     viewerAPI.layers.hideAll();
-  }
-  function createDrawing() {
-    viewerAPI.drawings.createFromOpenView();
-  }
-  function attachDrawingToBcf() {
-    viewerAPI.drawings.attachActiveToBcfTopic();
   }
   function createTopic() {
     viewerAPI.topics.openCreateModal();
@@ -480,32 +465,6 @@
         {/snippet}
       </Tooltip>
       <span class="ml-2 text-xs text-fg-muted">{layers.length} categories</span>
-    {:else if activeTab === "drawings"}
-      <Tooltip text={hasOpenView ? "Create a technical drawing from the open plan/elevation/section view" : "Open a plan/elevation/section view first"}>
-        {#snippet trigger()}
-          <button
-            type="button"
-            class="rbn-btn"
-            disabled={!hasOpenView}
-            onclick={createDrawing}
-          >
-            <SquarePlus class="h-4 w-4" /><span>New drawing from current view</span>
-          </button>
-        {/snippet}
-      </Tooltip>
-      <Tooltip text={selectedTopic ? "Attach the active drawing's DXF to the selected BCF topic" : "Select a BCF topic first"}>
-        {#snippet trigger()}
-          <button
-            type="button"
-            class="rbn-btn"
-            disabled={drawingCount === 0 || !selectedTopic}
-            onclick={attachDrawingToBcf}
-          >
-            <Link2 class="h-4 w-4" /><span>Attach to BCF topic</span>
-          </button>
-        {/snippet}
-      </Tooltip>
-      <span class="ml-2 text-xs text-fg-muted">{drawingCount} drawing(s)</span>
     {:else if activeTab === "bcf"}
       <Tooltip text="Create a new BCF topic">
         {#snippet trigger()}
