@@ -13,6 +13,7 @@
     Search,
     ShieldAlert,
     XCircle,
+    Sparkles,
   } from "lucide-svelte";
   import { push } from "svelte-spa-router";
   import { graphApi, sparqlApi } from "../../api";
@@ -27,10 +28,11 @@
   } from "../../types";
   import { Button, Select } from "../ui";
   import LoadingState from "../LoadingState.svelte";
+  import AiChatbot from "../ai/AiChatbot.svelte";
 
   let { projectId }: { projectId: number | null } = $props();
 
-  let activeTab = $state("health");
+  let activeTab = $state("rag");
 
   // --- Model Health Audit (inspired by ifc-to-graph-assignment) ---
   let healthReport: ModelHealthAuditReport | null = $state(null);
@@ -216,6 +218,13 @@
         class="flex flex-wrap items-center gap-1 rounded-xl border border-border-default bg-surface-canvas/60 p-1"
       >
         <Tabs.Trigger
+          value="rag"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+        >
+          <Sparkles class="h-3 w-3" />
+          Graph-RAG Copilot
+        </Tabs.Trigger>
+        <Tabs.Trigger
           value="health"
           class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
@@ -265,6 +274,19 @@
       <span>Full Page</span>
     </button>
   </div>
+
+  <!-- TAB 0: GRAPH-RAG COPILOT -->
+  {#if activeTab === "rag"}
+    <div class="mt-2 h-[560px] rounded-xl border border-border-default overflow-hidden bg-surface-canvas/30">
+      {#if !projectId}
+        <div class="p-6 text-center text-xs text-fg-muted">
+          Select or load a project model to start asking Graph-RAG questions.
+        </div>
+      {:else}
+        <AiChatbot {projectId} />
+      {/if}
+    </div>
+  {/if}
 
   <!-- TAB 1: MODEL HEALTH AUDIT -->
   {#if activeTab === "health"}

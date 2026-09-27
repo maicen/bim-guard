@@ -232,3 +232,73 @@ export interface GoverningRequirementsResponse {
   requirements: RegulatoryRequirementItem[];
 }
 
+/** Scope of knowledge for Graph-RAG. */
+export type GraphRagScope = "document" | "model" | "hybrid";
+
+/** A grounded reference cited by Graph-RAG. */
+export interface GraphRagCitation {
+  id: string;
+  source_type: "document" | "model" | "rule";
+  title: string;
+  reference: string;
+  snippet: string;
+  page_number?: number | null;
+  element_guid?: string | null;
+  ifc_type?: string | null;
+  properties?: Record<string, any>;
+}
+
+/** An analytical tool or graph traversal action recorded during Graph-RAG. */
+export interface GraphRagToolCall {
+  tool_name: string;
+  arguments: Record<string, any>;
+  output_summary: string;
+  cypher_query?: string | null;
+  status: "running" | "success" | "error";
+}
+
+/** A milestone in the Graph-RAG chain-of-thought or multi-step execution. */
+export interface GraphRagStep {
+  step_index: number;
+  title: string;
+  description: string;
+  status: "pending" | "running" | "done" | "failed";
+  data?: Record<string, any> | null;
+}
+
+/** Natural-language question and execution scope for Graph-RAG. */
+export interface GraphRagQueryRequest {
+  query: string;
+  scope?: GraphRagScope;
+  document_id?: number | null;
+  element_class?: string | null;
+  model_name?: string | null;
+  temperature?: number | null;
+}
+
+/** Grounded answer, explainability trace, and citations from Graph-RAG. */
+export interface GraphRagQueryResponse {
+  project_id: number;
+  scope: GraphRagScope;
+  answer: string;
+  citations: GraphRagCitation[];
+  tool_calls: GraphRagToolCall[];
+  reasoning_steps: GraphRagStep[];
+  cypher_queries: string[];
+  suggested_followups: string[];
+  subgraph_data?: {
+    nodes?: Array<{ id: string; label: string; type: string }>;
+    edges?: Array<{ source: string; target: string; label?: string }>;
+  };
+}
+
+/** Available document and IFC model entities available for Graph-RAG in a project. */
+export interface GraphRagContextSummary {
+  project_id: number;
+  has_ifc_model: boolean;
+  total_elements: number;
+  ifc_classes: Array<{ class_name: string; count: number }>;
+  documents: Array<{ id: number; title: string; section_count: number }>;
+  rulesets: string[];
+}
+

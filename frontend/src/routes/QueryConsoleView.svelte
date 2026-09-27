@@ -20,6 +20,7 @@
     XCircle,
     ChevronDown,
     ChevronRight,
+    Sparkles,
   } from "lucide-svelte";
   import { graphApi, projectsApi, sparqlApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -38,6 +39,7 @@
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
+  import AiChatbot from "../lib/components/ai/AiChatbot.svelte";
 
   interface Props {
     initialProjectId?: number | null;
@@ -49,7 +51,13 @@
   let projects: Project[] = $state([]);
   let loadingProjects = $state(false);
 
-  let activeTab = $state<"health" | "regulatory" | "cypher" | "sparql" | "trace">("health");
+  const initialTabParam = typeof window !== "undefined"
+    ? (new URLSearchParams(window.location.hash.split("?")[1] || window.location.search).get("tab") as any)
+    : null;
+  const validTabs = ["rag", "health", "regulatory", "cypher", "sparql", "trace"];
+  let activeTab = $state<"rag" | "health" | "regulatory" | "cypher" | "sparql" | "trace">(
+    validTabs.includes(initialTabParam) ? initialTabParam : "rag",
+  );
 
   // Keep selectedProjectId in sync when initialProjectId changes externally
   $effect(() => {
@@ -385,6 +393,14 @@ SELECT ?storey WHERE {
       <div class="border-b border-border-default bg-surface-canvas/50 px-4 py-2.5">
         <Tabs.List class="flex flex-wrap items-center gap-1.5">
           <Tabs.Trigger
+            value="rag"
+            class="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all data-[state=active]:bg-surface-selected data-[state=active]:text-accent text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+          >
+            <Sparkles class="h-3.5 w-3.5 text-accent" />
+            <span>Graph-RAG Copilot</span>
+          </Tabs.Trigger>
+
+          <Tabs.Trigger
             value="health"
             class="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all data-[state=active]:bg-surface-selected data-[state=active]:text-accent text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
           >
@@ -425,6 +441,26 @@ SELECT ?storey WHERE {
           </Tabs.Trigger>
         </Tabs.List>
       </div>
+
+      <!-- TAB 0: GRAPH-RAG COPILOT -->
+      <Tabs.Content value="rag" class="p-4 focus:outline-hidden">
+        {#if !selectedProjectId}
+          <div class="py-12">
+            <EmptyState
+              title="Select a Project"
+              description="Choose a project above to start conversational Graph-RAG questioning across documents, BIM model elements, and regulatory standards."
+            />
+          </div>
+        {:else}
+          <div class="h-[760px] rounded-2xl border border-border-default overflow-hidden bg-surface-canvas/20 shadow-inner">
+            <AiChatbot
+              projectId={selectedProjectId}
+              onOpenDocument={(docId) => push(`/documents?project_id=${selectedProjectId}&doc_id=${docId}`)}
+              onIsolateElement={(guid) => push(`/viewer?project_id=${selectedProjectId}&guid=${guid}`)}
+            />
+          </div>
+        {/if}
+      </Tabs.Content>
 
       <!-- TAB 1: MODEL HEALTH AUDIT -->
       <Tabs.Content value="health" class="p-6 space-y-6 focus:outline-hidden">
