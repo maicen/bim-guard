@@ -522,9 +522,7 @@
        none of the working app's sidebar/header chrome around them. -->
   <div class="min-h-screen bg-surface-canvas font-sans text-fg-primary antialiased">
     {#if activeView === "login"}
-      <div class="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6">
-        <LoginView />
-      </div>
+      <LoginView />
     {:else}
       <LandingView />
     {/if}
