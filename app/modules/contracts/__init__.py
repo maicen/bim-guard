@@ -162,6 +162,13 @@ from app.modules.contracts.graph import (
     RuleImpactResponse,
     SpatialTreeNodeContract,
     SpatialTreeResponse,
+    GraphRagScope,
+    GraphRagCitation,
+    GraphRagToolCall,
+    GraphRagStep,
+    GraphRagQueryRequest,
+    GraphRagQueryResponse,
+    GraphRagContextSummary,
 )
 from app.modules.contracts.models import (
     AttachRepoModelsRequest,
@@ -323,4 +330,11 @@ __all__ = ['ElementDataContract', 'RuleContract', 'ComplianceFailureContract', '
     'RegulatoryRequirementItem',
     'RegulatoryGraphContextResponse',
     'GoverningRequirementsResponse',
+    'GraphRagScope',
+    'GraphRagCitation',
+    'GraphRagToolCall',
+    'GraphRagStep',
+    'GraphRagQueryRequest',
+    'GraphRagQueryResponse',
+    'GraphRagContextSummary',
 ]

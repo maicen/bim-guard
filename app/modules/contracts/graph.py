@@ -34,6 +34,13 @@ __all__ = [
     'RegulatoryRequirementItem',
     'RegulatoryGraphContextResponse',
     'GoverningRequirementsResponse',
+    'GraphRagScope',
+    'GraphRagCitation',
+    'GraphRagToolCall',
+    'GraphRagStep',
+    'GraphRagQueryRequest',
+    'GraphRagQueryResponse',
+    'GraphRagContextSummary',
 ]
 
 # ---------------------------------------------------------------------------
@@ -331,4 +338,118 @@ class GoverningRequirementsResponse(BaseModel):
     total_requirements: int = 0
     standards_covered: list[str] = Field(default_factory=list)
     requirements: list[RegulatoryRequirementItem] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Graph-RAG Question Answering Contracts (Documents + BIM Models)
+# ---------------------------------------------------------------------------
+
+GraphRagScope = Literal["document", "model", "hybrid"]
+
+
+class GraphRagCitation(BaseModel):
+    """A grounded reference cited by Graph-RAG (Document clause, IFC element, or Rule)."""
+
+    id: str = Field(..., description="Unique citation token or reference id")
+    source_type: Literal["document", "model", "rule"] = Field(
+        ..., description="Provenance domain of the citation"
+    )
+    title: str = Field(..., description="Human-readable citation title or element name")
+    reference: str = Field(..., description="Clause number, document name, or element type")
+    snippet: str = Field("", description="Text excerpt, property summary, or requirement spec")
+    page_number: Optional[int] = Field(None, description="Page number if from document")
+    element_guid: Optional[str] = Field(None, description="IFC GlobalId if from model")
+    ifc_type: Optional[str] = Field(None, description="IFC class name if from model")
+    properties: dict[str, Any] = Field(
+        default_factory=dict, description="Supporting properties or attributes"
+    )
+
+
+class GraphRagToolCall(BaseModel):
+    """An analytical tool or graph traversal action recorded during Graph-RAG."""
+
+    tool_name: str = Field(..., description="Name of the executed tool or retriever")
+    arguments: dict[str, Any] = Field(
+        default_factory=dict, description="Input parameters passed to the tool"
+    )
+    output_summary: str = Field("", description="Brief human-readable summary of the output")
+    cypher_query: Optional[str] = Field(
+        None, description="Cypher query executed against Neo4j, if applicable"
+    )
+    status: Literal["running", "success", "error"] = Field(
+        "success", description="Execution status of the tool call"
+    )
+
+
+class GraphRagStep(BaseModel):
+    """A milestone in the Graph-RAG chain-of-thought or multi-step execution."""
+
+    step_index: int = Field(..., description="Zero-based sequence order")
+    title: str = Field(..., description="Step headline (e.g. 'Analyzing Query Intent')")
+    description: str = Field("", description="Detailed explanation of what the step discovered")
+    status: Literal["pending", "running", "done", "failed"] = Field(
+        "done", description="Execution state of the step"
+    )
+    data: Optional[dict[str, Any]] = Field(
+        None, description="Optional telemetry or intermediate metrics"
+    )
+
+
+class GraphRagQueryRequest(BaseModel):
+    """Natural-language question and execution scope for Graph-RAG."""
+
+    query: str = Field(..., min_length=1, description="Question about documents, models, or both")
+    scope: GraphRagScope = Field(
+        "hybrid", description="Target knowledge scope: document, model, or hybrid"
+    )
+    document_id: Optional[int] = Field(
+        None, description="Optional specific document to focus retrieval on"
+    )
+    element_class: Optional[str] = Field(
+        None, description="Optional IFC entity class to filter model traversal (e.g. IfcDoor)"
+    )
+    model_name: Optional[str] = Field(
+        None, description="Optional LLM model override (defaults to org LLM config)"
+    )
+    temperature: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Sampling temperature override"
+    )
+
+
+class GraphRagQueryResponse(BaseModel):
+    """Grounded answer, explainability trace, and citations from Graph-RAG."""
+
+    project_id: int = Field(..., description="Project database ID")
+    scope: GraphRagScope = Field(..., description="Scope used for retrieval")
+    answer: str = Field(..., description="Synthesized Markdown answer with inline citations")
+    citations: list[GraphRagCitation] = Field(
+        default_factory=list, description="All grounded evidence sources"
+    )
+    tool_calls: list[GraphRagToolCall] = Field(
+        default_factory=list, description="Tool calls and Cypher executions"
+    )
+    reasoning_steps: list[GraphRagStep] = Field(
+        default_factory=list, description="Chain-of-thought execution steps"
+    )
+    cypher_queries: list[str] = Field(
+        default_factory=list, description="All Cypher queries executed during retrieval"
+    )
+    suggested_followups: list[str] = Field(
+        default_factory=list, description="Recommended follow-up prompts"
+    )
+    subgraph_data: dict[str, Any] = Field(
+        default_factory=dict, description="Nodes and edges for visual artifact display"
+    )
+
+
+class GraphRagContextSummary(BaseModel):
+    """Available document and IFC model entities available for Graph-RAG in a project."""
+
+    project_id: int
+    has_ifc_model: bool
+    total_elements: int = 0
+    ifc_classes: list[dict[str, Any]] = Field(default_factory=list)
+    documents: list[dict[str, Any]] = Field(default_factory=list)
+    rulesets: list[str] = Field(default_factory=list)
+
 

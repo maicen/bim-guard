@@ -17,6 +17,7 @@ from app.services.documents_service import DocumentService
 from app.services.evaluation_service import EvaluationService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
+from app.services.graph_rag_service import GraphRagService
 from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.ifc_pipeline_service import IFCPipelineService
 from app.services.llm_call_log_service import LLMCallLogService
@@ -137,6 +138,15 @@ def get_regulatory_graph_service() -> RegulatoryGraphService:
     return RegulatoryGraphService(
         rules_service=get_container().rules_service,
         graph_service=get_container().graph_service,
+    )
+
+
+def get_graph_rag_service() -> GraphRagService:
+    """Return the configured GraphRagService instance for cross-domain question answering."""
+    return GraphRagService(
+        graph_service=get_container().graph_service,
+        models_service=get_container().models_service,
+        rules_service=get_container().rules_service,
     )
 
 

@@ -6,8 +6,10 @@ import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import (
+    get_graph_rag_service,
     get_graph_service,
     get_model_health_service,
     get_models_service,
@@ -30,6 +32,9 @@ from app.modules.contracts import (
     GraphQueryPresetListResponse,
     GraphQueryPresetSummary,
     GraphQueryResultResponse,
+    GraphRagContextSummary,
+    GraphRagQueryRequest,
+    GraphRagQueryResponse,
     GraphStatusContract,
     IssueProofGraphContract,
     ModelHealthAuditReport,
@@ -622,4 +627,63 @@ def ingest_regulatory_graph(
 ) -> dict[str, Any]:
     """Build and persist the connected regulatory knowledge graph in Neo4j."""
     return regulatory_service.ingest_regulatory_graph()
+
+
+# ---------------------------------------------------------------------------
+# Graph-RAG Conversational AI Endpoints (Documents, Models & Cross-Domain)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{project_id}/rag/context",
+    response_model=GraphRagContextSummary,
+    summary="Get project's available Graph-RAG context (documents and model classes)",
+)
+def get_graph_rag_context(
+    project_id: int,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    rag_service: Annotated[Any, Depends(get_graph_rag_service)],
+) -> GraphRagContextSummary:
+    """Return available IFC element classes and documents in Neo4j for scope selection."""
+    project_access(project_id)
+    return rag_service.get_project_context_summary(project_id=project_id)
+
+
+@router.post(
+    "/{project_id}/rag/query",
+    response_model=GraphRagQueryResponse,
+    summary="Execute Graph-RAG question answering over documents, models, or both",
+)
+async def query_graph_rag(
+    project_id: int,
+    payload: GraphRagQueryRequest,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    rag_service: Annotated[Any, Depends(get_graph_rag_service)],
+) -> GraphRagQueryResponse:
+    """Execute grounded question answering against Neo4j knowledge graphs."""
+    project_access(project_id)
+    return await rag_service.query(project_id=project_id, request=payload)
+
+
+@router.post(
+    "/{project_id}/rag/stream",
+    summary="Stream Graph-RAG tokens, reasoning steps, tool calls, and citations via SSE",
+)
+async def stream_graph_rag(
+    project_id: int,
+    payload: GraphRagQueryRequest,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    rag_service: Annotated[Any, Depends(get_graph_rag_service)],
+) -> StreamingResponse:
+    """Stream live tokens and reasoning milestones using Server-Sent Events."""
+    project_access(project_id)
+    stream_gen = rag_service.stream_query(project_id=project_id, request=payload)
+    return StreamingResponse(
+        stream_gen,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
