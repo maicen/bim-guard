@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { FileText, CheckCircle2 } from "lucide-svelte";
+  import { FileText, CheckCircle2, X } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import { Select } from "./ui";
   import { documentsApi } from "../api";
@@ -24,6 +24,8 @@
   }: Props = $props();
 
   let uploadFile: File | null = $state(null);
+  let rawText = $state("");
+  let docTitle = $state("");
   let uploadDocType = $state<string>("Specification");
   let isUploading = $state(false);
   let uploadError = $state("");
@@ -46,6 +48,8 @@
 
   function resetState() {
     uploadFile = null;
+    rawText = "";
+    docTitle = "";
     uploadDocType = "Specification";
     uploadError = "";
     uploadErrorLog = [];
@@ -57,15 +61,40 @@
     onClose();
   }
 
+  function getPastedFilename(): string {
+    const cleanTitle = docTitle.trim();
+    if (cleanTitle) {
+      let name = cleanTitle.replace(/[^a-zA-Z0-9_\-\.]+/g, "_").replace(/^_+|_+$/g, "");
+      if (!name.toLowerCase().endsWith(".txt") && !name.toLowerCase().endsWith(".md")) {
+        name += ".txt";
+      }
+      return name;
+    }
+    const firstLine = rawText.trim().split("\n")[0].trim().slice(0, 40);
+    const candidate = firstLine.replace(/[^a-zA-Z0-9_\-\.]+/g, "_").replace(/^_+|_+$/g, "");
+    if (candidate.length >= 3) {
+      return `${candidate}.txt`;
+    }
+    return `specification_clauses_${new Date().toISOString().slice(0, 10)}.txt`;
+  }
+
   async function handleUpload() {
-    if (!uploadFile) return;
+    const fileToUpload =
+      uploadFile ||
+      (rawText.trim()
+        ? new File([rawText.trim()], getPastedFilename(), {
+            type: "text/plain;charset=utf-8",
+          })
+        : null);
+
+    if (!fileToUpload) return;
     isUploading = true;
     uploadError = "";
     uploadErrorLog = [];
     uploadAbortController = new AbortController();
     try {
       const created = await documentsApi.upload(
-        uploadFile,
+        fileToUpload,
         uploadDocType,
         {
           generate_doclang: false,
@@ -81,7 +110,7 @@
       uploadError = apiErr.isNetworkError
         ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
         : apiErr.message || "Failed to upload document.";
-      uploadErrorLog = [toErrorLogEntry(err, uploadFile.name)];
+      uploadErrorLog = [toErrorLogEntry(err, fileToUpload.name)];
     } finally {
       uploadAbortController = null;
       isUploading = false;
@@ -91,7 +120,7 @@
 
 <Modal
   {isOpen}
-  title="Upload Document"
+  title="Upload or Add Document"
   maxWidth="max-w-xl"
   onClose={handleClose}
 >
@@ -134,6 +163,7 @@
       </p>
     </div>
 
+    <!-- Option 1: File dropzone -->
     <div
       class="rounded-xl border-2 border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-accent"
     >
@@ -153,6 +183,8 @@
             const target = e.target as HTMLInputElement;
             if (target.files && target.files[0]) {
               uploadFile = target.files[0];
+              rawText = "";
+              docTitle = "";
               uploadError = "";
               uploadErrorLog = [];
             }
@@ -167,11 +199,21 @@
         class="flex items-center justify-between rounded-xl border border-border-default bg-surface-canvas p-3 text-xs"
       >
         <span class="truncate font-medium text-fg-primary">{uploadFile.name}</span>
-        <span class="text-fg-muted">
-          {uploadFile.size > 1024 * 1024
-            ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
-            : `${(uploadFile.size / 1024).toFixed(1)} KB`}
-        </span>
+        <div class="flex items-center gap-2">
+          <span class="text-fg-muted">
+            {uploadFile.size > 1024 * 1024
+              ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
+              : `${(uploadFile.size / 1024).toFixed(1)} KB`}
+          </span>
+          <button
+            type="button"
+            onclick={() => { uploadFile = null; }}
+            class="rounded p-1 text-fg-muted hover:text-fg-primary hover:bg-surface-hover"
+            title="Remove selected file"
+          >
+            <X class="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {#if isDoclangSelected}
@@ -190,6 +232,43 @@
         </div>
       {/if}
     {/if}
+
+    <!-- Option 2: Paste Building Code / Specification Clauses Directly -->
+    <div class="space-y-2">
+      <label for="rule-raw-text" class="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+        Or Paste Building Code / Specification Clauses Directly:
+      </label>
+      <textarea
+        id="rule-raw-text"
+        bind:value={rawText}
+        oninput={() => {
+          if (rawText.trim()) {
+            uploadFile = null;
+          }
+        }}
+        rows="6"
+        placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
+        class="w-full rounded-xl border border-border-default bg-surface-canvas p-3.5 font-mono text-xs leading-relaxed text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
+      ></textarea>
+    </div>
+
+    {#if rawText.trim()}
+      <div class="space-y-1.5">
+        <label for="pasted-doc-title" class="block text-xs font-semibold text-fg-secondary">
+          Document Title (optional)
+        </label>
+        <input
+          id="pasted-doc-title"
+          type="text"
+          bind:value={docTitle}
+          placeholder="e.g. SBC 201 Section 3.4 Egress Doors"
+          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
+        />
+        <p class="text-caption text-fg-muted">
+          Pasted text will be ingested as a specification document ({rawText.trim().length} characters).
+        </p>
+      </div>
+    {/if}
   </div>
 
   {#snippet footer()}
@@ -203,11 +282,15 @@
       </button>
       <button
         type="button"
-        disabled={!uploadFile || isUploading}
+        disabled={(!uploadFile && !rawText.trim()) || isUploading}
         onclick={handleUpload}
         class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
       >
-        {isUploading ? "Uploading..." : "Upload Document"}
+        {isUploading
+          ? "Uploading..."
+          : rawText.trim()
+            ? "Add Document"
+            : "Upload Document"}
       </button>
     </div>
   {/snippet}

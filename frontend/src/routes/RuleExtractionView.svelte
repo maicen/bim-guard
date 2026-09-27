@@ -48,6 +48,7 @@
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
   import Button from "../lib/components/ui/Button.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import DocumentUploadModal from "../lib/components/DocumentUploadModal.svelte";
   import Modal from "../lib/components/Modal.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import SortHeader from "../lib/components/SortHeader.svelte";
@@ -72,9 +73,16 @@
   let documents: DocumentItem[] = $state([]);
   let selectedDocId: number | null = $state(untrack(() => initialDocId));
   let showReturnPrompt = $state(false);
-  let rawText = $state("");
+  let isUploadModalOpen = $state(false);
   let selectedModel = $state("");
   let viewingDraftRule: ExtractedRule | null = $state(null);
+
+  function handleDocumentAdded(newDoc: DocumentItem) {
+    documents = [newDoc, ...documents.filter((d) => d.id !== newDoc.id)];
+    selectedDocId = newDoc.id;
+    isUploadModalOpen = false;
+    toasts.success(`Selected newly added document "${newDoc.filename}".`);
+  }
 
   // Sections/paragraphs detected in the selected document, so extraction can be
   // scoped to a chosen clause instead of the whole document — the picked
@@ -714,41 +722,25 @@
       // get a reviewer audit trail. Picked sections scope the extraction to
       // that subset of the document; leaving none picked runs the whole
       // document through LlamaIndex's own clause-level chunking.
-      if (selectedDocId) {
-        const scopedText =
-          selectedSectionKeys.size > 0
-            ? docSections
-                .filter((s) => s.id && selectedSectionKeys.has(s.id))
-                .map((s) => s.text)
-                .join("\n\n")
-            : undefined;
-
-        const res = await ruleExtractionApi.extractDrafts(selectedDocId, selectedModel, scopedText);
-        draftRules = [...res.drafts, ...draftRules];
-        draftTable.clearSelection();
-        if (res.drafts.length === 0) {
-          error = "No valid OpenBIM rules could be parsed from this document.";
-        }
-        return;
+      if (!selectedDocId) {
+        throw new Error("Please select a specification document to extract rules.");
       }
 
-      if (!rawText.trim()) {
-        throw new Error("Please select a specification document or paste text to extract rules.");
-      }
+      const scopedText =
+        selectedSectionKeys.size > 0
+          ? docSections
+              .filter((s) => s.id && selectedSectionKeys.has(s.id))
+              .map((s) => s.text)
+              .join("\n\n")
+          : undefined;
 
-      const res = await ruleExtractionApi.extract(undefined, rawText, selectedModel);
-      extractedRules = (res.rules || []).map((r: any) => ({
-        ...r,
-        rowId: nextDraftRowId++,
-      }));
-      // Every freshly extracted rule starts selected, as before.
-      table.clearSelection();
-      for (const r of extractedRules) table.selectedIds.add(r.rowId);
-      extractionWarnings = res.warnings || [];
-
-      if (extractedRules.length === 0) {
-        error = "No valid OpenBIM rules could be parsed from the provided text.";
+      const res = await ruleExtractionApi.extractDrafts(selectedDocId, selectedModel, scopedText);
+      draftRules = [...res.drafts, ...draftRules];
+      draftTable.clearSelection();
+      if (res.drafts.length === 0) {
+        error = "No valid OpenBIM rules could be parsed from this document.";
       }
+      return;
     } catch (err: any) {
       error = err.message || "Rule extraction failed.";
     } finally {
@@ -900,12 +892,22 @@
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <!-- Document Source Selector -->
       <div class="space-y-2">
-        <label
-          for="rule-doc-source"
-          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
-        >
-          Source Specification Document
-        </label>
+        <div class="flex items-center justify-between">
+          <label
+            for="rule-doc-source"
+            class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
+          >
+            Source Specification Document
+          </label>
+          <button
+            type="button"
+            onclick={() => (isUploadModalOpen = true)}
+            class="inline-flex items-center gap-1 text-caption font-semibold text-accent hover:underline"
+          >
+            <Plus class="h-3 w-3" />
+            <span>Add / Upload Document</span>
+          </button>
+        </div>
         <select
           id="rule-doc-source"
           bind:value={selectedDocId}
@@ -1101,28 +1103,30 @@
         No sections were detected — extraction will run over the whole document.
       </p>
     {:else}
-      <!-- Raw Text Input (no document selected — stays ephemeral until saved) -->
-      <div class="space-y-2">
-        <label
-          for="rule-raw-text"
-          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
-        >
-          Or Paste Building Code / Specification Clauses Directly:
-        </label>
-        <textarea
-          id="rule-raw-text"
-          bind:value={rawText}
-          rows="6"
-          placeholder="e.g. Section 3.4.1: Exterior exit doors shall have a minimum clear width of 900 mm and fire protection rating of not less than 45 minutes..."
-          class="w-full rounded-xl border border-border-default bg-surface-canvas p-3.5 font-mono text-xs leading-relaxed text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
-        ></textarea>
+      <div class="rounded-xl border border-dashed border-border-default bg-surface-canvas/30 p-6 text-center space-y-2">
+        <p class="text-xs font-medium text-fg-secondary">
+          No document selected — choose a specification from the library above to configure extraction scope.
+        </p>
+        <p class="text-caption text-fg-muted">
+          Need to extract rules from text clauses? Add or paste them directly as a document.
+        </p>
+        <div>
+          <button
+            type="button"
+            onclick={() => (isUploadModalOpen = true)}
+            class="inline-flex items-center gap-1.5 rounded-lg border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs font-semibold text-fg-primary hover:bg-surface-hover hover:border-accent transition-colors"
+          >
+            <Plus class="h-3.5 w-3.5 text-accent" />
+            <span>Add / Upload Specification</span>
+          </button>
+        </div>
       </div>
     {/if}
 
     <div class="flex justify-end pt-2">
       <button
         type="button"
-        disabled={isExtracting || !selectedModel}
+        disabled={isExtracting || !selectedModel || !selectedDocId}
         aria-busy={isExtracting}
         onclick={handleExtract}
         class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover {isExtracting
@@ -2258,3 +2262,9 @@
     {/snippet}
   </Modal>
 {/if}
+
+<DocumentUploadModal
+  isOpen={isUploadModalOpen}
+  onClose={() => (isUploadModalOpen = false)}
+  onUploaded={handleDocumentAdded}
+/>
