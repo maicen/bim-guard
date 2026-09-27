@@ -17,6 +17,16 @@ import { hostname } from 'node:os';
 //   BIMGUARD_BACKEND_URL=http://127.0.0.1:8001 PORT=5174 npm run dev
 const backendTarget = process.env.BIMGUARD_BACKEND_URL || 'http://127.0.0.1:8000';
 
+// Additional hosts that Vite's dev server will accept requests from.
+// Set BIMGUARD_ALLOWED_HOSTS to a comma-separated list of LAN IPs or
+// hostnames (e.g. "192.168.14.77,mypc.local") so other machines on the same
+// network can reach the dev server without Vite blocking them.
+// The local machine's hostname is always included automatically.
+const extraHosts = (process.env.BIMGUARD_ALLOWED_HOSTS ?? '')
+  .split(',')
+  .map((h) => h.trim())
+  .filter(Boolean);
+
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.GITHUB_PAGES ? '/bim-guard/' : '/',
@@ -24,7 +34,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: Number(process.env.PORT) || 5173,
-    allowedHosts: [hostname()],
+    allowedHosts: [hostname(), ...extraHosts],
     proxy: {
       '/api': {
         target: backendTarget,
