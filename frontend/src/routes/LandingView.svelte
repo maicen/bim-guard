@@ -18,6 +18,7 @@
   import PipelineFlow from "../lib/components/marketing/PipelineFlow.svelte";
   import ComparisonTable, { type ComparisonRow } from "../lib/components/marketing/ComparisonTable.svelte";
   import FaqAccordion, { type FaqItem } from "../lib/components/marketing/FaqAccordion.svelte";
+  import LandingNav from "../lib/components/marketing/LandingNav.svelte";
 
   // Standards Marquee Data
   const STANDARDS = [
@@ -132,12 +133,7 @@
         </a>
       </div>
 
-      <nav class="hidden md:flex items-center gap-6 text-xs font-semibold text-fg-secondary">
-        <a href="#pipeline" class="hover:text-fg-primary transition-colors">Pipeline</a>
-        <a href="#features" class="hover:text-fg-primary transition-colors">Capabilities</a>
-        <a href="#comparison" class="hover:text-fg-primary transition-colors">Comparison</a>
-        <a href="#faq" class="hover:text-fg-primary transition-colors">FAQ</a>
-      </nav>
+      <LandingNav class="hidden md:flex" />
 
       <div class="flex items-center gap-3">
         <Button variant="ghost" size="sm" onclick={() => push("/login")}>
