@@ -43,14 +43,17 @@ _IFC_KEYWORD_MAP: dict[str, str] = {
     "wall": "IfcWall",
     "walls": "IfcWall",
     "partition": "IfcWall",
+    "partitions": "IfcWall",
     "space": "IfcSpace",
     "spaces": "IfcSpace",
     "room": "IfcSpace",
     "rooms": "IfcSpace",
     "corridor": "IfcSpace",
+    "corridors": "IfcSpace",
     "stair": "IfcStair",
     "stairs": "IfcStair",
     "stairway": "IfcStair",
+    "stairways": "IfcStair",
     "window": "IfcWindow",
     "windows": "IfcWindow",
     "column": "IfcColumn",
@@ -59,9 +62,22 @@ _IFC_KEYWORD_MAP: dict[str, str] = {
     "beams": "IfcBeam",
     "slab": "IfcSlab",
     "slabs": "IfcSlab",
+    "roof": "IfcRoof",
+    "roofs": "IfcRoof",
+    "railing": "IfcRailing",
+    "railings": "IfcRailing",
     "floor": "IfcBuildingStorey",
+    "floors": "IfcBuildingStorey",
     "storey": "IfcBuildingStorey",
+    "storeys": "IfcBuildingStorey",
+    "story": "IfcBuildingStorey",
+    "stories": "IfcBuildingStorey",
     "level": "IfcBuildingStorey",
+    "levels": "IfcBuildingStorey",
+    "element": "IfcProduct",
+    "elements": "IfcProduct",
+    "product": "IfcProduct",
+    "products": "IfcProduct",
 }
 
 # Thematic domain keywords for LightRAG high-level abstract query routing
@@ -874,6 +890,104 @@ class GraphRagService:
         # Local & Hybrid Search Mode: Targeted traversal with hub suppression
         primary_class = target_classes[0] if target_classes else "IfcProduct"
 
+        # Specialized handling for building storeys / levels
+        if primary_class == "IfcBuildingStorey":
+            cypher = """
+            MATCH (storey:IfcBuildingStorey {project_id: $pid})
+            OPTIONAL MATCH (storey)-[:CONTAINS]->(child)
+            RETURN storey.guid as guid, storey.name as name, storey.ifc_type as ifc_type,
+                   count(DISTINCT child) as element_count,
+                   collect(DISTINCT child.ifc_type)[..5] as element_types
+            ORDER BY storey.name ASC
+            """
+            try:
+                storeys_found = self.graph_service.execute(cypher, {"pid": pid_str}) or []
+            except Exception as exc:
+                logger.warning("Building storey graph query error: %s", exc)
+                storeys_found = []
+
+            if not storeys_found:
+                # Fallback matching on property if label indexing differs
+                cypher = """
+                MATCH (storey {project_id: $pid})
+                WHERE storey.ifc_type = 'IfcBuildingStorey'
+                RETURN storey.guid as guid, storey.name as name, storey.ifc_type as ifc_type,
+                       0 as element_count, [] as element_types
+                ORDER BY storey.name ASC
+                """
+                try:
+                    storeys_found = self.graph_service.execute(cypher, {"pid": pid_str}) or []
+                except Exception:
+                    storeys_found = []
+
+            text_lines = [f"Total Building Storeys (Floors) in model: {len(storeys_found)}"]
+            nodes = []
+            citations = []
+            for s in storeys_found:
+                guid = s.get("guid") or "UnknownGUID"
+                name = s.get("name") or "Storey"
+                elem_count = s.get("element_count", 0)
+                elem_types = s.get("element_types", [])
+                types_str = f" (Contains elements: {', '.join(elem_types)})" if elem_types else ""
+                ref = f"Storey ({name})"
+                citation_id = f"ifc_{guid}"
+
+                citations.append(
+                    GraphRagCitation(
+                        id=citation_id,
+                        source_type="model",
+                        title=f"Building Storey: {name}",
+                        reference=guid,
+                        snippet=f"Building Storey / Level '{name}' containing {elem_count} building elements{types_str}.",
+                        element_guid=guid,
+                        ifc_type="IfcBuildingStorey",
+                        properties={
+                            "name": name,
+                            "element_count": elem_count,
+                            "contained_types": elem_types,
+                        },
+                        score=1.5,
+                        retrieval_method="graph",
+                    )
+                )
+
+                text_lines.append(
+                    f"- [IFC: IfcBuildingStorey ({name}) | GUID: {guid}] Storey Name: '{name}', "
+                    f"Contained Elements: {elem_count}{types_str}"
+                )
+                nodes.append({"id": guid, "label": f"Storey: {name}", "type": "IfcBuildingStorey"})
+
+            output_summary = f"Located {len(storeys_found)} building storeys (floors) in model."
+            return {
+                "text": "\n".join(text_lines) if text_lines else "No building storeys located in model.",
+                "citations": citations,
+                "tool_call": GraphRagToolCall(
+                    tool_name="query_building_storeys",
+                    arguments={"primary_class": "IfcBuildingStorey", "project_id": project_id},
+                    output_summary=output_summary,
+                    cypher_query=cypher.strip(),
+                    status="success",
+                ),
+                "cypher": cypher.strip(),
+                "element_count": len(storeys_found),
+                "nodes": nodes,
+                "edges": [],
+            }
+
+        # Check if user asked for a count/inventory
+        is_count_query = any(term in query.lower() for term in [
+            "how many", "count", "number of", "total", "inventory"
+        ])
+        total_class_count = None
+        if is_count_query and primary_class != "IfcProduct":
+            count_cypher = f"MATCH (elem:{primary_class} {{project_id: $pid}}) RETURN count(elem) as total_count"
+            try:
+                c_rows = self.graph_service.execute(count_cypher, {"pid": pid_str})
+                if c_rows and c_rows[0].get("total_count") is not None:
+                    total_class_count = c_rows[0]["total_count"]
+            except Exception as exc:
+                logger.debug("Class count query notice: %s", exc)
+
         if element_guids:
             cypher = """
             MATCH (elem {project_id: $pid})
@@ -966,7 +1080,12 @@ class GraphRagService:
 
             nodes.append({"id": guid, "label": f"{ifc_type}: {name}", "type": "IfcProduct"})
 
-        output_summary = f"Traversed {len(elements_found)} IFC element nodes in model."
+        if total_class_count is not None:
+            text_lines.insert(0, f"Total {primary_class} elements in project: {total_class_count}")
+            output_summary = f"Found {total_class_count} total {primary_class} elements (inspected {len(elements_found)} in graph)."
+        else:
+            output_summary = f"Traversed {len(elements_found)} IFC element nodes in model."
+
         return {
             "text": "\n".join(text_lines) if text_lines else "No specific model elements located.",
             "citations": citations,
@@ -1031,7 +1150,7 @@ Ensure every statement cites the grounded source using [Doc: <Ref>, p. <Page>] o
 
         try:
             import litellm
-            with llm_call_context(task="graph_rag_query", organization_id=organization_id):
+            with llm_call_context(context="graph_rag_query", organization_id=organization_id):
                 response = await litellm.acompletion(
                     model=chosen_model,
                     messages=prompt_payload,
@@ -1056,7 +1175,7 @@ Ensure every statement cites the grounded source using [Doc: <Ref>, p. <Page>] o
 
         try:
             import litellm
-            with llm_call_context(task="graph_rag_stream", organization_id=organization_id):
+            with llm_call_context(context="graph_rag_stream", organization_id=organization_id):
                 stream_res = await litellm.acompletion(
                     model=chosen_model,
                     messages=prompt_payload,
@@ -1085,7 +1204,18 @@ Ensure every statement cites the grounded source using [Doc: <Ref>, p. <Page>] o
         if "RETRIEVED DOCUMENT PROVISIONS:" in user_msg:
             lines.append("- **Governing Document Requirements**: Relevant specification clauses and code criteria were cross-referenced in the knowledge graph.")
         if "RETRIEVED BIM MODEL FACTS:" in user_msg:
-            lines.append("- **Model Element Verification**: Corresponding IFC building elements were located and inspected in the project's spatial hierarchy.")
+            model_facts_block = user_msg.split("### RETRIEVED BIM MODEL FACTS:\n")[-1].split("###")[0]
+            summary_facts = [
+                line.strip()
+                for line in model_facts_block.strip().split("\n")
+                if line.strip().startswith("Total ") or line.strip().startswith("- [IFC:")
+            ]
+            if summary_facts:
+                lines.append("- **Model Element Verification**:")
+                for fact in summary_facts[:6]:
+                    lines.append(f"  {fact}")
+            else:
+                lines.append("- **Model Element Verification**: Corresponding IFC building elements were located and inspected in the project's spatial hierarchy.")
         lines.append("")
         lines.append("*(Live LLM endpoint was not reachable; the above citations reflect the exact verified graph entities).*")
         return "\n".join(lines)

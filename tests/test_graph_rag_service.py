@@ -156,3 +156,59 @@ def test_graph_rag_service_streaming():
     assert any("event: tool_call" in e for e in events)
     assert any("event: citation" in e for e in events)
     assert any("event: done" in e for e in events)
+
+
+def test_graph_rag_floors_query():
+    """Verify GraphRagService identifies 'floors' as IfcBuildingStorey and returns storey details."""
+    mock_graph = MagicMock()
+    mock_graph.provider = MagicMock()
+
+    executed_queries = []
+
+    def mock_execute(cypher: str, params: dict):
+        executed_queries.append(cypher)
+        if "IfcBuildingStorey" in cypher:
+            return [
+                {
+                    "guid": "storey_guid_1",
+                    "name": "Level 0 - Ground Floor",
+                    "ifc_type": "IfcBuildingStorey",
+                    "element_count": 85,
+                    "element_types": ["IfcWall", "IfcDoor", "IfcSlab"],
+                },
+                {
+                    "guid": "storey_guid_2",
+                    "name": "Level 1 - First Floor",
+                    "ifc_type": "IfcBuildingStorey",
+                    "element_count": 112,
+                    "element_types": ["IfcWall", "IfcDoor", "IfcWindow"],
+                },
+            ]
+        return []
+
+    mock_graph.execute.side_effect = mock_execute
+
+    service = GraphRagService(graph_service=mock_graph)
+    req = GraphRagQueryRequest(
+        query="How many floors in this model?",
+        scope="model",
+    )
+
+    response = asyncio.run(service.query(project_id=8, request=req))
+
+    assert response.project_id == 8
+    assert response.scope == "model"
+    # Verify tool call targets storeys query
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0].tool_name == "query_building_storeys"
+    assert response.tool_calls[0].arguments.get("primary_class") == "IfcBuildingStorey"
+
+    # Verify citations created for the floors
+    assert len(response.citations) == 2
+    assert response.citations[0].ifc_type == "IfcBuildingStorey"
+    assert "Level 0 - Ground Floor" in response.citations[0].title
+    assert "Level 1 - First Floor" in response.citations[1].title
+
+    # Verify answer contains verified facts
+    assert "Level 0 - Ground Floor" in response.answer or "Total Building Storeys" in response.answer
+
