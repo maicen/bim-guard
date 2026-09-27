@@ -8,7 +8,11 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 
 from app.api.dependencies import get_graph_service, get_models_service, get_rules_service
-from app.api.projects import ProjectAccessChecker, get_project_access_checker
+from app.api.projects import (
+    ProjectAccessChecker,
+    get_project_access_checker,
+    get_project_access_checker_flexible,
+)
 from app.modules.comparator.issue_schema import build_issue_proof_graph
 from app.modules.contracts import (
     CodeToIfcTraceEntry,
@@ -517,7 +521,7 @@ def ingest_project_compliance_decisions(
 )
 def export_prov_o_route(
     project_id: int,
-    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker_flexible)],
 ) -> Response:
     """Serialize compliance decision lineage and audit trail into W3C PROV-O Turtle (.ttl) format."""
     project_access(project_id)

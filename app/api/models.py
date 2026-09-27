@@ -30,7 +30,7 @@ from app.api.dependencies import (
     get_models_service,
     get_naming_config_service,
 )
-from app.api.projects import get_authorized_project
+from app.api.projects import get_authorized_project, get_authorized_project_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     AttachRepoModelsRequest,
@@ -615,7 +615,7 @@ def delete_model(
 def download_model(
     model_id: int,
     project_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
+    project: Annotated[dict, Depends(get_authorized_project_flexible)],
     service: Annotated[ModelsService, Depends(get_models_service)],
 ):
     """Retrieve the bytes of one attached model, by ``project_ifc_files.id``.

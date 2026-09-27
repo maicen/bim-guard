@@ -263,7 +263,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
  * after startup the promise is long since resolved and this await is a
  * same-microtask no-op.
  */
-async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   await authReady;
   const headers = { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) };
   let res: Response;
@@ -720,7 +720,7 @@ export const projectsApi = {
   },
 
   getIfcUrl(id: number): string {
-    return `${API_BASE}/projects/${id}/ifc`;
+    return withAuthToken(`${API_BASE}/projects/${id}/ifc`);
   },
 
   /** Rulesets bound to this project, and which of its org's grants remain
@@ -769,7 +769,7 @@ export const modelsApi = {
 
   /** URL for one specific attached model, rather than the project's primary. */
   downloadUrl(projectId: number, modelId: number): string {
-    return `${API_BASE}/models/${modelId}/download?project_id=${projectId}`;
+    return withAuthToken(`${API_BASE}/models/${modelId}/download?project_id=${projectId}`);
   },
 
   /** Promote one attached model to primary. Any previous primary is demoted. */
@@ -1166,17 +1166,17 @@ export const rulesApi = {
   },
 
   getIdsExportUrl(rulesetId?: string): string {
-    if (rulesetId) {
-      return `${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`;
-    }
-    return `${API_BASE}/rules/export-ids`;
+    const url = rulesetId
+      ? `${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`
+      : `${API_BASE}/rules/export-ids`;
+    return withAuthToken(url);
   },
 
   getJsonExportUrl(rulesetId?: string): string {
-    if (rulesetId) {
-      return `${API_BASE}/rules/export-json/${encodeURIComponent(rulesetId)}`;
-    }
-    return `${API_BASE}/rules/export-json`;
+    const url = rulesetId
+      ? `${API_BASE}/rules/export-json/${encodeURIComponent(rulesetId)}`
+      : `${API_BASE}/rules/export-json`;
+    return withAuthToken(url);
   },
 
   async getRulesetSourceMap(rulesetId: string): Promise<RulesetSourceMapResponse> {
@@ -1236,7 +1236,7 @@ export const rulesApi = {
   },
 
   getSnapshotPdfUrl(snapshotId: number): string {
-    return `${API_BASE}/rules/snapshots/${snapshotId}/pdf`;
+    return withAuthToken(`${API_BASE}/rules/snapshots/${snapshotId}/pdf`);
   },
 };
 
@@ -1716,11 +1716,11 @@ export const documentsApi = {
   },
 
   getFileUrl(id: number): string {
-    return `${API_BASE}/documents/${id}/file`;
+    return withAuthToken(`${API_BASE}/documents/${id}/file`);
   },
 
   getDoclangUrl(id: number): string {
-    return `${API_BASE}/documents/${id}/doclang`;
+    return withAuthToken(`${API_BASE}/documents/${id}/doclang`);
   },
 
   async getDoclang(id: number): Promise<string> {
@@ -1732,7 +1732,7 @@ export const documentsApi = {
   },
 
   getExportDoclangUrl(id: number): string {
-    return `${API_BASE}/documents/${id}/export-doclang`;
+    return withAuthToken(`${API_BASE}/documents/${id}/export-doclang`);
   },
 
   async getSections(id: number): Promise<DocumentSectionsResponse> {
@@ -1802,7 +1802,7 @@ export const documentsApi = {
   },
 
   getAssetUrl(id: number, filename: string): string {
-    return `${API_BASE}/documents/${id}/assets/${encodeURIComponent(filename)}`;
+    return withAuthToken(`${API_BASE}/documents/${id}/assets/${encodeURIComponent(filename)}`);
   },
 
   async importFromGoogleDrive(payload: GoogleDriveImportPayload): Promise<GoogleDriveImportResponse> {
@@ -1960,7 +1960,7 @@ export const ruleExtractionApi = {
   },
 
   getIdsPreviewUrl(documentId: number): string {
-    return `${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`;
+    return withAuthToken(`${API_BASE}/documents/${documentId}/rules/drafts/ids-preview`);
   },
 
   /**
@@ -2024,7 +2024,7 @@ export const ruleExtractionApi = {
   },
 
   getIdsExportUrl(rulesetId: string): string {
-    return `${API_BASE}/rules/export-ids/${rulesetId}`;
+    return withAuthToken(`${API_BASE}/rules/export-ids/${encodeURIComponent(rulesetId)}`);
   },
 };
 
@@ -2851,7 +2851,7 @@ export const graphApi = {
 
   /** Get URL for downloading the W3C PROV-O Turtle RDF compliance decision audit trail. */
   getProvOExportUrl(projectId: number): string {
-    return `${API_BASE}/graph/${projectId}/prov-o`;
+    return withAuthToken(`${API_BASE}/graph/${projectId}/prov-o`);
   },
 };
 

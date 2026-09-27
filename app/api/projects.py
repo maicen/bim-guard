@@ -775,7 +775,7 @@ def delete_project(
 @router.get("/{project_id}/ifc", summary="Download project IFC model")
 def download_project_ifc(
     project_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
+    project: Annotated[dict, Depends(get_authorized_project_flexible)],
     service: Annotated[ProjectsService, Depends(get_projects_service)],
 ):
     """Retrieve and download the stored IFC model for a project."""
@@ -857,7 +857,7 @@ def trigger_project_enhancement(
 def download_project_enhancement(
     project_id: int,
     lineage_id: int,
-    project: Annotated[dict, Depends(get_authorized_project)],
+    project: Annotated[dict, Depends(get_authorized_project_flexible)],
 ):
     """Download quality-improved IFC model artifact for a specific lineage version."""
     from app.services.model_lineage import SupabaseModelLineageRepository

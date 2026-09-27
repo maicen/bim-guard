@@ -1768,13 +1768,13 @@ def get_document_draft_source_map(
     )
 
 
-@router.get(
+@flexible_router.get(
     "/{document_id}/rules/drafts/ids-preview",
     summary="Preview the IDS XML that would be produced by a document's rule drafts",
 )
 def preview_rule_drafts_ids(
     document_id: int,
-    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker_flexible)],
 ) -> Response:
     """Render an IDS preview from a document's extraction drafts, before promotion."""
     access_checker(document_id)

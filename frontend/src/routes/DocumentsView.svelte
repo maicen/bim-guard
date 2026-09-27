@@ -19,6 +19,7 @@
   import Icon from "@iconify/svelte";
   import { documentsApi, parsingEnginesApi, orgParsingEnginesApi } from "../lib/api";
   import { withAuthToken } from "../lib/authToken";
+  import { downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
   import { DOCUMENT_TYPES } from "../lib/types";
   import type {
@@ -267,17 +268,8 @@
       `"${d.upload_date || ""}"`,
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `documents_export_${new Date().toISOString().substring(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `documents_export_${new Date().toISOString().substring(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
   }
 
   async function confirmBulkDelete() {

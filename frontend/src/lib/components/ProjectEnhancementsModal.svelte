@@ -11,6 +11,7 @@
     Eye,
   } from "lucide-svelte";
   import { lineageApi } from "../api";
+  import { withAuthToken } from "../authToken";
   import type { Project, ModelLineageRecord } from "../types";
   import Alert from "./Alert.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
@@ -209,7 +210,7 @@
                             </button>
                             {#if row.output_reference}
                               <a
-                                href={`/api/projects/${project.id}/enhancements/${row.id}/download`}
+                                href={withAuthToken(`/api/projects/${project.id}/enhancements/${row.id}/download`)}
                                 class="inline-flex items-center gap-1 rounded-lg border border-purple-800/40 bg-purple-950/40 px-3 py-1 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-900/60"
                                 title="Download enhanced IFC"
                               >

@@ -26,6 +26,7 @@
     RefreshCw,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi, llmProvidersApi, bsddApi } from "../lib/api";
+  import { downloadBlob, downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
@@ -122,14 +123,7 @@
     try {
       toasts.info(`Exporting TOC as ${format.toUpperCase()}…`);
       const blob = await documentsApi.exportSectionsTree(selectedDocId, format);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `document_${selectedDocId}_toc.${format}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `document_${selectedDocId}_toc.${format}`);
       toasts.success(`Downloaded TOC as ${format.toUpperCase()}.`);
     } catch (err: any) {
       toasts.error(err?.message || "Failed to export TOC.");
@@ -780,15 +774,11 @@
     previewingIds = true;
     try {
       const xmlText = await ruleExtractionApi.previewDraftsAsIds(selectedDocId);
-      const blob = new Blob([xmlText], { type: "application/xml;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `document_${selectedDocId}_drafts_preview.ids.xml`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadText(
+        xmlText,
+        `document_${selectedDocId}_drafts_preview.ids.xml`,
+        "application/xml;charset=utf-8;",
+      );
     } catch (err: any) {
       toasts.fromError(err, "Could not generate an IDS preview for this document's drafts.");
     } finally {
@@ -817,17 +807,8 @@
       r.severity || "Medium",
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `extracted_rules_draft_${new Date().toISOString().substring(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `extracted_rules_draft_${new Date().toISOString().substring(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
   }
 
   async function handleSaveSelected() {

@@ -21,6 +21,7 @@
     FileText,
   } from "lucide-svelte";
   import { revitSyncApi } from "../lib/api";
+  import { downloadText } from "../lib/utils/download";
   import type { RevitSyncRequest, RevitSyncResponse, RevitRuleResult } from "../lib/types";
   import Badge from "../lib/components/Badge.svelte";
   import BentoBox from "../lib/components/BentoBox.svelte";
@@ -201,17 +202,8 @@ print(response.read())
       r.missing_count || 0,
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `revit_sync_results_${new Date().toISOString().substring(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `revit_sync_results_${new Date().toISOString().substring(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
   }
 </script>
 

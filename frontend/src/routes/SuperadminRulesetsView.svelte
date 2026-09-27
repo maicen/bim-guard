@@ -22,6 +22,7 @@
   import DataTableHeader from "../lib/components/DataTableHeader.svelte";
   import RulesetDetailsModal from "../lib/components/RulesetDetailsModal.svelte";
   import { organizationsApi, rulesApi } from "../lib/api";
+  import { downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -321,23 +322,16 @@
 
   function exportSelectedRulesets() {
     const selectedList = rulesets.filter((r) => selectedRulesetIds.has(r.ruleset_id));
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Ruleset ID,Display Name,Category,Rule Count,Description"]
-        .concat(
-          selectedList.map(
-            (r) =>
-              `"${r.ruleset_id}","${r.display_name}","${r.category || ""}","${r.rules?.length || r.count || 0}","${(r.description || "").replace(/"/g, '""')}"`,
-          ),
-        )
-        .join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `rulesets-export-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csvContent = ["Ruleset ID,Display Name,Category,Rule Count,Description"]
+      .concat(
+        selectedList.map(
+          (r) =>
+            `"${r.ruleset_id}","${r.display_name}","${r.category || ""}","${r.rules?.length || r.count || 0}","${(r.description || "").replace(/"/g, '""')}"`,
+        ),
+      )
+      .join("\n");
+    const filename = `rulesets-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
     toasts.success(`Exported ${selectedList.length} ruleset(s) to CSV.`);
   }
 </script>

@@ -23,6 +23,7 @@
   import Modal from "../lib/components/Modal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { organizationsApi, documentsApi } from "../lib/api";
+  import { downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -306,23 +307,16 @@
 
   function exportSelectedDocs() {
     const selectedList = documents.filter((d) => selectedDocIds.has(d.id));
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Document ID,Filename,Doc Type,Project Code,Originator,CDE State"]
-        .concat(
-          selectedList.map(
-            (d) =>
-              `"${d.id}","${d.filename}","${d.doc_type || ""}","${d.project_code || ""}","${d.originator || ""}","${d.cde_state || ""}"`,
-          ),
-        )
-        .join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `documents-access-export-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csvContent = ["Document ID,Filename,Doc Type,Project Code,Originator,CDE State"]
+      .concat(
+        selectedList.map(
+          (d) =>
+            `"${d.id}","${d.filename}","${d.doc_type || ""}","${d.project_code || ""}","${d.originator || ""}","${d.cde_state || ""}"`,
+        ),
+      )
+      .join("\n");
+    const filename = `documents-access-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
     toasts.success(`Exported ${selectedList.length} document(s) to CSV.`);
   }
 </script>

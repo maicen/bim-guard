@@ -26,7 +26,7 @@ from app.api.dependencies import (
     get_ruleset_access_service,
 )
 from app.api.organizations import _require_membership, _require_superadmin
-from app.auth import CurrentUser, get_current_user
+from app.auth import CurrentUser, get_current_user, get_current_user_flexible
 from app.logging_config import get_logger
 from app.modules.contracts import (
     DocumentElementBbox,
@@ -80,6 +80,7 @@ logger = get_logger(__name__)
 # this just requires sign-in, applied once for the whole router rather than
 # on every route.
 router = APIRouter(dependencies=[Depends(get_current_user)])
+flexible_router = APIRouter(dependencies=[Depends(get_current_user_flexible)])
 
 
 def _rule_response(row: dict) -> RuleResponse:
@@ -175,6 +176,16 @@ def get_ruleset_access_checker(
     profiles: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> RulesetAccessChecker:
     """Dependency factory for :class:`RulesetAccessChecker`."""
+    return RulesetAccessChecker(current_user, memberships, ruleset_access, profiles)
+
+
+def get_ruleset_access_checker_flexible(
+    current_user: Annotated[CurrentUser, Depends(get_current_user_flexible)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    ruleset_access: Annotated[RulesetAccessService, Depends(get_ruleset_access_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+) -> RulesetAccessChecker:
+    """Dependency factory for :class:`RulesetAccessChecker` using flexible auth (header or ?token=)."""
     return RulesetAccessChecker(current_user, memberships, ruleset_access, profiles)
 
 
@@ -430,7 +441,7 @@ def get_ruleset_source_map(
     return RulesetSourceMapResponse(ruleset_id=ruleset_id, documents=documents)
 
 
-@router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
+@flexible_router.get("/export-ids", summary="Export active rules as buildingSMART IDS XML")
 def export_all_ids_xml(
     service: Annotated[RuleService, Depends(get_rules_service)],
     ruleset_id: str | None = None,
@@ -457,7 +468,7 @@ def export_all_ids_xml(
     )
 
 
-@router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")
+@flexible_router.get("/export-ids/{ruleset_id}", summary="Export ruleset as IDS XML")
 def export_ids_xml(
     ruleset_id: str,
     service: Annotated[RuleService, Depends(get_rules_service)],
@@ -480,7 +491,7 @@ def export_ids_xml(
     )
 
 
-@router.get("/export-json", summary="Export active rules as canonical JSON")
+@flexible_router.get("/export-json", summary="Export active rules as canonical JSON")
 def export_all_json(
     service: Annotated[RuleService, Depends(get_rules_service)],
     ruleset_id: str | None = None,
@@ -503,7 +514,7 @@ def export_all_json(
     )
 
 
-@router.get("/export-json/{ruleset_id}", summary="Export ruleset as canonical JSON")
+@flexible_router.get("/export-json/{ruleset_id}", summary="Export ruleset as canonical JSON")
 def export_json(
     ruleset_id: str,
     service: Annotated[RuleService, Depends(get_rules_service)],
@@ -714,10 +725,10 @@ def delete_rule_snapshot(
     svc.delete_snapshot(snapshot_id)
 
 
-@router.get("/snapshots/{snapshot_id}/pdf", summary="Download a rule snapshot as a structured PDF")
+@flexible_router.get("/snapshots/{snapshot_id}/pdf", summary="Download a rule snapshot as a structured PDF")
 def download_rule_snapshot_pdf(
     snapshot_id: int,
-    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
+    ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker_flexible)],
 ):
     """Render and return a snapshot's frozen rule configuration as a PDF spec sheet."""
     svc = RuleSnapshotService()

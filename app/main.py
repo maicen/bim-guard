@@ -458,6 +458,7 @@ app.include_router(
     api_digital_inspector.router, prefix="/api/projects", tags=["Digital Inspector"]
 )
 app.include_router(api_repositories.router, prefix="/api/repositories", tags=["Repositories"])
+app.include_router(api_rules.flexible_router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_rules.router, prefix="/api/rules", tags=["Rules"])
 app.include_router(api_analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(api_evaluation.router, prefix="/api/evaluation", tags=["Evaluation"])

@@ -17,6 +17,7 @@
   } from "lucide-svelte";
   import { documentsApi } from "../api";
   import { authHeaders, withAuthToken } from "../authToken";
+  import { downloadDirectWithToken } from "../utils/download";
   import type { DocumentElementBbox } from "../types";
   import LoadingState from "./LoadingState.svelte";
   import EmptyState from "./EmptyState.svelte";
@@ -267,7 +268,7 @@
   }
 
   function downloadDoclangArchive() {
-    window.open(withAuthToken(documentsApi.getExportDoclangUrl(documentId)), "_blank");
+    downloadDirectWithToken(documentsApi.getExportDoclangUrl(documentId));
   }
 
   interface ParsedOtslTable {

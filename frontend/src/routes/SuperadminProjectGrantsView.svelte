@@ -24,6 +24,7 @@
   import ProjectGroupAccessModal from "../lib/components/ProjectGroupAccessModal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import { organizationsApi, projectsApi } from "../lib/api";
+  import { downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -373,23 +374,16 @@
 
   function exportSelectedProjects() {
     const selectedList = projects.filter((p) => selectedProjectIds.has(p.id));
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      ["Project ID,Name,Country,Analysis Type,Organization ID"]
-        .concat(
-          selectedList.map(
-            (p) =>
-              `"${p.id}","${p.name}","${p.country || ""}","${p.analysis_type || ""}","${p.organization_id ?? ""}"`,
-          ),
-        )
-        .join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `projects-access-export-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csvContent = ["Project ID,Name,Country,Analysis Type,Organization ID"]
+      .concat(
+        selectedList.map(
+          (p) =>
+            `"${p.id}","${p.name}","${p.country || ""}","${p.analysis_type || ""}","${p.organization_id ?? ""}"`,
+        ),
+      )
+      .join("\n");
+    const filename = `projects-access-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
     toasts.success(`Exported ${selectedList.length} project(s) to CSV.`);
   }
 

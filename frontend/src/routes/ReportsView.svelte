@@ -25,6 +25,7 @@
     Network,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, bcfApi, rulesApi, graphApi } from "../lib/api";
+  import { downloadText, downloadDirectWithToken } from "../lib/utils/download";
   import Button from "../lib/components/ui/Button.svelte";
   import { authState } from "../lib/auth.svelte";
   import type { Project, AnalysisResult, BcfArtifact, BCFTopicResponse } from "../lib/types";
@@ -334,17 +335,8 @@
       `"${t.creation_date || ""}"`,
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `bcf_topics_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `bcf_topics_${currentProject?.name || "project"}_${new Date().toISOString().substring(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
   }
 
   function openTopicDetails(topic: BCFTopicResponse) {
@@ -414,17 +406,8 @@
       `"${a.created_at || ""}"`,
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `${type}_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `${type}_artifacts_export_${new Date().toISOString().substring(0, 10)}.csv`;
+    downloadText(csvContent, filename, "text/csv;charset=utf-8;");
   }
 
   // Built at click time, not render time: this list is rendered once when it
@@ -434,7 +417,7 @@
   // withAuthToken. A URL computed once up front would still download with
   // that original token even after it's expired.
   function downloadReportArtifact(type: ArtifactType, artifactId: number) {
-    window.location.href = analyzeApi.getReportArtifactUrl(type, artifactId);
+    downloadDirectWithToken(analyzeApi.getReportArtifactUrl(type, artifactId));
   }
 
   function promptDeleteArtifact(type: ArtifactType, artifact: BcfArtifact) {
@@ -509,7 +492,7 @@
           size="sm"
           class="flex items-center gap-2 border-border-interactive bg-surface-overlay text-xs font-medium text-fg-primary hover:bg-surface-hover"
           onclick={() => {
-            window.open(graphApi.getProvOExportUrl(selectedProjectId), '_blank');
+            downloadDirectWithToken(graphApi.getProvOExportUrl(selectedProjectId));
           }}
         >
           <Network class="h-4 w-4 text-accent" />
