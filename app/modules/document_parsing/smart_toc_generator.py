@@ -26,11 +26,11 @@ _SECTION_REF_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _TABLE_REF_PATTERN = re.compile(
-    r"\b(?:Table)\s+(\d+(?:\.\d+)*(?:\.[A-Z0-9]+)?)\b",
+    r"\b(?:Table)\s+(\d+(?:\.\d+)*(?:\.[A-Z0-9]+)?(?:\([A-Za-z0-9]+\))?(?:-[A-Za-z0-9]+)?)(?=[\s,.;:!?\)\]]|$|\b)",
     re.IGNORECASE,
 )
 _STANDARD_REF_PATTERN = re.compile(
-    r"\b(NFPA\s*\d+|IBC\s*\d+|ISO\s*\d+(?:-\d+)?|ASTM\s*[A-Z0-9\-]+|EN\s*\d+|NBC\s*\d+)\b",
+    r"\b(NFPA\s*\d+|IBC\s*\d+|SBC\s*\d+|ISO\s*\d+(?:-\d+)?|ASTM\s+[A-Z]+(?:\s*[-–]?\s*\d+[A-Za-z]*)?|ASTM\s*[A-Z0-9\-]+|ICC\s*[A-Za-z0-9\.\-]+|ASCE\s*\d+|GA-\d+|AWPA\s*[A-Za-z0-9]+|EN\s*\d+|NBC\s*\d+|UL\s*\d+)\b",
     re.IGNORECASE,
 )
 
@@ -63,6 +63,12 @@ _TOPIC_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\b(?:spatial separation|limiting distance|unprotected openings)\b", re.IGNORECASE), "Spatial Separation"),
     (re.compile(r"\b(?:plumbing|fixture counts|water closet|lavatory)\b", re.IGNORECASE), "Plumbing Fixtures"),
     (re.compile(r"\b(?:smoke barrier|smoke compartment|damper)\b", re.IGNORECASE), "Smoke Control"),
+    (re.compile(r"\b(?:type i|type ii|type iii|type iv|type v|construction classification)\b", re.IGNORECASE), "Construction Types"),
+    (re.compile(r"\b(?:building height|building area|height modification|area modification|mezzanine|unlimited area)\b", re.IGNORECASE), "Building Height & Area"),
+    (re.compile(r"\b(?:interior finish|flame spread|smoke-developed|wall covering)\b", re.IGNORECASE), "Interior Finishes"),
+    (re.compile(r"\b(?:safety glazing|sloped glazing|skylight|glass load|wired glass)\b", re.IGNORECASE), "Glass & Glazing"),
+    (re.compile(r"\b(?:roof assembly|roof covering|reroofing|flashing|shingle|underlayment)\b", re.IGNORECASE), "Roofs & Assemblies"),
+    (re.compile(r"\b(?:exterior wall|weather protection|masonry veneer|wall envelope)\b", re.IGNORECASE), "Exterior Walls"),
 ]
 
 
@@ -80,7 +86,9 @@ def extract_citations(text: str) -> list[str]:
         citations.add(f"Table {m.group(1)}")
 
     for m in _STANDARD_REF_PATTERN.finditer(text):
-        citations.add(m.group(1).strip())
+        raw_std = m.group(1).strip()
+        normalized_std = " ".join(raw_std.split())
+        citations.add(normalized_std)
 
     return sorted(citations)
 
@@ -221,6 +229,7 @@ def extract_dot_leader_entries(text: str) -> list[dict]:
       '1.1 Scope and Administration .................... 12'
       'SECTION 1004 OCCUPANT LOAD .................. 240'
       'Table 1004.5 Floor Area Allowances .......... 242'
+      'CHAPTER 1 DEFINITIONS ........................ 1'
     """
     entries: list[dict] = []
     if not text:
@@ -229,9 +238,22 @@ def extract_dot_leader_entries(text: str) -> list[dict]:
         line = line.strip()
         m = _DOT_LEADER_LINE.match(line)
         if m:
-            num = (m.group(1) or "").strip()
+            raw_lead = (m.group(1) or "").strip()
             title = (m.group(2) or "").strip()
             page_str = m.group(3).strip()
+
+            num = raw_lead
+            m_sec = re.match(
+                r"^(?:CHAPTER|SECTION|PART|TABLE)?\s*([0-9]+(?:\.[0-9]+)*(?:\([A-Za-z0-9]+\))?)\b\s*[:\-\—]?(.*)$",
+                f"{raw_lead} {title}".strip(),
+                re.IGNORECASE,
+            )
+            if m_sec:
+                num = m_sec.group(1).strip()
+                extracted_title = m_sec.group(2).strip()
+                if extracted_title:
+                    title = extracted_title
+
             entries.append(
                 {
                     "section_number": num or None,
@@ -240,6 +262,67 @@ def extract_dot_leader_entries(text: str) -> list[dict]:
                 }
             )
     return entries
+
+
+def smooth_page_numbers(flat: list[dict]) -> None:
+    """Detect and smooth anomalous, non-monotonic page numbers.
+
+    Because document sections occur in strictly forward sequence, any node
+    whose resolved physical page jumps backwards into a much earlier page
+    (common when a snippet matches boilerplate text or cross-references earlier in the PDF)
+    is bounded and smoothed by surrounding sequential anchors.
+    """
+    if len(flat) < 2:
+        return
+
+    # Pass 1: Forward-fill / clamp backwards jumps
+    last_valid_page: int | None = None
+    for i, node in enumerate(flat):
+        curr_p = node.get("page_number")
+        if curr_p is None:
+            continue
+
+        if last_valid_page is None:
+            last_valid_page = curr_p
+            continue
+
+        if curr_p < last_valid_page:
+            # Outlier check: look ahead for the next node with a valid page >= last_valid_page
+            next_valid_page = None
+            for j in range(i + 1, min(i + 15, len(flat))):
+                np = flat[j].get("page_number")
+                if np is not None and np >= last_valid_page:
+                    next_valid_page = np
+                    break
+
+            if next_valid_page is not None:
+                # Outlier: curr_p was a false backwards match; clamp to next valid
+                node["page_number"] = next_valid_page
+            elif curr_p + 15 < last_valid_page:
+                # Drastic backwards jump without recovery; clamp to last valid
+                node["page_number"] = last_valid_page
+            else:
+                last_valid_page = curr_p
+        else:
+            last_valid_page = curr_p
+
+    # Pass 2: Interpolate None page numbers between surrounding anchors
+    for i, node in enumerate(flat):
+        if node.get("page_number") is None:
+            prev_p = None
+            for j in range(i - 1, -1, -1):
+                if flat[j].get("page_number") is not None:
+                    prev_p = flat[j]["page_number"]
+                    break
+            next_p = None
+            for j in range(i + 1, len(flat)):
+                if flat[j].get("page_number") is not None:
+                    next_p = flat[j]["page_number"]
+                    break
+            if prev_p is not None:
+                node["page_number"] = prev_p
+            elif next_p is not None:
+                node["page_number"] = next_p
 
 
 def calibrate_page_offsets(tree: list[dict], flat: list[dict]) -> int | None:
@@ -314,6 +397,9 @@ def build_smart_toc(
         for node, page in zip(flat, page_numbers):
             node["page_number"] = page
 
+    # Smooth page numbers to eliminate spurious backwards jumps
+    smooth_page_numbers(flat)
+
     # Enrich each node with semantic and relational metadata
     for node in flat:
         text = node.get("text", "")
@@ -333,6 +419,7 @@ def build_smart_toc(
         for node in nodes:
             flat_item = id_to_flat.get(node["id"])
             if flat_item:
+                node["page_number"] = flat_item.get("page_number")
                 node["summary"] = flat_item["summary"]
                 node["citations"] = flat_item["citations"]
                 node["target_ifc_classes"] = flat_item["target_ifc_classes"]

@@ -17,8 +17,12 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+_TOC_HEADING_PATTERN = re.compile(
+    r"^TABLE\s+OF\s+(CONTENTS|TABLES|FIGURES)\b",
+    re.IGNORECASE,
+)
 _KEYWORD_HEADING_PATTERN = re.compile(
-    r"^(SECTION|Section|CHAPTER|Chapter|PART|Part|TABLE|Table|ARTICLE|Article|CLAUSE|Clause)\s+([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$",
+    r"^(SECTION|SECTIONS|CHAPTER|CHAPTERS|PART|PARTS|TABLE|TABLES|ARTICLE|ARTICLES|CLAUSE|CLAUSES)\s+([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$",
     re.IGNORECASE,
 )
 _DOTTED_HEADING_PATTERN = re.compile(
@@ -27,6 +31,7 @@ _DOTTED_HEADING_PATTERN = re.compile(
 _NUMBERED_ITEM_PATTERN = re.compile(r"^(\d+\.)(?:[:.)\s\-—]+(.*))?$")
 _YEAR_HEADING_PATTERN = re.compile(r"^(?:19\d\d|20\d\d)\b")
 _EXCEPTION_HEADING_PATTERN = re.compile(r"^Exceptions?[:\s]*$", re.IGNORECASE)
+_INDEX_HEADING_PATTERN = re.compile(r"^INDEX\b", re.IGNORECASE)
 
 
 def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]:
@@ -38,6 +43,7 @@ def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]
       - 'CHAPTER 15: SIGNS' -> ('15', 'CHAPTER 15 — SIGNS')
       - 'TABLE 2.7.7(1)' -> ('2.7.7(1)', 'TABLE 2.7.7(1)')
       - '2.24.2 Aircraft hangar.' -> ('2.24.2', '2.24.2 — Aircraft hangar.')
+      - 'TABLE OF CONTENTS' -> (None, 'TABLE OF CONTENTS')
       - 'Exceptions:' -> (None, 'Exceptions')
       - 'PREFACE' -> (None, 'PREFACE')
       - '2024 INTERNATIONAL BUILDING CODE' -> (None, '2024 INTERNATIONAL BUILDING CODE')
@@ -46,17 +52,41 @@ def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]
     if not clean:
         return None, ""
 
+    if _TOC_HEADING_PATTERN.match(clean):
+        return None, clean.upper()
+
     if _EXCEPTION_HEADING_PATTERN.match(clean):
         return None, "Exceptions"
+
+    if _INDEX_HEADING_PATTERN.match(clean):
+        return None, clean
 
     if _YEAR_HEADING_PATTERN.match(clean):
         return None, clean
 
     m_kw = _KEYWORD_HEADING_PATTERN.match(clean)
     if m_kw:
-        kw = m_kw.group(1).upper()
+        raw_kw = m_kw.group(1).upper()
+        # Normalize plural to singular
+        kw = raw_kw.rstrip("S") if raw_kw not in ("TABLE", "CLAUSE") else raw_kw
+        if kw == "TABLES":
+            kw = "TABLE"
+        elif kw == "CLAUSES":
+            kw = "CLAUSE"
+
         ref = m_kw.group(2)
         rest = (m_kw.group(3) or "").strip()
+
+        # If keyword is TABLE, reference must look like a table number, not an English word
+        if kw == "TABLE":
+            is_valid_table_num = bool(
+                re.match(r"^\d", ref)
+                or re.match(r"^[A-Z]\d", ref)
+                or re.match(r"^[IVXLCDM]+$", ref, re.IGNORECASE)
+            )
+            if not is_valid_table_num:
+                return None, clean
+
         name = f"{kw} {ref}" + (f" — {rest}" if rest else "")
         return ref, name
 
@@ -258,19 +288,21 @@ class DocLangChunker:
                 return
             combined_text = "\n\n".join(b for b in current_content_blocks if b.strip()).strip()
             if combined_text:
-                chunks.append(
-                    {
-                        "section_number": current_section_number,
-                        "section_name": current_section_name,
-                        "text": combined_text,
-                        "char_count": len(combined_text),
-                        "section_path": list(current_section_path),
-                        "node_type": current_node_type,
-                        "bbox": current_bbox,
-                        "page_number": current_page_number,
-                        "element_id": current_element_id,
-                    }
-                )
+                clean_alnum = re.sub(r"[\s\ufffd\-_—.,;:!?/\\|()\[\]{}]", "", combined_text)
+                if clean_alnum:
+                    chunks.append(
+                        {
+                            "section_number": current_section_number,
+                            "section_name": current_section_name,
+                            "text": combined_text,
+                            "char_count": len(combined_text),
+                            "section_path": list(current_section_path),
+                            "node_type": current_node_type,
+                            "bbox": current_bbox,
+                            "page_number": current_page_number,
+                            "element_id": current_element_id,
+                        }
+                    )
             current_content_blocks = []
             current_node_type = "paragraph"
             current_bbox = None
@@ -314,6 +346,9 @@ class DocLangChunker:
         }
         _TEXT_RUN_TAGS = {"text", "paragraph", "p", "item", "li"}
 
+        in_toc = False
+        seen_body_chapter_1 = False
+
         for elem in root.iter():
             if id(elem) in skip_ids:
                 continue
@@ -330,6 +365,29 @@ class DocLangChunker:
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         bbox_idx += 1
                     continue
+
+                # Check if entering Table of Contents
+                if _TOC_HEADING_PATTERN.match(heading_text):
+                    in_toc = True
+
+                # Check if we encounter true body Chapter 1
+                m_ch1 = re.match(r"^(?:CHAPTER|SECTION)\s+1\b", heading_text, re.IGNORECASE)
+                if m_ch1 and not re.search(r"\.{2,}|\_{2,}|\-{2,}|\s{4,}\d+$", heading_text):
+                    in_toc = False
+                    seen_body_chapter_1 = True
+
+                # If inside TOC, treat subsequent TOC entries (with dot leaders or premature chapter numbers) as TOC text
+                if in_toc and not seen_body_chapter_1:
+                    is_toc_entry = bool(
+                        re.search(r"\.{2,}|\_{2,}|\-{2,}|\s{4,}\d+$", heading_text)
+                        or _KEYWORD_HEADING_PATTERN.match(heading_text)
+                        or _DOTTED_HEADING_PATTERN.match(heading_text)
+                    )
+                    if is_toc_entry and not _TOC_HEADING_PATTERN.match(heading_text):
+                        current_content_blocks.append(heading_text)
+                        if total_bboxes > 0 and bbox_idx < total_bboxes:
+                            bbox_idx += 1
+                        continue
 
                 level_str = elem.attrib.get("level", "1")
                 try:
@@ -349,7 +407,12 @@ class DocLangChunker:
                     if not curr_num:
                         if prev_h.endswith(("-", "—", ",", ";", ":", "(")) or (heading_text and heading_text[0].islower()):
                             is_continuation = True
-                        elif len(heading_text.split()) <= 6 and not _KEYWORD_HEADING_PATTERN.match(heading_text):
+                        elif (
+                            len(heading_text.split()) <= 6
+                            and not _KEYWORD_HEADING_PATTERN.match(heading_text)
+                            and not _TOC_HEADING_PATTERN.match(heading_text)
+                            and not _DOTTED_HEADING_PATTERN.match(heading_text)
+                        ):
                             is_continuation = True
 
                     if is_continuation:
@@ -418,7 +481,24 @@ class DocLangChunker:
                         current_page_number = element_bboxes[bbox_idx].get("page_number")
                         current_element_id = element_bboxes[bbox_idx].get("element_id")
                         bbox_idx += 1
+
+                    # Check if table text begins with a TABLE title (e.g. "| TABLE 2.2.1.1 INCIDENTAL USE AREAS |")
+                    tbl_match = re.search(
+                        r"\|\s*TABLE\s+([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))?(?:-[A-Za-z0-9]+)?)\s*[:\-\—]?\s*([^|\n]*)",
+                        table_text,
+                        re.IGNORECASE,
+                    )
+                    orig_sec_num = current_section_number
+                    orig_sec_name = current_section_name
+                    if tbl_match:
+                        t_num = tbl_match.group(1).strip()
+                        t_rest = tbl_match.group(2).strip()
+                        current_section_number = t_num
+                        current_section_name = f"TABLE {t_num}" + (f" — {t_rest}" if t_rest else "")
                     flush_current_chunk()
+                    # Restore enclosing section number and name for subsequent text
+                    current_section_number = orig_sec_num
+                    current_section_name = orig_sec_name
 
             elif tag in ("text", "paragraph", "p"):
                 p_text = "".join(elem.itertext()).strip()

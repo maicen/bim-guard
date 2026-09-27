@@ -26,7 +26,8 @@ def _chunk(number: str, name: str, text: str = "body") -> dict:
 
 def test_compute_depth_variants():
     assert compute_depth("4", "Stairs") == 0  # bare taxonomy number
-    assert compute_depth("4.4", "SECTION 4.4") == 0  # SECTION/CHAPTER/PART always top-level
+    assert compute_depth("4", "CHAPTER 4") == 0  # CHAPTER is top-level (depth 0)
+    assert compute_depth("4.4", "SECTION 4.4") == 1  # dotted decimal nests by dot count (depth 1)
     assert compute_depth("4.4.1", "General") == 2  # two dots
     assert compute_depth("9.8.2.1", "Stair Width") == 3  # three dots
     assert compute_depth(None, None) == 0

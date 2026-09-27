@@ -1,6 +1,7 @@
-"""
+"""Splits extracted markdown or plain text into section chunks.
+
 document_parsing/section_chunker.py
----------------------------------------
+-----------------------------------
 Step 3 — Splits extracted markdown/plain text into section chunks.
 
 Recognises headings in this priority order:
@@ -112,6 +113,8 @@ class SectionChunker:
     @staticmethod
     def _derive_number_and_name(heading_text: str):
         """Build a (number, name) pair from an arbitrary heading string."""
+        if re.match(r"^TABLE\s+OF\s+(CONTENTS|TABLES|FIGURES)\b", heading_text, re.IGNORECASE):
+            return None, heading_text.strip()
         m = _TRAILING_NUMBER.search(heading_text)
         number = m.group(0) if m else heading_text[:20] or "?"
         name = heading_text[:100] or number

@@ -137,7 +137,9 @@ class DocumentOrchestratorService:
         from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
         from app.modules.document_parsing.smart_toc_generator import (
             build_smart_toc,
+            calibrate_page_offsets,
             resolve_page_ranges,
+            smooth_page_numbers,
         )
         from app.services.cache import cache_service
         from app.services.document_graph_service import DocumentGraphService
@@ -174,18 +176,23 @@ class DocumentOrchestratorService:
                 for idx, page_num in zip(unresolved_indices, matched_pages, strict=False):
                     flat[idx]["page_number"] = page_num
 
+                # Smooth any spurious non-monotonic page jumps
+                smooth_page_numbers(flat)
+
                 id_to_page = {f["id"]: f.get("page_number") for f in flat}
 
                 def _sync_page(nodes: list[dict]) -> None:
                     for n in nodes:
-                        if n.get("page_number") is None and n.get("id") in id_to_page:
+                        if n.get("id") in id_to_page:
                             n["page_number"] = id_to_page[n["id"]]
                         if n.get("children"):
                             _sync_page(n["children"])
 
                 _sync_page(tree)
-                # Recompute bounded page spans with resolved page numbers
+                # Recompute bounded page spans with smoothed page numbers
                 resolve_page_ranges(tree, flat)
+                # Calibrate logical-to-physical page offsets
+                calibrate_page_offsets(tree, flat)
 
         # Ingest Smart TOC into graph database for Graph RAG (best-effort, non-blocking)
         if graph_service:

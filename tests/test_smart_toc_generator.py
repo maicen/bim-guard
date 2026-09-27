@@ -12,7 +12,7 @@ from app.modules.document_parsing.smart_toc_generator import (
 )
 
 
-def _chunk(number: str, name: str, text: str, page: int | None = None) -> dict:
+def _chunk(number: str, name: str, text: str = "body", page: int | None = None) -> dict:
     return {
         "section_number": number,
         "section_name": name,
@@ -140,3 +140,101 @@ def test_resolve_page_ranges():
     assert tree[0]["page_number"] == 5
     assert tree[0]["end_page_number"] >= 8
     assert flat[1]["end_page_number"] == 8  # s1 ends where s2 starts
+
+
+def test_smooth_page_numbers_eliminates_backwards_jumps():
+    flat = [
+        {"id": "s0", "page_number": 232},
+        {"id": "s1", "page_number": 67},   # spurious backward jump
+        {"id": "s2", "page_number": 235},
+        {"id": "s3", "page_number": None},  # missing page
+        {"id": "s4", "page_number": 255},
+    ]
+    from app.modules.document_parsing.smart_toc_generator import smooth_page_numbers
+
+    smooth_page_numbers(flat)
+
+    # s1 should be smoothed forward to 235
+    assert flat[1]["page_number"] == 235
+    # s3 should be interpolated
+    assert flat[3]["page_number"] == 235 or flat[3]["page_number"] == 255
+
+
+def test_extract_citations_comprehensive_building_codes():
+    text = (
+        "Pursuant to SBC 201 Section 2.7.2, assemblies tested in accordance with ASTM E 96 "
+        "or ASTM C 1047 shall conform to Table 2.7.7(1). Refer also to SBC 801, ICC A117.1, "
+        "and ASCE 7 Section 11.15."
+    )
+    citations = extract_citations(text)
+    assert "Section 2.7.2" in citations
+    assert "Section 11.15" in citations
+    assert "Table 2.7.7(1)" in citations
+    assert "ASTM E 96" in citations
+    assert "ASTM C 1047" in citations
+    assert "SBC 201" in citations
+    assert "SBC 801" in citations
+    assert "ICC A117.1" in citations
+    assert "ASCE 7" in citations
+
+
+def test_prefix_hierarchy_prevents_table_footnote_hijack():
+    from app.modules.document_parsing.section_tree import build_section_tree
+
+    chunks = [
+        _chunk("2", "CHAPTER 2 - OCCUPANCY"),
+        _chunk("2.3", "SECTION 2.3 - ASSEMBLY GROUP A"),
+        {"section_number": None, "section_name": "REQUIRED SEPARATION OF OCCUPANCIES", "text": "Table text", "char_count": 10, "node_type": "table"},
+        {"section_number": None, "section_name": "NP = Not permitted.", "text": "Footnote text", "char_count": 10, "node_type": "paragraph"},
+        _chunk("2.4", "SECTION 2.4 - BUSINESS GROUP B"),
+        _chunk("2.5", "SECTION 2.5 - EDUCATIONAL GROUP E"),
+    ]
+
+    tree, flat = build_section_tree(chunks)
+
+    # Chapter 2 is root
+    assert len(tree) == 1
+    ch2 = tree[0]
+    assert ch2["section_number"] == "2"
+
+    # Section 2.4 and 2.5 MUST be direct children of Chapter 2, NOT nested under the table or footnote!
+    child_numbers = [c.get("section_number") for c in ch2["children"]]
+    assert "2.3" in child_numbers
+    assert "2.4" in child_numbers
+    assert "2.5" in child_numbers
+
+    # Section 2.3 contains the table and footnote
+    sec23 = next(c for c in ch2["children"] if c.get("section_number") == "2.3")
+    sec23_child_names = [c.get("section_name") for c in sec23["children"]]
+    assert "REQUIRED SEPARATION OF OCCUPANCIES" in sec23_child_names
+    assert "NP = Not permitted." in sec23_child_names
+
+
+def test_extract_dot_leader_entries_clean_numbers():
+    from app.modules.document_parsing.smart_toc_generator import extract_dot_leader_entries
+
+    toc_text = """
+    CHAPTER 1 DEFINITIONS ................................................. 1
+    SECTION 1.1 ........................................................... 1
+    SECTION 1.2 DEFINITIONS ............................................... 1
+    CHAPTER 2 USE AND OCCUPANCY CLASSIFICATION ............................ 17
+    CHAPTER 15 SIGNS ...................................................... 299
+    """
+    entries = extract_dot_leader_entries(toc_text)
+    assert len(entries) == 5
+
+    assert entries[0]["section_number"] == "1"
+    assert entries[0]["printed_page_number"] == "1"
+
+    assert entries[1]["section_number"] == "1.1"
+    assert entries[1]["printed_page_number"] == "1"
+
+    assert entries[2]["section_number"] == "1.2"
+    assert entries[2]["printed_page_number"] == "1"
+
+    assert entries[3]["section_number"] == "2"
+    assert entries[3]["printed_page_number"] == "17"
+
+    assert entries[4]["section_number"] == "15"
+    assert entries[4]["printed_page_number"] == "299"
+

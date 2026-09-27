@@ -24,14 +24,37 @@ from __future__ import annotations
 import re
 
 _DOTTED = re.compile(r"^\d+(?:\.\d+)+$")
-_CHAPTER_WORD = re.compile(r"^(CHAPTER|PART)\b", re.IGNORECASE)
+_CHAPTER_WORD = re.compile(r"^(CHAPTER|PART|DIVISION)\b", re.IGNORECASE)
 _EXCEPTION_WORD = re.compile(r"^Exceptions?\b", re.IGNORECASE)
+_TOP_LEVEL_TITLES = re.compile(
+    r"^(PREFACE|TABLE\s+OF\s+CONTENTS|REFERENCED\s+STANDARDS|INDEX|APPENDIX(?:\s+[A-Z0-9]+)?)\b",
+    re.IGNORECASE,
+)
+
+
+def _get_parent_prefixes(sec_num: str | None) -> list[str]:
+    """Return candidate parent section numbers for a given section number in descending specificity.
+
+    Examples:
+      '2.27.3.1' -> ['2.27.3', '2.27', '2']
+      '2.4'      -> ['2']
+      '8.14.1'   -> ['8.14', '8']
+      '2.7.7(1)' -> ['2.7.7', '2.7', '2']
+    """
+    if not sec_num:
+        return []
+    clean = sec_num.strip().split("(")[0].rstrip(".")
+    parts = clean.split(".")
+    candidates = []
+    for i in range(len(parts) - 1, 0, -1):
+        candidates.append(".".join(parts[:i]))
+    return candidates
 
 
 def compute_depth(section_number: str | None, section_name: str | None) -> int:
     """Return the outline depth (0 = top-level) inferred for one chunk."""
     name = (section_name or "").strip()
-    if _CHAPTER_WORD.match(name):
+    if _CHAPTER_WORD.match(name) or _TOP_LEVEL_TITLES.match(name):
         return 0
 
     if _EXCEPTION_WORD.match(name):
@@ -54,6 +77,13 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
     and DocLang chunks (exact hierarchy depth from ``section_path``, with
     OTSL table nodes, page numbers, and bounding boxes).
 
+    Uses a hybrid prefix-matching and depth-stack algorithm:
+      - Numbered clauses (e.g. '2.4', '8.14.1') deterministically attach to their
+        matching parent prefix ('2', '8.14') on the stack, preventing table
+        captions or notes from hijacking subsequent sections.
+      - Tables, paragraphs, and unnumbered notes attach subordinate to the current
+        active section without popping the stack to root level.
+
     Args:
         chunks: The list of dicts returned by ``SectionChunker.chunk()``
             or ``DocLangChunker.chunk()`` in document order.
@@ -63,7 +93,8 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
     """
     flat: list[dict] = []
     roots: list[dict] = []
-    stack: list[tuple[int, dict]] = []  # (depth, tree_node)
+    # stack entry: (depth, tree_node, sec_num)
+    stack: list[tuple[int, dict, str | None]] = []
 
     for i, chunk in enumerate(chunks):
         section_number = chunk.get("section_number")
@@ -86,8 +117,6 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         }
         flat.append(flat_item)
 
-        # Infer depth: DocLang provides section_path when hierarchy is captured;
-        # otherwise compute from dotted numbers and clause keywords.
         num_depth = compute_depth(section_number, section_name)
         if "section_path" in chunk and chunk["section_path"] and len(chunk["section_path"]) > 1:
             base_depth = max(0, len(chunk["section_path"]) - 1)
@@ -97,7 +126,6 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         elif num_depth > 0:
             depth = num_depth
         elif (section_name or "").strip().lower() == "exceptions" and stack:
-            # An Exception clause belongs directly under its preceding parent clause
             depth = stack[-1][0] + 1
         else:
             depth = num_depth
@@ -113,6 +141,57 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
             "children": [],
         }
 
+        # 1. Top-level Chapters/Parts/Major Divisions: always start at root
+        name_str = (section_name or "").strip()
+        is_major_root = bool(
+            _CHAPTER_WORD.match(name_str)
+            or _TOP_LEVEL_TITLES.match(name_str)
+            or (not stack and depth == 0)
+        )
+
+        if is_major_root:
+            stack.clear()
+            roots.append(tree_node)
+            stack.append((0, tree_node, section_number))
+            continue
+
+        # 2. Non-heading chunk (table, paragraph) sharing section_number with active heading
+        if node_type != "heading" and stack and stack[-1][2] == section_number:
+            stack[-1][1]["children"].append(tree_node)
+            continue
+
+        # 3. Numbered section/clause: check if its logical parent prefix exists on stack
+        parent_matched = False
+        if section_number:
+            prefixes = _get_parent_prefixes(section_number)
+            for pfx in prefixes:
+                for idx in range(len(stack) - 1, -1, -1):
+                    anc_num = stack[idx][2]
+                    if anc_num and anc_num.split("(")[0].rstrip(".") == pfx:
+                        # Pop everything above this ancestor
+                        while len(stack) > idx + 1:
+                            stack.pop()
+                        stack[idx][1]["children"].append(tree_node)
+                        stack.append((stack[idx][0] + 1, tree_node, section_number))
+                        parent_matched = True
+                        break
+                if parent_matched:
+                    break
+
+        if parent_matched:
+            continue
+
+        # 3. Unnumbered chunks (tables, notes, footnotes, paragraphs, unnumbered sub-clauses)
+        # When an active section exists on stack, nest inside it rather than resetting to root!
+        if not section_number and stack:
+            # Subordinate to current top of stack
+            stack[-1][1]["children"].append(tree_node)
+            # If it's a heading with substantial depth, track it so sub-items can nest under it
+            if node_type == "heading":
+                stack.append((stack[-1][0] + 1, tree_node, None))
+            continue
+
+        # 4. Fallback depth-based stack resolution
         while stack and stack[-1][0] >= depth:
             stack.pop()
 
@@ -121,7 +200,7 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         else:
             roots.append(tree_node)
 
-        stack.append((depth, tree_node))
+        stack.append((depth, tree_node, section_number))
 
     return roots, flat
 
