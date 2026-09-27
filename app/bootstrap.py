@@ -797,6 +797,13 @@ def build_default_container() -> ApplicationContainer:
                     neo4j_provider.ensure_vector_index("document_section_vector", "DocumentSection", "embedding", 1536)
                     neo4j_provider.ensure_fulltext_index("document_section_fulltext", "DocumentSection", ["section_number", "section_name", "summary"])
                     neo4j_provider.ensure_fulltext_index("ifc_product_fulltext", "IfcProduct", ["name", "guid", "ifc_type", "tag"])
+                    neo4j_provider.ensure_index("IfcProduct", "id")
+                    neo4j_provider.ensure_index("IfcProduct", "guid")
+                    neo4j_provider.ensure_index("IfcProduct", "project_id")
+                    neo4j_provider.ensure_index("IfcBuildingStorey", "id")
+                    neo4j_provider.ensure_index("IfcBuildingStorey", "project_id")
+                    neo4j_provider.ensure_index("IfcSpace", "id")
+                    neo4j_provider.ensure_index("IfcSpace", "project_id")
                 except Exception as index_err:
                     logger.debug("Neo4j GraphRAG index setup note: %s", index_err)
                 logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)

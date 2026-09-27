@@ -10,6 +10,7 @@ import logging
 import re
 import time
 import uuid
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 try:
@@ -207,10 +208,12 @@ class Neo4jDatabaseProvider:
             self._node_label_by_id[props[pk]] = label
             prepared_batch.append(props)
 
+        # Add secondary IfcProduct label if this is an IFC entity
+        secondary_label = ":IfcProduct" if (label.startswith("Ifc") and label != "IfcProduct") else ""
         query = (
             f"UNWIND $batch AS item "
             f"MERGE (n:{label} {{{pk}: item.{pk}}}) "
-            f"SET n += item"
+            f"SET n{secondary_label}, n += item"
         )
         self.execute_query(query, {"batch": prepared_batch})
 
@@ -275,7 +278,7 @@ class Neo4jDatabaseProvider:
         from_pk: Optional[str] = None,
         to_pk: Optional[str] = None,
     ) -> None:
-        """Add or update multiple edges in a single UNWIND batch query."""
+        """Add or update multiple edges in UNWIND batch queries, grouping heterogeneous endpoints."""
         if not edges:
             return
         self._validate_identifier(rel_type)
@@ -288,38 +291,40 @@ class Neo4jDatabaseProvider:
         if to_pk:
             self._validate_identifier(to_pk)
 
-        first_source = edges[0].get("source_id")
-        first_target = edges[0].get("target_id")
-        resolved_from = from_label or self._node_label_by_id.get(first_source)
-        resolved_to = to_label or self._node_label_by_id.get(first_target)
-
-        from_clause = f":{resolved_from}" if resolved_from else ""
-        to_clause = f":{resolved_to}" if resolved_to else ""
-
-        pk_a = from_pk or (self._node_pk_by_label.get(resolved_from, "id") if resolved_from else "id")
-        pk_b = to_pk or (self._node_pk_by_label.get(resolved_to, "id") if resolved_to else "id")
-
-        prepared_edges = []
+        # Group edges by (resolved_from, resolved_to) to prevent mismatched label constraints in UNWIND
+        grouped: dict[tuple[Optional[str], Optional[str]], list[dict[str, Any]]] = defaultdict(list)
         for edge in edges:
+            src = edge.get("source_id")
+            tgt = edge.get("target_id")
+            fl = from_label or self._node_label_by_id.get(src)
+            tl = to_label or self._node_label_by_id.get(tgt)
             props = dict(edge.get("properties") or {})
             for key in props:
                 self._validate_identifier(key)
-            prepared_edges.append(
-                {
-                    "source_id": edge["source_id"],
-                    "target_id": edge["target_id"],
-                    "props": props,
-                }
-            )
+            grouped[(fl, tl)].append({
+                "source_id": src,
+                "target_id": tgt,
+                "props": props,
+            })
 
-        query = (
-            f"UNWIND $batch AS edge "
-            f"MATCH (a{from_clause} {{{pk_a}: edge.source_id}}), "
-            f"(b{to_clause} {{{pk_b}: edge.target_id}}) "
-            f"MERGE (a)-[r:{rel_type}]->(b) "
-            f"SET r += edge.props"
-        )
-        self.execute_query(query, {"batch": prepared_edges})
+        for (fl, tl), prepared_edges in grouped.items():
+            if fl:
+                self._validate_identifier(fl)
+            if tl:
+                self._validate_identifier(tl)
+            from_clause = f":{fl}" if fl else ""
+            to_clause = f":{tl}" if tl else ""
+            pk_a = from_pk or (self._node_pk_by_label.get(fl, "id") if fl else "id")
+            pk_b = to_pk or (self._node_pk_by_label.get(tl, "id") if tl else "id")
+
+            query = (
+                f"UNWIND $batch AS edge "
+                f"MATCH (a{from_clause} {{{pk_a}: edge.source_id}}), "
+                f"(b{to_clause} {{{pk_b}: edge.target_id}}) "
+                f"MERGE (a)-[r:{rel_type}]->(b) "
+                f"SET r += edge.props"
+            )
+            self.execute_query(query, {"batch": prepared_edges})
 
     def ensure_index(self, label: str, property_name: str) -> None:
         """Create an index on a node property if it does not already exist."""
