@@ -6,7 +6,6 @@
     PlayCircle,
     FileText,
     Activity,
-    Settings,
     ChevronLeft,
     ChevronRight,
     ArrowLeft,
@@ -14,6 +13,9 @@
   } from "lucide-svelte";
   import { link, push } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
+  import OrgSwitcher from "./sidebar/OrgSwitcher.svelte";
+  import NavUser from "./sidebar/NavUser.svelte";
+  import Tooltip from "./Tooltip.svelte";
   import type { Project } from "../types";
 
   interface Props {
@@ -35,9 +37,7 @@
 
   let collapsed = $state(false);
 
-  // Views that all fall under the single "Compliance Audit" destination —
-  // switching between them happens via the in-page domain tab strip
-  // (AnalysisDomainTabs), not a separate sidebar entry per domain.
+  // Views that all fall under the single "Compliance Audit" destination
   const AUDIT_VIEW_IDS = new Set(["arch"]);
 
   function getNavHref(itemId: string): string {
@@ -59,8 +59,6 @@
     onCloseMobile();
   }
 
-  // Every item here requires a project in context — this sidebar only
-  // renders once one is selected (see App.svelte's isProjectView).
   const NAV_SECTIONS = [
     {
       title: "Project",
@@ -104,70 +102,58 @@
     {mobileOpen ? 'left-0' : '-left-64'}
     {collapsed ? 'md:w-16' : 'md:w-64'}"
 >
-  <!-- Brand Header -->
-  <div class="flex h-16 items-center justify-between border-b border-border-default px-3.5">
+  <!-- Header: Team / Organization Switcher (sidebar-07) -->
+  <div class="flex h-16 items-center justify-between border-b border-border-default px-2 gap-1.5 shrink-0">
+    <div class="flex-1 min-w-0 {collapsed ? 'flex justify-center' : ''}">
+      <OrgSwitcher {collapsed} />
+    </div>
+
     {#if !collapsed}
-      <div class="flex items-center gap-2.5 overflow-hidden">
-        <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
-        >
-          BG
-        </div>
-        <div class="flex flex-col truncate">
-          <span class="text-base font-bold leading-none tracking-tight text-fg-primary"
-            >BIM Guard</span
-          >
-          <span class="mt-1 text-micro font-semibold uppercase tracking-widest text-fg-muted"
-            >OpenBIM Compliance</span
-          >
-        </div>
-      </div>
-    {:else}
-      <div
-        class="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr from-accent to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+      <button
+        type="button"
+        onclick={() => (collapsed = !collapsed)}
+        class="hidden shrink-0 rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:block cursor-pointer"
+        aria-label="Collapse sidebar"
       >
-        BG
-      </div>
+        <ChevronLeft class="h-4 w-4" />
+      </button>
     {/if}
 
     <button
       type="button"
       onclick={onCloseMobile}
-      class="shrink-0 rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden"
+      class="shrink-0 rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:hidden cursor-pointer"
       aria-label="Close navigation"
     >
       <ChevronLeft class="h-5 w-5" />
     </button>
-
-    <button
-      type="button"
-      onclick={() => (collapsed = !collapsed)}
-      class="hidden shrink-0 rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary md:block"
-      title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-    >
-      {#if collapsed}
-        <ChevronRight class="h-4 w-4" />
-      {:else}
-        <ChevronLeft class="h-4 w-4" />
-      {/if}
-    </button>
   </div>
 
-  <!-- Current project + exit -->
-  <div class="border-b border-border-default px-2 py-3">
-    <button
-      type="button"
-      onclick={handleExitProject}
-      class="group flex w-full items-center gap-2 rounded-lg px-2 py-1 text-caption font-semibold uppercase tracking-wider text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-      title="Back to Organization"
-    >
-      <ArrowLeft class="h-3 w-3 shrink-0" />
-      {#if !collapsed}
-        <span>All Projects</span>
-      {/if}
-    </button>
-    {#if !collapsed}
-      <div class="mt-1.5 truncate px-2 text-sm font-bold text-fg-primary">
+  <!-- Current project context bar (sidebar-07) -->
+  <div class="border-b border-border-default px-2 py-2 shrink-0">
+    {#snippet backButton()}
+      <button
+        type="button"
+        onclick={handleExitProject}
+        class="group flex items-center gap-2 rounded-lg px-2 py-1 text-nano font-bold uppercase tracking-wider text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary cursor-pointer {collapsed ? 'justify-center mx-auto size-8 p-0' : 'w-full'}"
+        aria-label="Back to Organization"
+      >
+        <ArrowLeft class="h-3.5 w-3.5 shrink-0" />
+        {#if !collapsed}
+          <span>All Projects</span>
+        {/if}
+      </button>
+    {/snippet}
+
+    {#if collapsed}
+      <Tooltip text="Back to All Projects" side="right" sideOffset={8}>
+        {#snippet trigger()}
+          {@render backButton()}
+        {/snippet}
+      </Tooltip>
+    {:else}
+      {@render backButton()}
+      <div class="mt-1 truncate px-2 text-xs font-bold text-fg-primary">
         {selectedProject?.name || "Selected Project"}
       </div>
     {/if}
@@ -175,11 +161,11 @@
 
   <!-- Nav Groups -->
   <div class="flex-1 space-y-4 overflow-y-auto px-2 py-3">
-    {#each NAV_SECTIONS as section (section)}
+    {#each NAV_SECTIONS as section (section.title)}
       <div class="space-y-1">
         {#if !collapsed}
           <div
-            class="rounded-lg bg-surface-overlay px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-fg-muted"
+            class="text-nano font-bold uppercase tracking-wider text-fg-muted px-2.5 py-1"
           >
             {section.title}
           </div>
@@ -188,63 +174,64 @@
         {#each section.items as item (item.id)}
           {@const isActive =
             activeView === item.id || (item.id === "arch" && AUDIT_VIEW_IDS.has(activeView))}
-          <a
-            href={getNavHref(item.id)}
-            use:link
-            onclick={onCloseMobile}
-            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
-              ? 'font-bold'
-              : 'font-medium'} {isActive
-              ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
-              : item.highlight
-                ? 'text-accent hover:bg-surface-hover'
-                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-            title={collapsed ? item.label : undefined}
-          >
-            <item.icon
-              class="h-4 w-4 shrink-0 {isActive
-                ? 'text-fg-primary'
-                : item.highlight
-                  ? 'text-accent'
-                  : 'text-fg-muted group-hover:text-fg-primary'}"
-            />
-            {#if !collapsed}
-              <span class="truncate text-left">{item.label}</span>
-            {/if}
 
-            {#if collapsed && isActive}
-              <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
-            {/if}
-          </a>
+          {#snippet navItemBtn()}
+            <a
+              href={getNavHref(item.id)}
+              use:link
+              onclick={onCloseMobile}
+              class="group relative flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
+                ? 'font-bold'
+                : 'font-medium'} {isActive
+                ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
+                : item.highlight
+                  ? 'text-accent hover:bg-surface-hover'
+                  : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed ? 'justify-center px-0 h-9 w-9 mx-auto' : 'w-full'}"
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <item.icon
+                class="h-4 w-4 shrink-0 {isActive
+                  ? 'text-white'
+                  : item.highlight
+                    ? 'text-accent'
+                    : 'text-fg-muted group-hover:text-fg-primary'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left flex-1">{item.label}</span>
+              {/if}
+
+              {#if collapsed && isActive}
+                <span class="absolute bottom-2 left-0 top-2 w-1 rounded-r-md bg-white"></span>
+              {/if}
+            </a>
+          {/snippet}
+
+          {#if collapsed}
+            <Tooltip text={item.label} side="right" sideOffset={8}>
+              {#snippet trigger()}
+                {@render navItemBtn()}
+              {/snippet}
+            </Tooltip>
+          {:else}
+            {@render navItemBtn()}
+          {/if}
         {/each}
       </div>
     {/each}
   </div>
 
-  <!-- Sidebar Footer: Settings -->
-  <div class="space-y-1 border-t border-border-default bg-surface-canvas/60 p-2">
-    <a
-      href={authState.activeOrganizationId
-        ? `/settings?org=${authState.activeOrganizationId}`
-        : "/settings"}
-      use:link
-      onclick={onCloseMobile}
-      class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-      'settings'
-        ? 'bg-accent text-white'
-        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed
-        ? 'justify-center'
-        : ''}"
-      title={collapsed ? "Settings" : undefined}
-    >
-      <Settings
-        class="h-4 w-4 shrink-0 {activeView === 'settings'
-          ? 'text-fg-primary'
-          : 'text-fg-muted group-hover:text-fg-primary'}"
-      />
-      {#if !collapsed}
-        <span>Settings</span>
-      {/if}
-    </a>
+  <!-- Sidebar Footer: NavUser (sidebar-07) -->
+  <div class="space-y-1 border-t border-border-default bg-surface-canvas/60 p-2 shrink-0 flex flex-col gap-1">
+    <NavUser {collapsed} />
+    {#if collapsed}
+      <button
+        type="button"
+        onclick={() => (collapsed = false)}
+        class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary mx-auto flex size-8 items-center justify-center rounded-lg p-1 transition-colors cursor-pointer"
+        aria-label="Expand sidebar"
+      >
+        <ChevronRight class="h-4 w-4" />
+      </button>
+    {/if}
   </div>
 </aside>

@@ -4,7 +4,6 @@
   import { authState } from "../auth.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
-  import OrgSwitcher from "./OrgSwitcher.svelte";
   import ResourcesMenu from "./ResourcesMenu.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
@@ -129,7 +128,6 @@
 
   <!-- Actions & Status -->
   <div class="flex shrink-0 items-center gap-2.5">
-    <OrgSwitcher />
     <GlobalPipelineStatus onOpen={onOpenPipeline} />
 
     <IntegrationsMenu {activeView} />

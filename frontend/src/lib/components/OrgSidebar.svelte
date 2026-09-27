@@ -1,11 +1,8 @@
 <script lang="ts">
   import {
     LayoutDashboard,
-    BookOpenCheck,
-    Box,
     Sparkles,
     ListChecks,
-    Settings,
     ChevronLeft,
     ChevronRight,
     PlayCircle,
@@ -13,6 +10,9 @@
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
+  import OrgSwitcher from "./sidebar/OrgSwitcher.svelte";
+  import NavUser from "./sidebar/NavUser.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   interface Props {
     activeView?: string;
@@ -30,16 +30,6 @@
     return `/${itemId}?org=${authState.activeOrganizationId}`;
   }
 
-  // Org-level nav only — everything scoped to a single project (Viewer,
-  // Compliance Audit, Reports, Models, Live Pipeline) lives in
-  // ProjectSidebar instead, shown once a project is selected. The project
-  // registry itself lives on the Dashboard (org homepage), not a separate
-  // nav item. bSDD Wiki, Design System, and API Docs stay in the navbar's
-  // Resources menu (ResourcesMenu.svelte); User Manual and Modeling Manual
-  // are also pinned here for one-click access. Integrations (Revit Sync,
-  // IFC Export Setting) are in the navbar's Integrations menu
-  // (IntegrationsMenu.svelte). Organization Settings is reachable from the
-  // user menu (UserMenu.svelte).
   const NAV_SECTIONS = [
     {
       title: "My Home",
@@ -81,62 +71,40 @@
     {mobileOpen ? 'left-0' : '-left-64'}
     {collapsed ? 'md:w-16' : 'md:w-64'}"
 >
-  <!-- Brand Header -->
-  <div class="border-border-default flex h-16 items-center justify-between border-b px-3.5">
+  <!-- Header: Team / Organization Switcher (sidebar-07) -->
+  <div class="border-border-default flex h-16 items-center justify-between border-b px-2 gap-1.5 shrink-0">
+    <div class="flex-1 min-w-0 {collapsed ? 'flex justify-center' : ''}">
+      <OrgSwitcher {collapsed} />
+    </div>
+
     {#if !collapsed}
-      <div class="flex items-center gap-2.5 overflow-hidden">
-        <div
-          class="from-accent flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
-        >
-          BG
-        </div>
-        <div class="flex flex-col truncate">
-          <span class="text-fg-primary text-base leading-none font-bold tracking-tight"
-            >BIM Guard</span
-          >
-          <span class="text-micro text-fg-muted mt-1 font-semibold tracking-widest uppercase"
-            >OpenBIM Compliance</span
-          >
-        </div>
-      </div>
-    {:else}
-      <div
-        class="from-accent mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-tr to-cyan-400 text-sm font-bold text-white shadow-md shadow-blue-500/20"
+      <button
+        type="button"
+        onclick={() => (collapsed = !collapsed)}
+        class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary hidden shrink-0 rounded-lg p-1.5 transition-colors md:block cursor-pointer"
+        aria-label="Collapse sidebar"
       >
-        BG
-      </div>
+        <ChevronLeft class="h-4 w-4" />
+      </button>
     {/if}
 
     <button
       type="button"
       onclick={onCloseMobile}
-      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary shrink-0 rounded-lg p-2 transition-colors md:hidden"
+      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary shrink-0 rounded-lg p-1.5 transition-colors md:hidden cursor-pointer"
       aria-label="Close navigation"
     >
       <ChevronLeft class="h-5 w-5" />
-    </button>
-
-    <button
-      type="button"
-      onclick={() => (collapsed = !collapsed)}
-      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary hidden shrink-0 rounded-lg p-1 transition-colors md:block"
-      title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-    >
-      {#if collapsed}
-        <ChevronRight class="h-4 w-4" />
-      {:else}
-        <ChevronLeft class="h-4 w-4" />
-      {/if}
     </button>
   </div>
 
   <!-- Nav Groups -->
   <div class="flex-1 space-y-4 overflow-y-auto px-2 py-3">
-    {#each NAV_SECTIONS as section (section)}
+    {#each NAV_SECTIONS as section (section.title)}
       <div class="space-y-1">
         {#if !collapsed}
           <div
-            class="bg-surface-overlay text-fg-muted rounded-lg px-2.5 py-1 text-sm font-bold tracking-wider uppercase"
+            class="text-nano font-bold uppercase tracking-wider text-fg-muted px-2.5 py-1"
           >
             {section.title}
           </div>
@@ -145,85 +113,96 @@
         {#each section.items as item (item.id)}
           {@const isActive = activeView === item.id}
           {#if item.id === "dashboard"}
-            <a
-              href={getNavHref("new-project")}
-              use:link
-              onclick={onCloseMobile}
-              class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-              'new-project'
-                ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
-                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-              title={collapsed ? "New Project" : undefined}
-            >
-              <Plus
-                class="h-4 w-4 shrink-0 {activeView === 'new-project'
-                  ? 'text-fg-primary'
-                  : 'text-fg-muted group-hover:text-fg-primary'}"
-              />
-              {#if !collapsed}
-                <span class="truncate text-left">New Project</span>
-              {/if}
-            </a>
+            {#snippet newProjectBtn()}
+              <a
+                href={getNavHref("new-project")}
+                use:link
+                onclick={onCloseMobile}
+                class="group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
+                'new-project'
+                  ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
+                  : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed ? 'justify-center px-0 h-9 w-9 mx-auto' : 'w-full'}"
+                aria-current={activeView === 'new-project' ? 'page' : undefined}
+              >
+                <Plus
+                  class="h-4 w-4 shrink-0 {activeView === 'new-project'
+                    ? 'text-white'
+                    : 'text-fg-muted group-hover:text-fg-primary'}"
+                />
+                {#if !collapsed}
+                  <span class="truncate text-left flex-1">New Project</span>
+                {/if}
+              </a>
+            {/snippet}
+
+            {#if collapsed}
+              <Tooltip text="New Project" side="right" sideOffset={8}>
+                {#snippet trigger()}
+                  {@render newProjectBtn()}
+                {/snippet}
+              </Tooltip>
+            {:else}
+              {@render newProjectBtn()}
+            {/if}
           {/if}
 
-          <a
-            href={getNavHref(item.id)}
-            use:link
-            onclick={onCloseMobile}
-            class="group relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
-              ? 'font-bold'
-              : 'font-medium'} {isActive
-              ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
-              : item.highlight
-                ? 'text-accent hover:bg-surface-hover'
-                : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
-            title={collapsed ? item.label : undefined}
-          >
-            <item.icon
-              class="h-4 w-4 shrink-0 {isActive
-                ? 'text-fg-primary'
+          {#snippet navItemBtn()}
+            <a
+              href={getNavHref(item.id)}
+              use:link
+              onclick={onCloseMobile}
+              class="group relative flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition-all {item.highlight
+                ? 'font-bold'
+                : 'font-medium'} {isActive
+                ? 'bg-accent text-white shadow-xs shadow-blue-600/30'
                 : item.highlight
-                  ? 'text-accent'
-                  : 'text-fg-muted group-hover:text-fg-primary'}"
-            />
-            {#if !collapsed}
-              <span class="truncate text-left">{item.label}</span>
-            {/if}
+                  ? 'text-accent hover:bg-surface-hover'
+                  : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed ? 'justify-center px-0 h-9 w-9 mx-auto' : 'w-full'}"
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <item.icon
+                class="h-4 w-4 shrink-0 {isActive
+                  ? 'text-white'
+                  : item.highlight
+                    ? 'text-accent'
+                    : 'text-fg-muted group-hover:text-fg-primary'}"
+              />
+              {#if !collapsed}
+                <span class="truncate text-left flex-1">{item.label}</span>
+              {/if}
 
-            {#if collapsed && isActive}
-              <span class="absolute top-2 bottom-2 left-0 w-1 rounded-r-md bg-white"></span>
-            {/if}
-          </a>
+              {#if collapsed && isActive}
+                <span class="absolute top-2 bottom-2 left-0 w-1 rounded-r-md bg-white"></span>
+              {/if}
+            </a>
+          {/snippet}
+
+          {#if collapsed}
+            <Tooltip text={item.label} side="right" sideOffset={8}>
+              {#snippet trigger()}
+                {@render navItemBtn()}
+              {/snippet}
+            </Tooltip>
+          {:else}
+            {@render navItemBtn()}
+          {/if}
         {/each}
       </div>
     {/each}
   </div>
 
-  <!-- Sidebar Footer: Settings -->
-  <div class="border-border-default bg-surface-canvas/60 space-y-1 border-t p-2">
-    <!-- Settings Link -->
-    <a
-      href={authState.activeOrganizationId
-        ? `/settings?org=${authState.activeOrganizationId}`
-        : "/settings"}
-      use:link
-      onclick={onCloseMobile}
-      class="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all {activeView ===
-      'settings'
-        ? 'bg-accent text-white'
-        : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'} {collapsed
-        ? 'justify-center'
-        : ''}"
-      title={collapsed ? "Settings" : undefined}
-    >
-      <Settings
-        class="h-4 w-4 shrink-0 {activeView === 'settings'
-          ? 'text-fg-primary'
-          : 'text-fg-muted group-hover:text-fg-primary'}"
-      />
-      {#if !collapsed}
-        <span>Settings</span>
-      {/if}
-    </a>
+  <!-- Sidebar Footer: NavUser (sidebar-07) -->
+  <div class="border-border-default bg-surface-canvas/60 border-t p-2 flex flex-col gap-1 shrink-0">
+    <NavUser {collapsed} />
+    {#if collapsed}
+      <button
+        type="button"
+        onclick={() => (collapsed = false)}
+        class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary mx-auto flex size-8 items-center justify-center rounded-lg p-1 transition-colors cursor-pointer"
+        aria-label="Expand sidebar"
+      >
+        <ChevronRight class="h-4 w-4" />
+      </button>
+    {/if}
   </div>
 </aside>
