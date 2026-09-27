@@ -73,6 +73,7 @@ from app.services.membership_service import MembershipService
 from app.services.models_service import ModelsService
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
+from app.services.project_orchestrator_service import ProjectOrchestratorService
 from app.services.project_visibility import visible_project_rows
 from app.services.projects_service import ProjectsService
 from app.services.ruleset_access_service import RulesetAccessService
@@ -242,40 +243,20 @@ def _owned_project_ids(
     memberships: MembershipService,
     profiles: ProfileService,
 ) -> list[int]:
-    """Filter *project_ids* down to ones the caller may act on.
-
-    A superadmin may act on all of them; everyone else only the ones they can
-    reach via ``_can_access_project`` (their own organization's, or one shared
-    in via a cross-org grant).
-    """
-    if profiles.is_superadmin(current_user.id):
-        return project_ids
-    owned = []
-    for pid in project_ids:
-        row = service.get_project(pid)
-        if row and _can_access_project(row, current_user.id, memberships):
-            owned.append(pid)
-    return owned
+    """Delegate to :meth:`ProjectOrchestratorService.owned_project_ids`."""
+    return ProjectOrchestratorService.owned_project_ids(
+        project_ids,
+        user_id=current_user.id,
+        is_superadmin=profiles.is_superadmin(current_user.id),
+        service=service,
+        memberships=memberships,
+        can_access_fn=_can_access_project,
+    )
 
 
 def _primary_organization_id(current_user: CurrentUser, memberships: MembershipService) -> int:
-    """Return the organization a newly created project should belong to.
-
-    There's no "current organization" selector in the UI yet, so this is
-    simply the caller's first membership — for almost every user today that's
-    the single default organization every pre-multi-tenant project also
-    lives in.
-
-    Raises:
-        HTTPException: 400 if the caller somehow has no organization at all.
-    """
-    org_ids = memberships.org_ids_for_user(current_user.id)
-    if not org_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Your account is not a member of any organization.",
-        )
-    return next(iter(org_ids))
+    """Delegate to :meth:`ProjectOrchestratorService.primary_organization_id`."""
+    return ProjectOrchestratorService.primary_organization_id(current_user.id, memberships)
 
 
 @router.get("", response_model=ProjectListResponse, summary="List all projects")
@@ -452,23 +433,10 @@ def _link_project_inputs(
     document_ids: list[int],
     standards_codes: list[str],
 ) -> None:
-    """Link the wizard's chosen documents and standards to a new project.
-
-    Deliberately non-fatal. The project row already exists by the time this
-    runs, and handing the caller a 500 would leave them with a created project
-    and an error page. A failure to link is logged and the project is returned.
-    """
-    if document_ids:
-        try:
-            service.link_library_documents(project_id, document_ids)
-        except Exception:
-            logger.exception("Could not link documents project_id=%d", project_id)
-
-    if standards_codes:
-        try:
-            service.set_standards_for_project(project_id, standards_codes)
-        except Exception:
-            logger.exception("Could not link standards project_id=%d", project_id)
+    """Delegate to :meth:`ProjectOrchestratorService.link_project_inputs`."""
+    ProjectOrchestratorService.link_project_inputs(
+        service, project_id, document_ids=document_ids, standards_codes=standards_codes
+    )
 
 
 @router.post(

@@ -69,6 +69,7 @@ from app.modules.contracts import (
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
 from app.services.rule_extraction_service import RuleExtractionService
+from app.services.rule_formatter_service import RuleFormatterService
 from app.services.rule_snapshot_service import RuleSnapshotService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
@@ -84,16 +85,8 @@ flexible_router = APIRouter(dependencies=[Depends(get_current_user_flexible)])
 
 
 def _rule_response(row: dict) -> RuleResponse:
-    """Build a RuleResponse from a raw rules-table row.
-
-    The persistence layer stores the human-readable rule identifier under
-    the "reference" column (see RuleService._rules schema); RuleResponse
-    exposes it as "rule_id" for a clearer public contract, so it needs
-    bridging here rather than relying on Pydantic to find a same-named key.
-    """
-    if not row.get("rule_id"):
-        row = {**row, "rule_id": row.get("reference")}
-    return RuleResponse(**row)
+    """Delegate to :meth:`RuleFormatterService.rule_response`."""
+    return RuleFormatterService.rule_response(row)  # type: ignore[return-value]
 
 
 def _require_ruleset_grant(

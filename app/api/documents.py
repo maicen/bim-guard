@@ -68,15 +68,14 @@ from app.modules.contracts import (
 )
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
-from app.modules.document_parsing.section_tree_enhancer import enhance_section_tree
-from app.modules.document_parsing.smart_toc_generator import build_smart_toc, resolve_page_ranges
+from app.modules.document_parsing.smart_toc_generator import build_smart_toc
 from app.modules.permissions import Action
 from app.services.audit_log_service import AuditLogService
 from app.services.cache import cache_service
 from app.services.cde_state_machine import CDEStateMachine
 from app.services.document_access_service import DocumentAccessService
 from app.services.document_graph_service import DocumentGraphService
-from app.services.document_pages_service import DocumentPagesService
+from app.services.document_orchestrator_service import DocumentOrchestratorService
 from app.services.documents_service import DocumentService
 from app.services.graph_database import GraphService
 from app.services.membership_service import MembershipService
@@ -344,30 +343,8 @@ def get_document_file(
 
 
 def _row_to_detail_response(row: dict, service: "DocumentService") -> DocumentDetailResponse:
-    """Build a DocumentDetailResponse from a `documents` row dict."""
-    text = service.get_document_text(row)
-    return DocumentDetailResponse(
-        id=row["id"],
-        filename=row.get("filename", "document"),
-        doc_type=row.get("doc_type") or "Specification",
-        file_path=row.get("file_path"),
-        upload_date=row.get("upload_date"),
-        text=text,
-        char_count=len(text),
-        doclang_storage_path=row.get("doclang_storage_path"),
-        doclang_archive_path=row.get("doclang_archive_path"),
-        doclang_xml=service.get_doclang_content(row),
-        project_code=row.get("project_code", ""),
-        originator=row.get("originator", ""),
-        volume_system=row.get("volume_system", ""),
-        level=row.get("level", ""),
-        type=row.get("type", ""),
-        role=row.get("role", ""),
-        number=row.get("number", ""),
-        suitability_code=row.get("suitability_code", "S0"),
-        revision_code=row.get("revision_code", "P01.01"),
-        cde_state=row.get("cde_state") or "WIP",
-    )
+    """Delegate to :meth:`DocumentOrchestratorService.row_to_detail_response`."""
+    return DocumentOrchestratorService.row_to_detail_response(row, service)
 
 
 def _resolve_llm_organization_id(
@@ -380,36 +357,17 @@ def _resolve_llm_organization_id(
     document_access: DocumentAccessService,
     profiles: ProfileService,
 ) -> Optional[int]:
-    """Pick the organization whose LLM provider settings an AI call on *document_id* uses.
-
-    Documents carry no ``organization_id`` (access is granted per organization),
-    so without this the key lookup got ``None`` and skipped the organization's
-    saved provider key entirely, falling back to a server environment variable
-    that is usually unset -- every model call then went out with no credentials.
-
-    An explicitly requested organization (query parameter or header) wins, but
-    only if the caller belongs to it (superadmins excepted), so nobody can spend
-    another organization's provider key by guessing its id. With nothing
-    requested, use the caller's organization that holds a grant on the document
-    when exactly one does.
-    """
-    org_id = requested_org_id
-    if org_id is None and x_org_id and x_org_id.strip().isdigit():
-        org_id = int(x_org_id.strip())
-
-    user_org_ids = memberships.org_ids_for_user(current_user.id)
-    if org_id is not None:
-        if not profiles.is_superadmin(current_user.id) and org_id not in user_org_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You do not belong to organization {org_id}.",
-            )
-        return org_id
-
-    granted = [oid for oid in user_org_ids if document_id in document_access.list_org_grants(oid)]
-    if len(granted) == 1:
-        return granted[0]
-    return doc.get("organization_id")
+    """Delegate to :meth:`DocumentOrchestratorService.resolve_llm_organization_id`."""
+    return DocumentOrchestratorService.resolve_llm_organization_id(
+        document_id=document_id,
+        doc=doc,
+        requested_org_id=requested_org_id,
+        x_org_id=x_org_id,
+        user_id=current_user.id,
+        user_org_ids=memberships.org_ids_for_user(current_user.id),
+        is_superadmin=profiles.is_superadmin(current_user.id),
+        org_grants_fn=document_access.list_org_grants,
+    )
 
 
 def _resolve_parsing_instance(
@@ -1054,72 +1012,10 @@ async def _build_and_persist_smart_toc(
     service: DocumentService,
     graph_service: GraphService,
 ) -> DocumentSectionTreeResponse:
-    """Generate, enhance, persist in DB, and ingest into Graph RAG the Smart TOC for a document."""
-    doclang_xml = service.get_doclang_content(doc).strip()
-    chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
-    tree, flat = build_smart_toc(chunks)
-
-    # Optional, one-shot AI label-cleanup pass
-    tree, enhanced = await enhance_section_tree(tree, flat)
-    if enhanced:
-        id_to_name: dict[str, str] = {}
-
-        def _collect_names(nodes: list[dict]) -> None:
-            for n in nodes:
-                id_to_name[n["id"]] = n["section_name"]
-                if n.get("children"):
-                    _collect_names(n["children"])
-
-        _collect_names(tree)
-        for chunk in flat:
-            chunk["section_name"] = id_to_name.get(chunk["id"], chunk["section_name"])
-
-    # Attach page numbers for any chunks where not already resolved
-    unresolved_indices = [i for i, chunk in enumerate(flat) if chunk.get("page_number") is None]
-    if unresolved_indices:
-        pages = DocumentPagesService().get_pages(document_id)
-        if pages:
-            snippets = [flat[i]["text"][:250] for i in unresolved_indices]
-            matched_pages = DocumentPagesService.find_best_matching_pages(
-                pages, snippets, sequential=True
-            )
-            for idx, page_num in zip(unresolved_indices, matched_pages, strict=False):
-                flat[idx]["page_number"] = page_num
-
-            id_to_page = {f["id"]: f.get("page_number") for f in flat}
-
-            def _sync_page(nodes: list[dict]) -> None:
-                for n in nodes:
-                    if n.get("page_number") is None and n.get("id") in id_to_page:
-                        n["page_number"] = id_to_page[n["id"]]
-                    if n.get("children"):
-                        _sync_page(n["children"])
-
-            _sync_page(tree)
-            # Recompute bounded page spans with resolved page numbers
-            resolve_page_ranges(tree, flat)
-
-    # Ingest Smart TOC into graph database for Graph RAG (best-effort, non-blocking failure)
-    if graph_service:
-        try:
-            doc_title = getattr(doc, "name", None) or getattr(doc, "title", None) or f"Document {document_id}"
-            DocumentGraphService(graph_service).ingest_document_tree(
-                document_id, tree, flat, document_title=doc_title
-            )
-        except Exception as exc:
-            logger.warning("Graph RAG tree ingestion failed for doc %d: %s", document_id, exc)
-
-    response = DocumentSectionTreeResponse(
-        document_id=document_id,
-        tree=tree,
-        sections=[DocumentSection(**chunk) for chunk in flat],
-        enhanced=enhanced,
+    """Delegate to :meth:`DocumentOrchestratorService.build_and_persist_smart_toc`."""
+    return await DocumentOrchestratorService.build_and_persist_smart_toc(
+        document_id, doc, service, graph_service
     )
-    # Persist in DB so it doesn't recalculate unless regenerate is requested
-    service.save_toc_tree(document_id, response.model_dump())
-    cache_key = f"section_tree:{document_id}"
-    cache_service.set(cache_key, response.model_dump())
-    return response
 
 
 @router.get(

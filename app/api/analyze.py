@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import (
     APIRouter,
@@ -41,9 +41,7 @@ from app.modules.contracts import (
     AnalysisResultContract,
     AnalysisRunRequest,
     ArchAnalysisResponse,
-    AuditIssueContract,
     IfcUploadAttachResponse,
-    IssueStatsContract,
     ResultPageContract,
     RevitRuleResult,
     RevitSyncRequest,
@@ -51,6 +49,7 @@ from app.modules.contracts import (
     WorkflowStatusContract,
 )
 from app.modules.pipeline_io.analysis_result_exporter import export
+from app.services.analysis_result_service import AnalysisResultService
 from app.services.analysis_runner import RUNNABLE_SLUGS, run_analysis
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.ifc_pipeline_service import IFCPipelineService
@@ -103,193 +102,48 @@ def get_authorized_project_for_analyze_flexible(
     return require_project_access(project_id, current_user, service, memberships, profiles)
 
 
-def _issue_stats(issues: list) -> dict[str, int]:
-    """Count ``issues`` by band, keeping data-quality notes out of the totals.
+# ---------------------------------------------------------------------------
+# Thin delegations to AnalysisResultService
+# ---------------------------------------------------------------------------
+# The private names below are kept for backward compatibility: tests and any
+# existing code that does `from app.api.analyze import _sort_issues` continue
+# to work without modification.  All logic now lives in the service.
 
-    Data-quality findings report what could not be assessed rather than a
-    verdict, so they are counted on their own line and excluded from ``total``
-    — the same split the analyse page draws.
-    """
-    stats = {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "data_quality": 0}
-    for issue in issues:
-        if issue.mechanism == "data_quality":
-            stats["data_quality"] += 1
-            continue
-        stats["total"] += 1
-        band = getattr(issue.band, "value", str(issue.band)).lower()
-        if band in stats:
-            stats[band] += 1
-    return stats
+# Re-export the Literal type aliases and token so route Query() params compile.
+from app.services.analysis_result_service import (  # noqa: E402
+    IssueBand,
+    PageSort,
+)
+
+
+def _issue_stats(issues: list) -> dict[str, int]:
+    """Delegate to :meth:`AnalysisResultService.issue_stats`."""
+    return AnalysisResultService.issue_stats(issues)
 
 
 def _format_result(slug: str, project_id: int, result: dict) -> AnalysisResultContract:
-    """Format raw analysis result dictionary into strict Pydantic model."""
-    raw_issues = result.get("audit_issues", [])
-    issues: list[AuditIssueContract] = []
-    for i in raw_issues:
-        band_val = getattr(i.band, "value", str(i.band)).lower()
-        raw_citations = getattr(i, "citations", []) or []
-        citations: list[dict[str, str]] = []
-        for c in raw_citations:
-            if isinstance(c, dict):
-                citations.append({
-                    "standard": c.get("standard", ""),
-                    "clause": c.get("clause", ""),
-                    "reason": c.get("reason", ""),
-                })
-            elif hasattr(c, "standard"):
-                citations.append({
-                    "standard": getattr(c, "standard", ""),
-                    "clause": getattr(c, "clause", ""),
-                    "reason": getattr(c, "reason", ""),
-                })
-
-        issues.append(
-            AuditIssueContract(
-                id=i.id,
-                element_id=i.element_id,
-                rule_id=i.rule_id,
-                title=i.title,
-                band=band_val,
-                score=getattr(i, "score", 0.0) or 0.0,
-                mechanism=i.mechanism,
-                description=i.description or "",
-                mitigation=i.mitigation or "",
-                assignee_role=getattr(i, "assignee_role", "BIM coordinator") or "BIM coordinator",
-                citations=citations,
-                details=dict(i.metadata) if hasattr(i, "metadata") and i.metadata else {},
-            )
-        )
-
-    raw_stats = result.get("issue_stats", {})
-    stats = IssueStatsContract(
-        total=raw_stats.get("total", len([i for i in issues if i.mechanism != "data_quality"])),
-        critical=raw_stats.get("critical", 0),
-        high=raw_stats.get("high", 0),
-        medium=raw_stats.get("medium", 0),
-        low=raw_stats.get("low", 0),
-        data_quality=raw_stats.get("data_quality", sum(1 for i in issues if i.mechanism == "data_quality")),
-    )
-
-    element_count = result.get("ifc_element_count") or len(issues)
-
-    return AnalysisResultContract(
-        pipeline="audit",
-        project_id=project_id,
-        slug=slug,
-        element_count=element_count,
-        audit_issues=issues,
-        issue_stats=stats,
-        compliance_error=result.get("compliance_error"),
-        compliance_is_demo=result.get("compliance_is_demo", False),
-        cached=result.get("cached", False),
-        shacl_issues=result.get("shacl_issues", []),
-        shacl_error=result.get("shacl_error"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Result pagination
-# ---------------------------------------------------------------------------
-
-#: Band ranking used when ordering a page, mirroring ``SEVERITY_WEIGHTS`` in
-#: ``AnalyzeView.svelte``. An unrecognised band ranks last rather than raising,
-#: the same as the page's ``?? 0``.
-_BAND_WEIGHT: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-
-#: Sort orders a paginated request may ask for.
-#:
-#: ``band_then_score`` is the default and is the analyse page's order: the page
-#: sorts on the band column descending and nothing else, so criticals lead and
-#: lows trail. Within a band the page relies on ``Array.prototype.sort`` being
-#: stable, i.e. on whatever order the run emitted — which is not a sort key a
-#: second request can reproduce, so score descending is the tiebreak here.
-#: ``natural`` is the escape hatch for a caller that wants the run's own order
-#: sliced verbatim, exactly as the unpaginated body would have listed it.
-#:
-#: ``band_asc`` and ``score_asc`` are the ascending counterparts, added so the
-#: analyse page's column headers can offer a direction rather than a single
-#: fixed order. In both, data-quality notes sort *last* rather than first: a
-#: plain reversal would open the table with the elements the engines refused to
-#: score, which reads as "here are your least severe findings" when it is not a
-#: finding list at all. Least-severe-first means the mildest verdict first, and
-#: the notes still trail it.
-PageSort = Literal[
-    "band_then_score",
-    "score_desc",
-    "natural",
-    "band_asc",
-    "score_asc",
-]
-
-#: Bands a page may be filtered to.
-#:
-#: ``data_quality`` is not a band the engines emit; it selects the notes that
-#: report what could not be assessed. It is here because the analyse page's
-#: severity dropdown offers it alongside the four real bands, and a filter the
-#: page cannot express is a filter the page cannot use. ``include_data_quality``
-#: remains the separate, global "show these at all" switch.
-IssueBand = Literal["critical", "high", "medium", "low", "data_quality"]
-
-#: The ``mechanism`` token that selects data-quality notes rather than an
-#: engine prefix, mirroring the analyse page's mechanism dropdown.
-DATA_QUALITY_TOKEN = "DATA_QUALITY"
+    """Delegate to :meth:`AnalysisResultService.format_result`."""
+    return AnalysisResultService.format_result(slug, project_id, result)
 
 
 def _source_files_for(project_id: int) -> list[dict]:
-    """Return the project's attached models for a BCF export's ``Header``.
-
-    ``[{"filename": ..., "date": ...}, ...]`` naming each attached IFC and when
-    it was uploaded, so a topic's ``Header/File`` names the model it was
-    actually computed from instead of the placeholder ``BIMGUARD_AI_Model.ifc``.
-
-    A project whose models cannot be resolved yields an empty list rather than
-    raising: a Header that names no file is a smaller failure than an export
-    that does not happen.
-    """
-    try:
-        resolved, _missing = ModelsService(
-            project_mirror=ProjectsService()
-        ).resolve_all_paths(project_id)
-    except Exception:
-        logger.warning("Could not resolve model filenames for project %s", project_id)
-        return []
-    files: list[dict] = []
-    for row, _path in resolved:
-        name = str((row or {}).get("file_name") or "").strip()
-        if not name:
-            continue
-        files.append({"filename": name, "date": str((row or {}).get("uploaded_at") or "")})
-    return files
+    """Delegate to :meth:`AnalysisResultService.source_files_for`."""
+    return AnalysisResultService.source_files_for(project_id)
 
 
 def _band_of(issue: Any) -> str:
-    """Return an issue's band as a lowercase string, enum or not."""
-    return getattr(issue.band, "value", str(issue.band)).lower()
+    """Delegate to :meth:`AnalysisResultService.band_of`."""
+    return AnalysisResultService.band_of(issue)
 
 
 def _is_data_quality(issue: Any) -> bool:
-    """Report whether a finding describes unassessable data, not a verdict.
-
-    Both spellings are checked because the engines emit ``"data_quality"`` and
-    the architecture path emits ``"Data Quality"``; the analyse page tests for
-    both for the same reason.
-    """
-    return issue.mechanism in ("data_quality", "Data Quality")
+    """Delegate to :meth:`AnalysisResultService.is_data_quality`."""
+    return AnalysisResultService.is_data_quality(issue)
 
 
 def _search_haystack(issue: Any) -> list[str]:
-    """Return the text ``q`` matches against.
-
-    The same fields the analyse page's search box already covers, so moving
-    the search to the server does not quietly change what a query finds.
-    """
-    fields = [issue.title, issue.rule_id, issue.element_id, issue.mechanism]
-    for citation in getattr(issue, "citations", None) or []:
-        if isinstance(citation, dict):
-            fields.append(citation.get("standard", ""))
-            fields.append(citation.get("clause", ""))
-    return fields
+    """Delegate to :meth:`AnalysisResultService.search_haystack`."""
+    return AnalysisResultService.search_haystack(issue)
 
 
 def _select_issues(
@@ -300,94 +154,19 @@ def _select_issues(
     include_data_quality: bool,
     query: str | None = None,
 ) -> list:
-    """Narrow ``issues`` to what a page should list.
-
-    Filters shape ``audit_issues`` alone. ``issue_stats`` is left describing
-    the whole run, so a page of criticals still reports the run's real totals
-    rather than the page's.
-
-    ``bands`` excludes data-quality notes from the four real bands even when a
-    note carries a matching one: asking for "the criticals" means the critical
-    verdicts. The notes are selected by the ``data_quality`` band instead,
-    which is exactly how the page's severity dropdown behaves.
-
-    ``mechanisms`` is a case-insensitive prefix match on ``rule_id``, so
-    ``ARCH`` and ``ARCH-EGRESS-001`` both select an engine's verdicts together
-    with its ``.DATA`` notes; the token ``data_quality`` selects the notes on
-    their own. Several values union, so ``ARCH`` and ``data_quality`` together
-    select both.
-
-    An unrecognised mechanism selects nothing rather than falling back to
-    everything: the caller is filtering a view, and quietly widening it back
-    to the full run would misreport what was asked for.
-    """
-    selected = issues
-
-    if not include_data_quality:
-        selected = [i for i in selected if not _is_data_quality(i)]
-
-    if bands:
-        wanted_bands = {b.lower() for b in bands}
-        notes_wanted = "data_quality" in wanted_bands
-        selected = [
-            i
-            for i in selected
-            if (notes_wanted if _is_data_quality(i) else _band_of(i) in wanted_bands)
-        ]
-
-    if mechanisms:
-        tokens = {m.upper() for m in mechanisms}
-        notes_wanted = DATA_QUALITY_TOKEN in tokens
-        prefixes = tuple(t for t in tokens if t != DATA_QUALITY_TOKEN)
-        selected = [
-            i
-            for i in selected
-            if (notes_wanted and _is_data_quality(i))
-            or (prefixes and i.rule_id.upper().startswith(prefixes))
-        ]
-
-    if query:
-        needle = query.strip().lower()
-        if needle:
-            selected = [
-                i
-                for i in selected
-                if any(needle in (field or "").lower() for field in _search_haystack(i))
-            ]
-
-    return selected
-
-
-def _sort_issues(issues: list, sort: PageSort) -> list:
-    """Order ``issues`` deterministically for slicing.
-
-    Every order but ``natural`` breaks ties on ``id``, so two requests for
-    adjacent pages of the same run cannot overlap or skip a finding just
-    because two issues compared equal.
-    """
-    if sort == "natural":
-        return issues
-    if sort == "score_desc":
-        return sorted(issues, key=lambda i: (-(i.score or 0.0), i.id))
-    if sort == "band_asc":
-        # ``_is_data_quality`` leads the key so the notes land after every
-        # verdict: they carry the Low band, so sorting on band alone would
-        # bring them to the front of an ascending page.
-        return sorted(
-            issues,
-            key=lambda i: (
-                _is_data_quality(i),
-                _BAND_WEIGHT.get(_band_of(i), 0),
-                i.score or 0.0,
-                i.id,
-            ),
-        )
-    if sort == "score_asc":
-        return sorted(issues, key=lambda i: (_is_data_quality(i), i.score or 0.0, i.id))
-    return sorted(
+    """Delegate to :meth:`AnalysisResultService.select_issues`."""
+    return AnalysisResultService.select_issues(
         issues,
-        key=lambda i: (-_BAND_WEIGHT.get(_band_of(i), 0), -(i.score or 0.0), i.id),
+        bands=bands,
+        mechanisms=mechanisms,
+        include_data_quality=include_data_quality,
+        query=query,
     )
+
+
+def _sort_issues(issues: list, sort: "PageSort") -> list:
+    """Delegate to :meth:`AnalysisResultService.sort_issues`."""
+    return AnalysisResultService.sort_issues(issues, sort)
 
 
 def _paginate_result(
@@ -398,49 +177,20 @@ def _paginate_result(
     bands: list[str] | None,
     mechanisms: list[str] | None,
     include_data_quality: bool,
-    sort: PageSort,
+    sort: "PageSort",
     query: str | None = None,
 ) -> tuple[dict, ResultPageContract]:
-    """Return ``result`` with ``audit_issues`` narrowed to one page.
-
-    Applied to what ``run_analysis`` returned rather than inside it: the cache
-    entry must hold the whole run its key describes, so nothing here reaches
-    the cache.
-
-    ``issue_stats`` is filled in from the whole run before the slice, and
-    ``ifc_element_count`` is pinned, so :func:`_format_result` computes neither
-    from the handful of issues it is about to be handed.
-    """
-    all_issues = result.get("audit_issues", [])
-    matching = _select_issues(
-        all_issues,
+    """Delegate to :meth:`AnalysisResultService.paginate_result`."""
+    return AnalysisResultService.paginate_result(
+        result,
+        limit=limit,
+        offset=offset,
         bands=bands,
         mechanisms=mechanisms,
         include_data_quality=include_data_quality,
+        sort=sort,
         query=query,
     )
-    ordered = _sort_issues(matching, sort)
-
-    # An offset past the end is an empty page, not an error: a client holding a
-    # page number while the run shrank asked a reasonable question and gets a
-    # truthful "nothing here", with total_matching to re-aim by.
-    window = ordered[offset:] if limit is None else ordered[offset : offset + limit]
-
-    page = ResultPageContract(
-        limit=limit,
-        offset=offset,
-        returned=len(window),
-        total_matching=len(ordered),
-        has_more=offset + len(window) < len(ordered),
-    )
-
-    narrowed = {
-        **result,
-        "audit_issues": window,
-        "issue_stats": result.get("issue_stats") or _issue_stats(all_issues),
-        "ifc_element_count": result.get("ifc_element_count") or len(all_issues),
-    }
-    return narrowed, page
 
 
 @router.post("/upload", response_model=IfcUploadAttachResponse, summary="Attach an IFC model to a project")
