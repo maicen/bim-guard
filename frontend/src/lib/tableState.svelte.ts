@@ -66,6 +66,11 @@ export interface TableStateOptions<T, Id extends RowId = RowId> {
    * which is the convention every existing view already uses.
    */
   filters?: Record<string, (row: T, value: string) => boolean>;
+  /**
+   * Multi-value filter predicates. A filter is active while its array of selected
+   * values is non-empty.
+   */
+  multiFilters?: Record<string, (row: T, values: string[]) => boolean>;
   /** Per-field comparators for columns that do not sort as plain strings. */
   comparators?: Record<string, (a: T, b: T) => number>;
   initialSort?: { field: string; asc?: boolean };
@@ -154,6 +159,13 @@ export class TableState<T, Id extends RowId = RowId> {
           // the views spell the sentinel both "all" and "ALL".
           if (!value || value.toLowerCase() === "all") continue;
           if (!predicate(row, value)) return false;
+        }
+      }
+      if (this.#options.multiFilters) {
+        for (const [key, predicate] of Object.entries(this.#options.multiFilters)) {
+          const values = this.multiFilters[key];
+          if (!values || values.length === 0) continue;
+          if (!predicate(row, values)) return false;
         }
       }
       return true;
@@ -250,17 +262,118 @@ export class TableState<T, Id extends RowId = RowId> {
     this.filters = { ...this.filters, [key]: value };
   }
 
+  // --- multi-select & faceted filtering ------------------------------------
+
+  multiFilters = $state<Record<string, string[]>>({});
+
+  setMultiFilter(key: string, values: string[]) {
+    this.multiFilters = { ...this.multiFilters, [key]: values };
+    this.requestedPage = 1;
+  }
+
+  toggleMultiFilter(key: string, value: string) {
+    const current = this.multiFilters[key] ?? [];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    this.setMultiFilter(key, next);
+  }
+
+  clearMultiFilter(key: string) {
+    if (this.multiFilters[key]?.length) {
+      const next = { ...this.multiFilters };
+      delete next[key];
+      this.multiFilters = next;
+      this.requestedPage = 1;
+    }
+  }
+
+  getMultiFilter(key: string): string[] {
+    return this.multiFilters[key] ?? [];
+  }
+
+  /**
+   * Compute live facet counts for a field or property.
+   * If `filterKeyToExclude` is provided, includes search and all active filters EXCEPT that key,
+   * matching standard Linear/shadcn faceted search behavior where sibling options display potential match counts.
+   */
+  getFacetedCounts(
+    getValue: (row: T) => string | string[] | null | undefined,
+    filterKeyToExclude?: string,
+  ): Record<string, number> {
+    const { rows, searchFields, filters, multiFilters: multiFiltersConfig } = this.#options;
+    const needle = this.search.trim().toLowerCase();
+
+    const activeRows = rows()
+      .filter((row) => !this.pendingDeletions.has(this.#options.getId(row)))
+      .map((row) => {
+        const patch = this.pendingUpdates.get(this.#options.getId(row));
+        return patch ? { ...row, ...patch } : row;
+      });
+
+    const counts: Record<string, number> = {};
+
+    for (const row of activeRows) {
+      if (needle && searchFields) {
+        const hit = searchFields(row).some((field) =>
+          (field ?? "").toString().toLowerCase().includes(needle),
+        );
+        if (!hit) continue;
+      }
+      if (filters) {
+        let matches = true;
+        for (const [key, predicate] of Object.entries(filters)) {
+          if (filterKeyToExclude && key === filterKeyToExclude) continue;
+          const value = this.filters[key];
+          if (!value || value.toLowerCase() === "all") continue;
+          if (!predicate(row, value)) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) continue;
+      }
+      if (multiFiltersConfig) {
+        let matches = true;
+        for (const [key, predicate] of Object.entries(multiFiltersConfig)) {
+          if (filterKeyToExclude && key === filterKeyToExclude) continue;
+          const values = this.multiFilters[key];
+          if (!values || values.length === 0) continue;
+          if (!predicate(row, values)) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) continue;
+      }
+
+      const raw = getValue(row);
+      if (raw == null) continue;
+      if (Array.isArray(raw)) {
+        for (const item of raw) {
+          if (item) counts[item] = (counts[item] || 0) + 1;
+        }
+      } else {
+        counts[raw] = (counts[raw] || 0) + 1;
+      }
+    }
+
+    return counts;
+  }
+
   /** Clear search and every filter. */
   reset() {
     this.search = "";
     this.filters = this.#defaultFilters();
+    this.multiFilters = {};
     this.requestedPage = 1;
   }
 
   get hasActiveFilters(): boolean {
     return (
       this.search.trim() !== "" ||
-      Object.values(this.filters).some((v) => v && v.toLowerCase() !== "all")
+      Object.values(this.filters).some((v) => v && v.toLowerCase() !== "all") ||
+      Object.values(this.multiFilters).some((arr) => arr && arr.length > 0)
     );
   }
 
