@@ -187,6 +187,8 @@ class GraphRagService:
                 rulesets=[],
             )
 
+        self._ensure_project_model_ingested(project_id)
+
         # 1. Check IFC element classes in model graph
         try:
             cypher_classes = """
@@ -818,6 +820,34 @@ class GraphRagService:
     # SOTA Hub-Suppressed Model Graph Traversal (HippoRAG / LinearRAG)
     # -----------------------------------------------------------------------
 
+    def _ensure_project_model_ingested(self, project_id: int) -> None:
+        """Auto-ingest the project's primary IFC model into graph database if not already ingested."""
+        if not self.graph_service or not self.graph_service.provider:
+            return
+        pid_str = str(project_id)
+        try:
+            check_cypher = "MATCH (n {project_id: $pid}) RETURN count(n) as cnt LIMIT 1"
+            rows = self.graph_service.execute(check_cypher, {"pid": pid_str})
+            if rows and rows[0].get("cnt", 0) > 0:
+                return  # Already ingested
+        except Exception as exc:
+            logger.debug("Error checking project graph ingestion: %s", exc)
+
+        # Not ingested; resolve model file and ingest
+        try:
+            model_path = self.models_service.resolve_primary_path(project_id)
+            if model_path and model_path.exists():
+                import ifcopenshell
+
+                from app.modules.ifc_reader.ifc_graph import ingest_ifc_to_graph
+
+                logger.info("Auto-ingesting primary IFC model into graph for project %d: %s", project_id, model_path)
+                model = ifcopenshell.open(str(model_path))
+                ingest_ifc_to_graph(model, self.graph_service, project_id=pid_str)
+                logger.info("Auto-ingestion completed for project %d", project_id)
+        except Exception as exc:
+            logger.warning("Auto-ingesting IFC model failed for project %d: %s", project_id, exc)
+
     def _retrieve_model_graph(
         self,
         project_id: int,
@@ -827,6 +857,7 @@ class GraphRagService:
         retrieval_mode: str = "hybrid_rrf",
     ) -> dict[str, Any]:
         """Traverse IFC model entities with hub suppression and spatial containment."""
+        self._ensure_project_model_ingested(project_id)
         pid_str = str(project_id)
         citations: list[GraphRagCitation] = []
         elements_found: list[dict[str, Any]] = []
