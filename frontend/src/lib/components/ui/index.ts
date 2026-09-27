@@ -157,16 +157,6 @@ export {
   MenubarGroupHeading,
 } from "./Menubar.svelte";
 export { default as PinInput, PinInputRoot, PinInputCell } from "./PinInput.svelte";
-export {
-  default as NavigationMenu,
-  NavigationMenuRoot,
-  NavigationMenuList,
-  NavigationMenuItem,
-  NavigationMenuTrigger,
-  NavigationMenuContent,
-  NavigationMenuLink,
-  NavigationMenuIndicator,
-  NavigationMenuViewport,
-} from "./NavigationMenu.svelte";
-
+export * from "./navigation-menu";
 export * from "./sidebar";
+

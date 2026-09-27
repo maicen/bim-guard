@@ -35,6 +35,12 @@
     AccordionHeader,
     AccordionTrigger,
     AccordionContent,
+    NavigationMenu,
+    NavigationMenuList,
+    NavigationMenuItem,
+    NavigationMenuTrigger,
+    NavigationMenuContent,
+    NavigationMenuLink,
     type ButtonVariant,
     type ButtonSize,
     type SelectOption,
@@ -493,6 +499,78 @@
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+          </div>
+
+          <!-- Navigation Menu Primitive (shadcn / Base UI) -->
+          <div class="mt-8 space-y-3">
+            <div>
+              <h4 class="text-xs font-bold text-fg-primary uppercase tracking-wider">Navigation Menu (shadcn / Base UI)</h4>
+              <p class="text-micro text-fg-muted mt-0.5">Composable website navigation with animated trigger carets, floating viewports, and multi-column rich card links.</p>
+            </div>
+
+            <div class="rounded-2xl border border-border-default bg-surface-canvas/60 p-6 flex flex-col items-center justify-center min-h-[220px]">
+              <NavigationMenu>
+                <NavigationMenuList>
+                  <NavigationMenuItem>
+                    <NavigationMenuTrigger>OpenBIM Specs</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <ul class="grid w-[380px] gap-2 p-3 sm:w-[480px] md:grid-cols-2 md:w-[540px]">
+                        <li>
+                          <NavigationMenuLink href="#/documents" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">ISO 19650 Governance</span>
+                            <span class="text-nano text-fg-muted mt-0.5">CDE metadata states, suitability tiers, and automated naming validation.</span>
+                          </NavigationMenuLink>
+                        </li>
+                        <li>
+                          <NavigationMenuLink href="#/rules" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">Database-Driven Rules</span>
+                            <span class="text-nano text-fg-muted mt-0.5">Dynamic engineering cutoffs, spatial egress, and fire separation engines.</span>
+                          </NavigationMenuLink>
+                        </li>
+                        <li>
+                          <NavigationMenuLink href="#/extract" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">Docling NLP Extraction</span>
+                            <span class="text-nano text-fg-muted mt-0.5">Automated rule proposition directly from regulatory architectural PDF manuals.</span>
+                          </NavigationMenuLink>
+                        </li>
+                        <li>
+                          <NavigationMenuLink href="#/viewer" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">3D IFC Geometry View</span>
+                            <span class="text-nano text-fg-muted mt-0.5">High-performance ThatOpenEngine viewer with BCF viewpoint synchronizations.</span>
+                          </NavigationMenuLink>
+                        </li>
+                      </ul>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+
+                  <NavigationMenuItem>
+                    <NavigationMenuTrigger>Integrations</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <ul class="flex flex-col gap-1.5 p-3 w-[280px]">
+                        <li>
+                          <NavigationMenuLink href="#/revit-sync" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">Autodesk Revit Sync</span>
+                            <span class="text-nano text-fg-muted">Direct bidirectional sync with local Revit models via REST daemon.</span>
+                          </NavigationMenuLink>
+                        </li>
+                        <li>
+                          <NavigationMenuLink href="#/reports" class="hover:bg-surface-hover">
+                            <span class="text-xs font-bold text-fg-primary">BCF 2.1 & 3.0 Topics</span>
+                            <span class="text-nano text-fg-muted">Export compliance issues directly to Solibri, Navisworks, and BIMcollab.</span>
+                          </NavigationMenuLink>
+                        </li>
+                      </ul>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+
+                  <NavigationMenuItem>
+                    <NavigationMenuLink href="#/user-manual" class="px-3 py-2">
+                      <span class="text-xs font-medium text-fg-secondary hover:text-fg-primary">Documentation</span>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                </NavigationMenuList>
+              </NavigationMenu>
+            </div>
           </div>
         </CardContent>
       </Card>

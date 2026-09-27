@@ -1,33 +1,48 @@
 <script lang="ts" module>
-  import { NavigationMenu as NavigationMenuPrimitive } from "bits-ui";
-
-  export const NavigationMenuRoot = NavigationMenuPrimitive.Root;
-  export const NavigationMenuList = NavigationMenuPrimitive.List;
-  export const NavigationMenuItem = NavigationMenuPrimitive.Item;
-  export const NavigationMenuTrigger = NavigationMenuPrimitive.Trigger;
-  export const NavigationMenuContent = NavigationMenuPrimitive.Content;
-  export const NavigationMenuLink = NavigationMenuPrimitive.Link;
-  export const NavigationMenuIndicator = NavigationMenuPrimitive.Indicator;
-  export const NavigationMenuViewport = NavigationMenuPrimitive.Viewport;
+  export {
+    NavigationMenu,
+    NavigationMenuRoot,
+    Root,
+    NavigationMenuList,
+    NavigationMenuItem,
+    NavigationMenuTrigger,
+    navigationMenuTriggerStyle,
+    NavigationMenuContent,
+    NavigationMenuLink,
+    NavigationMenuIndicator,
+    NavigationMenuViewport,
+    List,
+    Item,
+    Trigger,
+    Content,
+    Link,
+    Indicator,
+    Viewport,
+  } from "./navigation-menu";
 </script>
 
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { cn } from "../../utils/cn";
+  import type { NavigationMenu as NavigationMenuPrimitive } from "bits-ui";
+  import NavigationMenuRootComponent from "./navigation-menu/NavigationMenu.svelte";
 
-  interface Props {
-    class?: string;
+  let {
+    ref = $bindable(null),
+    class: className,
+    viewport = true,
+    children,
+    ...restProps
+  }: NavigationMenuPrimitive.RootProps & {
+    viewport?: boolean;
     children?: Snippet;
-  }
-
-  let { class: className, children }: Props = $props();
+  } = $props();
 </script>
 
-<NavigationMenuPrimitive.Root class={cn("relative z-10 flex max-w-max items-center justify-center", className)}>
-  <NavigationMenuPrimitive.List class="group flex flex-1 list-none items-center justify-center gap-1">
-    {@render children?.()}
-  </NavigationMenuPrimitive.List>
-  <div class="absolute left-0 top-full flex justify-center">
-    <NavigationMenuPrimitive.Viewport class="relative mt-1.5 h-[var(--bits-navigation-menu-viewport-height)] w-full overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl transition-[width,_height] duration-300 md:w-[var(--bits-navigation-menu-viewport-width)]" />
-  </div>
-</NavigationMenuPrimitive.Root>
+<NavigationMenuRootComponent
+  bind:ref
+  class={className}
+  {viewport}
+  {...restProps}
+>
+  {@render children?.()}
+</NavigationMenuRootComponent>
