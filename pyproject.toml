@@ -94,6 +94,7 @@ dev = [
     "pytest-json-report>=1.5.0",
     # Validates generated BCF archives against the vendored buildingSMART
     # 2.1 XSDs in tests/schemas/bcf21/ (tests/test_bcf_generator.py).
+    "pytest-picked>=0.5.1",
     "pytest-xdist>=3.8.0",
     "xmlschema>=3.0.0",
 ]
@@ -109,6 +110,12 @@ markers = [
     "slow: marks tests that need real PDFs/full engine runs and are slow",
     "llm: marks tests that call the LLM (slow, costs tokens)",
     "integration: marks end-to-end pipeline tests",
+    "documents: document management, parsing, Smart TOC, and chunking tests",
+    "api: FastAPI router endpoint and contract validation tests",
+    "engine: architectural compliance, geometry, and IFC evaluators",
+    "rules: rule extraction, catalog, draft workflow, and alignment tests",
+    "graph: Neo4j, Kuzu, RDF triplestore, and OpenCDE integrations",
+    "export: BCF, IDS, and analysis report export pipelines",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:supabase.*:",

@@ -135,6 +135,14 @@ docker compose --profile tunnel up -d --build bim-guard
 uv run ruff check .
 uv run pytest tests/ -m 'not slow' -v
 
+# Targeted testing workflows (avoid running all tests every time):
+uv run python scripts/test_relevant.py          # Auto-detect git changes and run relevant tests
+uv run pytest --picked                         # Run only modified or untracked test files in git
+uv run pytest -m documents                     # Run tests by domain marker (documents, api, engine, rules, graph, export)
+uv run pytest -k "smart_toc or document"       # Filter tests by function/class/file keywords
+uv run pytest --lf                             # Re-run only tests that failed in the last run
+uv run pytest tests/test_document_pages_service.py # Run a single test file directly
+
 # Slow tests are intentionally excluded by default. Only run them when the
 # task is specifically about slow pipeline/engine behavior or a fast validation
 # path is not sufficient.
@@ -142,6 +150,21 @@ uv run pytest -m slow          # only the slow tests (full engine/pipeline runs)
 uv run pytest -m ""             # everything, including slow tests
 uv run pytest -m "not llm"      # skip tests that call an LLM
 ```
+
+### Targeted Testing Guide
+
+To keep feedback cycles fast without running all 150+ tests every time, use these strategies:
+1. **Auto-detect relevant tests from git changes**: `uv run python scripts/test_relevant.py` inspects git status and automatically maps changed source files (`app/api/...`, `app/services/...`) or test files to their matching test targets.
+2. **Run modified test files**: `uv run pytest --picked` uses `pytest-picked` to execute only test files that are modified or untracked in git.
+3. **Domain markers (`-m`)**: Tests are categorized with registered markers in `pyproject.toml`:
+   - `documents`: Document ingestion, PDF parsing, Smart TOC, DocLang chunking, CDE gates.
+   - `api`: FastAPI route handlers, dependencies, and contract validation.
+   - `engine`: Architectural compliance engines (egress, spatial, stair, door, etc.).
+   - `rules`: Rule extraction, catalog, draft workflow, and semantic alignment.
+   - `graph`: Neo4j, Kuzu, RDF triplestore, and OpenCDE integrations.
+   - `export`: BCF, IDS, and analysis report export pipelines.
+4. **Name / Keyword filtering (`-k`)**: E.g. `uv run pytest -k "document and not export"`.
+5. **Re-run failures first**: Use `uv run pytest --lf` to quickly iterate on failing tests until they pass.
 
 ## Production Serving at https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
 

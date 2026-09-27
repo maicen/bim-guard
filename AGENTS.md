@@ -14,6 +14,10 @@ BIM-Guard uses a modern, decoupled architecture:
 - Run backend locally: `uv run uvicorn main:app --reload`
 - Lint backend: `uv run ruff check .`
 - Run backend tests (default fast path; skip slow tests unless strictly required): `uv run pytest tests/ -m 'not slow'`
+- Run tests relevant to local git changes automatically: `uv run python scripts/test_relevant.py`
+- Run only modified/untracked test files in git: `uv run pytest --picked`
+- Run targeted tests by domain marker: `uv run pytest -m documents` (or `api`, `engine`, `rules`, `graph`, `export`)
+- Re-run only failed tests: `uv run pytest --lf`
 - Install frontend dependencies: `cd frontend && npm install`
 - Run frontend locally: `cd frontend && npm run dev`
 - Build frontend: `cd frontend && npm run build`
@@ -175,7 +179,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
 ## Quality bar
 
 - Build features consistent with the decoupled FastAPI + Svelte 5 architecture while preserving framework-agnostic compute engine interfaces.
-- Validate backend by default: `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`.
+- Validate backend by default: `uv run ruff check .` and targeted tests via `uv run python scripts/test_relevant.py` (or `uv run pytest tests/ -m 'not slow'`).
 - Run `uv run pytest -m slow` or `uv run pytest -m ""` only when the task explicitly requires slow pipeline/engine coverage or can only be validated with the full suite.
 - Validate frontend: `cd frontend && npm run build`.
 

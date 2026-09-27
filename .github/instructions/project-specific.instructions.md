@@ -229,22 +229,34 @@ async def upload_handler(file: UploadFile = File(...)):
 
 ## Database-Driven Rule Engine Architecture
 
-All compliance and corrosion analysis workflows are strictly database-driven:
-- **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, material tables, flow velocity/dead-leg intervals, zone-to-environment mappings, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
-- **Corrosion Engine Catalogs**: `app/services/corrosion_rule_catalog.py` translates DB rules into engine lookups for `BIMGUARD-GC-001`, `BIMGUARD-CC-001`, and `BIMGUARD-MC-001`.
-- **Live Catalog Reloading**: In-memory engine catalogs are refreshed via `reload_all_catalogs()` at the start of each analysis run.
+All architectural compliance workflows are strictly database-driven:
+- **Zero Hardcoded Logic**: Multi-criteria scoring weights, risk band thresholds, spatial parameters, egress clearance distances, stair/door geometry bounds, and mitigations are read dynamically from database rules (`RuleService`), not hardcoded constants.
+- **Dynamic Rule Resolution**: `RuleService` loads active rulesets (`ARCH-EGRESS-001`, `ARCH-SPATIAL-001`, etc.) per project or analysis invocation.
 
 ---
 
 ## Testing Conventions
 
-Automated testing is active and required for all changes:
+Automated testing is active and required for all changes. To keep test cycles rapid without executing all 150+ tests every time, use targeted execution strategies:
 
-### Backend Testing
-- **Default test execution**: `uv run pytest tests/ -m 'not slow'` — skip slow tests unless the task is explicitly about slow engine/pipeline behavior or a fast-path validation is not possible.
+### Targeted & Relevant Test Execution
+- **Auto-run tests for git changes**: `uv run python scripts/test_relevant.py` — discovers modified source files (`app/api/...`, `app/services/...`, etc.) and automatically runs only their relevant test suites.
+- **Run modified test files**: `uv run pytest --picked` — runs only test files that are modified or untracked in git.
+- **Domain marker filtering (`-m`)**: Run tests matching a specific functional domain:
+  - `uv run pytest -m documents` (Smart TOC, DocLang parsing, chunking, CDE gates)
+  - `uv run pytest -m api` (FastAPI route handlers and contract schemas)
+  - `uv run pytest -m engine` (Architectural egress, spatial, stair, and door geometry engines)
+  - `uv run pytest -m rules` (Rule extraction, draft workflow, and catalog services)
+  - `uv run pytest -m graph` (Neo4j, Kuzu, RDF triplestore, and OpenCDE)
+  - `uv run pytest -m export` (BCF, IDS, and analysis report export pipelines)
+- **Keyword filtering (`-k`)**: `uv run pytest -k "document or smart_toc"`
+- **Re-run failures only**: `uv run pytest --lf`
+- **Default full test execution**: `uv run pytest tests/ -m 'not slow'` — skips slow PDF / engine tests.
+
+### Backend Verification
 - **Linting**: `uv run ruff check .`
 - **API Tests**: Validate endpoint request/response payloads against Pydantic models (`tests/test_api_*.py`).
-- **Engine Tests**: Validate physics and compliance rules pull dynamically from the database without hardcoded cutoffs (`tests/test_db_rules_workflow.py`). Run slow-engine/full-suite tests only when the task truly requires them.
+- **Engine Tests**: Validate physics and compliance rules pull dynamically from the database without hardcoded cutoffs. Run slow-engine/full-suite tests only when the task truly requires them.
 
 ### Frontend Testing & Verification
 - **Build validation**: `cd frontend && npm run build` (verifies TypeScript types and Vite bundle)
