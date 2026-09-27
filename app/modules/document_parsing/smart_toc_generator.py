@@ -208,6 +208,88 @@ def resolve_page_ranges(tree: list[dict], flat: list[dict]) -> None:
     _postorder_tree(tree)
 
 
+_DOT_LEADER_LINE = re.compile(
+    r"^([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*)?\s*(.*?)\s*(?:\.{2,}|…{2,}|\_{2,}|\-{2,}|\s{3,})\s*([ivxlcdm]+|\d+)\s*$",
+    re.IGNORECASE,
+)
+
+
+def extract_dot_leader_entries(text: str) -> list[dict]:
+    """Extract explicit TOC entries from text blocks with dot leaders.
+
+    Matches lines like:
+      '1.1 Scope and Administration .................... 12'
+      'SECTION 1004 OCCUPANT LOAD .................. 240'
+      'Table 1004.5 Floor Area Allowances .......... 242'
+    """
+    entries: list[dict] = []
+    if not text:
+        return entries
+    for line in text.splitlines():
+        line = line.strip()
+        m = _DOT_LEADER_LINE.match(line)
+        if m:
+            num = (m.group(1) or "").strip()
+            title = (m.group(2) or "").strip()
+            page_str = m.group(3).strip()
+            entries.append(
+                {
+                    "section_number": num or None,
+                    "title": title or None,
+                    "printed_page_number": page_str,
+                }
+            )
+    return entries
+
+
+def calibrate_page_offsets(tree: list[dict], flat: list[dict]) -> int | None:
+    """Calibrate logical-to-physical page offsets between printed and physical PDF pages.
+
+    Physical PDF Index = Printed TOC Page + Offset
+
+    If a consistent offset vector is discovered (e.g. Roman numeral front matter causes
+    body Chapter 1 printed on page 1 to appear on physical page 11), calibrates
+    `printed_page_number` for all nodes where only physical `page_number` is known.
+    """
+    offsets: list[int] = []
+    for node in flat:
+        text = node.get("text", "")
+        entries = extract_dot_leader_entries(text)
+        if entries:
+            for entry in entries:
+                ref_num = entry.get("section_number")
+                printed_p = entry.get("printed_page_number")
+                if ref_num and printed_p and printed_p.isdigit():
+                    p_int = int(printed_p)
+                    for target in flat:
+                        if target.get("section_number") == ref_num:
+                            phys_p = target.get("page_number")
+                            if phys_p is not None and phys_p >= p_int:
+                                offsets.append(phys_p - p_int)
+                                target["printed_page_number"] = str(p_int)
+
+    if offsets:
+        offsets.sort()
+        median_offset = offsets[len(offsets) // 2]
+        id_to_printed = {}
+        for node in flat:
+            if not node.get("printed_page_number") and node.get("page_number") is not None:
+                calc_printed = node["page_number"] - median_offset
+                if calc_printed >= 1:
+                    node["printed_page_number"] = str(calc_printed)
+            id_to_printed[node["id"]] = node.get("printed_page_number")
+
+        def _sync_printed(nodes: list[dict]) -> None:
+            for n in nodes:
+                n["printed_page_number"] = id_to_printed.get(n["id"])
+                _sync_printed(n.get("children") or [])
+
+        _sync_printed(tree)
+        return median_offset
+
+    return None
+
+
 def build_smart_toc(
     chunks: list[dict],
     *,
@@ -242,6 +324,7 @@ def build_smart_toc(
         node["target_ifc_classes"] = extract_target_ifc_classes(text, name)
         node["key_topics"] = extract_key_topics(text, name)
         node["summary"] = generate_extractive_summary(text, name, number)
+        node["printed_page_number"] = node.get("printed_page_number")
 
     # Propagate enriched attributes to tree nodes
     id_to_flat = {n["id"]: n for n in flat}
@@ -254,6 +337,7 @@ def build_smart_toc(
                 node["citations"] = flat_item["citations"]
                 node["target_ifc_classes"] = flat_item["target_ifc_classes"]
                 node["key_topics"] = flat_item["key_topics"]
+                node["printed_page_number"] = flat_item.get("printed_page_number")
             _sync_tree(node.get("children") or [])
 
     _sync_tree(tree)
@@ -261,4 +345,8 @@ def build_smart_toc(
     # Resolve bounding page ranges
     resolve_page_ranges(tree, flat)
 
+    # Calibrate logical-to-physical page offsets
+    calibrate_page_offsets(tree, flat)
+
     return tree, flat
+

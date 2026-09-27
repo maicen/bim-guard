@@ -866,6 +866,9 @@ class DocumentSection(BaseModel):
     page_number: Optional[int] = Field(
         default=None, description="Resolved source-document page this section starts on, when known"
     )
+    printed_page_number: Optional[str] = Field(
+        default=None, description="Logical or printed page number from document TOC or pagination layout"
+    )
     node_type: str = Field(default="section", description="Type of node: 'section', 'heading', 'table', 'paragraph'")
     bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")
     summary: Optional[str] = Field(default=None, description="Semantic summary of section provisions and requirements")
@@ -891,6 +894,9 @@ class SectionTreeNode(BaseModel):
     char_count: int = 0
     page_number: Optional[int] = Field(
         default=None, description="Resolved source-document page this section starts on, when known"
+    )
+    printed_page_number: Optional[str] = Field(
+        default=None, description="Logical or printed page number from document TOC or pagination layout"
     )
     node_type: str = Field(default="section", description="Type of outline node: 'section', 'heading', 'table'")
     bbox: Optional[dict[str, Any]] = Field(default=None, description="Bounding box coordinates on the page")

@@ -397,6 +397,7 @@ export interface DocumentSection {
   text: string;
   char_count: number;
   page_number?: number | null;
+  printed_page_number?: string | null;
   node_type?: string;
   bbox?: BoundingBox | null;
   summary?: string | null;
@@ -417,6 +418,7 @@ export interface SectionTreeNode {
   section_name?: string | null;
   char_count: number;
   page_number?: number | null;
+  printed_page_number?: string | null;
   node_type?: string;
   bbox?: BoundingBox | null;
   summary?: string | null;

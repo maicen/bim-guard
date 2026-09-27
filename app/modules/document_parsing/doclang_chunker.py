@@ -22,8 +22,10 @@ _KEYWORD_HEADING_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _DOTTED_HEADING_PATTERN = re.compile(
-    r"^(\d+(?:\.\d+)*(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$"
+    r"^(\d+(?:\.\d+)+(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$"
 )
+_NUMBERED_ITEM_PATTERN = re.compile(r"^(\d+\.)(?:[:.)\s\-—]+(.*))?$")
+_YEAR_HEADING_PATTERN = re.compile(r"^(?:19\d\d|20\d\d)\b")
 _EXCEPTION_HEADING_PATTERN = re.compile(r"^Exceptions?[:\s]*$", re.IGNORECASE)
 
 
@@ -38,6 +40,7 @@ def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]
       - '2.24.2 Aircraft hangar.' -> ('2.24.2', '2.24.2 — Aircraft hangar.')
       - 'Exceptions:' -> (None, 'Exceptions')
       - 'PREFACE' -> (None, 'PREFACE')
+      - '2024 INTERNATIONAL BUILDING CODE' -> (None, '2024 INTERNATIONAL BUILDING CODE')
     """
     clean = " ".join((heading_text or "").split()).strip()
     if not clean:
@@ -45,6 +48,9 @@ def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]
 
     if _EXCEPTION_HEADING_PATTERN.match(clean):
         return None, "Exceptions"
+
+    if _YEAR_HEADING_PATTERN.match(clean):
+        return None, clean
 
     m_kw = _KEYWORD_HEADING_PATTERN.match(clean)
     if m_kw:
@@ -58,6 +64,13 @@ def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]
     if m_dot:
         ref = m_dot.group(1)
         rest = (m_dot.group(2) or "").strip()
+        name = f"{ref}" + (f" — {rest}" if rest else "")
+        return ref, name
+
+    m_num = _NUMBERED_ITEM_PATTERN.match(clean)
+    if m_num:
+        ref = m_num.group(1).rstrip(".")
+        rest = (m_num.group(2) or "").strip()
         name = f"{ref}" + (f" — {rest}" if rest else "")
         return ref, name
 
@@ -279,6 +292,20 @@ class DocLangChunker:
             if elem.tag.lower().split("}")[-1] == "field_region":
                 skip_ids.update(id(descendant) for descendant in elem.iter() if descendant is not elem)
 
+        # Pre-scan headings to identify repetitive running headers/footers
+        heading_counts: dict[str, int] = {}
+        for h_elem in root.iter():
+            if h_elem.tag.lower().split("}")[-1] == "heading":
+                h_text = " ".join("".join(h_elem.itertext()).split()).strip().lower()
+                if h_text:
+                    heading_counts[h_text] = heading_counts.get(h_text, 0) + 1
+
+        running_headers = {
+            h_text
+            for h_text, count in heading_counts.items()
+            if count >= 3 and not _DOTTED_HEADING_PATTERN.match(h_text)
+        }
+
         # Needed to tell an inline `<formula>`/`<code>` (nested inside a
         # `text`/`paragraph`/`item` run whose `itertext()` already captured
         # it) apart from a standalone block that needs its own chunk.
@@ -293,15 +320,52 @@ class DocLangChunker:
             tag = elem.tag.lower().split("}")[-1]  # Strip namespace
 
             if tag == "heading":
-                # Flush previous content under prior heading
-                flush_current_chunk()
-
                 heading_text = "".join(elem.itertext()).strip()
+                if not heading_text:
+                    continue
+
+                normalized_h = " ".join(heading_text.split()).strip().lower()
+                if normalized_h in running_headers:
+                    # Skip repetitive running headers appearing across many pages
+                    if total_bboxes > 0 and bbox_idx < total_bboxes:
+                        bbox_idx += 1
+                    continue
+
                 level_str = elem.attrib.get("level", "1")
                 try:
                     level = int(level_str)
                 except ValueError:
                     level = 1
+
+                # Check if this heading is a multiline continuation of the preceding heading
+                if (
+                    current_content_blocks
+                    and current_node_type == "heading"
+                    and len(current_content_blocks) == 1
+                ):
+                    prev_h = current_content_blocks[0].strip()
+                    curr_num, _ = extract_heading_number_and_name(heading_text)
+                    is_continuation = False
+                    if not curr_num:
+                        if prev_h.endswith(("-", "—", ",", ";", ":", "(")) or (heading_text and heading_text[0].islower()):
+                            is_continuation = True
+                        elif len(heading_text.split()) <= 6 and not _KEYWORD_HEADING_PATTERN.match(heading_text):
+                            is_continuation = True
+
+                    if is_continuation:
+                        stitched_text = f"{prev_h} {heading_text}"
+                        sec_num, sec_name = extract_heading_number_and_name(stitched_text)
+                        current_content_blocks[0] = stitched_text
+                        current_section_number = sec_num
+                        current_section_name = sec_name
+                        level_map[level] = sec_num or stitched_text
+                        current_section_path = [level_map[lvl] for lvl in sorted(level_map.keys())]
+                        if total_bboxes > 0 and bbox_idx < total_bboxes:
+                            bbox_idx += 1
+                        continue
+
+                # Flush previous content under prior heading
+                flush_current_chunk()
 
                 # Detect section number and name
                 sec_num, sec_name = extract_heading_number_and_name(heading_text)
@@ -319,14 +383,23 @@ class DocLangChunker:
                 current_content_blocks = [heading_text]
                 current_node_type = "heading"
 
-                # Check for element bbox
+                # Check for element bbox or direct attributes
+                page_attr = elem.attrib.get("page") or elem.attrib.get("page_no") or elem.attrib.get("prov_page")
+                if page_attr and page_attr.isdigit():
+                    current_page_number = int(page_attr)
+
+                elem_id_attr = elem.attrib.get("id") or elem.attrib.get("element_id")
+                if elem_id_attr:
+                    current_element_id = elem_id_attr
+
                 if elem.attrib.get("bbox"):
-                    # XML attribute bbox
                     pass
                 elif total_bboxes > 0 and bbox_idx < total_bboxes:
                     current_bbox = element_bboxes[bbox_idx].get("bbox")
-                    current_page_number = element_bboxes[bbox_idx].get("page_number")
-                    current_element_id = element_bboxes[bbox_idx].get("element_id")
+                    if current_page_number is None:
+                        current_page_number = element_bboxes[bbox_idx].get("page_number")
+                    if current_element_id is None:
+                        current_element_id = element_bboxes[bbox_idx].get("element_id")
                     bbox_idx += 1
 
             elif tag == "table":
@@ -337,6 +410,9 @@ class DocLangChunker:
                         flush_current_chunk()
                     current_node_type = "table"
                     current_content_blocks.append(table_text)
+                    page_attr = elem.attrib.get("page") or elem.attrib.get("page_no") or elem.attrib.get("prov_page")
+                    if page_attr and page_attr.isdigit():
+                        current_page_number = int(page_attr)
                     if total_bboxes > 0 and bbox_idx < total_bboxes:
                         current_bbox = element_bboxes[bbox_idx].get("bbox")
                         current_page_number = element_bboxes[bbox_idx].get("page_number")

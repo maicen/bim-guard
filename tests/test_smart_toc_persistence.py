@@ -194,3 +194,65 @@ def test_toc_csv_serialization_roundtrip():
     assert row["page_number"] == "5"
     assert "IfcDoor" in row["target_ifc_classes"]
     assert "NFPA 101" in row["citations"]
+
+
+def test_multiline_heading_stitching_and_running_header_pruning():
+    """Verify multiline wrapped headings are stitched and repetitive headers are pruned."""
+    xml = """<doclang>
+<heading level="1">2024 INTERNATIONAL BUILDING CODE</heading>
+<heading level="2">1004.1 Design occupant</heading>
+<heading level="2">load.</heading>
+<paragraph>Occupant load shall be calculated per Table 1004.5.</paragraph>
+<heading level="1">2024 INTERNATIONAL BUILDING CODE</heading>
+<heading level="2">1004.2 Minimum egress width</heading>
+<paragraph>Corridors shall provide minimum clear width.</paragraph>
+<heading level="1">2024 INTERNATIONAL BUILDING CODE</heading>
+<heading level="2">1004.3 Exits</heading>
+<paragraph>Exit access requirements.</paragraph>
+</doclang>"""
+
+    chunker = DocLangChunker()
+    chunks = chunker.chunk(xml)
+
+    # Running header "2024 INTERNATIONAL BUILDING CODE" appeared 3 times -> pruned!
+    # No chunk should have section_name "2024 INTERNATIONAL BUILDING CODE"
+    for c in chunks:
+        assert c.get("section_name") != "2024 INTERNATIONAL BUILDING CODE"
+
+    # Multiline heading was stitched into "1004.1 — Design occupant load."
+    first = chunks[0]
+    assert first["section_number"] == "1004.1"
+    assert "Design occupant load" in first["section_name"]
+    assert len(chunks) == 3  # 1004.1, 1004.2, 1004.3
+
+
+def test_explicit_toc_dot_leader_and_page_offset_calibration():
+    """Verify dot leader extraction and logical-to-physical page offset calibration."""
+    xml = """<doclang>
+<heading level="1">TABLE OF CONTENTS</heading>
+<paragraph>
+1.1 Scope and Administration .................... 10
+1.2 Occupancy Classification .................. 15
+</paragraph>
+<heading level="1">SECTION 1.1</heading>
+<paragraph>General provisions for commercial construction.</paragraph>
+<heading level="1">SECTION 1.2 OCCUPANCY</heading>
+<paragraph>Classification requirements.</paragraph>
+</doclang>"""
+
+    chunks = DocLangChunker().chunk(xml)
+    # Assign physical PDF pages: TOC on page 2, Section 1.1 on physical page 18, Section 1.2 on physical page 23
+    # Offset is 18 - 10 = 8
+    physical_pages = [2, 18, 23]
+    tree, flat = build_smart_toc(chunks, page_numbers=physical_pages)
+
+    # Flat contains Section 1.1 and 1.2
+    sec11 = next(n for n in flat if n.get("section_number") == "1.1")
+    sec12 = next(n for n in flat if n.get("section_number") == "1.2")
+
+    assert sec11["page_number"] == 18
+    assert sec11["printed_page_number"] == "10"
+
+    assert sec12["page_number"] == 23
+    assert sec12["printed_page_number"] == "15"
+

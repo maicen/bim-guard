@@ -133,11 +133,17 @@
       </span>
     {/if}
     {#if node.page_number}
-      <span class="shrink-0 rounded border border-border-default px-1 text-[11px] text-fg-muted">
+      <span
+        class="shrink-0 rounded border border-border-default px-1 text-[11px] text-fg-muted"
+        title={node.printed_page_number ? `Physical PDF page ${node.page_number} (Printed page ${node.printed_page_number})` : `Physical page ${node.page_number}`}
+      >
         {#if node.end_page_number && node.end_page_number > node.page_number}
           pp. {node.page_number}–{node.end_page_number}
         {:else}
           p. {node.page_number}
+        {/if}
+        {#if node.printed_page_number}
+          <span class="text-accent text-[9px] font-mono ml-0.5">[{node.printed_page_number}]</span>
         {/if}
       </span>
     {/if}

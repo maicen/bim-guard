@@ -39,6 +39,9 @@ from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause
 
 logger = get_logger(__name__)
 
+# Backward-compatibility alias for tests
+_format_kg_context = format_kg_context
+
 
 class _LLMRuleCandidate(BaseModel):
     """One extracted rule — an item in the Pydantic program's output array."""
