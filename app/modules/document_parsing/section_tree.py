@@ -24,17 +24,24 @@ from __future__ import annotations
 import re
 
 _DOTTED = re.compile(r"^\d+(?:\.\d+)+$")
-_SECTION_WORD = re.compile(r"^(SECTION|CHAPTER|PART)\b", re.IGNORECASE)
+_CHAPTER_WORD = re.compile(r"^(CHAPTER|PART)\b", re.IGNORECASE)
+_EXCEPTION_WORD = re.compile(r"^Exceptions?\b", re.IGNORECASE)
 
 
 def compute_depth(section_number: str | None, section_name: str | None) -> int:
     """Return the outline depth (0 = top-level) inferred for one chunk."""
     name = (section_name or "").strip()
-    if _SECTION_WORD.match(name):
+    if _CHAPTER_WORD.match(name):
         return 0
 
-    num = (section_number or "").strip().rstrip(".")
+    if _EXCEPTION_WORD.match(name):
+        return 2  # exceptions subordinate to section/article
+
+    num = (section_number or "").strip().rstrip(".").split("(")[0]
     if _DOTTED.match(num):
+        return num.count(".")
+
+    if "." in num and any(part.isdigit() for part in num.split(".")):
         return num.count(".")
 
     return 0
@@ -79,12 +86,21 @@ def build_section_tree(chunks: list[dict]) -> tuple[list[dict], list[dict]]:
         }
         flat.append(flat_item)
 
-        # Infer depth: DocLang provides exact section_path; otherwise compute from number
-        if "section_path" in chunk and chunk["section_path"]:
+        # Infer depth: DocLang provides section_path when hierarchy is captured;
+        # otherwise compute from dotted numbers and clause keywords.
+        num_depth = compute_depth(section_number, section_name)
+        if "section_path" in chunk and chunk["section_path"] and len(chunk["section_path"]) > 1:
             base_depth = max(0, len(chunk["section_path"]) - 1)
-            depth = base_depth + 1 if node_type == "table" else base_depth
+            depth = max(base_depth, num_depth)
+            if node_type == "table":
+                depth += 1
+        elif num_depth > 0:
+            depth = num_depth
+        elif (section_name or "").strip().lower() == "exceptions" and stack:
+            # An Exception clause belongs directly under its preceding parent clause
+            depth = stack[-1][0] + 1
         else:
-            depth = compute_depth(section_number, section_name)
+            depth = num_depth
 
         tree_node = {
             "id": node_id,

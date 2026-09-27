@@ -1,7 +1,10 @@
 """FastAPI router for document management and text extraction."""
 
 import asyncio
+import csv
 import hashlib
+import io
+import json
 import mimetypes
 from typing import Annotated, Optional
 
@@ -1045,63 +1048,20 @@ def get_document_sections(
     return DocumentSectionsResponse(document_id=document_id, sections=sections)
 
 
-@router.get(
-    "/{document_id}/sections-tree",
-    response_model=DocumentSectionTreeResponse,
-    summary="Hierarchical, AI-arranged view of a document's sections, for scoping rule extraction",
-)
-async def get_document_sections_tree(
+async def _build_and_persist_smart_toc(
     document_id: int,
-    service: Annotated[DocumentService, Depends(get_documents_service)],
-    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
-    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+    doc: dict,
+    service: DocumentService,
+    graph_service: GraphService,
 ) -> DocumentSectionTreeResponse:
-    """Nest a document's detected sections into a tree for the scope picker.
-
-    The tree *structure* is derived deterministically from each DocLang
-    section's number/heading (see ``build_smart_toc``). Heading *labels*
-    then get one optional, cheap AI cleanup pass (see
-    ``section_tree_enhancer``) that only fixes garbled/duplicate titles —
-    never adds, removes, or reparents nodes — so the response is fully
-    usable even when that pass fails or is skipped; ``enhanced`` reports
-    whether it actually ran. The whole response is cached per document, so
-    the AI pass runs at most once per document rather than once per view.
-
-    Returns an empty tree when the document has no DocLang XML yet
-    (generation deferred or failed) — the caller should fall back to a
-    manual excerpt. Each section's starting page is resolved (free —
-    snippet matching, not an LLM call) against ``document_pages``, when that
-    table has rows for this document; older documents uploaded before that
-    table existed just get ``page_number: null`` everywhere.
-    """
-    access_checker(document_id)
-    doc = service.get_document(document_id)
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document with ID {document_id} not found.",
-        )
-
-    cache_key = f"section_tree:{document_id}"
-    cached = cache_service.get(cache_key)
-    if cached is not None:
-        return DocumentSectionTreeResponse.model_validate(cached)
-
+    """Generate, enhance, persist in DB, and ingest into Graph RAG the Smart TOC for a document."""
     doclang_xml = service.get_doclang_content(doc).strip()
     chunks = DocLangChunker().chunk(doclang_xml) if doclang_xml else []
     tree, flat = build_smart_toc(chunks)
 
-    # Optional, one-shot AI label-cleanup pass (see section_tree_enhancer's
-    # module docstring) — cheap by design: it only ever sees a compact
-    # id/depth/number/name skeleton, never section body text, and the result
-    # is cached below so it runs once per document rather than once per
-    # view. Any failure (LLM error, oversized tree) is swallowed internally
-    # and returns the deterministic tree unchanged with enhanced=False.
+    # Optional, one-shot AI label-cleanup pass
     tree, enhanced = await enhance_section_tree(tree, flat)
     if enhanced:
-        # The enhancer only relabels `tree` nodes (see its docstring) —
-        # mirror those labels onto `flat` so the "sections" list the scope
-        # picker's filter box searches doesn't show stale titles.
         id_to_name: dict[str, str] = {}
 
         def _collect_names(nodes: list[dict]) -> None:
@@ -1155,6 +1115,301 @@ async def get_document_sections_tree(
         sections=[DocumentSection(**chunk) for chunk in flat],
         enhanced=enhanced,
     )
+    # Persist in DB so it doesn't recalculate unless regenerate is requested
+    service.save_toc_tree(document_id, response.model_dump())
+    cache_key = f"section_tree:{document_id}"
+    cache_service.set(cache_key, response.model_dump())
+    return response
+
+
+@router.get(
+    "/{document_id}/sections-tree",
+    response_model=DocumentSectionTreeResponse,
+    summary="Hierarchical, AI-arranged view of a document's sections, for scoping rule extraction",
+)
+async def get_document_sections_tree(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+    regenerate: bool = Query(
+        default=False,
+        description="Force rebuild of TOC from DocLang XML, replacing the persisted DB and Graph records",
+    ),
+) -> DocumentSectionTreeResponse:
+    """Nest a document's detected sections into a tree for the scope picker.
+
+    Checks the database for a persisted TOC first. If found and regenerate=False,
+    returns the stored TOC immediately. When regenerate=True or no TOC is saved yet,
+    re-derives the TOC, ingests it into Graph RAG, and saves the new tree to the DB.
+    """
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    cache_key = f"section_tree:{document_id}"
+    if not regenerate:
+        cached = cache_service.get(cache_key)
+        if cached is not None:
+            return DocumentSectionTreeResponse.model_validate(cached)
+
+        saved_toc = service.get_toc_tree(doc)
+        if saved_toc:
+            cache_service.set(cache_key, saved_toc)
+            return DocumentSectionTreeResponse.model_validate(saved_toc)
+
+    return await _build_and_persist_smart_toc(document_id, doc, service, graph_service)
+
+
+@router.post(
+    "/{document_id}/sections-tree/regenerate",
+    response_model=DocumentSectionTreeResponse,
+    summary="Regenerate Smart TOC from DocLang XML and replace the persisted DB and Graph records",
+)
+async def regenerate_document_sections_tree(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> DocumentSectionTreeResponse:
+    """Force re-extracting and rebuilding the Smart TOC, replacing the DB and Graph records."""
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+    return await _build_and_persist_smart_toc(document_id, doc, service, graph_service)
+
+
+@flexible_router.get(
+    "/{document_id}/sections-tree/export",
+    summary="Export document TOC as JSON or CSV",
+)
+async def export_document_sections_tree(
+    document_id: int,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker_flexible)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+    format: str = Query(
+        default="json",
+        pattern="^(json|csv)$",
+        description="Export format: 'json' or 'csv'",
+    ),
+) -> Response:
+    """Export the document's Table of Contents (TOC) as a downloadable JSON or CSV file."""
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    saved_toc = service.get_toc_tree(doc)
+    if saved_toc:
+        toc_resp = DocumentSectionTreeResponse.model_validate(saved_toc)
+    else:
+        toc_resp = await _build_and_persist_smart_toc(document_id, doc, service, graph_service)
+
+    raw_filename = doc.get("filename") or f"document_{document_id}"
+    base_name = raw_filename.rsplit(".", 1)[0]
+
+    if format.lower() == "json":
+        export_payload = {
+            "document_id": document_id,
+            "filename": raw_filename,
+            "tree": [node.model_dump() for node in toc_resp.tree],
+            "sections": [sec.model_dump() for sec in toc_resp.sections],
+            "enhanced": toc_resp.enhanced,
+        }
+        json_content = json.dumps(export_payload, indent=2, ensure_ascii=False)
+        return Response(
+            content=json_content.encode("utf-8"),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{base_name}_toc.json"',
+            },
+        )
+
+    # CSV export
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id",
+        "section_number",
+        "section_name",
+        "page_number",
+        "end_page_number",
+        "target_ifc_classes",
+        "citations",
+        "key_topics",
+        "char_count",
+        "summary",
+    ])
+    for s in toc_resp.sections:
+        writer.writerow([
+            s.id,
+            s.section_number or "",
+            s.section_name or "",
+            s.page_number or "",
+            s.end_page_number or "",
+            "; ".join(s.target_ifc_classes or []),
+            "; ".join(s.citations or []),
+            "; ".join(s.key_topics or []),
+            s.char_count,
+            s.summary or "",
+        ])
+    csv_content = output.getvalue()
+    return Response(
+        content=csv_content.encode("utf-8"),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{base_name}_toc.csv"',
+        },
+    )
+
+
+@router.post(
+    "/{document_id}/sections-tree/import",
+    response_model=DocumentSectionTreeResponse,
+    summary="Import document TOC from an uploaded JSON or CSV file, replacing DB and Graph records",
+)
+async def import_document_sections_tree(
+    document_id: int,
+    file: UploadFile,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    access_checker: Annotated[DocumentAccessChecker, Depends(get_document_access_checker)],
+    graph_service: Annotated[GraphService, Depends(get_graph_service)],
+) -> DocumentSectionTreeResponse:
+    """Import a customized or corrected TOC from JSON or CSV, updating DB and Graph records."""
+    access_checker(document_id)
+    doc = service.get_document(document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with ID {document_id} not found.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+
+    fname = (file.filename or "").lower()
+    sections_list: list[dict] = []
+    provided_tree: list[dict] | None = None
+
+    if fname.endswith(".json"):
+        try:
+            data = json.loads(file_bytes.decode("utf-8"))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid JSON file format: {exc}",
+            )
+
+        if isinstance(data, dict):
+            if "tree" in data and "sections" in data:
+                provided_tree = data["tree"]
+                sections_list = data["sections"]
+            elif "sections" in data and isinstance(data["sections"], list):
+                sections_list = data["sections"]
+            elif "tree" in data and isinstance(data["tree"], list):
+                provided_tree = data["tree"]
+
+                def _collect(nodes: list[dict]):
+                    for n in nodes:
+                        c_copy = dict(n)
+                        c_copy.pop("children", None)
+                        sections_list.append(c_copy)
+                        if n.get("children"):
+                            _collect(n["children"])
+
+                _collect(provided_tree)
+        elif isinstance(data, list):
+            sections_list = data
+
+    elif fname.endswith(".csv"):
+        try:
+            text = file_bytes.decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(text))
+            for i, row in enumerate(reader):
+                sec_id = row.get("id") or f"s{i}"
+                sec_num = row.get("section_number") or None
+                sec_name = row.get("section_name") or None
+                p_start = int(row["page_number"]) if row.get("page_number", "").strip().isdigit() else None
+                p_end = int(row["end_page_number"]) if row.get("end_page_number", "").strip().isdigit() else None
+                ifc_raw = row.get("target_ifc_classes") or ""
+                ifc_classes = [c.strip() for c in ifc_raw.replace(";", ",").split(",") if c.strip()]
+                cit_raw = row.get("citations") or ""
+                citations = [c.strip() for c in cit_raw.replace(";", ",").split(",") if c.strip()]
+                top_raw = row.get("key_topics") or ""
+                topics = [t.strip() for t in top_raw.replace(";", ",").split(",") if t.strip()]
+                char_c = int(row["char_count"]) if row.get("char_count", "").strip().isdigit() else 0
+                summary = row.get("summary") or ""
+                sections_list.append({
+                    "id": sec_id,
+                    "section_number": sec_num,
+                    "section_name": sec_name,
+                    "page_number": p_start,
+                    "end_page_number": p_end,
+                    "target_ifc_classes": ifc_classes,
+                    "citations": citations,
+                    "key_topics": topics,
+                    "char_count": char_c,
+                    "summary": summary,
+                    "text": row.get("text", ""),
+                })
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse CSV file: {exc}",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file format. Please upload a .json or .csv file.",
+        )
+
+    if not sections_list and not provided_tree:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid sections found in the uploaded file.",
+        )
+
+    if provided_tree:
+        tree = provided_tree
+        flat = sections_list
+    else:
+        tree, flat = build_smart_toc(sections_list)
+
+    # Ingest into Neo4j/Graph RAG
+    if graph_service:
+        try:
+            doc_title = getattr(doc, "name", None) or getattr(doc, "title", None) or f"Document {document_id}"
+            DocumentGraphService(graph_service).ingest_document_tree(
+                document_id, tree, flat, document_title=doc_title
+            )
+        except Exception as exc:
+            logger.warning("Graph RAG tree ingestion failed on import for doc %d: %s", document_id, exc)
+
+    response = DocumentSectionTreeResponse(
+        document_id=document_id,
+        tree=tree,
+        sections=[DocumentSection(**chunk) for chunk in flat],
+        enhanced=True,
+    )
+    # Persist the newly imported TOC in the DB (replacing the old one)
+    service.save_toc_tree(document_id, response.model_dump())
+    cache_key = f"section_tree:{document_id}"
     cache_service.set(cache_key, response.model_dump())
     return response
 

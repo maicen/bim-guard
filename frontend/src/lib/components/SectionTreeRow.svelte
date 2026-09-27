@@ -9,6 +9,7 @@
     selected,
     depth,
     query = "",
+    forceExpanded = null,
     onViewSource,
   }: {
     node: SectionTreeNode;
@@ -17,6 +18,8 @@
     depth: number;
     /** Already-trimmed/lowercased filter text, forces this row open while active. */
     query?: string;
+    /** Controlled expansion override (e.g. from Expand All / Collapse All buttons). */
+    forceExpanded?: boolean | null;
     /** When given, shows a "view in document" icon for nodes with a known page_number or bbox. */
     onViewSource?: (node: SectionTreeNode) => void;
   } = $props();
@@ -24,7 +27,14 @@
   // Top-level chapters open by default; deeper clauses stay collapsed until
   // the user expands them (or a filter match forces every branch open).
   let userExpanded = $state<boolean | null>(null);
-  const isExpanded = $derived(query !== "" || (userExpanded !== null ? userExpanded : depth === 0));
+  const isExpanded = $derived(
+    query !== "" ||
+      (forceExpanded !== null && forceExpanded !== undefined
+        ? forceExpanded
+        : userExpanded !== null
+          ? userExpanded
+          : depth === 0),
+  );
 
   function allLeafIds(n: SectionTreeNode): string[] {
     if (n.children.length === 0) return [n.id];
@@ -147,6 +157,6 @@
     {/if}
   </label>
   {#if node.children.length > 0 && isExpanded}
-    <SectionTree nodes={node.children} {selected} depth={depth + 1} {query} {onViewSource} />
+    <SectionTree nodes={node.children} {selected} depth={depth + 1} {query} {forceExpanded} {onViewSource} />
   {/if}
 </div>

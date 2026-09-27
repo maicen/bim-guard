@@ -1740,8 +1740,32 @@ export const documentsApi = {
     return handleResponse<DocumentSectionsResponse>(res);
   },
 
-  async getSectionsTree(id: number): Promise<DocumentSectionTreeResponse> {
-    const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree`);
+  async getSectionsTree(id: number, regenerate: boolean = false): Promise<DocumentSectionTreeResponse> {
+    const url = regenerate
+      ? `${API_BASE}/documents/${id}/sections-tree?regenerate=true`
+      : `${API_BASE}/documents/${id}/sections-tree`;
+    const res = await apiFetch(url);
+    return handleResponse<DocumentSectionTreeResponse>(res);
+  },
+
+  async regenerateSectionsTree(id: number): Promise<DocumentSectionTreeResponse> {
+    const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree/regenerate`, {
+      method: "POST",
+    });
+    return handleResponse<DocumentSectionTreeResponse>(res);
+  },
+
+  getExportSectionsTreeUrl(id: number, format: "json" | "csv" = "json"): string {
+    return `${API_BASE}/documents/${id}/sections-tree/export?format=${format}`;
+  },
+
+  async importSectionsTree(id: number, file: File): Promise<DocumentSectionTreeResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await apiFetch(`${API_BASE}/documents/${id}/sections-tree/import`, {
+      method: "POST",
+      body: formData,
+    });
     return handleResponse<DocumentSectionTreeResponse>(res);
   },
 

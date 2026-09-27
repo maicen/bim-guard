@@ -17,7 +17,51 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_HEADING_NUM_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)(?:[.)\s]+(.*))?$")
+_KEYWORD_HEADING_PATTERN = re.compile(
+    r"^(SECTION|Section|CHAPTER|Chapter|PART|Part|TABLE|Table|ARTICLE|Article|CLAUSE|Clause)\s+([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$",
+    re.IGNORECASE,
+)
+_DOTTED_HEADING_PATTERN = re.compile(
+    r"^(\d+(?:\.\d+)*(?:\([A-Za-z0-9]+\))?)(?:[:.)\s\-—]+(.*))?$"
+)
+_EXCEPTION_HEADING_PATTERN = re.compile(r"^Exceptions?[:\s]*$", re.IGNORECASE)
+
+
+def extract_heading_number_and_name(heading_text: str) -> tuple[str | None, str]:
+    """Extract standard section number and human-readable section title from a heading.
+
+    Handles building code formats:
+      - 'SECTION 1.1' -> ('1.1', 'SECTION 1.1')
+      - 'SECTION 1.2 DEFINITIONS' -> ('1.2', 'SECTION 1.2 — DEFINITIONS')
+      - 'CHAPTER 15: SIGNS' -> ('15', 'CHAPTER 15 — SIGNS')
+      - 'TABLE 2.7.7(1)' -> ('2.7.7(1)', 'TABLE 2.7.7(1)')
+      - '2.24.2 Aircraft hangar.' -> ('2.24.2', '2.24.2 — Aircraft hangar.')
+      - 'Exceptions:' -> (None, 'Exceptions')
+      - 'PREFACE' -> (None, 'PREFACE')
+    """
+    clean = " ".join((heading_text or "").split()).strip()
+    if not clean:
+        return None, ""
+
+    if _EXCEPTION_HEADING_PATTERN.match(clean):
+        return None, "Exceptions"
+
+    m_kw = _KEYWORD_HEADING_PATTERN.match(clean)
+    if m_kw:
+        kw = m_kw.group(1).upper()
+        ref = m_kw.group(2)
+        rest = (m_kw.group(3) or "").strip()
+        name = f"{kw} {ref}" + (f" — {rest}" if rest else "")
+        return ref, name
+
+    m_dot = _DOTTED_HEADING_PATTERN.match(clean)
+    if m_dot:
+        ref = m_dot.group(1)
+        rest = (m_dot.group(2) or "").strip()
+        name = f"{ref}" + (f" — {rest}" if rest else "")
+        return ref, name
+
+    return None, clean
 
 
 def parse_otsl_table(table_elem: ET.Element) -> tuple[list[list[str]], str]:
@@ -260,13 +304,7 @@ class DocLangChunker:
                     level = 1
 
                 # Detect section number and name
-                match = _HEADING_NUM_PATTERN.match(heading_text)
-                if match:
-                    sec_num = match.group(1)
-                    sec_name = (match.group(2) or "").strip() or heading_text
-                else:
-                    sec_num = None
-                    sec_name = heading_text
+                sec_num, sec_name = extract_heading_number_and_name(heading_text)
 
                 # Update hierarchy
                 level_map[level] = sec_num or heading_text

@@ -23,6 +23,7 @@
     ArrowDown,
     Download,
     AlertTriangle,
+    RefreshCw,
   } from "lucide-svelte";
   import { documentsApi, ruleExtractionApi, llmProvidersApi, bsddApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -92,6 +93,54 @@
 
   function clearSectionSelection() {
     selectedSectionKeys.clear();
+  }
+
+  let isRegeneratingToc = $state(false);
+  let isExportMenuOpen = $state(false);
+  let isImportingToc = $state(false);
+
+  async function handleRegenerateToc() {
+    if (!selectedDocId || isRegeneratingToc) return;
+    isRegeneratingToc = true;
+    try {
+      toasts.info("Regenerating document outline & Smart TOC…");
+      const res = await documentsApi.regenerateSectionsTree(selectedDocId);
+      docSections = res.sections;
+      sectionTree = res.tree;
+      sectionsEnhanced = res.enhanced;
+      toasts.success("Table of Contents regenerated and persisted in DB.");
+    } catch (err: any) {
+      toasts.error(err?.message || "Failed to regenerate Table of Contents.");
+    } finally {
+      isRegeneratingToc = false;
+    }
+  }
+
+  function handleExportToc(format: "json" | "csv") {
+    if (!selectedDocId) return;
+    const url = documentsApi.getExportSectionsTreeUrl(selectedDocId, format);
+    window.open(url, "_blank");
+    isExportMenuOpen = false;
+  }
+
+  async function handleImportTocFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !selectedDocId) return;
+    isImportingToc = true;
+    try {
+      toasts.info(`Importing TOC from "${file.name}"…`);
+      const res = await documentsApi.importSectionsTree(selectedDocId, file);
+      docSections = res.sections;
+      sectionTree = res.tree;
+      sectionsEnhanced = res.enhanced;
+      toasts.success(`Successfully imported TOC (${res.sections.length} clauses).`);
+    } catch (err: any) {
+      toasts.error(err?.message || "Failed to import TOC.");
+    } finally {
+      isImportingToc = false;
+      input.value = "";
+    }
   }
 
   $effect(() => {
@@ -908,31 +957,119 @@
       <div
         role="group"
         aria-labelledby="rule-section-scope-label"
-        class="space-y-2 rounded-xl border border-border-default bg-surface-canvas/60 p-4"
+        class="space-y-3 rounded-xl border border-border-default bg-surface-canvas/60 p-4 shadow-xs"
       >
-        <div class="flex items-center justify-between gap-3">
-          <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-fg-muted">
-            Optionally Scope Extraction to a Section / Paragraph
-          </span>
-          <div class="flex shrink-0 items-center gap-3 text-micro font-semibold text-accent">
-            <button type="button" onclick={selectAllSections} class="hover:underline">
-              Select all
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="space-y-0.5">
+            <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+              Document Outline & Extraction Scope
+            </span>
+            <p class="text-micro text-fg-muted">
+              {docSections.length} clause{docSections.length === 1 ? "" : "s"} detected in Smart TOC.
+              {#if selectedSectionKeys.size > 0}
+                <span class="font-semibold text-accent">({selectedSectionKeys.size} scoped)</span>
+              {:else}
+                <span>Leave all unselected to process the whole document.</span>
+              {/if}
+              {#if sectionsEnhanced}
+                <span class="ml-1 inline-flex items-center gap-1 text-accent font-medium">
+                  <Sparkles class="h-3 w-3" /> AI-arranged
+                </span>
+              {/if}
+            </p>
+          </div>
+
+          <!-- Action Toolbar: Regenerate, Export, Import, Select all / Clear -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Regenerate TOC Button -->
+            <button
+              type="button"
+              disabled={isRegeneratingToc}
+              onclick={handleRegenerateToc}
+              class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50 transition-colors"
+              title="Re-extract and rebuild Smart TOC from DocLang XML, replacing the persisted DB record"
+            >
+              <RefreshCw class="h-3 w-3 {isRegeneratingToc ? 'animate-spin' : ''}" />
+              <span>{isRegeneratingToc ? "Regenerating…" : "Regenerate TOC"}</span>
             </button>
-            <button type="button" onclick={clearSectionSelection} class="hover:underline">
-              Clear
-            </button>
+
+            <!-- Export Dropdown -->
+            <div class="relative inline-block">
+              <button
+                type="button"
+                onclick={() => (isExportMenuOpen = !isExportMenuOpen)}
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors"
+                title="Export outline as JSON or CSV"
+              >
+                <Download class="h-3 w-3" />
+                <span>Export</span>
+                <ChevronDown class="h-3 w-3 text-fg-muted" />
+              </button>
+              {#if isExportMenuOpen}
+                <div
+                  class="absolute right-0 top-full z-20 mt-1 w-32 rounded-lg border border-border-default bg-surface-overlay p-1 shadow-lg backdrop-blur-md"
+                >
+                  <button
+                    type="button"
+                    onclick={() => handleExportToc("json")}
+                    class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-fg-primary text-left"
+                  >
+                    Export JSON
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => handleExportToc("csv")}
+                    class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-fg-primary text-left"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              {/if}
+            </div>
+
+            <!-- Import Button -->
+            <label
+              class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors {isImportingToc ? 'opacity-50 pointer-events-none' : ''}"
+              title="Import corrected TOC from JSON or CSV file"
+            >
+              <Upload class="h-3 w-3" />
+              <span>{isImportingToc ? "Importing…" : "Import"}</span>
+              <input
+                type="file"
+                accept=".json,.csv"
+                class="hidden"
+                onchange={handleImportTocFile}
+                disabled={isImportingToc}
+              />
+            </label>
+
+            <div class="h-3.5 w-px bg-border-default"></div>
+
+            <!-- Selection controls -->
+            <div class="flex items-center gap-2 text-micro font-semibold">
+              {#if selectedSectionKeys.size > 0}
+                <button
+                  type="button"
+                  onclick={clearSectionSelection}
+                  class="rounded bg-accent/15 px-2 py-0.5 text-accent hover:underline"
+                >
+                  Clear ({selectedSectionKeys.size})
+                </button>
+              {:else}
+                <button
+                  type="button"
+                  onclick={selectAllSections}
+                  class="text-accent hover:underline"
+                >
+                  Select all
+                </button>
+              {/if}
+            </div>
           </div>
         </div>
-        <p class="text-micro text-fg-muted">
-          {docSections.length} section{docSections.length === 1 ? "" : "s"} detected. Pick one or more
-          to scope the extraction, or leave all unselected to process the whole document.
-          {#if sectionsEnhanced}
-            <span class="ml-1 inline-flex items-center gap-1 text-accent">
-              <Sparkles class="h-3 w-3" /> AI-arranged
-            </span>
-          {/if}
-        </p>
-        <div class="max-h-64 overflow-y-auto pr-1">
+
+        <!-- Section Tree Container: enlarged from max-h-64 to max-h-[30rem] -->
+        <div class="max-h-[30rem] overflow-y-auto pr-1 rounded-lg border border-border-subtle bg-surface-canvas/40 p-2">
           <SectionTree
             nodes={sectionTree}
             selected={selectedSectionKeys}
@@ -942,9 +1079,6 @@
                 filename: documents.find((d) => d.id === selectedDocId)?.filename ?? "",
                 page_number: node.page_number ?? null,
                 bbox: node.bbox ?? null,
-                // Highlight the section's actual opening text (same snippet
-                // the backend resolved page_number from), not its AI-cleaned
-                // label -- the label may no longer appear verbatim in the PDF.
                 snippet:
                   docSections.find((s) => s.id === node.id)?.text?.slice(0, 250) ||
                   node.section_name ||

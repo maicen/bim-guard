@@ -78,6 +78,7 @@ class DocumentService:
                     "char_count": int,
                     "text_preview": str,
                     "element_bboxes": list,
+                    "toc_tree": dict,
                 },
             )
         )
@@ -516,6 +517,28 @@ class DocumentService:
         records = doc.get("element_bboxes") or []
         return [r for r in records if isinstance(r, dict) and r.get("element_id")]
 
+    def get_toc_tree(self, doc_or_id: int | dict) -> dict | None:
+        """Retrieve the persisted Smart Table of Contents (TOC) JSON from the database."""
+        if isinstance(doc_or_id, int):
+            doc = self.get_document(doc_or_id)
+        else:
+            doc = doc_or_id
+        if not doc:
+            return None
+        toc = doc.get("toc_tree")
+        if isinstance(toc, dict) and toc.get("tree"):
+            return toc
+        return None
+
+    def save_toc_tree(self, document_id: int, toc_data: dict) -> None:
+        """Persist or replace the Smart Table of Contents (TOC) JSON in the database."""
+        self._documents.update(
+            updates={"toc_tree": toc_data},
+            pk_values=document_id,
+        )
+        invalidate_cache(f"bimguard:documents:item:document_id={document_id}")
+        logger.info("Persisted TOC tree for document_id=%d in DB", document_id)
+
     def update_document(
         self,
         document_id: int,
@@ -580,6 +603,7 @@ class DocumentService:
             # feature (or a re-import with no fresh ids) doesn't keep stale
             # records pointing at ids that no longer exist in the new XML.
             updates["element_bboxes"] = element_bboxes or []
+            updates["toc_tree"] = None
 
             if doclang_archive_path is None and doclang_xml.strip():
                 try:
