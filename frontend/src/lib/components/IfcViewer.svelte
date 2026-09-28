@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { run } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
   import { Loader2, AlertCircle, RefreshCw, ClipboardList, LayoutGrid, ListTree, Copy } from "lucide-svelte";
@@ -165,11 +164,17 @@
       // before parsing any of it, then loads, selects and frames it, logging
       // each stage under [bimguard-3d]. Never throws -- a failed stage comes
       // back as a reason, so the spinner clears on one path either way.
+      const sources: { label: string; url: string }[] = [];
+      if (bcfArtifactId) {
+        sources.push({ label: `artifact:${bcfArtifactId}`, url: analyzeApi.getBcfArtifactUrl(bcfArtifactId) });
+      }
+      sources.push(
+        { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
+        { label: `export:${slug}`, url: analyzeApi.getExportUrl(id, slug, "bcf") },
+      );
+
       const result = await viewerAPI.loadBcfForElement(
-        [
-          { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
-          { label: `export:${slug}`, url: analyzeApi.getExportUrl(id, slug, "bcf") },
-        ],
+        sources,
         guid,
         authHeaders,
       );
@@ -198,7 +203,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-band-colors-2";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-bcf-resilience-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
 
       // The mount argument is deliberately both shapes at once: it IS the
@@ -289,9 +294,22 @@
 
       if (bcfArtifactId) {
         loadingMessage = "Loading BCF viewpoints...";
-        const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-        await viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
-        loadedBcfArtifactId = bcfArtifactId;
+        try {
+          const sources = [
+            { label: `artifact:${bcfArtifactId}`, url: analyzeApi.getBcfArtifactUrl(bcfArtifactId) },
+            { label: "latest", url: analyzeApi.getLatestBcfUrl(id) },
+          ];
+          await viewerAPI.loadBcf(sources, elementGuid, authHeaders);
+        } catch (bcfErr: any) {
+          console.warn("[bimguard-3d] Failed to load BCF viewpoints:", bcfErr);
+          if (elementGuid) {
+            await focusElement(id, elementGuid);
+          } else {
+            notFoundMessage = `BCF viewpoints could not be loaded for artifact #${bcfArtifactId}. Showing 3D model without viewpoints.`;
+          }
+        } finally {
+          loadedBcfArtifactId = bcfArtifactId;
+        }
       } else if (elementGuid) {
         await focusElement(id, elementGuid);
       }
@@ -335,21 +353,32 @@
     isInitialized = false;
   });
 
-  run(() => {
+  $effect(() => {
     if (viewerAPI && projectId && (projectId !== loadedProjectId || fileId !== loadedFileId)) {
       loadProjectModel(projectId, fileId);
     }
   });
 
-  run(() => {
+  $effect(() => {
     if (viewerAPI && bcfArtifactId && bcfArtifactId !== loadedBcfArtifactId && loadedProjectId) {
-      loadedBcfArtifactId = bcfArtifactId;
-      const bcfUrl = analyzeApi.getBcfArtifactUrl(bcfArtifactId);
-      viewerAPI.loadBcf(bcfUrl, elementGuid, authHeaders);
+      const targetBcfId = bcfArtifactId;
+      loadedBcfArtifactId = targetBcfId;
+      const sources = [
+        { label: `artifact:${targetBcfId}`, url: analyzeApi.getBcfArtifactUrl(targetBcfId) },
+        { label: "latest", url: analyzeApi.getLatestBcfUrl(loadedProjectId) },
+      ];
+      viewerAPI.loadBcf(sources, elementGuid, authHeaders).catch((bcfErr: any) => {
+        console.warn("[bimguard-3d] Failed to load BCF viewpoints overlay:", bcfErr);
+        if (elementGuid) {
+          focusElement(loadedProjectId!, elementGuid);
+        } else {
+          notFoundMessage = `BCF viewpoints could not be loaded for artifact #${targetBcfId}. Showing 3D model without viewpoints.`;
+        }
+      });
     }
   });
 
-  run(() => {
+  $effect(() => {
     // Only the standalone element deep link. With a bcfArtifactId the effect
     // above already loads that archive and selects from it.
     if (viewerAPI && elementGuid && !bcfArtifactId && loadedProjectId) {
@@ -359,14 +388,14 @@
 
   // Clearing the banner (or linking to a different element) re-arms the
   // lookup, so a retry after a failure is one click rather than a reload.
-  run(() => {
+  $effect(() => {
     if (!elementGuid) {
       notFoundMessage = null;
       focusAttempted = null;
     }
   });
 
-  run(() => {
+  $effect(() => {
     if (viewerAPI && viewerAPI.setTheme && $resolvedTheme) {
       viewerAPI.setTheme($resolvedTheme);
     }

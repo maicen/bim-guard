@@ -21,7 +21,7 @@ import { normalizeMounts, VIEWER_MOUNTS_API } from "./viewer-mounts.js?v=viewer-
 export { VIEWER_MOUNTS_API };
 
 /** Cache-busting token this file is published under; kept beside the API version. */
-export const VIEWER_ASSET_VERSION = "viewer-band-colors-2";
+export const VIEWER_ASSET_VERSION = "viewer-bcf-resilience-1";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -1464,12 +1464,34 @@ export async function initViewer(mounts) {
     async function loadBcf(urlOrFile, elementGuid, getHeaders, options = {}) {
         const { autoSelectTopic = true } = options;
         try {
-            const file = typeof urlOrFile === "string"
-                ? await fetchWithAuthRetry(urlOrFile, getHeaders).then(async (response) => {
-                    if (!response.ok) throw new Error(`BCF request failed (${response.status})`);
-                    return new File([await response.blob()], "report.bcf");
-                })
-                : urlOrFile;
+            let file = null;
+            if (urlOrFile instanceof File || (typeof Blob !== "undefined" && urlOrFile instanceof Blob)) {
+                file = urlOrFile;
+            } else if (Array.isArray(urlOrFile)) {
+                let buffer = null;
+                for (const item of urlOrFile) {
+                    const label = typeof item === "string" ? item : (item.label || item.url);
+                    const url = typeof item === "string" ? item : item.url;
+                    const t0 = performance.now();
+                    try {
+                        const response = await fetchWithAuthRetry(url, getHeaders);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        buffer = await response.arrayBuffer();
+                        console.info(`${LOG} bcf source=${label} bytes=${buffer.byteLength} ms=${since(t0)}`);
+                        break;
+                    } catch (err) {
+                        console.warn(`${LOG} bcf source fetch failed: ${label} ${err?.message || err}`);
+                    }
+                }
+                if (!buffer) throw new Error("No BCF archive could be loaded from candidate sources");
+                file = new File([buffer], "report.bcf");
+            } else if (typeof urlOrFile === "string") {
+                const response = await fetchWithAuthRetry(urlOrFile, getHeaders);
+                if (!response.ok) throw new Error(`BCF request failed (${response.status})`);
+                file = new File([await response.blob()], "report.bcf");
+            } else {
+                throw new Error("Invalid BCF source provided");
+            }
             const imported = await workspace.topics.load(new Uint8Array(await file.arrayBuffer()));
             const importedViewpoints = Array.from(imported.viewpoints);
             for (const viewpoint of importedViewpoints) viewpoint.world = world;
