@@ -843,7 +843,7 @@ class GraphRagService:
 
                 logger.info("Auto-ingesting primary IFC model into graph for project %d: %s", project_id, model_path)
                 model = ifcopenshell.open(str(model_path))
-                ingest_ifc_to_graph(model, self.graph_service, project_id=pid_str)
+                ingest_ifc_to_graph(model, self.graph_service, project_id=pid_str, bridge_classes=True)
                 logger.info("Auto-ingestion completed for project %d", project_id)
         except Exception as exc:
             logger.warning("Auto-ingesting IFC model failed for project %d: %s", project_id, exc)

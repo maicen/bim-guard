@@ -14,6 +14,7 @@ import re
 from typing import Any, Optional
 
 from app.logging_config import get_logger
+from app.services.embedding_service import EmbeddingService
 from app.services.graph_database import GraphService
 
 logger = get_logger(__name__)
@@ -22,9 +23,14 @@ logger = get_logger(__name__)
 class DocumentGraphService:
     """Service for managing document structure graphs and Graph RAG queries."""
 
-    def __init__(self, graph_service: Optional[GraphService] = None):
-        """Initialize with an optional GraphService instance."""
+    def __init__(
+        self,
+        graph_service: Optional[GraphService] = None,
+        embedding_service: Optional[EmbeddingService] = None,
+    ):
+        """Initialize with an optional GraphService and EmbeddingService instance."""
         self.graph_service = graph_service
+        self.embedding_service = embedding_service
 
     def is_available(self) -> bool:
         """Check if graph persistence provider is configured and available."""
@@ -37,6 +43,10 @@ class DocumentGraphService:
         flat: list[dict],
         *,
         document_title: str | None = None,
+        filename: str | None = None,
+        file_path: str | None = None,
+        project_id: int | str | None = None,
+        compute_embeddings: bool = True,
     ) -> dict[str, int]:
         """Ingest a Smart TOC tree into the graph database.
 
@@ -48,6 +58,10 @@ class DocumentGraphService:
             tree: Hierarchical section tree nodes.
             flat: Flat list of all section nodes with PageIndex enrichments.
             document_title: Optional human-readable document title.
+            filename: Optional original filename.
+            file_path: Optional storage object path.
+            project_id: Optional project identifier for multi-tenant scoping.
+            compute_embeddings: Whether to compute dense vector embeddings for sections.
 
         Returns:
             Dictionary with ingested node and edge counts.
@@ -59,15 +73,20 @@ class DocumentGraphService:
         assert self.graph_service is not None
 
         doc_node_id = f"doc_{document_id}"
-        # 1. Ensure Document node exists
-        self.graph_service.add_node(
-            "Document",
-            {
-                "id": doc_node_id,
-                "document_id": document_id,
-                "title": document_title or f"Document {document_id}",
-            },
-        )
+        # 1. Ensure Document node exists with comprehensive metadata
+        doc_props: dict[str, Any] = {
+            "id": doc_node_id,
+            "document_id": document_id,
+            "title": document_title or f"Document {document_id}",
+            "filename": filename or "",
+            "file_path": file_path or "",
+            "total_sections": len(flat),
+            "chunk_count": len(flat),
+        }
+        if project_id is not None:
+            doc_props["project_id"] = str(project_id)
+
+        self.graph_service.add_node("Document", doc_props)
 
         node_count = 1
         edge_count = 0
@@ -83,11 +102,25 @@ class DocumentGraphService:
                 if norm_num and norm_num != num:
                     number_to_id[norm_num] = item["id"]
 
+        # Compute dense vector embeddings for sections in batch if enabled
+        embeddings: list[list[float]] | None = None
+        if compute_embeddings:
+            emb_svc = self.embedding_service or EmbeddingService()
+            texts_to_embed = [
+                f"{item.get('section_number', '')} {item.get('section_name', '')}: {item.get('summary', '')}".strip()
+                for item in flat
+            ]
+            try:
+                embeddings = emb_svc.get_embeddings_batch_sync(texts_to_embed)
+            except Exception as emb_err:
+                logger.warning("Failed computing section embeddings for doc %d: %s", document_id, emb_err)
+                embeddings = None
+
         # 2. Ingest DocumentSection nodes
         section_nodes_batch: list[dict[str, Any]] = []
         ifc_classes_seen: set[str] = set()
 
-        for item in flat:
+        for idx, item in enumerate(flat):
             sec_id = f"doc_{document_id}_{item['id']}"
             props = {
                 "id": sec_id,
@@ -101,6 +134,11 @@ class DocumentGraphService:
                 "char_count": item.get("char_count") or 0,
                 "node_type": item.get("node_type") or "section",
             }
+            if project_id is not None:
+                props["project_id"] = str(project_id)
+            if embeddings and idx < len(embeddings):
+                props["embedding"] = embeddings[idx]
+
             section_nodes_batch.append(props)
             node_count += 1
 
@@ -112,7 +150,7 @@ class DocumentGraphService:
 
         # Ingest IFC class nodes
         if ifc_classes_seen:
-            ifc_nodes = [{"id": cls_name, "class_name": cls_name} for cls_name in ifc_classes_seen]
+            ifc_nodes = [{"id": cls_name, "class_name": cls_name, "name": cls_name} for cls_name in ifc_classes_seen]
             self.graph_service.add_nodes_batch("IfcClass", ifc_nodes)
             node_count += len(ifc_nodes)
 

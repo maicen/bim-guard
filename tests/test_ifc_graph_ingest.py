@@ -167,6 +167,23 @@ def test_ingest_ifc_to_graph_batches():
     assert "HASMATERIAL" in provider.edges_by_type
 
 
+def test_ingest_ifc_to_graph_with_class_bridging():
+    model = MockIfcModel()
+    provider = InMemoryGraphProvider()
+    service = GraphService(provider=provider)
+
+    stats = ingest_ifc_to_graph(model, service, project_id="P123", bridge_classes=True)
+
+    # Elements (7) + IfcClass nodes (5: IfcProject, IfcSite, IfcBuildingStorey, IfcWall, IfcPipeSegment)
+    assert stats["nodes"] == 12
+    assert "IfcClass" in provider.nodes_by_label
+    assert "INSTANCE_OF" in provider.edges_by_type
+    # Verify that walls have INSTANCE_OF edges pointing to IfcWall
+    wall_instances = [e for e in provider.edges_by_type["INSTANCE_OF"] if e["target_id"] == "IfcWall"]
+    assert len(wall_instances) == 2
+
+
+
 def test_render_ifc_graph_returns_summary(monkeypatch):
     mock_open = MagicMock(return_value=MockIfcModel())
     monkeypatch.setattr("ifcopenshell.open", mock_open)

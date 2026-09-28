@@ -30,8 +30,8 @@ logger = get_logger(__name__)
 
 
 class BIMGuard_App:
-    """
-    Application-level orchestrator used by the web routes.
+    """Application-level orchestrator used by the web routes.
+
     Provides orchestrate_workflow() for full IFC + compliance analysis.
     """
 
@@ -68,8 +68,8 @@ class BIMGuard_App:
         enable_arch_engines: bool = False,
         enable_graph: bool = False,
     ) -> dict:
-        """
-        Run the full analysis pipeline for a project:
+        """Run the full analysis pipeline for a project.
+
         1. Load project + documents from DB
         2. Load and parse the IFC file once (or use synthetic demo data)
         3. Run architectural compliance checks
@@ -194,6 +194,19 @@ class BIMGuard_App:
                 project_id,
                 log_progress,
             )
+
+        # Persist compliance verdicts and causal lineage into graph database if wired
+        if self._graph_service is not None and theme_result.get("audit_issues"):
+            try:
+                from app.services.compliance_decision_graph import ingest_compliance_verdicts
+
+                ingest_compliance_verdicts(
+                    self._graph_service,
+                    str(project_id),
+                    theme_result["audit_issues"],
+                )
+            except Exception as graph_verdict_exc:
+                logger.debug("Failed saving compliance decision graph for project %d: %s", project_id, graph_verdict_exc)
 
         if selected_theme == "MEP":
             ifc_element_count = len(ifc["elements"])
@@ -742,6 +755,7 @@ class BIMGuard_App:
                             m2_reader.ifc_file,
                             graph_service,
                             project_id=str(project_id),
+                            bridge_classes=True,
                             graph=graph,
                         )
                         track_emit(

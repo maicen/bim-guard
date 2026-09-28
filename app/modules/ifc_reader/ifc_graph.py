@@ -31,7 +31,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _SPATIAL_TYPES = {"IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcSpace"}
-_EDGE_PRIORITY = {"ContainedIn": 0, "Aggregates": 1, "Connects": 2, "HasMaterial": 3}
+_EDGE_PRIORITY = {
+    "ContainedIn": 0,
+    "Aggregates": 1,
+    "Connects": 2,
+    "HasMaterial": 3,
+    "HasVoid": 4,
+    "FilledBy": 5,
+    "HostedIn": 6,
+    "BoundedBy": 7,
+}
 
 
 def _safe_label(entity: Any) -> str:
@@ -146,6 +155,58 @@ def build_ifc_graph(model: Any) -> nx.DiGraph:
                     rel_type="HasMaterial",
                     color="#9C27B0",
                 )
+
+    # Voids: (:BuildingElement)-[:HasVoid]->(:OpeningElement)
+    for rel in model.by_type("IfcRelVoidsElement"):
+        host = getattr(rel, "RelatingBuildingElement", None)
+        opening = getattr(rel, "RelatedOpeningElement", None)
+        host_guid = getattr(host, "GlobalId", None)
+        opening_guid = getattr(opening, "GlobalId", None)
+        if host_guid and opening_guid and host_guid in graph and opening_guid in graph:
+            graph.add_edge(
+                host_guid,
+                opening_guid,
+                rel_type="HasVoid",
+                color="#795548",
+            )
+
+    # Fills: (:OpeningElement)-[:FilledBy]->(:BuildingElement)
+    # Also add direct shortcut: (:BuildingElement)-[:HostedIn]->(:BuildingElement)
+    for rel in model.by_type("IfcRelFillsElement"):
+        opening = getattr(rel, "RelatingOpeningElement", None)
+        filling = getattr(rel, "RelatedBuildingElement", None)
+        opening_guid = getattr(opening, "GlobalId", None)
+        filling_guid = getattr(filling, "GlobalId", None)
+        if opening_guid and filling_guid and opening_guid in graph and filling_guid in graph:
+            graph.add_edge(
+                opening_guid,
+                filling_guid,
+                rel_type="FilledBy",
+                color="#00BCD4",
+            )
+            # Find the host building element (wall/slab) of the opening
+            for host_guid in list(graph.predecessors(opening_guid)):
+                if graph.edges[host_guid, opening_guid].get("rel_type") == "HasVoid":
+                    graph.add_edge(
+                        filling_guid,
+                        host_guid,
+                        rel_type="HostedIn",
+                        color="#673AB7",
+                    )
+
+    # Space boundaries: (:Space)-[:BoundedBy]->(:BuildingElement)
+    for rel in model.by_type("IfcRelSpaceBoundary"):
+        space = getattr(rel, "RelatingSpace", None)
+        element = getattr(rel, "RelatedBuildingElement", None)
+        space_guid = getattr(space, "GlobalId", None)
+        element_guid = getattr(element, "GlobalId", None)
+        if space_guid and element_guid and space_guid in graph and element_guid in graph:
+            graph.add_edge(
+                space_guid,
+                element_guid,
+                rel_type="BoundedBy",
+                color="#E91E63",
+            )
 
     return graph
 
@@ -351,6 +412,7 @@ def ingest_ifc_to_graph(
     project_id: str | None = None,
     include_psets: bool = False,
     reify_psets: bool = False,
+    bridge_classes: bool = False,
     graph: nx.DiGraph | None = None,
 ) -> dict[str, int]:
     """Extract IFC entities and relationships and ingest them in batch into GraphService.
@@ -361,6 +423,8 @@ def ingest_ifc_to_graph(
         project_id: Optional project identifier to associate with all ingested nodes.
         include_psets: Whether to flatten and attach property set values to element nodes.
         reify_psets: Whether to create explicit PropertySet nodes and HAS_PROPERTY_SET edges.
+        bridge_classes: Whether to create IfcClass nodes and INSTANCE_OF edges to bridge
+            physical model entities with regulatory document specifications.
         graph: An already-built graph for ``model_or_path`` (from
             ``build_ifc_graph``), reused instead of building a second one.
 
@@ -451,12 +515,47 @@ def ingest_ifc_to_graph(
         graph_service.add_nodes_batch(label, nodes)
         total_nodes += len(nodes)
 
+    # Bridge: Connect each physical entity to an IfcClass node for GraphRAG cross-domain queries
+    if bridge_classes:
+        ifc_classes_needed: set[str] = set()
+        instance_of_edges: list[dict[str, Any]] = []
+        for node_id, attrs in graph.nodes(data=True):
+            itype = attrs.get("ifc_type")
+            if itype and itype != "IfcMaterial" and not itype.startswith("PropertySet"):
+                ifc_classes_needed.add(itype)
+                instance_of_edges.append(
+                    {
+                        "source_id": node_id,
+                        "target_id": itype,
+                        "properties": {"project_id": project_id} if project_id else {},
+                    }
+                )
+
+        if ifc_classes_needed:
+            ifc_class_batch = [{"id": cls, "class_name": cls, "name": cls} for cls in ifc_classes_needed]
+            graph_service.add_nodes_batch("IfcClass", ifc_class_batch)
+            total_nodes += len(ifc_class_batch)
+
+        if instance_of_edges:
+            edges_by_type["INSTANCE_OF"].extend(instance_of_edges)
+
     # Group graph edges by rel_type
     for source_id, target_id, attrs in graph.edges(data=True):
         rel_type = attrs.get("rel_type", "CONNECTS").upper()
         # Normalise relationship names to standard Cypher convention
         if rel_type == "CONTAINEDIN":
             rel_type = "CONTAINS"
+        elif rel_type == "HASVOID":
+            rel_type = "HAS_VOID"
+        elif rel_type == "FILLEDBY":
+            rel_type = "FILLED_BY"
+        elif rel_type == "HOSTEDIN":
+            rel_type = "HOSTED_IN"
+        elif rel_type == "BOUNDEDBY":
+            rel_type = "BOUNDED_BY"
+        elif rel_type == "HASMATERIAL":
+            rel_type = "HASMATERIAL"
+
         edges_by_type[rel_type].append(
             {
                 "source_id": source_id,

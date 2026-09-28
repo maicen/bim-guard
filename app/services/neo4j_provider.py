@@ -208,12 +208,13 @@ class Neo4jDatabaseProvider:
             self._node_label_by_id[props[pk]] = label
             prepared_batch.append(props)
 
-        # Add secondary IfcProduct label if this is an IFC entity
-        secondary_label = ":IfcProduct" if (label.startswith("Ifc") and label != "IfcProduct") else ""
+        # Add secondary IfcProduct label if this is an IFC entity (excluding IfcClass)
+        secondary_label = ":IfcProduct" if (label.startswith("Ifc") and label not in ("IfcProduct", "IfcClass")) else ""
+        set_clause = f"SET n{secondary_label}, n += item" if secondary_label else "SET n += item"
         query = (
             f"UNWIND $batch AS item "
             f"MERGE (n:{label} {{{pk}: item.{pk}}}) "
-            f"SET n{secondary_label}, n += item"
+            f"{set_clause}"
         )
         self.execute_query(query, {"batch": prepared_batch})
 

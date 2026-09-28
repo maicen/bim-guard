@@ -66,7 +66,7 @@ def _run_background_ingest(path: str, graph_service: GraphService, project_id: s
         import ifcopenshell
 
         model = ifcopenshell.open(path)
-        stats = ingest_ifc_to_graph(model, graph_service, project_id=project_id)
+        stats = ingest_ifc_to_graph(model, graph_service, project_id=project_id, bridge_classes=True)
         logger.info("Background graph ingestion succeeded for project %s: %s", project_id, stats)
     except Exception as exc:
         logger.error("Background graph ingestion failed for project %s: %s", project_id, exc, exc_info=True)
@@ -106,7 +106,7 @@ async def ingest_project_graph(
         import ifcopenshell
 
         model = ifcopenshell.open(str(path))
-        ingest_stats = ingest_ifc_to_graph(model, graph_service, project_id=str(project_id))
+        ingest_stats = ingest_ifc_to_graph(model, graph_service, project_id=str(project_id), bridge_classes=True)
         graph = build_ifc_graph(model)
         summary = build_ifc_graph_summary(graph)
 

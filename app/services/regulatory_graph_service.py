@@ -62,12 +62,19 @@ _CURATED_STANDARDS_MAP: dict[str, dict[str, Any]] = {
 _CROSS_REF_RE = re.compile(r"\b(?:Section|Clause|Item)\s+([\w\.\-]+)", re.IGNORECASE)
 
 
+def _get_rule_attr(rule: Any, key: str, default: Any = None) -> Any:
+    """Retrieve attribute from either a Pydantic model/class or a plain dict."""
+    if isinstance(rule, dict):
+        return rule.get(key, default)
+    return getattr(rule, key, default)
+
+
 def _resolve_standard_and_clause(rule: Any) -> tuple[str, str]:
     """Resolve standard name and clause string from rule fields."""
-    std = getattr(rule, "standard", None) or getattr(rule, "ruleset_id", None)
-    rule_id_str = str(getattr(rule, "rule_id", "") or "")
-    if std and std.strip():
-        standard = std.strip()
+    std = _get_rule_attr(rule, "standard") or _get_rule_attr(rule, "ruleset_id")
+    rule_id_str = str(_get_rule_attr(rule, "rule_id", "") or _get_rule_attr(rule, "id", "") or "")
+    if std and str(std).strip():
+        standard = str(std).strip()
     elif rule_id_str.startswith("IBC"):
         standard = "IBC 2024"
     elif rule_id_str.startswith("NFPA"):
@@ -79,8 +86,13 @@ def _resolve_standard_and_clause(rule: Any) -> tuple[str, str]:
     else:
         standard = "IBC 2024"
 
-    clause = getattr(rule, "clause", None) or getattr(rule, "code", None) or rule_id_str or f"Rule_{getattr(rule, 'id', '')}"
-    return standard, clause
+    clause = (
+        _get_rule_attr(rule, "clause")
+        or _get_rule_attr(rule, "code")
+        or rule_id_str
+        or f"Rule_{_get_rule_attr(rule, 'id', '')}"
+    )
+    return standard, str(clause)
 
 
 class RegulatoryGraphService:
@@ -110,28 +122,28 @@ class RegulatoryGraphService:
         clean_type = ifc_type.strip()
 
         for rule in all_rules:
-            target = getattr(rule, "target_ifc_class", "") or ""
+            target = _get_rule_attr(rule, "target_ifc_class", "") or ""
             target_types = [t.strip() for t in target.split(",") if t.strip()]
 
             if clean_type in target_types or clean_type.lower() == target.lower():
                 std, clause = _resolve_standard_and_clause(rule)
                 standards_set.add(std)
 
-                param = getattr(rule, "property_name", None) or getattr(rule, "parameter", None) or "ComplianceCriteria"
-                val = getattr(rule, "check_value", None) or getattr(rule, "value", None) or getattr(rule, "value_min", "")
-                desc = getattr(rule, "description", None) or getattr(rule, "name", "") or ""
+                param = _get_rule_attr(rule, "property_name") or _get_rule_attr(rule, "parameter") or "ComplianceCriteria"
+                val = _get_rule_attr(rule, "check_value") or _get_rule_attr(rule, "value") or _get_rule_attr(rule, "value_min", "")
+                desc = _get_rule_attr(rule, "description") or _get_rule_attr(rule, "name", "") or ""
 
                 matching_items.append(
                     RegulatoryRequirementItem(
-                        rule_id=getattr(rule, "id", None),
+                        rule_id=_get_rule_attr(rule, "id"),
                         standard=std,
                         clause=clause,
                         target_ifc_type=clean_type,
                         parameter=param,
-                        operator=getattr(rule, "operator", "==") or "==",
+                        operator=_get_rule_attr(rule, "operator", "==") or "==",
                         value=val,
-                        unit=getattr(rule, "unit", None),
-                        severity=getattr(rule, "severity", "critical") or "critical",
+                        unit=_get_rule_attr(rule, "unit"),
+                        severity=_get_rule_attr(rule, "severity", "critical") or "critical",
                         description=desc,
                     )
                 )
@@ -157,11 +169,11 @@ class RegulatoryGraphService:
         clean_ref = clause_ref.strip()
 
         for rule in all_rules:
-            ref = str(getattr(rule, "reference", "") or "").strip()
-            clause = str(getattr(rule, "clause", "") or "").strip()
-            code = str(getattr(rule, "code", "") or "").strip()
-            rule_id_str = str(getattr(rule, "rule_id", "") or "").strip()
-            desc = str(getattr(rule, "description", "") or "").strip()
+            ref = str(_get_rule_attr(rule, "reference", "") or "").strip()
+            clause = str(_get_rule_attr(rule, "clause", "") or "").strip()
+            code = str(_get_rule_attr(rule, "code", "") or "").strip()
+            rule_id_str = str(_get_rule_attr(rule, "rule_id", "") or "").strip()
+            desc = str(_get_rule_attr(rule, "description", "") or "").strip()
             if (
                 clean_ref in (ref, clause, code, rule_id_str)
                 or (clean_ref.lower() in ref.lower())
@@ -171,15 +183,15 @@ class RegulatoryGraphService:
                 matched_rule = rule
                 break
 
-        standard = getattr(matched_rule, "standard", "IBC 2024") if matched_rule else "IBC 2024"
-        clause_id = getattr(matched_rule, "clause", clean_ref) if matched_rule else clean_ref
+        standard = _get_rule_attr(matched_rule, "standard", "IBC 2024") if matched_rule else "IBC 2024"
+        clause_id = _get_rule_attr(matched_rule, "clause", clean_ref) if matched_rule else clean_ref
         title = (
-            getattr(matched_rule, "name", f"Regulatory Requirement {clean_ref}")
+            _get_rule_attr(matched_rule, "name", f"Regulatory Requirement {clean_ref}")
             if matched_rule
             else f"Requirement {clean_ref}"
         )
-        text = getattr(matched_rule, "description", "") if matched_rule else ""
-        target_ifc = getattr(matched_rule, "target_ifc_class", "IfcProduct") if matched_rule else "IfcProduct"
+        text = _get_rule_attr(matched_rule, "description", "") if matched_rule else ""
+        target_ifc = _get_rule_attr(matched_rule, "target_ifc_class", "IfcProduct") if matched_rule else "IfcProduct"
         target_types = [t.strip() for t in target_ifc.split(",") if t.strip()]
 
         # Extract cross-references mentioned in the rule description
@@ -207,15 +219,15 @@ class RegulatoryGraphService:
         if matched_rule:
             extracted_reqs.append(
                 RegulatoryRequirementItem(
-                    rule_id=getattr(matched_rule, "id", None),
+                    rule_id=_get_rule_attr(matched_rule, "id"),
                     standard=standard,
                     clause=clause_id,
                     target_ifc_type=target_types[0] if target_types else "IfcProduct",
-                    parameter=getattr(matched_rule, "parameter", "") or "ComplianceCheck",
-                    operator=getattr(matched_rule, "operator", "==") or "==",
-                    value=getattr(matched_rule, "value", ""),
-                    unit=getattr(matched_rule, "unit", None),
-                    severity=getattr(matched_rule, "severity", "critical") or "critical",
+                    parameter=_get_rule_attr(matched_rule, "parameter", "") or "ComplianceCheck",
+                    operator=_get_rule_attr(matched_rule, "operator", "==") or "==",
+                    value=_get_rule_attr(matched_rule, "value", ""),
+                    unit=_get_rule_attr(matched_rule, "unit"),
+                    severity=_get_rule_attr(matched_rule, "severity", "critical") or "critical",
                     description=text,
                 )
             )
@@ -273,7 +285,7 @@ class RegulatoryGraphService:
         applies_to_edges: list[dict[str, Any]] = []
 
         for rule in all_rules:
-            std_name = getattr(rule, "standard", "IBC 2024") or "IBC 2024"
+            std_name = _get_rule_attr(rule, "standard", "IBC 2024") or "IBC 2024"
             std_id = f"STD_{std_name.replace(' ', '_')}"
             standards_nodes[std_id] = {
                 "id": std_id,
@@ -281,8 +293,9 @@ class RegulatoryGraphService:
                 "title": _CURATED_STANDARDS_MAP.get(std_name, {}).get("title", std_name),
             }
 
-            clause_str = getattr(rule, "clause", "") or getattr(rule, "code", "") or f"Rule_{rule.id}"
-            parts = clause_str.split(".")
+            rule_id = _get_rule_attr(rule, "id", "")
+            clause_str = _get_rule_attr(rule, "clause", "") or _get_rule_attr(rule, "code", "") or f"Rule_{rule_id}"
+            parts = str(clause_str).split(".")
             sec_num = parts[0] if parts else "General"
             sec_id = f"SEC_{std_id}_{sec_num}"
 
@@ -297,28 +310,28 @@ class RegulatoryGraphService:
             clause_id = f"CLS_{std_id}_{clause_str}"
             clause_nodes[clause_id] = {
                 "id": clause_id,
-                "clause_id": clause_str,
+                "clause_id": str(clause_str),
                 "standard": std_name,
-                "title": getattr(rule, "name", ""),
-                "description": getattr(rule, "description", ""),
+                "title": _get_rule_attr(rule, "name", ""),
+                "description": _get_rule_attr(rule, "description", ""),
             }
             contains_clause_edges.append({"source_id": sec_id, "target_id": clause_id})
 
-            req_id = f"REQ_{rule.id}"
+            req_id = f"REQ_{rule_id}"
             requirement_nodes[req_id] = {
                 "id": req_id,
-                "rule_id": rule.id,
-                "parameter": getattr(rule, "parameter", "") or "",
-                "operator": getattr(rule, "operator", "") or "",
-                "value": str(getattr(rule, "value", "")),
-                "severity": getattr(rule, "severity", "critical") or "critical",
+                "rule_id": rule_id,
+                "parameter": _get_rule_attr(rule, "parameter", "") or "",
+                "operator": _get_rule_attr(rule, "operator", "") or "",
+                "value": str(_get_rule_attr(rule, "value", "")),
+                "severity": _get_rule_attr(rule, "severity", "critical") or "critical",
             }
             mandates_edges.append({"source_id": clause_id, "target_id": req_id})
 
-            target_class = getattr(rule, "target_ifc_class", "") or "IfcProduct"
-            for tc in [t.strip() for t in target_class.split(",") if t.strip()]:
-                class_id = f"IFC_{tc}"
-                ifc_class_nodes[class_id] = {"id": class_id, "name": tc}
+            target_class = _get_rule_attr(rule, "target_ifc_class", "") or "IfcProduct"
+            for tc in [t.strip() for t in str(target_class).split(",") if t.strip()]:
+                class_id = tc
+                ifc_class_nodes[class_id] = {"id": class_id, "class_name": tc, "name": tc}
                 applies_to_edges.append({"source_id": req_id, "target_id": class_id})
 
         # Batch write nodes

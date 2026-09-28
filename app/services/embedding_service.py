@@ -103,6 +103,32 @@ class EmbeddingService:
 
         return [r or [0.0] * self.dimension for r in results]
 
+    def get_embeddings_batch_sync(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings synchronously for a batch of text strings."""
+        if not texts:
+            return []
+
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(lambda: asyncio.run(self.get_embeddings_batch(texts)))
+                    return future.result(timeout=60.0)
+            else:
+                return asyncio.run(self.get_embeddings_batch(texts))
+        except Exception as exc:
+            logger.warning(
+                "Synchronous embedding generation failed (using deterministic pseudo-vectors): %s",
+                exc,
+            )
+            return [self._generate_fallback_vector(t) for t in texts]
+
     async def _call_embedding_provider(self, texts: list[str]) -> list[list[float]]:
         """Call litellm.aembedding."""
         try:
