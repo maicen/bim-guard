@@ -145,12 +145,14 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       LOGFLARE_API_KEY: ""
+      HOSTNAME: "0.0.0.0"
     depends_on:
       meta:
         condition: service_started
 
 volumes:
   supabase-db-data:
-    name: supabase-db-data
+    external: true
   supabase-storage-data:
-    name: supabase-storage-data
+    external: true
+
