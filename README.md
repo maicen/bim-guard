@@ -138,17 +138,12 @@ Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 
 Supabase schema changes are now tracked in-repo under `supabase/migrations/`. For a fresh Supabase environment, apply the migrations in that folder instead of relying on runtime table creation.
 
-### 2b. (Optional) Local Database & Storage instead of the hosted project
+### 2b. Database & Storage Architecture (Self-Hosted Production & Dev Options)
 
-By default `.env` points at the team's shared hosted Supabase project for both Postgres and file storage — this is also what production always uses. To develop against a disposable local database and local file storage instead:
-
-```bash
-supabase start
-```
-
-This boots a full local stack in Docker (Postgres, Auth, Storage, Studio) and replays every file in `supabase/migrations/` against it, so you get the real schema — including the Arch-only `CHECK` constraints — locally. Copy the `SUPABASE_*` values from [`example.env.local`](example.env.local) into your `.env` — these are `supabase start`'s fixed local demo keys, already filled in — and the matching `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` into `frontend/.env` per `frontend/.env.example`. `supabase stop` tears it down; `supabase db reset` wipes and replays migrations for a clean slate.
-
-If you also run `docker compose up` locally (for `neo4j`/`docling-serve`/`opencde`), see `docker-compose.override.yml` — `opencde` needs `OPENCDE_SUPABASE_URL=http://host.docker.internal:54321` to reach a local Supabase stack from inside the container network.
+The platform runs a self-hosted Supabase Docker Compose stack (`docker/supabase/docker-compose.yml`) integrated directly into production via `docker-compose.yml`:
+- **Production Host**: Database (PostgreSQL 17 on `54322`), Kong Gateway (`54321` host / `8000` internal), Auth, Storage, and Studio (`54323`).
+- **Dev-Only Hosted Supabase**: The team's remote hosted Supabase project is preserved exclusively for development and staging tests. To point your local development environment at the hosted project instead of the local Docker stack, copy the credentials from `.env.hosted_dev`.
+- **Disposable CLI Stack**: Alternatively, `supabase start` boots a lightweight temporary local stack using the Supabase CLI. Copy values from [`example.env.local`](example.env.local) if using this path.
 
 ### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
 

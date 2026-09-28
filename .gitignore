@@ -11,7 +11,13 @@ site/
 
 # Environment variables (contains secrets — never commit)
 .env
-.env.local
+.env.*
+!.env.example
+docker/supabase/.env
+!docker/supabase/.env.example
+
+# Migration dumps, auth exports, and storage artifacts (sensitive & heavy — never commit)
+data/migration/
 
 # Virtual environments
 .venv

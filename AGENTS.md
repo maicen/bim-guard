@@ -47,23 +47,30 @@ The platform is served in production at `https://bim-guard.xyz` via **OrbStack /
 
 2. **Container services in `docker-compose.yml`**:
    - **`bim-guard` (`bim-guard-app`)**: Production 4-worker FastAPI gateway on port `8000` serving the compiled Svelte 5 SPA from `frontend/dist` and `/api` REST/SSE endpoints.
+   - **Self-Hosted Supabase (`docker/supabase/docker-compose.yml`)**: PostgreSQL 17 (`supabase-db` on `54322`), Kong Gateway (`supabase-kong` on `54321` host / `8000` internal), GoTrue Auth (`supabase-auth`), PostgREST (`supabase-rest`), Storage (`supabase-storage`), Studio (`supabase-studio` on `54323`), and Meta daemon (`supabase-meta`).
    - **`neo4j` (`bim-guard-neo4j`)**: Graph database on ports `7474` (HTTP) and `7687` (Bolt), health-checked before `bim-guard` initializes.
    - **`docling-serve` (`bim-guard-docling`)**: Self-hosted CPU Docling document parsing engine on port `5001` (starts by default; healthy before `bim-guard` starts).
    - **`opencde` (`bim-guard-opencde`)**: OpenCDE Documents API on port `8081` with Supabase JWT authentication parity.
-   - **`cloudflared` (`bim-guard-cloudflared`)**: Outbound encrypted tunnel to Cloudflare's edge under profile `tunnel`, routing `https://bim-guard.xyz` directly to `http://bim-guard:8000` without opening local ports.
+   - **`cloudflared` (`bim-guard-cloudflared`)**: Outbound encrypted tunnel to Cloudflare's edge under profile `tunnel`, routing `https://bim-guard.xyz` to `http://bim-guard:8000` and `https://supabase.bim-guard.xyz` to `http://kong:8000`.
 
 3. **Required `.env` configuration**:
    ```env
-   BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+   BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz,https://supabase.bim-guard.xyz
    TUNNEL_TOKEN=<cloudflare-zero-trust-tunnel-token>
    COMPOSE_PROFILES=tunnel
-   SUPABASE_JWKS_URL=${SUPABASE_URL}/auth/v1/.well-known/jwks.json
+   SUPABASE_URL=http://localhost:54321
+   SUPABASE_INTERNAL_URL=http://kong:8000
+   SUPABASE_JWKS_URL=http://localhost:54321/auth/v1/.well-known/jwks.json
+   SUPABASE_INTERNAL_JWKS_URL=http://kong:8000/auth/v1/.well-known/jwks.json
+   JWT_SECRET=<jwt_secret_hex>
+   PUBLIC_SUPABASE_URL=https://supabase.bim-guard.xyz
    DOCLING_LOCAL_URL=http://docling-serve:5001
    NEO4J_URI=bolt://neo4j:7687
    ```
 
 4. **Google OAuth & Public Endpoints**:
-   - **OAuth Consent Screen**: Google Cloud Console branding requires Authorized Domains: (1) `bim-guard.xyz` and (2) `supabase.co` (for Supabase callback `https://<ref>.supabase.co/auth/v1/callback`).
+   - **OAuth Consent Screen**: Google Cloud Console branding requires Authorized Domains: (1) `bim-guard.xyz` and (2) `supabase.co` (for hosted dev fallback).
+   - **Authorized Redirect URIs**: (1) `https://supabase.bim-guard.xyz/auth/v1/callback` (Production Self-Hosted) and (2) `https://pmisdhiigakpjfuyxgfb.supabase.co/auth/v1/callback` (Dev-Only Hosted).
    - **Public Endpoints**: `/privacy` (Privacy Policy), `/terms` (Terms of Service), `/sitemap.xml` (Search Sitemap), `/robots.txt` (Crawler Directives), and `/og-image.png` (Social Preview Card).
 
 ### Local dev sign-in

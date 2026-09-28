@@ -3,6 +3,10 @@
 # FastAPI Backend Gateway + Svelte 5 SPA + Supabase & LLM Integration
 # ==============================================================================
 
+include:
+  - path: docker/supabase/docker-compose.yml
+    env_file: docker/supabase/.env
+
 services:
   bim-guard:
     build:
@@ -26,15 +30,16 @@ services:
       # host in dev (not in this Compose project), no service here needs to
       # change: only `opencde`, which does run in this project, needs the
       # docker-compose.override.yml adjustment for reaching a local stack.
-      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_URL=${SUPABASE_INTERNAL_URL:-${SUPABASE_URL}}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
       - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY:-}
-      - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL:-}
+      - SUPABASE_JWKS_URL=${SUPABASE_INTERNAL_JWKS_URL:-${SUPABASE_JWKS_URL:-}}
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-bim-guard-artifacts}
       - SUPABASE_STORAGE_PREFIX=${SUPABASE_STORAGE_PREFIX:-}
       - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN:-}
+      - JWT_SECRET=${JWT_SECRET:-}
 
       # ── LLM Extraction & Agent Providers ────────────────────────────────────
       - BIM_GUARD_LLM_MODEL=${BIM_GUARD_LLM_MODEL:-openrouter/auto}
@@ -90,6 +95,8 @@ services:
         condition: service_healthy
       docling-serve:
         condition: service_healthy
+      kong:
+        condition: service_started
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
@@ -170,7 +177,7 @@ services:
       AppBaseUrl: ${OPENCDE_APP_BASE_URL:-http://localhost:8081}
       # Same Supabase project BIM-Guard's own users sign in against, so the
       # caller's BIM-Guard access token authenticates here unchanged.
-      Supabase__Url: ${SUPABASE_URL}
+      Supabase__Url: ${SUPABASE_INTERNAL_URL:-${SUPABASE_URL}}
       # Publishable/anon key -- safe to expose to the browser. Lets the
       # server's own UI (http://localhost:8081) sign users in directly via
       # Supabase Auth; leave unset and its login screen just stays disabled.

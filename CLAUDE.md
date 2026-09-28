@@ -173,10 +173,19 @@ BIM Guard is served in production at `https://bim-guard.xyz` using **OrbStack / 
 ### Stack Topology & Services (`docker-compose.yml`)
 
 1. **`bim-guard` (`bim-guard-app`)**: Multi-stage production container (`Dockerfile`) compiling the Svelte 5 SPA (`frontend/dist`) and running a 4-worker Uvicorn ASGI gateway on port `8000`. Health-checked via `curl -f http://localhost:8000/api/health`.
-2. **`neo4j` (`bim-guard-neo4j`)**: Self-hosted Neo4j 5.26 graph database (`bolt://neo4j:7687`, HTTP on `7474`), backing topological queries. Starts automatically and is marked healthy before `bim-guard` boots.
-3. **`docling-serve` (`bim-guard-docling`)**: Self-hosted CPU Docling REST parsing engine (`http://docling-serve:5001`), started by default and health-checked before `bim-guard` boots.
-4. **`opencde` (`bim-guard-opencde`)**: buildingSMART OpenCDE Documents API on port `8081` with Supabase JWT bearer token verification.
-5. **`cloudflared` (`bim-guard-cloudflared`)**: Official Cloudflare Zero Trust tunnel client running under the `tunnel` compose profile. Establishes outbound encrypted QUIC/HTTP2 tunnels to Cloudflare's edge, forwarding `https://bim-guard.xyz` traffic directly to `http://bim-guard:8000` without opening firewall ports.
+2. **Self-Hosted Supabase Stack (`docker/supabase/docker-compose.yml`)**:
+   - Included directly in `docker-compose.yml` via Compose `include:`.
+   - **`supabase-db`**: PostgreSQL 17 database (`supabase/postgres:17.6.1.111`) with RLS triggers on host port `54322`.
+   - **`supabase-kong`**: Unified API gateway routing `/auth/v1`, `/rest/v1`, and `/storage/v1` on host port `54321` and internal port `8000`.
+   - **`supabase-auth`**: GoTrue authentication server supporting symmetric HS256 JWTs and Google OAuth.
+   - **`supabase-rest`**: PostgREST auto-generated REST API on internal port `3000`.
+   - **`supabase-storage`**: Supabase Storage engine managing file uploads and downloads.
+   - **`supabase-meta`**: Postgres introspection daemon for Studio.
+   - **`supabase-studio`**: Supabase Dashboard UI for live database and storage inspection on host port `54323`.
+3. **`neo4j` (`bim-guard-neo4j`)**: Self-hosted Neo4j 5.26 graph database (`bolt://neo4j:7687`, HTTP on `7474`), backing topological queries. Starts automatically and is marked healthy before `bim-guard` boots.
+4. **`docling-serve` (`bim-guard-docling`)**: Self-hosted CPU Docling REST parsing engine (`http://docling-serve:5001`), started by default and health-checked before `bim-guard` boots.
+5. **`opencde` (`bim-guard-opencde`)**: buildingSMART OpenCDE Documents API on port `8081` with Supabase JWT bearer token verification.
+6. **`cloudflared` (`bim-guard-cloudflared`)**: Official Cloudflare Zero Trust tunnel client running under the `tunnel` compose profile. Establishes outbound encrypted QUIC/HTTP2 tunnels to Cloudflare's edge, forwarding `https://bim-guard.xyz` traffic directly to `http://bim-guard:8000` and `https://supabase.bim-guard.xyz` to `http://kong:8000` without opening firewall ports.
 
 ### Quickstart Commands
 
@@ -188,7 +197,7 @@ docker compose --profile tunnel up -d --build
 docker compose up -d --build
 
 # Fast iterative redeploy: rebuild and re-serve only the app container
-# (keeps Neo4j, Docling, and Cloudflared running with zero connection disruption):
+# (keeps Supabase, Neo4j, Docling, and Cloudflared running with zero disruption):
 docker compose --profile tunnel up -d --build bim-guard
 
 # Remote trigger & CI/CD deployment:
@@ -205,16 +214,30 @@ docker compose logs -f cloudflared
 
 ```env
 # ── Cloudflare Tunnel & Domain Routing ────────────────────────────────────────
-BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz,https://supabase.bim-guard.xyz
 TUNNEL_TOKEN=<cloudflare-zero-trust-tunnel-token>
 COMPOSE_PROFILES=tunnel
 
-# ── Supabase & Auth Keys ──────────────────────────────────────────────────────
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_KEY=<anon-key>
-SUPABASE_PUBLISHABLE_KEY=<anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
-SUPABASE_JWKS_URL=https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+# ── Self-Hosted Supabase Production Stack ─────────────────────────────────────
+# Dual-network access pattern:
+# - On macOS Host (dev/tests): http://localhost:54321
+# - Inside Docker Containers (bim-guard-app/opencde): http://kong:8000
+SUPABASE_URL=http://localhost:54321
+SUPABASE_INTERNAL_URL=http://kong:8000
+SUPABASE_KEY=<anon-jwt-token>
+SUPABASE_PUBLISHABLE_KEY=<anon-jwt-token>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-jwt-token>
+SUPABASE_JWKS_URL=http://localhost:54321/auth/v1/.well-known/jwks.json
+SUPABASE_INTERNAL_JWKS_URL=http://kong:8000/auth/v1/.well-known/jwks.json
+JWT_SECRET=<jwt-secret-hex>
+SUPABASE_STORAGE_BUCKET=bim-guard-artifacts
+SUPABASE_STORAGE_PREFIX=
+
+# Public client endpoints
+PUBLIC_SUPABASE_URL=https://supabase.bim-guard.xyz
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon-jwt-token>
+VITE_SUPABASE_URL=https://supabase.bim-guard.xyz
+VITE_SUPABASE_ANON_KEY=<anon-jwt-token>
 
 # ── Inter-Service Networking ──────────────────────────────────────────────────
 DOCLING_LOCAL_URL=http://docling-serve:5001
@@ -223,11 +246,15 @@ NEO4J_URI=bolt://neo4j:7687
 
 ### Cloudflare Zero Trust & Google OAuth Branding
 
-- **Tunnel Public Hostname**: Points `https://bim-guard.xyz` to `http://bim-guard:8000` (internal Docker hostname) with Type `HTTP`.
-- **Supabase Auth Redirects**: Supabase Dashboard &rarr; Auth &rarr; URL Configuration must register `https://bim-guard.xyz/**` and `https://bim-guard.xyz/`.
+- **Tunnel Public Hostnames**:
+  1. `https://bim-guard.xyz` &rarr; `http://bim-guard:8000` (Type `HTTP`).
+  2. `https://supabase.bim-guard.xyz` &rarr; `http://kong:8000` (Type `HTTP`).
 - **Google OAuth Consent Screen**: Requires Authorized Domains:
   1. `bim-guard.xyz` (the app domain)
-  2. `supabase.co` (the OAuth redirect host `https://<ref>.supabase.co/auth/v1/callback`)
+  2. `supabase.co` (for dev-only hosted fallback)
+- **Authorized Redirect URIs**:
+  1. `https://supabase.bim-guard.xyz/auth/v1/callback` (Production Self-Hosted)
+  2. `https://pmisdhiigakpjfuyxgfb.supabase.co/auth/v1/callback` (Dev-Only Hosted)
 - **Public Compliance & SEO Endpoints**: Served directly at `https://bim-guard.xyz`:
   - `/privacy` & `/privacy.html` — Standalone Privacy Policy (Google API Limited Use compliant).
   - `/terms` & `/terms.html` — Standalone Terms of Service (with OpenBIM engineering disclaimers).

@@ -22,23 +22,25 @@ This guide explains how to deploy, serve, and operate **BIM Guard** in productio
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │ bim-guard-cloudflared container                                 │   │
 │   │ (Proxies traffic into the internal Docker compose network)      │   │
-│   └────────────────────────────────┬────────────────────────────────┘   │
-│                                    │ HTTP                               │
-│                                    ▼                                    │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │ bim-guard-app container (Port 8000)                             │   │
-│   │  - Compiled Svelte 5 Single Page Application (frontend/dist)    │   │
-│   │  - 4-Worker Uvicorn ASGI FastAPI Gateway                        │   │
-│   │  - REST APIs, SSE Events (/api/events/{project_id})             │   │
-│   │  - Legal & SEO Endpoints (/privacy, /terms, /sitemap.xml)       │   │
-│   └───────┬────────────────────────┬───────────────────────┬────────┘   │
-│           │ Bolt (7687)            │ HTTP (5001)           │ HTTP (8081)│
-│           ▼                        ▼                       ▼            │
-│   ┌───────────────┐        ┌───────────────┐       ┌────────────────┐   │
-│   │ bim-guard-    │        │ bim-guard-    │       │ bim-guard-     │   │
-│   │ neo4j         │        │ docling       │       │ opencde        │   │
-│   │ (Graph DB)    │        │ (REST Parser) │       │ (OpenCDE API)  │   │
-│   └───────────────┘        └───────────────┘       └────────────────┘   │
+│   └─────────────────┬───────────────────────────────┬───────────────┘   │
+│                     │ HTTP (bim-guard:8000)         │ HTTP (kong:8000)  │
+│                     ▼                               ▼                   │
+│   ┌─────────────────────────────────┐   ┌───────────────────────────┐   │
+│   │ bim-guard-app container         │   │ supabase-kong Gateway     │   │
+│   │  - Svelte 5 SPA (frontend/dist) │   │  - Auth: /auth/v1         │   │
+│   │  - FastAPI Gateway (port 8000)  │   │  - REST: /rest/v1         │   │
+│   │  - REST APIs, SSE Events        │   │  - Storage: /storage/v1   │   │
+│   └─┬──────────────┬──────────────┬─┘   └─┬──────┬──────┬──────┬────┘   │
+│     │ Bolt (7687)  │ HTTP (5001)  │       │      │      │      │        │
+│     ▼              ▼              ▼       ▼      ▼      ▼      ▼        │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────┐ ┌────┐ ┌─────┐ ┌──────┐   │
+│ │bim-guard-│ │bim-guard-│ │bim-guard-│ │auth│ │rest│ │store│ │studio│   │
+│ │neo4j     │ │docling   │ │opencde   │ └─┬──┘ └─┬──┘ └──┬──┘ └──┬───┘   │
+│ └──────────┘ └──────────┘ └──────────┘   │      │       │       │       │
+│                                          ▼      ▼       ▼       ▼       │
+│                                       ┌─────────────────────────────┐   │
+│                                       │ supabase-db (PostgreSQL 17) │   │
+│                                       └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -46,10 +48,36 @@ This guide explains how to deploy, serve, and operate **BIM Guard** in productio
 
 ## 2. Docker Compose Stack & Services (`docker-compose.yml`)
 
-The platform is orchestrated as a multi-container stack:
+The platform is orchestrated as a fully integrated multi-container stack:
 
 1. **`bim-guard` (`bim-guard-app`)**:
    - Built via the multi-stage [`Dockerfile`](../Dockerfile) (Node 22 Svelte 5 builder &rarr; Python 3.12 Astral uv virtualenv &rarr; Debian Bookworm runtime with OpenCASCADE/IfcOpenShell bindings).
+   - Serves the compiled Svelte 5 SPA at `/` and the FastAPI API gateway at `/api`.
+   - Listens on internal port `8000` (mapped to `${PORT:-8000}`).
+   - Healthcheck monitors `http://localhost:8000/api/health`.
+2. **Self-Hosted Supabase Stack (`docker/supabase/docker-compose.yml`)**:
+   - Included directly in the root `docker-compose.yml` via Compose `include:`.
+   - **`supabase-db`**: PostgreSQL 17 database (`supabase/postgres:17.6.1.111`) with `pgcrypto`, `vector`, `uuid-ossp`, and RLS triggers. Listens on host port `54322`.
+   - **`supabase-kong`**: Unified API gateway routing `/auth/v1`, `/rest/v1`, and `/storage/v1`. Listens on host port `54321` and internal port `8000`.
+   - **`supabase-auth`**: GoTrue authentication server supporting symmetric HS256 JWTs, password logins, and Google OAuth SSO.
+   - **`supabase-rest`**: PostgREST auto-generated REST API on internal port `3000`.
+   - **`supabase-storage`**: Supabase Storage engine managing file uploads and downloads.
+   - **`supabase-meta`**: Postgres introspection daemon for Studio.
+   - **`supabase-studio`**: Supabase Dashboard UI for live database and storage inspection on host port `54323`.
+3. **`neo4j` (`bim-guard-neo4j`)**:
+   - Neo4j 5.26 Community Edition graph database.
+   - Listens on `7474` (HTTP / Neo4j Browser) and `7687` (Bolt binary protocol).
+   - Starts by default; healthy dependency for `bim-guard`.
+4. **`docling-serve` (`bim-guard-docling`)**:
+   - Self-hosted CPU Docling REST parsing engine (`quay.io/docling-project/docling-serve-cpu:latest`).
+   - Listens on port `5001`.
+   - Starts by default; healthy dependency for `bim-guard`.
+5. **`opencde` (`bim-guard-opencde`)**:
+   - buildingSMART OpenCDE Documents API on port `8081`.
+   - Verifies caller bearer tokens against BIM Guard's own Supabase JWKS for seamless single sign-on.
+6. **`cloudflared` (`bim-guard-cloudflared`)**:
+   - Official Cloudflare connector (`cloudflare/cloudflared:latest`) running under compose profile `tunnel`.
+   - Establishes persistent outbound tunnels to Cloudflare Edge using `TUNNEL_TOKEN`. Python 3.12 Astral uv virtualenv &rarr; Debian Bookworm runtime with OpenCASCADE/IfcOpenShell bindings).
    - Serves the compiled Svelte 5 SPA at `/` and the FastAPI API gateway at `/api`.
    - Listens on internal port `8000` (mapped to `${PORT:-8000}`).
    - Healthcheck monitors `http://localhost:8000/api/health`.
@@ -83,13 +111,18 @@ In this setup, `cloudflared` runs as a container inside OrbStack. No host-level 
    - Select **Docker**.
    - Copy the token string following `--token` (e.g. `eyJh...`). This is your `TUNNEL_TOKEN`.
 5. Click **Next** to access the **Public Hostnames** tab.
-6. Add the public routing rule:
-   - **Subdomain**: Leave blank (for apex `bim-guard.xyz`) or specify `app` / `www`.
-   - **Domain**: `bim-guard.xyz`
-   - **Path**: Leave blank.
-   - **Type**: `HTTP`
-   - **URL**: `bim-guard:8000` *(resolves to the `bim-guard` service inside the compose bridge network)*.
-7. Click **Save tunnel**. Cloudflare automatically provisions the CNAME record in [Cloudflare DNS](https://dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/bim-guard.xyz/dns/records).
+6. Add the public routing rules:
+   - **Primary App Route**:
+     - **Subdomain**: Leave blank (for apex `bim-guard.xyz`) or specify `app` / `www`.
+     - **Domain**: `bim-guard.xyz`
+     - **Type**: `HTTP`
+     - **URL**: `bim-guard:8000` *(resolves to the `bim-guard` service inside the compose bridge network)*.
+   - **Supabase API Gateway Route**:
+     - **Subdomain**: `supabase`
+     - **Domain**: `bim-guard.xyz`
+     - **Type**: `HTTP`
+     - **URL**: `kong:8000` *(resolves to the `supabase-kong` gateway inside the compose bridge network)*.
+7. Click **Save tunnel**. Cloudflare automatically provisions the CNAME records in [Cloudflare DNS](https://dash.cloudflare.com/a7ed8378cd620788b8f508e8b5d15975/bim-guard.xyz/dns/records).
 
 ### Step 2: Configure Environment Variables in `.env`
 
@@ -97,29 +130,39 @@ Ensure your root `.env` includes:
 
 ```env
 # ── Cloudflare Tunnel & Domain Routing ────────────────────────────────────────
-BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz
+BIM_GUARD_ALLOWED_ORIGINS=https://bim-guard.xyz,https://www.bim-guard.xyz,https://supabase.bim-guard.xyz
 TUNNEL_TOKEN=eyJh...your_copied_token...
 COMPOSE_PROFILES=tunnel
 
-# ── Supabase Database & Auth ──────────────────────────────────────────────────
-SUPABASE_URL=https://<project-id>.supabase.co
-SUPABASE_KEY=<anon_or_publishable_key>
-SUPABASE_PUBLISHABLE_KEY=<anon_key>
-SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
-SUPABASE_JWKS_URL=https://<project-id>.supabase.co/auth/v1/.well-known/jwks.json
+# ── Self-Hosted Supabase Production Stack ─────────────────────────────────────
+# Dual-network access pattern:
+# - On macOS Host (dev/tests): http://localhost:54321
+# - Inside Docker Containers (bim-guard-app/opencde): http://kong:8000
+SUPABASE_URL=http://localhost:54321
+SUPABASE_INTERNAL_URL=http://kong:8000
+SUPABASE_KEY=<anon_jwt_token>
+SUPABASE_PUBLISHABLE_KEY=<anon_jwt_token>
+SUPABASE_SERVICE_ROLE_KEY=<service_role_jwt_token>
+SUPABASE_JWKS_URL=http://localhost:54321/auth/v1/.well-known/jwks.json
+SUPABASE_INTERNAL_JWKS_URL=http://kong:8000/auth/v1/.well-known/jwks.json
+JWT_SECRET=<jwt_secret_hex>
 SUPABASE_STORAGE_BUCKET=bim-guard-artifacts
+SUPABASE_STORAGE_PREFIX=
+
+# Public client envs (Browser SPA builds)
+PUBLIC_SUPABASE_URL=https://supabase.bim-guard.xyz
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon_jwt_token>
+VITE_SUPABASE_URL=https://supabase.bim-guard.xyz
+VITE_SUPABASE_ANON_KEY=<anon_jwt_token>
 
 # ── Inter-Container Microservices ─────────────────────────────────────────────
 DOCLING_LOCAL_URL=http://docling-serve:5001
 NEO4J_URI=bolt://neo4j:7687
 NEO4J_AUTH=neo4j/bimguardpassword
-
-# ── Optional S3 Storage Backend (if enabled) ──────────────────────────────────
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-S3_ENDPOINT_URL=
-S3_REGION=
 ```
+
+> [!TIP]
+> **Dev-Only Hosted Supabase Fallback**: The remote hosted Supabase project is preserved in `.env.hosted_dev`. If you need to test against the hosted instance in development without affecting the local production containers, copy or load `.env.hosted_dev` into your local environment.
 
 > [!NOTE]
 > `docker-compose.yml` automatically passes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as build arguments into Stage 1 of the Docker build, baking your live Supabase endpoint into the compiled Svelte 5 bundle.

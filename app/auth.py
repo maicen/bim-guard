@@ -51,15 +51,25 @@ def _jwks() -> PyJWKClient:
 
 def _verify(token: str) -> CurrentUser:
     """Verify a bearer token's signature/expiry and decode it into a CurrentUser."""
+    jwt_secret = os.getenv("JWT_SECRET", "").strip()
     try:
-        signing_key = _jwks().get_signing_key_from_jwt(token)
-        claims = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=[signing_key.algorithm_name],
-            audience="authenticated",
-            options={"require": ["exp", "sub"]},
-        )
+        if jwt_secret:
+            claims = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+                options={"require": ["exp", "sub"]},
+            )
+        else:
+            signing_key = _jwks().get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[signing_key.algorithm_name],
+                audience="authenticated",
+                options={"require": ["exp", "sub"]},
+            )
     except jwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
