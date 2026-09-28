@@ -8,6 +8,7 @@
     PlayCircle,
     Plus,
     Terminal,
+    Bot,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -59,6 +60,7 @@
     {
       title: "Coordination & Graph",
       items: [
+        { id: "copilot", label: "Graph-RAG Copilot", icon: Bot },
         { id: "query-console", label: "Query Console", icon: Terminal },
       ],
     },

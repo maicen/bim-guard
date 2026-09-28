@@ -34,6 +34,7 @@
   import ArchAnalyzeView from "./routes/ArchAnalyzeView.svelte";
   import WorkflowView from "./routes/WorkflowView.svelte";
   import QueryConsoleView from "./routes/QueryConsoleView.svelte";
+  import CopilotView from "./routes/CopilotView.svelte";
   import ReportsView from "./routes/ReportsView.svelte";
   import UserManualView from "./routes/UserManualView.svelte";
   import ModelingManualView from "./routes/ModelingManualView.svelte";
@@ -392,7 +393,7 @@
   // different project from the Dashboard's registry while on one of these
   // re-runs that same view against the new project; from anywhere else it
   // just updates the context so the next project-scoped view you open has it.
-  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "evaluation", "viewer", "workflow", "models", "query-console"]);
+  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "evaluation", "viewer", "workflow", "models", "query-console", "copilot"]);
 
   // Whether the app shell is in "project view" (project-scoped sidebar,
   // navbar, and dashboard) vs. "organization view". Driven by project_id
@@ -638,6 +639,8 @@
           </div>
         {:else if activeView === "workflow"}
           <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
+        {:else if activeView === "copilot"}
+          <CopilotView projectId={targetProjectId} />
         {:else if activeView === "query-console"}
           <QueryConsoleView initialProjectId={targetProjectId} />
         {:else if activeView === "reports"}

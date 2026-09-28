@@ -11,6 +11,7 @@ from app.services.bsdd_ontology_repository import (
     BSDDOntologyRepository,
     get_bsdd_ontology_repository,
 )
+from app.services.copilot_service import DEFAULT_COPILOT_SERVICE, CopilotService
 from app.services.digital_inspector_service import DigitalInspectorService
 from app.services.document_access_service import DocumentAccessService
 from app.services.documents_service import DocumentService
@@ -218,3 +219,8 @@ def get_scim_token_service() -> ScimTokenService:
 def get_scim_service() -> ScimService:
     """Return the configured ScimService instance."""
     return get_container().scim_service
+
+
+def get_copilot_service() -> CopilotService:
+    """Return the configured CopilotService instance."""
+    return DEFAULT_COPILOT_SERVICE

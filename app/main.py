@@ -37,6 +37,9 @@ from app.api import (
     cde_integration as api_cde,
 )
 from app.api import (
+    copilot as api_copilot,
+)
+from app.api import (
     dashboard as api_dashboard,
 )
 from app.api import (
@@ -235,6 +238,10 @@ TAGS_METADATA = [
         "name": "SCIM",
         "description": "SCIM 2.0 (RFC 7644) user/group provisioning for external IdPs (Okta, Azure AD, ...), "
         "authenticated by a per-organization bearer token rather than Supabase JWT.",
+    },
+    {
+        "name": "Graph-RAG Copilot",
+        "description": "Conversational Graph-RAG AI assistant and persistent thread management.",
     },
     {
         "name": "Public",
@@ -494,6 +501,7 @@ app.include_router(
 )
 app.include_router(api_sparql.router, prefix="/api", tags=["sparql"])
 app.include_router(api_graph.router, prefix="/api", tags=["Graph & Spatial Intelligence"])
+app.include_router(api_copilot.router, prefix="/api", tags=["Graph-RAG Copilot"])
 app.include_router(api_events.router, prefix="/api", tags=["Events"])
 app.include_router(api_audit_log.router, prefix="/api/audit-log", tags=["Audit Log"])
 app.include_router(api_llm_calls.router, prefix="/api/llm-calls", tags=["LLM Call Log"])

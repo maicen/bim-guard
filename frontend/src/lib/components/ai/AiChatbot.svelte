@@ -15,6 +15,7 @@
   import AiArtifact from "./AiArtifact.svelte";
   import { graphApi } from "../../api";
   import { toasts } from "../../toast.svelte";
+  import { copilotStore } from "../../stores/copilotStore.svelte";
   import type {
     GraphRagCitation,
     GraphRagContextSummary,
@@ -27,6 +28,7 @@
 
   interface Props {
     projectId: number;
+    persistent?: boolean;
     initialScope?: GraphRagScope;
     initialDocumentId?: number | null;
     initialElementClass?: string | null;
@@ -36,6 +38,7 @@
 
   let {
     projectId,
+    persistent = false,
     initialScope = "hybrid",
     initialDocumentId = null,
     initialElementClass = null,
@@ -51,6 +54,18 @@
   let messages = $state<ChatMessage[]>([]);
   let isStreaming = $state(false);
   let stopStreamFn = $state<(() => void) | null>(null);
+
+  // Sync messages with store if persistent
+  $effect(() => {
+    if (persistent) {
+      messages = copilotStore.activeMessages;
+      if (copilotStore.activeSummary) {
+        scope = copilotStore.activeSummary.scope;
+        selectedDocId = copilotStore.activeSummary.document_id || null;
+        selectedElementClass = copilotStore.activeSummary.element_class || null;
+      }
+    }
+  });
 
   let contextSummary = $state<GraphRagContextSummary | null>(null);
   let loadingContext = $state(false);
@@ -93,6 +108,14 @@
   // Handle Query Submission
   async function handleSubmit(queryText: string) {
     if (!queryText.trim() || isStreaming) return;
+
+    if (persistent && !copilotStore.activeConversationId) {
+      await copilotStore.startNewConversation(projectId, {
+        scope,
+        documentId: selectedDocId,
+        elementClass: selectedElementClass,
+      });
+    }
 
     const userMessageId = `user_${Date.now()}`;
     const assistantMessageId = `asst_${Date.now()}`;
@@ -187,8 +210,21 @@
           if (result.suggested_followups && result.suggested_followups.length > 0) {
             suggestions = result.suggested_followups;
           }
+          if (result.subgraph_data && (result.subgraph_data.nodes?.length || result.subgraph_data.edges?.length)) {
+            activeSubgraph = result.subgraph_data;
+          }
           messages = [...messages];
         }
+
+        if (persistent && copilotStore.activeConversationId) {
+          const uTurn = messages.find((m) => m.id === userMessageId);
+          const aTurn = messages.find((m) => m.id === assistantMessageId);
+          if (uTurn && aTurn) {
+            copilotStore.saveTurns(copilotStore.activeConversationId, projectId, [uTurn, aTurn]);
+            copilotStore.autoTitleIfDefault(copilotStore.activeConversationId, queryText, projectId);
+          }
+        }
+
         isStreaming = false;
         stopStreamFn = null;
       },
@@ -211,7 +247,15 @@
   }
 
   function clearChat() {
-    messages = [];
+    if (persistent && projectId) {
+      copilotStore.startNewConversation(projectId, {
+        scope,
+        documentId: selectedDocId,
+        elementClass: selectedElementClass,
+      });
+    } else {
+      messages = [];
+    }
     activeCitation = null;
     activeCypher = null;
     showArtifactPanel = false;
@@ -239,8 +283,12 @@
           <Sparkles class="w-3.5 h-3.5" />
         </div>
         <div>
-          <h2 class="font-semibold text-fg-primary text-sm leading-tight">
-            Graph-RAG Compliance Copilot
+          <h2 class="font-semibold text-fg-primary text-sm leading-tight flex items-center gap-1.5">
+            {#if persistent && copilotStore.activeSummary}
+              <span class="truncate max-w-[280px] sm:max-w-md">{copilotStore.activeSummary.title}</span>
+            {:else}
+              <span>Graph-RAG Compliance Copilot</span>
+            {/if}
           </h2>
           <p class="text-[11px] text-fg-muted font-mono">
             {#if contextSummary?.has_ifc_model}

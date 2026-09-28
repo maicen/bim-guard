@@ -19,3 +19,4 @@ export * from "./namingConfig";
 export * from "./organizations";
 export * from "./graph";
 export * from "./evaluation";
+export * from "./copilot";

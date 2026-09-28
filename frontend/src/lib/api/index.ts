@@ -34,6 +34,7 @@ export { bcfApi } from "./bcf";
 export { namingConfigApi } from "./namingConfig";
 export { bsddApi } from "./bsdd";
 export { graphApi, sparqlApi } from "./graph";
+export { copilotApi } from "./copilot";
 export {
   settingsApi,
   parsingEnginesApi,

@@ -452,12 +452,30 @@ SELECT ?storey WHERE {
             />
           </div>
         {:else}
-          <div class="h-[760px] rounded-2xl border border-border-default overflow-hidden bg-surface-canvas/20 shadow-inner">
-            <AiChatbot
-              projectId={selectedProjectId}
-              onOpenDocument={(docId) => push(`/documents?project_id=${selectedProjectId}&doc_id=${docId}`)}
-              onIsolateElement={(guid) => push(`/viewer?project_id=${selectedProjectId}&guid=${guid}`)}
-            />
+          <div class="space-y-3">
+            <div class="flex items-center justify-between px-4 py-2.5 rounded-xl border border-accent/30 bg-accent/10 text-xs">
+              <div class="flex items-center gap-2">
+                <Sparkles class="w-4 h-4 text-accent" />
+                <span class="text-fg-primary font-medium">Looking for persistent chat history, thread search, and sidebar navigation?</span>
+              </div>
+              <button
+                type="button"
+                onclick={() => push(`/copilot?project_id=${selectedProjectId}`)}
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-white hover:bg-accent/90 transition-colors shadow-2xs cursor-pointer"
+              >
+                <span>Open Dedicated Copilot Page</span>
+                <ExternalLink class="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div class="h-[740px] rounded-2xl border border-border-default overflow-hidden bg-surface-canvas/20 shadow-inner">
+              <AiChatbot
+                projectId={selectedProjectId}
+                persistent={true}
+                onOpenDocument={(docId) => push(`/documents?project_id=${selectedProjectId}&doc_id=${docId}`)}
+                onIsolateElement={(guid) => push(`/viewer?project_id=${selectedProjectId}&guid=${guid}`)}
+              />
+            </div>
           </div>
         {/if}
       </Tabs.Content>
