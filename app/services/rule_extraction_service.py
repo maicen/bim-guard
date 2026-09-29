@@ -655,9 +655,19 @@ class RuleExtractionService:
         return ExtractionResult(rules=rules, warnings=[])
 
     async def ingest_with_llamaindex(
-        self, document_id: int, text: str, *, organization_id: int | None = None
+        self,
+        document_id: int,
+        text: str,
+        *,
+        organization_id: int | None = None,
+        doclang_xml: str | None = None,
+        element_bboxes: list[dict] | None = None,
     ) -> list[contracts.DocumentNodeContract]:
         """Ingest document text into clause-annotated nodes with deontic statements.
+
+        When `doclang_xml` is given, nodes follow its element structure (the
+        same clauses the Smart TOC shows) instead of heading detection over
+        `text`, which misses heading styles it doesn't recognise.
 
         Does not report through the shared pipeline_tracker: that tracker is
         keyed by project_id against a fixed engine registry, so binding it
@@ -668,7 +678,13 @@ class RuleExtractionService:
         (unstreamed) for now.
         """
         pages = self._pages_service.get_pages(document_id)
-        nodes = self._ingestor.nodes_from_text(text, source_document_id=document_id, pages=pages)
+        nodes = self._ingestor.nodes_from_text(
+            text,
+            source_document_id=document_id,
+            pages=pages,
+            doclang_xml=doclang_xml,
+            element_bboxes=element_bboxes,
+        )
         statements = await self._ingestor.extract_deontic_statements(nodes, organization_id=organization_id)
 
         logger.info(
@@ -686,6 +702,8 @@ class RuleExtractionService:
         *,
         model: str | None = None,
         organization_id: int | None = None,
+        doclang_xml: str | None = None,
+        element_bboxes: list[dict] | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Ingest a document and generate reviewable rule drafts via LlamaIndex.
 
@@ -704,6 +722,9 @@ class RuleExtractionService:
         Args:
             model: Extraction LLM override (e.g. from the UI's model
                 selector), applied to every node in this document.
+            doclang_xml: The document's DocLang XML, for whole-document runs;
+                see :meth:`ingest_with_llamaindex`.
+            element_bboxes: Per-element bbox records paired with `doclang_xml`.
         """
         draft_service = self._draft_service
         if draft_service is None:
@@ -711,7 +732,13 @@ class RuleExtractionService:
 
             draft_service = RuleDraftService()
 
-        nodes = await self.ingest_with_llamaindex(document_id, text, organization_id=organization_id)
+        nodes = await self.ingest_with_llamaindex(
+            document_id,
+            text,
+            organization_id=organization_id,
+            doclang_xml=doclang_xml,
+            element_bboxes=element_bboxes,
+        )
         deontic_by_node = {
             node.node_id: (node.deontic_statements[0] if node.deontic_statements else None)
             for node in nodes

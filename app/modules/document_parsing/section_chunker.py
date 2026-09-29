@@ -4,12 +4,12 @@ document_parsing/section_chunker.py
 -----------------------------------
 Step 3 — Splits extracted markdown/plain text into section chunks.
 
-Recognises headings in this priority order:
-  1. The original 13-topic code taxonomy ("# 4 Stairs", "4 Stairs...")
-     — exact match required, preserved for backward compatibility.
+Recognises headings in this priority order (every section keeps the heading's
+own text as its name):
+  1. Top-level numbered headings ("4 Stairs", "01 Core Dimensions").
   2. Real dotted-decimal numbering ("9.8.2.1.  Stair Width") — the actual
      Article/Sentence numbering scheme building codes use, independent of
-     markdown and independent of the 13-topic taxonomy above. This is what
+     markdown. This is what
       pypdf's plain-text extraction of a real code PDF looks like, so it's the
      pattern the live document-upload -> extract-rules flow actually needs.
   3. Any markdown heading, any level ("## SECTION 8.14 ...") — the extractor's
@@ -31,27 +31,12 @@ Usage:
 
 import re
 
-CODE_SECTION_HEADINGS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
-
-CODE_SECTION_NAMES = {
-    "1": "Building Basics",
-    "2": "Means of Egress and Exit Paths",
-    "3": "Doors (Detailed)",
-    "4": "Stairs (Detailed - Part 9)",
-    "5": "Ramps",
-    "6": "Guards and Handrails",
-    "7": "Windows and Glazing",
-    "8": "Washrooms and Basic Accessibility",
-    "9": "Plumbing Fixture Counts",
-    "10": "Fire Protection",
-    "11": "Garage and Carport",
-    "12": "Spatial Separation to Property Line",
-    "13": "Model QA",
-}
-
-# ── 1. Original 13-topic taxonomy — unchanged, exact match only ──────────────
-_CODE_MD_HEADING = re.compile(r"^#{1,3}\s+(1[0-3]|[1-9])\s+.+")
-_CODE_TXT_HEADING = re.compile(r"^(1[0-3]|[1-9])[\s\.].+")
+# ── 1. Top-level numbered headings: "4 Stairs", "01 Core Dimensions",
+# "12 Units ...". A 1-2 digit number (zero-padded or not) followed by
+# whitespace and a capitalised title. Requiring whitespace straight after the
+# number keeps a numbered table row ("1.  Private stairs(1) 200 125...") from
+# matching.
+_TOP_LEVEL_HEADING = re.compile(r"^(\d{1,2})\s+[A-Z].+")
 
 # ── 2. Real dotted-decimal Article numbering, e.g. "9.8.2.1.  Stair Width"
 # or "9.8.2.  Stair Dimensions" — 3 to 5 dot-separated components. Requires
@@ -81,18 +66,9 @@ class SectionChunker:
         if not s:
             return None
 
-        if _CODE_MD_HEADING.match(s):
-            m = re.search(r"(1[0-3]|[1-9])", s)
-            if m:
-                num = m.group(1)
-                return num, CODE_SECTION_NAMES.get(num, "Unknown")
-
-        if _CODE_TXT_HEADING.match(s):
-            m = re.match(r"^(1[0-3]|[1-9])", s)
-            if m:
-                candidate = m.group(1)
-                if s[len(candidate) : len(candidate) + 1] == " ":
-                    return candidate, CODE_SECTION_NAMES.get(candidate, "Unknown")
+        m = _TOP_LEVEL_HEADING.match(s)
+        if m:
+            return m.group(1), s[:100]
 
         m = _CODE_DOTTED_HEADING.match(s)
         if m:
@@ -126,6 +102,7 @@ class SectionChunker:
         current_num = None
         current_name = None
         current_lines = []
+        preamble_lines = []
 
         for line in lines:
             detected = self._detect_section(line)
@@ -145,6 +122,8 @@ class SectionChunker:
                 current_lines = [line.strip()]
             elif current_num:
                 current_lines.append(line.strip())
+            else:
+                preamble_lines.append(line.strip())
 
         if current_num and current_lines:
             text = "\n".join(current_lines).strip()
@@ -157,8 +136,23 @@ class SectionChunker:
                 }
             )
 
+        # Text before the first recognised heading is kept as its own chunk
+        # rather than dropped -- an unrecognised heading style would otherwise
+        # silently discard everything above the first one that does match.
+        preamble = "\n".join(preamble_lines).strip()
+        if preamble and chunks:
+            chunks.insert(
+                0,
+                {
+                    "section_number": None,
+                    "section_name": None,
+                    "text": preamble,
+                    "char_count": len(preamble),
+                },
+            )
+
         print(f"[SectionChunker] {len(chunks)} sections detected")
         for c in chunks:
-            print(f"  {c['section_number']:<6} {c['section_name']:<40} {c['char_count']:>8,} chars")
+            print(f"  {c['section_number'] or '-':<6} {c['section_name'] or '(preamble)':<40} {c['char_count']:>8,} chars")
 
         return chunks

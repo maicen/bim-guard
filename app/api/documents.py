@@ -1523,7 +1523,8 @@ async def extract_rule_drafts(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found.",
         )
-    text = (body.text if body and body.text else None) or service.get_document_text(doc)
+    scoped_text = body.text if body and body.text else None
+    text = scoped_text or service.get_document_text(doc)
     if not text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1535,8 +1536,15 @@ async def extract_rule_drafts(
     )
     extraction_service = RuleExtractionService()
     try:
+        # A whole-document run splits on the DocLang structure (the clauses the
+        # Smart TOC shows); a picked-sections run only has the joined text.
         drafts = await extraction_service.extract_rule_drafts(
-            document_id, text, model=model, organization_id=llm_org_id
+            document_id,
+            text,
+            model=model,
+            organization_id=llm_org_id,
+            doclang_xml=None if scoped_text else service.get_doclang_content(doc),
+            element_bboxes=None if scoped_text else service.get_element_bboxes(doc),
         )
     except RuleGenerationFailedError as exc:
         # The model rejected every clause (bad/missing key, no credit, ...): report the

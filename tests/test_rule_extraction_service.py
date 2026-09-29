@@ -616,8 +616,14 @@ class FakeIngestor:
             )
             for i in range(node_count)
         ]
+        self.doclang_xml = None
+        self.element_bboxes = None
 
-    def nodes_from_text(self, text: str, *, source_document_id: int, pages=None):
+    def nodes_from_text(
+        self, text: str, *, source_document_id: int, pages=None, doclang_xml=None, element_bboxes=None
+    ):
+        self.doclang_xml = doclang_xml
+        self.element_bboxes = element_bboxes
         return self._nodes
 
     async def extract_deontic_statements(self, nodes, *, organization_id=None):
@@ -639,7 +645,9 @@ class FakeGenerator:
         self.max_in_flight = 0
         self.calls = 0
 
-    async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
+    async def generate_drafts_from_node(
+        self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None, check_categories=None
+    ):
         self.calls += 1
         self.in_flight += 1
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
@@ -679,6 +687,29 @@ def test_extract_rule_drafts_saves_one_draft_per_node():
     assert all(d.id is not None for d in drafts)
 
 
+def test_extract_rule_drafts_splits_on_doclang_structure_when_given():
+    """A whole-document run hands the DocLang XML to the ingestor, not just plain text."""
+    extraction_progress.STORE.clear()
+    ingestor = FakeIngestor(node_count=2)
+    service = RuleExtractionService(
+        ingestor=ingestor,
+        generator=FakeGenerator(),
+        bsdd_client=FakeBSDDClient([]),
+        draft_service=RuleDraftService(drafts_repo=FakeDraftsTable()),
+        pages_service=FakePagesService(),
+    )
+    bboxes = [{"element_id": "e1", "page": 1}]
+
+    asyncio.run(
+        service.extract_rule_drafts(
+            document_id=3, text="irrelevant", doclang_xml="<doclang/>", element_bboxes=bboxes
+        )
+    )
+
+    assert ingestor.doclang_xml == "<doclang/>"
+    assert ingestor.element_bboxes == bboxes
+
+
 def test_extract_rule_drafts_reports_progress_to_completion():
     extraction_progress.STORE.clear()
     service = _service_with_fakes(node_count=5)
@@ -711,7 +742,9 @@ def test_extract_rule_drafts_bounds_concurrency():
 
 def test_extract_rule_drafts_survives_one_node_failing():
     class FlakyGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
+        async def generate_drafts_from_node(
+            self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None, check_categories=None
+        ):
             if node.node_id == "node-1":
                 raise RuntimeError("LLM blew up")
             return await super().generate_drafts_from_node(node, deontic=deontic, model=model)
@@ -749,7 +782,9 @@ def test_extract_rule_drafts_raises_the_models_reason_when_every_node_fails():
     from app.services.rule_extraction_service import RuleGenerationFailedError
 
     class RejectingGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
+        async def generate_drafts_from_node(
+            self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None, check_categories=None
+        ):
             raise RuntimeError(
                 'OpenrouterException - {"error":{"message":"No cookie auth credentials found","code":401}}'
             )
@@ -774,7 +809,9 @@ def test_extract_rule_drafts_error_never_echoes_an_api_key():
     from app.services.rule_extraction_service import RuleGenerationFailedError
 
     class LeakyGenerator(FakeGenerator):
-        async def generate_drafts_from_node(self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None):
+        async def generate_drafts_from_node(
+            self, node, *, deontic=None, model=None, organization_id=None, clause_grounding=None, check_categories=None
+        ):
             raise RuntimeError("Incorrect API key provided: sk-or-v1-abcdef1234567890abcdef")
 
     extraction_progress.STORE.clear()

@@ -96,10 +96,10 @@ Guards shall not be less than 900 mm in height.
     assert "6" in nums
 
 
-def test_chunker_returns_correct_section_names(chunker):
-    text = "# 4 Stairs\nEvery stair shall have a clear width."
+def test_chunker_names_sections_from_their_own_heading(chunker):
+    text = "# 4 Stairs\nEvery stair shall have a clear width.\n\n12 Units and Global IDs\nEvery window has a GlobalId."
     chunks = chunker.chunk(text)
-    assert chunks[0]["section_name"] == "Stairs (Detailed - Part 9)"
+    assert [c["section_name"] for c in chunks] == ["4 Stairs", "12 Units and Global IDs"]
 
 
 def test_chunker_empty_text(chunker):
@@ -134,6 +134,33 @@ Line C about guards.
     all_text = " ".join(c["text"] for c in chunks)
     for phrase in ["Line A", "Line B", "Line C"]:
         assert phrase in all_text, f"Content silently dropped: '{phrase}'"
+
+
+def test_chunker_detects_zero_padded_headings(chunker):
+    text = """01 Core Dimensions | 6 rules
+WR-001 Width must be at least 800 mm.
+
+02 Fire and Smoke Protection | 1 rule
+WR-068 FireRating must be at least 60 min.
+"""
+    chunks = chunker.chunk(text)
+    by_num = {c["section_number"]: c for c in chunks}
+    assert "WR-001" in by_num["01"]["text"]
+    assert "WR-068" in by_num["02"]["text"]
+    assert by_num["01"]["section_name"].startswith("01 Core Dimensions")
+
+
+def test_chunker_keeps_text_before_first_heading(chunker):
+    """Content above the first recognised heading must not be dropped."""
+    text = """Intro requirement that sits before any heading.
+
+# 4 Stairs
+Stair width shall be not less than 860 mm.
+"""
+    chunks = chunker.chunk(text)
+    assert chunks[0]["section_number"] is None
+    assert "Intro requirement" in chunks[0]["text"]
+    assert any(c["section_number"] == "4" for c in chunks)
 
 
 def test_chunker_char_count_field(chunker):
