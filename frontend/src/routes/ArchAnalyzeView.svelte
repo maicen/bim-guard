@@ -44,7 +44,9 @@
     FireSeparationResult,
     GarageResult,
     RuleFolder,
+    RuleCheckCategory,
   } from "../lib/types";
+  import { UNCATEGORIZED_LABEL } from "../lib/checkCategories";
 
   interface Props {
     initialProjectId?: number | null;
@@ -70,6 +72,8 @@
   // Rule folder selection — '' means "All rules"
   let ruleFolders: RuleFolder[] = $state([]);
   let selectedFolder = $state(""); // '' = All
+  // Ordered headings each element type's rule results are grouped under.
+  let checkCategories = $state.raw<RuleCheckCategory[]>([]);
   let isFoldersLoading = $state(false);
 
   let folderOptions = $derived([
@@ -111,7 +115,11 @@
   onMount(async () => {
     // Load projects and rule folders in parallel; do NOT auto-run analysis
     try {
-      const [projectData] = await Promise.all([projectsApi.list(), loadFolders()]);
+      const [projectData] = await Promise.all([
+        projectsApi.list(),
+        loadFolders(),
+        loadCheckCategories(),
+      ]);
       projects = projectData.projects || [];
       // Only check for enhanced model — do not auto-run
       if (selectedProjectId) {
@@ -132,6 +140,51 @@
     } finally {
       isFoldersLoading = false;
     }
+  }
+
+  async function loadCheckCategories(): Promise<void> {
+    try {
+      checkCategories = await rulesApi.listCheckCategories();
+    } catch {
+      // Grouping falls back to one "Uncategorized" list; results still show.
+      checkCategories = [];
+    }
+  }
+
+  interface CheckCategoryGroup {
+    name: string;
+    rules: RuleComplianceResult[];
+    failCount: number;
+    missingCount: number;
+  }
+
+  /**
+   * Split one element type's rule results into check-category groups, in the
+   * database's sort order, with uncategorized rules last. Categories with no
+   * rules for this element type are omitted.
+   */
+  function groupByCheckCategory(rules: RuleComplianceResult[]): CheckCategoryGroup[] {
+    const byName = new Map<string, RuleComplianceResult[]>();
+    for (const rule of rules) {
+      const name = rule.check_category || UNCATEGORIZED_LABEL;
+      byName.set(name, [...(byName.get(name) || []), rule]);
+    }
+    const order = checkCategories.map((c) => c.name);
+    const rank = (name: string) =>
+      name === UNCATEGORIZED_LABEL
+        ? Number.MAX_SAFE_INTEGER
+        : order.includes(name)
+          ? order.indexOf(name)
+          : order.length;
+    return [...byName.entries()]
+      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+      .map(([name, groupRules]) => ({
+        name,
+        rules: groupRules,
+        failCount: groupRules.filter((r) => r.status === "FAIL").length,
+        missingCount: groupRules.filter((r) => ["MISSING_DATA", "PARTIAL"].includes(r.status || ""))
+          .length,
+      }));
   }
 
   /** Check for enhanced model only — do NOT run analysis. */
@@ -1503,67 +1556,86 @@
                   No applicable checks found in the rule library for this category.
                 </p>
               {:else}
-                {#each activeRules as rule (rule)}
-                  {@const rKey = `${domain.key}-${rule.rule_ref || rule.property_name}`}
-                  {@const rStatus = rule.status || ""}
-                  {@const failC = rule.fail_count || 0}
-                  {@const passC = rule.pass_count || 0}
-                  {@const missC = rule.missing_count || 0}
-                  {@const totalC = rule.total_count || 0}
-                  {@const summaryTxt =
-                    failC || missC
-                      ? `${failC} fail · ${passC} pass · ${missC} missing`
-                      : `${passC}/${totalC} pass`}
-                  {@const ruleLabel = `${rule.rule_ref || ""}  ${(rule.rule_desc || "").slice(0, 65)}`}
-                  {@const isRuleOpen =
-                    openRules[rKey] || rStatus === "FAIL" || rStatus === "MISSING_DATA"}
-
-                  <CollapsibleRoot
-                    open={isRuleOpen}
-                    onOpenChange={() => toggleRule(rKey)}
-                    class="overflow-hidden rounded-xl border border-border-subtle"
-                  >
-                    <CollapsibleTrigger
-                      class="group flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
-                    >
-                      <div class="flex min-w-0 items-center gap-2">
-                        <ChevronRight
-                          class="h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-200 group-data-[state=open]:rotate-90"
-                        />
-                        <span class="truncate text-xs font-bold text-accent">{ruleLabel}</span>
-                      </div>
-                      <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
-                        >{summaryTxt} · {ruleRequiredText(rule)}</span
+                {#each groupByCheckCategory(activeRules) as group (group.name)}
+                  <section class="space-y-2" aria-label={group.name}>
+                    <div class="flex items-center justify-between gap-2 px-1 pt-2">
+                      <h4 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
+                        {group.name}
+                      </h4>
+                      <span
+                        class="shrink-0 rounded-md border px-2 py-0.5 text-micro font-semibold {group.failCount
+                          ? 'border-critical-border bg-critical-bg text-critical'
+                          : group.missingCount
+                            ? 'border-warning-border bg-warning-bg text-warning'
+                            : 'border-success-border bg-success-bg text-success'}"
                       >
-                    </CollapsibleTrigger>
+                        {group.rules.length} rule{group.rules.length === 1 ? "" : "s"}
+                        {#if group.failCount}· {group.failCount} failed{:else if group.missingCount}· {group.missingCount} missing data{:else}· all pass{/if}
+                      </span>
+                    </div>
+                    {#each group.rules as rule (rule)}
+                      {@const rKey = `${domain.key}-${rule.rule_ref || rule.property_name}`}
+                      {@const rStatus = rule.status || ""}
+                      {@const failC = rule.fail_count || 0}
+                      {@const passC = rule.pass_count || 0}
+                      {@const missC = rule.missing_count || 0}
+                      {@const totalC = rule.total_count || 0}
+                      {@const summaryTxt =
+                        failC || missC
+                          ? `${failC} fail · ${passC} pass · ${missC} missing`
+                          : `${passC}/${totalC} pass`}
+                      {@const ruleLabel = `${rule.rule_ref || ""}  ${(rule.rule_desc || "").slice(0, 65)}`}
+                      {@const isRuleOpen =
+                        openRules[rKey] || rStatus === "FAIL" || rStatus === "MISSING_DATA"}
 
-                    <CollapsibleContent>
-                      {#if rule.property_name}
-                        <div
-                          class="flex items-center gap-1.5 border-t border-border-subtle px-3.5 py-1.5 text-micro text-fg-muted"
+                      <CollapsibleRoot
+                        open={isRuleOpen}
+                        onOpenChange={() => toggleRule(rKey)}
+                        class="overflow-hidden rounded-xl border border-border-subtle"
+                      >
+                        <CollapsibleTrigger
+                          class="group flex w-full items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-surface-hover"
                         >
-                          Checks
-                          <BsddBadge kind="property" value={rule.property_name} class="font-mono text-fg-secondary" />
-                        </div>
-                      {/if}
-                      {#if rule.scope_warnings?.length}
-                        <div class="space-y-1.5 border-t border-border-subtle px-3.5 py-2">
-                          {#each rule.scope_warnings as warning (warning)}
-                            <Alert type="warning" message={warning} />
-                          {/each}
-                        </div>
-                      {/if}
-                      <ElementResultsTable
-                        elements={rule.all_elements || []}
-                        unit={rule.unit}
-                        requiredText={ruleRequiredText(rule)}
-                        {fmtVal}
-                        onViewIn3d={(guid) =>
-                          selectedProjectId &&
-                          openViewerInNewTab(selectedProjectId, guid, result?.bcf_artifact_id || undefined)}
-                      />
-                    </CollapsibleContent>
-                  </CollapsibleRoot>
+                          <div class="flex min-w-0 items-center gap-2">
+                            <ChevronRight
+                              class="h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-200 group-data-[state=open]:rotate-90"
+                            />
+                            <span class="truncate text-xs font-bold text-accent">{ruleLabel}</span>
+                          </div>
+                          <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
+                            >{summaryTxt} · {ruleRequiredText(rule)}</span
+                          >
+                        </CollapsibleTrigger>
+
+                        <CollapsibleContent>
+                          {#if rule.property_name}
+                            <div
+                              class="flex items-center gap-1.5 border-t border-border-subtle px-3.5 py-1.5 text-micro text-fg-muted"
+                            >
+                              Checks
+                              <BsddBadge kind="property" value={rule.property_name} class="font-mono text-fg-secondary" />
+                            </div>
+                          {/if}
+                          {#if rule.scope_warnings?.length}
+                            <div class="space-y-1.5 border-t border-border-subtle px-3.5 py-2">
+                              {#each rule.scope_warnings as warning (warning)}
+                                <Alert type="warning" message={warning} />
+                              {/each}
+                            </div>
+                          {/if}
+                          <ElementResultsTable
+                            elements={rule.all_elements || []}
+                            unit={rule.unit}
+                            requiredText={ruleRequiredText(rule)}
+                            {fmtVal}
+                            onViewIn3d={(guid) =>
+                              selectedProjectId &&
+                              openViewerInNewTab(selectedProjectId, guid, result?.bcf_artifact_id || undefined)}
+                          />
+                        </CollapsibleContent>
+                      </CollapsibleRoot>
+                    {/each}
+                  </section>
                 {/each}
               {/if}
             </div>

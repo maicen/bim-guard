@@ -4,7 +4,9 @@
   import Select, { type SelectOption } from "../ui/Select.svelte";
   import Alert from "../Alert.svelte";
   import { ARCH_CATEGORY_OPTIONS, ARCH_MECHANISM_OPTIONS } from "../../analysisDomain";
-  import type { RuleFolder } from "../../types";
+  import { rulesApi } from "../../api";
+  import { checkCategoryFromOption, checkCategoryOptions } from "../../checkCategories";
+  import type { RuleCheckCategory, RuleFolder } from "../../types";
   import { toErrorLogEntry, type ErrorLogEntry } from "../../utils/errorLog";
 
   interface Props {
@@ -18,6 +20,7 @@
       mechanism?: string;
       severity?: string;
       needs_review?: number;
+      check_category?: string;
     }) => Promise<void>;
   }
 
@@ -34,6 +37,8 @@
   let mechanism = $state("__keep__");
   let severity = $state("__keep__");
   let needsReview = $state("__keep__");
+  let checkCategory = $state("__keep__");
+  let checkCategories = $state.raw<RuleCheckCategory[]>([]);
   let isUpdating = $state(false);
   let errorMessage = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
@@ -45,6 +50,7 @@
       mechanism = "__keep__";
       severity = "__keep__";
       needsReview = "__keep__";
+      checkCategory = "__keep__";
       errorMessage = "";
       errorLog = [];
       isUpdating = false;
@@ -63,6 +69,23 @@
     { value: "__keep__", label: "— Keep current —" },
     ...ARCH_CATEGORY_OPTIONS,
   ];
+
+  let checkCategorySelectOptions: SelectOption[] = $derived([
+    { value: "__keep__", label: "— Keep current —" },
+    ...checkCategoryOptions(checkCategories),
+  ]);
+
+  async function loadCheckCategories() {
+    try {
+      checkCategories = await rulesApi.listCheckCategories();
+    } catch (err: any) {
+      errorMessage = `Could not load check categories: ${err?.message || err}`;
+    }
+  }
+
+  $effect(() => {
+    if (isOpen) loadCheckCategories();
+  });
 
   const mechanismOptions: SelectOption[] = [
     { value: "__keep__", label: "— Keep current —" },
@@ -94,12 +117,14 @@
         mechanism?: string;
         severity?: string;
         needs_review?: number;
+        check_category?: string;
       } = {};
       if (rulesetId !== "__keep__") payload.ruleset_id = rulesetId;
       if (category !== "__keep__") payload.category = category;
       if (mechanism !== "__keep__") payload.mechanism = mechanism;
       if (severity !== "__keep__") payload.severity = severity;
       if (needsReview !== "__keep__") payload.needs_review = parseInt(needsReview, 10);
+      if (checkCategory !== "__keep__") payload.check_category = checkCategoryFromOption(checkCategory);
 
       await onUpdate(payload);
       onClose();
@@ -140,6 +165,16 @@
         value={rulesetId}
         onValueChange={(v) => (rulesetId = v)}
         ariaLabel="Move to Ruleset Folder"
+      />
+    </div>
+
+    <div class="space-y-1.5">
+      <span class="block font-semibold text-fg-secondary">Check Category</span>
+      <Select
+        options={checkCategorySelectOptions}
+        value={checkCategory}
+        onValueChange={(v) => (checkCategory = v)}
+        ariaLabel="Check Category"
       />
     </div>
 

@@ -42,7 +42,9 @@ export interface Rule extends Timestamps {
   ruleset_id?: string;
   rule_category?: string;
   category?: RulesetCategory | string;
-  /** IFC entity type the rule applies to (e.g. IfcPipeSegment), often bSDD-sourced. */
+  /** Name of the rule_check_categories entry results are grouped under (e.g. "Fire and Smoke Protection"); null = uncategorized. */
+  check_category?: string | null;
+  /** IFC entity type the rule applies to (e.g. IfcDoor, IfcWindow), often bSDD-sourced. */
   target_ifc_class?: string | null;
   property_set?: string;
   property_name?: string;
@@ -169,6 +171,15 @@ export interface RuleBulkUpdatePayload {
   severity?: string;
   needs_review?: number;
   property_set?: string;
+  /** Check category name to assign; "" clears it. */
+  check_category?: string;
+}
+
+/** One entry of the ordered check-category list (mirrors RuleCheckCategoryResponse). */
+export interface RuleCheckCategory {
+  id: number;
+  name: string;
+  sort_order: number;
 }
 
 export interface RuleBulkActionResponse {
@@ -263,6 +274,8 @@ export interface RuleCreateRequest {
   ruleset_id?: string | null;
   rule_category?: string;
   category?: string | null;
+  /** Name of the rule_check_categories entry results are grouped under (e.g. "Fire and Smoke Protection"); null = uncategorized. */
+  check_category?: string | null;
   target_ifc_class?: string | null;
   property_set?: string | null;
   property_name?: string | null;

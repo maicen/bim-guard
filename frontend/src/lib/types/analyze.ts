@@ -218,6 +218,8 @@ export interface RuleComplianceResult {
   rule_ref?: string;
   rule_id?: number;
   rule_desc?: string;
+  /** Check category the rule is grouped under within its element type; null = uncategorized. */
+  check_category?: string | null;
   property_name?: string;
   target?: string;
   operator?: string;

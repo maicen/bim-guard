@@ -3,7 +3,18 @@
   import { SlidersHorizontal } from "lucide-svelte";
   import { rulesApi } from "../api";
   import { ARCH_MECHANISM_OPTIONS } from "../analysisDomain";
-  import type { BSDDClassItem, BSDDPropertyItem, Rule, RulesetCategory } from "../types";
+  import type {
+    BSDDClassItem,
+    BSDDPropertyItem,
+    Rule,
+    RuleCheckCategory,
+    RulesetCategory,
+  } from "../types";
+  import {
+    UNCATEGORIZED_VALUE,
+    checkCategoryFromOption,
+    checkCategoryOptions,
+  } from "../checkCategories";
   import type { IfcPropertySuggestion } from "../archDomains";
   import {
     ROOM_TYPE_SUGGESTIONS,
@@ -15,6 +26,7 @@
   } from "../roomTypes";
   import Button from "./ui/Button.svelte";
   import Input from "./ui/Input.svelte";
+  import Select from "./ui/Select.svelte";
   import BsddAutocomplete from "./BsddAutocomplete.svelte";
   import BsddBadge from "./BsddBadge.svelte";
   import LiveReliability from "./LiveReliability.svelte";
@@ -82,6 +94,14 @@
   // `public.rules`), so this is carried through as a fixed value rather than
   // a user choice.
   const formDomainCategory: RulesetCategory = "Arch";
+  // Groups this rule's results under its element type in the analysis view.
+  let formCheckCategory = $state(seed?.check_category || UNCATEGORIZED_VALUE);
+  let checkCategories = $state.raw<RuleCheckCategory[]>([]);
+  let checkCategoryError = $state("");
+  rulesApi
+    .listCheckCategories()
+    .then((rows) => (checkCategories = rows))
+    .catch((err) => (checkCategoryError = `Could not load check categories: ${err.message}`));
   let formTargetIfcClass = $state(seed?.target_ifc_class || seedLockedClass || "");
   let formPropertySet = $state(seed?.property_set || "Pset_Compliance");
   let formPropertyName = $state(seed?.property_name || "");
@@ -235,6 +255,7 @@
         ruleset_id: formRulesetId,
         rule_category: formCategory,
         category: formDomainCategory,
+        check_category: checkCategoryFromOption(formCheckCategory),
         target_ifc_class: formTargetIfcClass || null,
         property_set: formPropertySet,
         property_name: formPropertyName,
@@ -359,6 +380,25 @@
       </div>
     </div>
   {/if}
+
+  <div>
+    <span class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary">
+      Check Category
+    </span>
+    <Select
+      options={checkCategoryOptions(checkCategories)}
+      bind:value={formCheckCategory}
+      ariaLabel="Check category"
+      triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas"
+    />
+    {#if checkCategoryError}
+      <p class="mt-1 text-xs text-critical">{checkCategoryError}</p>
+    {:else}
+      <p class="mt-1 text-xs text-fg-muted">
+        The heading this rule's results appear under for its element type.
+      </p>
+    {/if}
+  </div>
 
   <div>
     <span class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary">

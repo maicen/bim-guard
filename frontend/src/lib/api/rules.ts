@@ -3,6 +3,7 @@ import type {
   Rule,
   RuleBulkActionResponse,
   RuleBulkUpdatePayload,
+  RuleCheckCategory,
   RuleFolder,
   RuleFolderBulkActionResponse,
   RuleFolderBulkUpdatePayload,
@@ -136,6 +137,12 @@ export const rulesApi = {
       },
       options,
     );
+  },
+
+  /** Ordered check categories rule results are grouped under (GET /rules/check-categories). */
+  async listCheckCategories(): Promise<RuleCheckCategory[]> {
+    const res = await apiFetch(`${API_BASE}/rules/check-categories`);
+    return handleResponse<RuleCheckCategory[]>(res);
   },
 
   async createFolder(payload: RuleFolderCreatePayload): Promise<RuleFolder> {
