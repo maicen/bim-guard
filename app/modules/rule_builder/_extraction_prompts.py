@@ -129,7 +129,7 @@ CLAUSE TEXT:
 # ── Check-category formatter ──────────────────────────────────────────────────
 
 
-def format_check_category_context(*, categories: dict[str, str], section_heading: str | None) -> str:
+def format_check_category_context(*, categories: list[dict[str, str]], section_heading: str | None) -> str:
     """Render the allowed check categories as a prompt block, or "" if there are none.
 
     Pure function, injected into ``{check_category_context}`` in ``RULE_PROMPT``.
@@ -138,16 +138,23 @@ def format_check_category_context(*, categories: dict[str, str], section_heading
     category outright (e.g. "3. Fire and Smoke Protection").
 
     Args:
-        categories: ``{name: description}`` of the allowed categories, in display order.
+        categories: ``{name, description, target_ifc_class}`` per allowed category,
+            in display order; a category with a class only fits rules on that class.
         section_heading: Nearest enclosing section heading of the clause, if known.
     """
     if not categories:
         return ""
-    lines = ["CHECK CATEGORIES (pick exactly one name for check_category, or \"\"):"]
-    lines.extend(
-        f"  - {name}: {description}" if description else f"  - {name}"
-        for name, description in categories.items()
-    )
+    lines = [
+        "CHECK CATEGORIES (pick exactly one name for check_category, or \"\"; a",
+        "category listed under an element type only fits rules targeting that type):",
+    ]
+    for ifc_class in dict.fromkeys(c.get("target_ifc_class") or "" for c in categories):
+        lines.append(f"  {ifc_class or 'Any element type'}:")
+        lines.extend(
+            f"    - {c['name']}: {c['description']}" if c.get("description") else f"    - {c['name']}"
+            for c in categories
+            if (c.get("target_ifc_class") or "") == ifc_class
+        )
     if section_heading:
         lines.append(f'The clause sits under the section heading: "{section_heading}".')
     lines.append("")

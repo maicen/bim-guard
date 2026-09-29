@@ -386,7 +386,7 @@
       Check Category
     </span>
     <Select
-      options={checkCategoryOptions(checkCategories)}
+      options={checkCategoryOptions(checkCategories, formTargetIfcClass)}
       bind:value={formCheckCategory}
       ariaLabel="Check category"
       triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas"

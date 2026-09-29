@@ -16,6 +16,7 @@ _CATEGORY_COLUMNS = {
     "id": int,
     "name": str,
     "description": str,
+    "target_ifc_class": str,
     "sort_order": int,
     "created_at": str,
 }
@@ -59,13 +60,21 @@ class RuleCheckCategoryService:
         """Return the category names in display order."""
         return [str(r["name"]) for r in self.list_categories() if r.get("name")]
 
-    def descriptions(self) -> dict[str, str]:
-        """Return ``{name: description}`` in display order (for the extraction prompt)."""
-        return {
-            str(r["name"]): str(r.get("description") or "")
+    def prompt_categories(self) -> list[dict[str, str]]:
+        """Return ``{name, description, target_ifc_class}`` per category, in display order.
+
+        Shape consumed by the extraction prompt; ``target_ifc_class`` is ""
+        for a category offered to every element type.
+        """
+        return [
+            {
+                "name": str(r["name"]),
+                "description": str(r.get("description") or ""),
+                "target_ifc_class": str(r.get("target_ifc_class") or ""),
+            }
             for r in self.list_categories()
             if r.get("name")
-        }
+        ]
 
     def resolve(self, value: str | None) -> str | None:
         """Map a user- or LLM-supplied name to its stored spelling, or None.

@@ -538,6 +538,9 @@ class RuleCheckCategoryResponse(BaseModel):
     id: int
     name: str
     description: str = Field(default="", description="What rules in this category test")
+    target_ifc_class: Optional[str] = Field(
+        default=None, description="Element type the category groups (e.g. IfcWindow); null = every type"
+    )
     sort_order: int = 0
 
 class RuleBulkDeleteRequest(BaseModel):

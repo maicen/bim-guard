@@ -181,6 +181,8 @@ export interface RuleCheckCategory {
   name: string;
   /** What rules in this category test; shown under its heading. */
   description: string;
+  /** Element type the category groups (e.g. IfcWindow); null = every element type. */
+  target_ifc_class: string | null;
   sort_order: number;
 }
 

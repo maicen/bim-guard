@@ -14,11 +14,22 @@ export const UNCATEGORIZED_LABEL = "Uncategorized";
  */
 export const UNCATEGORIZED_VALUE = "__uncategorized__";
 
-/** Options for a category picker, "Uncategorized" first. */
-export function checkCategoryOptions(categories: RuleCheckCategory[]) {
+/**
+ * Options for a category picker, "Uncategorized" first. With `targetIfcClass`
+ * only categories for that element type (or for every type) are offered;
+ * without it every category is listed, labelled with its element type.
+ */
+export function checkCategoryOptions(categories: RuleCheckCategory[], targetIfcClass?: string | null) {
+  const target = targetIfcClass?.trim().toLowerCase();
+  const offered = target
+    ? categories.filter((c) => !c.target_ifc_class || c.target_ifc_class.toLowerCase() === target)
+    : categories;
   return [
     { value: UNCATEGORIZED_VALUE, label: UNCATEGORIZED_LABEL },
-    ...categories.map((c) => ({ value: c.name, label: c.name })),
+    ...offered.map((c) => ({
+      value: c.name,
+      label: !target && c.target_ifc_class ? `${c.name} (${c.target_ifc_class})` : c.name,
+    })),
   ];
 }
 

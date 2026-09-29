@@ -15,7 +15,10 @@ from app.services.rules_service import RuleService
 pytestmark = pytest.mark.rules
 
 CATEGORIES = ["Fire and Smoke Protection", "Emergency Escape", "Energy Performance"]
-DESCRIPTIONS = {name: f"Tests about {name.lower()}." for name in CATEGORIES}
+PROMPT_CATEGORIES = [
+    {"name": name, "description": f"Tests about {name.lower()}.", "target_ifc_class": "IfcWindow"}
+    for name in CATEGORIES
+]
 
 
 class _FakeCategoriesRepo:
@@ -104,22 +107,33 @@ def _node() -> DocumentNodeContract:
 
 
 def test_candidate_category_is_mapped_to_stored_spelling():
-    candidate = _LLMRuleCandidate(description="Rated windows", check_category="FIRE AND SMOKE PROTECTION")
-    draft = _candidate_to_draft(candidate, _node(), check_categories=DESCRIPTIONS)
+    candidate = _LLMRuleCandidate(
+        description="Rated windows", target_ifc_class="IfcWindow", check_category="FIRE AND SMOKE PROTECTION"
+    )
+    draft = _candidate_to_draft(candidate, _node(), check_categories=PROMPT_CATEGORIES)
     assert draft.proposed_rule.check_category == "Fire and Smoke Protection"
 
 
 def test_invented_candidate_category_is_dropped():
     candidate = _LLMRuleCandidate(description="Rated windows", check_category="Fire Resistance")
-    draft = _candidate_to_draft(candidate, _node(), check_categories=DESCRIPTIONS)
+    draft = _candidate_to_draft(candidate, _node(), check_categories=PROMPT_CATEGORIES)
+    assert draft.proposed_rule.check_category is None
+
+
+def test_category_of_another_element_type_is_dropped():
+    candidate = _LLMRuleCandidate(
+        description="Rated doors", target_ifc_class="IfcDoor", check_category="Fire and Smoke Protection"
+    )
+    draft = _candidate_to_draft(candidate, _node(), check_categories=PROMPT_CATEGORIES)
     assert draft.proposed_rule.check_category is None
 
 
 def test_category_context_lists_names_and_heading():
-    block = format_check_category_context(categories=DESCRIPTIONS, section_heading="3. Fire and Smoke")
-    assert all(f"  - {name}: {DESCRIPTIONS[name]}" in block for name in CATEGORIES)
+    block = format_check_category_context(categories=PROMPT_CATEGORIES, section_heading="3. Fire and Smoke")
+    assert "  IfcWindow:" in block
+    assert all(f"    - {c['name']}: {c['description']}" in block for c in PROMPT_CATEGORIES)
     assert '"3. Fire and Smoke"' in block
-    assert format_check_category_context(categories={}, section_heading="x") == ""
+    assert format_check_category_context(categories=[], section_heading="x") == ""
 
 
 def test_property_map_lookup_is_case_insensitive_and_class_scoped():
