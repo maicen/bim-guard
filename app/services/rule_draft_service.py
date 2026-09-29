@@ -336,7 +336,7 @@ class RuleDraftService:
             ruleset_id=payload.ruleset_id or "",
             rule_category=payload.rule_category or "property_check",
             category=payload.category or "",
-            check_category=payload.check_category,
+            check_category_id=payload.check_category_id,
             confidence=float(payload.confidence) if payload.confidence else 1.0,
             extraction_method=payload.extraction_method or "ai_extracted",
             needs_review=payload.needs_review,

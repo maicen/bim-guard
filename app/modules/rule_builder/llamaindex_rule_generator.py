@@ -139,7 +139,7 @@ def _candidate_to_draft(
     *,
     deontic: DeonticStatement | None = None,
     class_candidates: list[dict] | None = None,
-    check_categories: list[dict[str, str]] | None = None,
+    check_categories: list[dict] | None = None,
 ) -> RuleExtractionDraft | None:
     """Map a validated LLM candidate onto a RuleExtractionDraft, or None if empty.
 
@@ -162,15 +162,21 @@ def _candidate_to_draft(
     # rules column is a foreign key, so an invented category can't be saved.
     # A category scoped to another element type (a door category on a window
     # rule) is dropped too.
+    # Names repeat across element types, so the match is made within the
+    # candidate's class and stored by id.
     wanted = candidate.check_category.strip().casefold()
     target = candidate.target_ifc_class.strip().casefold()
-    check_category = next(
+    check_category_id = next(
         (
-            c["name"]
+            c["id"]
             for c in check_categories or []
             if wanted
             and c["name"].casefold() == wanted
-            and (not c.get("target_ifc_class") or not target or c["target_ifc_class"].casefold() == target)
+            and (
+                not c.get("target_ifc_classes")
+                or not target
+                or target in (cls.casefold() for cls in c["target_ifc_classes"])
+            )
         ),
         None,
     )
@@ -204,7 +210,7 @@ def _candidate_to_draft(
         rase_selection=candidate.rase_selection or None,
         rase_exception=candidate.rase_exception or None,
         kg_candidate_used=candidate.kg_candidate_used.strip() or None,
-        check_category=check_category,
+        check_category_id=check_category_id,
     )
 
     return RuleExtractionDraft(
@@ -237,7 +243,7 @@ class LlamaIndexRuleGenerator:
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
-        check_categories: list[dict[str, str]] | None = None,
+        check_categories: list[dict] | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -256,8 +262,8 @@ class LlamaIndexRuleGenerator:
                 and clause-dependency edges are shown to the LLM as part of
                 the prompt (see _format_kg_context), instead of only being
                 used to correct the LLM's answer after the fact.
-            check_categories: Allowed check categories as ``{name,
-                description, target_ifc_class}`` (from ``rule_check_categories``);
+            check_categories: Allowed check categories as ``{id, name,
+                description, target_ifc_classes}`` (from ``rule_check_categories``);
                 the LLM picks one per rule, guided by the descriptions and the
                 clause's section heading. None/empty skips categorisation.
         """

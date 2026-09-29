@@ -11,8 +11,8 @@
     RulesetCategory,
   } from "../types";
   import {
-    UNCATEGORIZED_VALUE,
     checkCategoryFromOption,
+    checkCategoryOption,
     checkCategoryOptions,
   } from "../checkCategories";
   import type { IfcPropertySuggestion } from "../archDomains";
@@ -95,7 +95,7 @@
   // a user choice.
   const formDomainCategory: RulesetCategory = "Arch";
   // Groups this rule's results under its element type in the analysis view.
-  let formCheckCategory = $state(seed?.check_category || UNCATEGORIZED_VALUE);
+  let formCheckCategory = $state(checkCategoryOption(seed?.check_category_id));
   let checkCategories = $state.raw<RuleCheckCategory[]>([]);
   let checkCategoryError = $state("");
   rulesApi
@@ -255,7 +255,7 @@
         ruleset_id: formRulesetId,
         rule_category: formCategory,
         category: formDomainCategory,
-        check_category: checkCategoryFromOption(formCheckCategory),
+        check_category_id: checkCategoryFromOption(formCheckCategory),
         target_ifc_class: formTargetIfcClass || null,
         property_set: formPropertySet,
         property_name: formPropertyName,

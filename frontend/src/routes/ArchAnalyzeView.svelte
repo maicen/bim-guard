@@ -152,6 +152,8 @@
   }
 
   interface CheckCategoryGroup {
+    /** Category id, or 0 for the uncategorized group. */
+    id: number;
     name: string;
     description: string;
     rules: RuleComplianceResult[];
@@ -165,23 +167,21 @@
    * rules for this element type are omitted.
    */
   function groupByCheckCategory(rules: RuleComplianceResult[]): CheckCategoryGroup[] {
-    const byName = new Map<string, RuleComplianceResult[]>();
+    const byId = new Map<number, RuleComplianceResult[]>();
     for (const rule of rules) {
-      const name = rule.check_category || UNCATEGORIZED_LABEL;
-      byName.set(name, [...(byName.get(name) || []), rule]);
+      // An id missing from the list (category since deleted) counts as uncategorized.
+      const known = checkCategories.some((c) => c.id === rule.check_category_id);
+      const id = known ? (rule.check_category_id as number) : 0;
+      byId.set(id, [...(byId.get(id) || []), rule]);
     }
-    const order = checkCategories.map((c) => c.name);
-    const rank = (name: string) =>
-      name === UNCATEGORIZED_LABEL
-        ? Number.MAX_SAFE_INTEGER
-        : order.includes(name)
-          ? order.indexOf(name)
-          : order.length;
-    return [...byName.entries()]
-      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-      .map(([name, groupRules]) => ({
-        name,
-        description: checkCategories.find((c) => c.name === name)?.description || "",
+    const order = checkCategories.map((c) => c.id);
+    const rank = (id: number) => (id === 0 ? Number.MAX_SAFE_INTEGER : order.indexOf(id));
+    return [...byId.entries()]
+      .sort(([a], [b]) => rank(a) - rank(b))
+      .map(([id, groupRules]) => ({
+        id,
+        name: checkCategories.find((c) => c.id === id)?.name || UNCATEGORIZED_LABEL,
+        description: checkCategories.find((c) => c.id === id)?.description || "",
         rules: groupRules,
         failCount: groupRules.filter((r) => r.status === "FAIL").length,
         missingCount: groupRules.filter((r) => ["MISSING_DATA", "PARTIAL"].includes(r.status || ""))
@@ -1558,7 +1558,7 @@
                   No applicable checks found in the rule library for this category.
                 </p>
               {:else}
-                {#each groupByCheckCategory(activeRules) as group (group.name)}
+                {#each groupByCheckCategory(activeRules) as group (group.id)}
                   <section class="space-y-2" aria-label={group.name}>
                     <div class="flex items-start justify-between gap-2 px-1 pt-2">
                       <div class="min-w-0">

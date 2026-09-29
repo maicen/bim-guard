@@ -83,10 +83,10 @@ _META_COLUMNS = {
     "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
     # | "scoring_model" | "mitigation" | "reference_config"
     "category": str,  # "Arch"
-    # Name of a rule_check_categories row (e.g. "Fire and Smoke Protection")
-    # that groups this rule's results under each element type; "" / NULL =
-    # uncategorized. Distinct from rule_category above, which is the mechanism.
-    "check_category": str,
+    # rule_check_categories row (e.g. "Fire and Smoke Protection") that groups
+    # this rule's results under its element type; NULL = uncategorized.
+    # Distinct from rule_category above, which is the mechanism.
+    "check_category_id": int,
 }
 
 _FOLDER_COLUMNS = {
@@ -442,7 +442,7 @@ class RuleService:
         ruleset_id: str = "",
         rule_category: str = "property_check",
         category: str = "",
-        check_category: str | None = None,
+        check_category_id: int | None = None,
         rule_id: str = "",
         # RASE (Requirement/Applicability/Selection/Exception) provenance
         rase_requirement: str | None = None,
@@ -454,8 +454,8 @@ class RuleService:
         ref = (rule_id or reference or "").strip()
         now = now_iso_utc()
         # An explicit category wins; otherwise the class + property map decides.
-        resolved_check_category = self.resolve_check_category(
-            check_category
+        resolved_check_category_id = self.validate_check_category_id(
+            check_category_id, target_ifc_class
         ) or self._check_categories.category_for_property(target_ifc_class, property_name)
         norm_cat = self.normalize_category(category, default="") or self.infer_category(
             {
@@ -515,7 +515,7 @@ class RuleService:
             "updated_at": now,
             # Only written when set, so an uncategorized rule never names the
             # column: a database without it would otherwise reject every insert.
-            **({"check_category": resolved_check_category} if resolved_check_category else {}),
+            **({"check_category_id": resolved_check_category_id} if resolved_check_category_id else {}),
         }
 
     def create_rule(self, **kwargs) -> dict:
@@ -576,8 +576,8 @@ class RuleService:
         ruleset_id: str = "",
         rule_category: str = "",
         category: str = "",
-        # None leaves the stored check category untouched; "" clears it.
-        check_category: str | None = None,
+        # None leaves the stored check category untouched; 0 clears it.
+        check_category_id: int | None = None,
         # ifc target
         property_set: str = "",
         property_name: str = "",
@@ -661,8 +661,10 @@ class RuleService:
             updates["category"] = self.normalize_category(category)
         if applies_when is not None:
             updates["applies_when"] = json.dumps(applies_when)
-        if check_category is not None:
-            updates["check_category"] = self.resolve_check_category(check_category)
+        if check_category_id is not None:
+            updates["check_category_id"] = self.validate_check_category_id(
+                check_category_id, updates["target_ifc_class"]
+            )
 
         self._rules.update(
             updates=updates,
@@ -678,19 +680,20 @@ class RuleService:
             self._drop_folder_if_orphan(old_normalized)
         invalidate_cache("bimguard:rules")
 
-    def resolve_check_category(self, value: str | None) -> str | None:
-        """Return the stored spelling of a check category, or None when blank.
+    def validate_check_category_id(self, category_id: int | None, target_ifc_class: str | None) -> int | None:
+        """Return ``category_id`` when it may be stored on a rule of ``target_ifc_class``; None when 0/None.
 
-        Raises ValueError for a name that is not in ``rule_check_categories``:
-        the column is a foreign key, and writing an unknown name would fail
-        the insert/update outright.
+        Raises ValueError for an id that is not in ``rule_check_categories``
+        (the column is a foreign key, so it would fail the write outright) or
+        that belongs to another element type (a door category on a window rule).
         """
-        if not (value or "").strip():
+        if not category_id:
             return None
-        resolved = self._check_categories.resolve(value)
-        if resolved is None:
-            raise ValueError(f"Unknown check category {value!r}.")
-        return resolved
+        if not self._check_categories.applies_to(category_id, target_ifc_class):
+            raise ValueError(
+                f"Check category {category_id} does not exist or does not apply to {target_ifc_class or 'this rule'}."
+            )
+        return int(category_id)
 
     def patch_rule_columns(self, rule_id: int, columns: dict[str, Any]) -> None:
         """Overwrite the given columns of one rule and leave every other column as stored.
@@ -1148,8 +1151,13 @@ class RuleService:
             cleaned_updates["needs_review"] = int(updates["needs_review"])
         if "property_set" in updates and updates["property_set"] is not None:
             cleaned_updates["property_set"] = updates["property_set"].strip()
-        if "check_category" in updates and updates["check_category"] is not None:
-            cleaned_updates["check_category"] = self.resolve_check_category(updates["check_category"])
+        if "check_category_id" in updates and updates["check_category_id"] is not None:
+            # Validated against every rule first, so a category that fits only
+            # some of them changes none.
+            category_id = updates["check_category_id"]
+            for rule in filter(None, (self.get_rule(rid) for rid in rule_ids)):
+                self.validate_check_category_id(category_id, rule.get("target_ifc_class"))
+            cleaned_updates["check_category_id"] = category_id or None
 
         updated_ids: list[int] = []
         for rule_id in rule_ids:
@@ -1377,9 +1385,12 @@ class RuleService:
                 ruleset_id=ruleset_id,
                 rule_category=str(rule.get("rule_category") or "property_check"),
                 category=str(rule.get("category") or top_category),
-                # A file from another deployment may name a category this one
-                # doesn't have; that rule imports uncategorized, not as a failure.
-                check_category=self._check_categories.resolve(rule.get("check_category")),
+                # Carried by name: ids differ between deployments. A name this
+                # one doesn't have imports uncategorized, not as a failure.
+                check_category_id=self._check_categories.id_for_name(
+                    rule.get("check_category"),
+                    str(rule.get("target") or rule.get("target_ifc_class") or ""),
+                ),
                 parameters=json.dumps(rule.get("parameters") or {}),
             )
             saved += 1
@@ -1419,7 +1430,6 @@ class RuleService:
                 "ref": r.get("reference") or r.get("rule_id") or "",
                 "rule_type": r.get("rule_type") or "numeric_comparison",
                 "rule_category": r.get("rule_category") or "",
-                "check_category": r.get("check_category") or "",
                 "desc": r.get("description") or "",
                 "target": r.get("target_ifc_class") or "",
                 "source_text": r.get("source_text") or "",

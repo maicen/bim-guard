@@ -42,8 +42,8 @@ export interface Rule extends Timestamps {
   ruleset_id?: string;
   rule_category?: string;
   category?: RulesetCategory | string;
-  /** Name of the rule_check_categories entry results are grouped under (e.g. "Fire and Smoke Protection"); null = uncategorized. */
-  check_category?: string | null;
+  /** rule_check_categories id this rule's results are grouped under; null = uncategorized. */
+  check_category_id?: number | null;
   /** IFC entity type the rule applies to (e.g. IfcDoor, IfcWindow), often bSDD-sourced. */
   target_ifc_class?: string | null;
   property_set?: string;
@@ -171,8 +171,8 @@ export interface RuleBulkUpdatePayload {
   severity?: string;
   needs_review?: number;
   property_set?: string;
-  /** Check category name to assign; "" clears it. */
-  check_category?: string;
+  /** Check category id to assign; 0 clears it. */
+  check_category_id?: number;
 }
 
 /** One entry of the ordered check-category list (mirrors RuleCheckCategoryResponse). */
@@ -181,8 +181,8 @@ export interface RuleCheckCategory {
   name: string;
   /** What rules in this category test; shown under its heading. */
   description: string;
-  /** Element type the category groups (e.g. IfcWindow); null = every element type. */
-  target_ifc_class: string | null;
+  /** Element types the category groups (e.g. ["IfcWindow"]); empty = every element type. */
+  target_ifc_classes: string[];
   sort_order: number;
 }
 
@@ -278,8 +278,8 @@ export interface RuleCreateRequest {
   ruleset_id?: string | null;
   rule_category?: string;
   category?: string | null;
-  /** Name of the rule_check_categories entry results are grouped under (e.g. "Fire and Smoke Protection"); null = uncategorized. */
-  check_category?: string | null;
+  /** rule_check_categories id this rule's results are grouped under; null = uncategorized. */
+  check_category_id?: number | null;
   target_ifc_class?: string | null;
   property_set?: string | null;
   property_name?: string | null;

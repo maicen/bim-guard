@@ -1,7 +1,8 @@
 /**
  * Check categories group a rule's results under its element type (e.g.
  * "Fire and Smoke Protection" under Windows). The list itself is data —
- * `rulesApi.listCheckCategories()` — so only the "none" handling lives here.
+ * `rulesApi.listCheckCategories()` — and names repeat across element types,
+ * so rules and results reference a category by id.
  */
 import type { RuleCheckCategory } from "./types";
 
@@ -9,31 +10,48 @@ import type { RuleCheckCategory } from "./types";
 export const UNCATEGORIZED_LABEL = "Uncategorized";
 
 /**
- * Select value standing in for "no category": bits-ui Select treats "" as
- * "nothing selected", so the explicit choice needs a real value.
+ * Select value for "no category". It is also what the API takes to clear a
+ * category (id 0), and bits-ui Select treats "" as "nothing selected".
  */
-export const UNCATEGORIZED_VALUE = "__uncategorized__";
+export const UNCATEGORIZED_VALUE = "0";
+
+/** True when `category` is offered for `targetIfcClass` (or for every element type). */
+export function categoryAppliesTo(category: RuleCheckCategory, targetIfcClass?: string | null): boolean {
+  const target = targetIfcClass?.trim().toLowerCase();
+  return (
+    !target ||
+    !category.target_ifc_classes.length ||
+    category.target_ifc_classes.some((c) => c.toLowerCase() === target)
+  );
+}
 
 /**
  * Options for a category picker, "Uncategorized" first. With `targetIfcClass`
  * only categories for that element type (or for every type) are offered;
- * without it every category is listed, labelled with its element type.
+ * without it every category is listed, labelled with its element types.
  */
 export function checkCategoryOptions(categories: RuleCheckCategory[], targetIfcClass?: string | null) {
-  const target = targetIfcClass?.trim().toLowerCase();
-  const offered = target
-    ? categories.filter((c) => !c.target_ifc_class || c.target_ifc_class.toLowerCase() === target)
-    : categories;
+  const hasTarget = !!targetIfcClass?.trim();
   return [
     { value: UNCATEGORIZED_VALUE, label: UNCATEGORIZED_LABEL },
-    ...offered.map((c) => ({
-      value: c.name,
-      label: !target && c.target_ifc_class ? `${c.name} (${c.target_ifc_class})` : c.name,
-    })),
+    ...categories
+      .filter((c) => categoryAppliesTo(c, targetIfcClass))
+      .map((c) => ({
+        value: String(c.id),
+        label:
+          !hasTarget && c.target_ifc_classes.length
+            ? `${c.name} (${c.target_ifc_classes.join(", ")})`
+            : c.name,
+      })),
   ];
 }
 
-/** Map a picker value back to what the API expects ("" clears the category). */
-export function checkCategoryFromOption(value: string): string {
-  return value === UNCATEGORIZED_VALUE ? "" : value;
+/** The picker value for a stored category id. */
+export function checkCategoryOption(categoryId: number | null | undefined): string {
+  return categoryId ? String(categoryId) : UNCATEGORIZED_VALUE;
+}
+
+/** Map a picker value back to the id the API expects (0 clears the category). */
+export function checkCategoryFromOption(value: string): number {
+  return Number(value) || 0;
 }

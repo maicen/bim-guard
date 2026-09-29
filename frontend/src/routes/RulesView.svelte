@@ -364,7 +364,7 @@
     mechanism?: string;
     severity?: string;
     needs_review?: number;
-    check_category?: string;
+    check_category_id?: number;
   }) {
     if (!table.selectedCount) return;
     const targetIds = [...table.selectedIdList];
@@ -376,7 +376,7 @@
     if (payload.mechanism !== undefined) patch.mechanism = payload.mechanism;
     if (payload.severity !== undefined) patch.severity = payload.severity as any;
     if (payload.needs_review !== undefined) patch.needs_review = payload.needs_review;
-    if (payload.check_category !== undefined) patch.check_category = payload.check_category || null;
+    if (payload.check_category_id !== undefined) patch.check_category_id = payload.check_category_id || null;
 
     await table.optimisticUpdate({
       ids: targetIds,

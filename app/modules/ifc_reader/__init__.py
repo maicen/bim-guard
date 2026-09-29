@@ -1989,7 +1989,7 @@ class IFCReader:
                     "ruleset_id": rule.get("ruleset_id"),
                     # Groups this rule's result under its element type in the
                     # analysis view (e.g. "Fire and Smoke Protection").
-                    "check_category": rule.get("check_category") or None,
+                    "check_category_id": rule.get("check_category_id") or None,
                     "source_text": rule.get("source_text"),
                     "source_document_id": rule.get("source_document_id"),
                     "source_page_number": rule.get("source_page_number"),

@@ -20,7 +20,7 @@
       mechanism?: string;
       severity?: string;
       needs_review?: number;
-      check_category?: string;
+      check_category_id?: number;
     }) => Promise<void>;
   }
 
@@ -117,14 +117,14 @@
         mechanism?: string;
         severity?: string;
         needs_review?: number;
-        check_category?: string;
+        check_category_id?: number;
       } = {};
       if (rulesetId !== "__keep__") payload.ruleset_id = rulesetId;
       if (category !== "__keep__") payload.category = category;
       if (mechanism !== "__keep__") payload.mechanism = mechanism;
       if (severity !== "__keep__") payload.severity = severity;
       if (needsReview !== "__keep__") payload.needs_review = parseInt(needsReview, 10);
-      if (checkCategory !== "__keep__") payload.check_category = checkCategoryFromOption(checkCategory);
+      if (checkCategory !== "__keep__") payload.check_category_id = checkCategoryFromOption(checkCategory);
 
       await onUpdate(payload);
       onClose();

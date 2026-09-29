@@ -1004,8 +1004,8 @@ def bulk_update_rules(
         updates["needs_review"] = payload.needs_review
     if payload.property_set is not None:
         updates["property_set"] = payload.property_set
-    if payload.check_category is not None:
-        updates["check_category"] = payload.check_category
+    if payload.check_category_id is not None:
+        updates["check_category_id"] = payload.check_category_id
 
     try:
         updated_ids = service.bulk_update_rules(payload.rule_ids, updates)
@@ -1237,7 +1237,7 @@ def create_rule(
             ruleset_id=payload.ruleset_id,
             rule_category=payload.rule_category or "property_check",
             category=payload.category or "",
-            check_category=payload.check_category,
+            check_category_id=payload.check_category_id,
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "manual",
             needs_review=payload.needs_review,
@@ -1500,7 +1500,7 @@ def bulk_create_rules(
             mechanism=payload.mechanism or "CODE",
             ruleset_id=payload.ruleset_id,
             rule_category=payload.rule_category or "property_check",
-            check_category=payload.check_category,
+            check_category_id=payload.check_category_id,
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "ai_extracted",
             needs_review=payload.needs_review,

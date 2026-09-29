@@ -191,7 +191,7 @@ class RuleDraftGenerator(Protocol):
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
-        check_categories: list[dict[str, str]] | None = None,
+        check_categories: list[dict] | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Generate zero or more rule drafts from one clause-annotated node."""
         ...
@@ -262,9 +262,9 @@ class RuleExtractionService:
         """
         rule = draft.proposed_rule
         mapped = self._check_categories.category_for_property(rule.target_ifc_class, rule.property_name)
-        if not mapped or mapped == rule.check_category:
+        if not mapped or mapped == rule.check_category_id:
             return draft
-        return draft.model_copy(update={"proposed_rule": rule.model_copy(update={"check_category": mapped})})
+        return draft.model_copy(update={"proposed_rule": rule.model_copy(update={"check_category_id": mapped})})
 
     def _search_properties_grounded(self, prop_name: str) -> list[contracts.BSDDPropertyItem]:
         """Local ontology first (in-process DuckDB, <1ms, offline), live bSDD only on a local miss.
