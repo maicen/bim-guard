@@ -1,857 +1,192 @@
-# TODO
-
-Last reviewed: 2026-09-05
-
-## Completed Foundations
-
-- [x] Centralize deterministic `.env` loading for application startup, logging,
-      persistence, object storage, and module configuration.
-- [x] Remove stale database-backed storage/model settings and legacy configuration
-      paths.
-- [x] Separate enhancement planning/execution from read-only analysis services.
-- [x] Execute IFC enhancement against a temporary output instead of overwriting the
-      source model.
-- [x] Upload versioned enhanced IFC artifacts to Supabase Storage under
-      `enhancements/{project_id}`.
-- [x] Deploy the `model_enhancement_lineage` ledger with project/version uniqueness,
-      source/output validation, and append-only application privileges.
-- [x] Add dependency-injected storage, improver, and lineage contracts to the
-      enhancement pipeline.
-- [x] Add a rule-evaluator protocol and registry for GC-001, CC-001, and MC-001.
-- [x] Add IDS XML import/export for compatible property rules.
-- [x] Add extracted-rule preview, inline correction, confidence/review badges, and
-      per-rule save controls.
-
-## Priority 1: Production Pipeline Separation
-
-- [x] Replace placeholder `AnalysisService` results with the real comparator registry.
-- [x] Make the audit pipeline the controlling application analysis path.
-- [x] Guarantee that audit processing never invokes IFC mutation or `improver.py`.
-- [x] Return typed audit issues and BCF topics from the audit pipeline.
-- [x] Connect DB-backed rules to audit execution. Owner: Osama.
-- [x] Add a separately authorized enhancement command/API; do not expose enhancement
-      as an audit option.
-- [x] Allocate enhancement versions transactionally from the lineage repository rather
-      than accepting arbitrary caller-provided versions.
-- [x] Add project UI for enhancement history, source version, generated version, status,
-      summary, and artifact download.
-
-Completion evidence (2026-08-22):
-
-- `BIMGuard_App` routes MEP evaluation through the immutable audit service and merges
-  DB-backed rule failures into the same issue/BCF topic contract.
-- Supabase migration `20260822141146_allocate_model_enhancement_versions` provides
-  collision-free database-owned version allocation; eight concurrent calls returned
-  unique consecutive versions.
-- The enhancement route is fail-closed behind `BIM_GUARD_ENHANCEMENT_TOKEN` and is
-  separate from all audit routes.
-- Production smoke test generated project 5 version 1, preserved the source SHA-256,
-  uploaded a 231,306-byte IFC artifact, and recorded lineage row 2.
-- Desktop and 390 px mobile browser checks passed; invalid authorization left lineage
-  unchanged, and history/download controls rendered correctly.
-
-## Priority 2: Dependency Inversion
-
-- [x] Replace broad evaluator `Any`/`dict` contracts with typed request and result models (`RuleEvaluationRequest`, `RuleEvaluationResult` in `app/modules/contracts.py`).
-- [x] Make each physics engine implement the evaluator interface directly instead of
-      relying on `CallableRuleEvaluator` adapters (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`).
-- [x] Keep custom Python evaluators limited to geometry, topology, proximity, and other
-      checks IDS cannot express. Documented in `docs/architecture.md`.
-- [x] Provide central dependency injection for FastAPI service layer in `app/api/dependencies.py`.
-- [x] Inject project, document, rule, storage, and lineage repositories into services;
-      remove internal construction of Supabase adapters from business logic.
-- [x] Move default engine/repository composition to an application bootstrap module (`app/bootstrap.py`).
-
-Completion evidence (2026-08-29):
-
-- Added strict Pydantic contracts `RuleEvaluationRequest` and `RuleEvaluationResult` to `app/modules/contracts.py` with dictionary-like mapping compatibility (`__getitem__`, `.get()`, `__contains__`, `__eq__`, `to_dict()`).
-- Implemented `RuleEvaluator` protocol directly across physics engines (`GalvanicCorrosionEngine`, `CreviceCorrosionEngine`, `MICEngine`) and architectural engines (`EgressAnalysisEngine`, `SpatialDaylightEngine` in `app/engines/bimguard_arch_engine.py`).
-- Seeded database-driven architectural code rules (`CODE 9.9.10.1`, `CODE 9.9.4.1`, `CODE 9.7.2.3`, `CODE 9.10.9.14.PW`) under `BUILDING-CODE-PART9`, parameterizing `ifc_egress.py` and `ifc_spatial.py` with dynamic threshold resolution.
-- Updated `register_default_engines()` in `app/modules/comparator/engine_registry.py` to register all corrosion and architectural engine instances directly without `CallableRuleEvaluator` wrapping.
-- Refactored `ProjectsService`, `DocumentService`, `RuleService`, `SettingsService`, `StaticDataService`, `SupabaseModelLineageRepository`, and `ObjectStorage` to accept optional injected repositories and storage instances.
-- Created `ArchAnalysisService` with constructor dependency injection and wired it into `ApplicationContainer` and FastAPI dependency injection (`/api/analyze/arch`).
-- Created `app/bootstrap.py` with `ApplicationContainer`, `build_default_container()`, `get_container()`, `set_container()`, and `reset_container()` for single-point composition of persistence adapters, engines, and domain services.
-- Re-wired `app/api/dependencies.py` and `app/main.py` to resolve dependencies from the bootstrap container.
-- Added comprehensive unit test suites in `tests/test_dependency_inversion.py` (9 tests) and `tests/test_arch_engine_di.py` (6 tests) validating contracts, direct engine evaluation, repository injection, dynamic threshold overrides, and container composition.
-- All API and registry test suites passed (`tests/test_api_projects.py`, `tests/test_api_rules.py`, `tests/test_api_analyze.py`, `tests/test_api_events.py`, `tests/test_api_gateway.py`, `tests/test_rule_evaluator_contract.py`, `tests/test_rule_registry.py`).
-- Frontend production bundle built cleanly with zero errors (`npm run build`).
-
-## Priority 3: Rules and IDS
-
-- [x] Drive compliance and corrosion engines dynamically from database-stored rules (`RuleService` & `corrosion_rule_catalog.py`). Owner: Osama.
-- [x] Implement in-memory engine catalog hot-reloading (`reload_all_catalogs()`) on analysis runs without server restarts.
-- [x] Extend rule engine with advanced validation operators: field consistency (`compare_property`, `name_pattern`), element uniqueness within scope (`uniqueness_scope`), and relative property thresholds (`value_min_property`, `value_max_property`, offsets).
-- [x] Add a scale factor (`value_min_scale`, `value_max_scale`) to relative property thresholds so a bound can be multiplicative (e.g. `riser height <= 0.5 * TreadGoing`), not just additive-offset. Migration `20260925194844_add_value_scale_to_rules.sql`.
-- [ ] Extend `value_min_property`/`value_max_property` resolution to reference a property on a DIFFERENT element than the one the rule targets (currently same-element only, resolved in `app/modules/ifc_reader/__init__.py::extract_for_compliance`) — needed for clauses like "exit doors shall be separated by not less than one-half of the building's maximum diagonal," where the diagonal belongs to the containing room/building, not the door. Requires resolving the target element's containing space/building (the `spatial`/`room` context already computed per-element in that same loop) and a geometric diagonal computation, then applying the existing scale/offset machinery on top. Currently falls back to `needs_review` in the LLM extraction prompt (`llamaindex_rule_generator.py`).
-- [x] Seed standard building code rulesets (`BUILDING-CODE-PART9`, `BUILDING-CODE-PART9-EXT`) and corrosion rulesets (`BIMGUARD-GC-001`, `BIMGUARD-CC-001`, `BIMGUARD-MC-001`) via `ruleset_seeder.py`.
-- [x] Scope architectural analysis runs by rule folder / ruleset ID in `orchestrator.py` via `RuleService.list_by_ruleset(rule_folder)`.
-- [ ] Replace handwritten LLM rule normalization with strict Pydantic schemas in `rule_extractor.py`.
-- [ ] Reject or quarantine invalid structured responses with actionable validation
-      messages instead of silently returning an empty rule list.
-- [ ] Define a durable extraction-draft model separate from canonical rules.
-- [ ] Add explicit approve/reject decisions, reviewer identity, timestamps, comments,
-      and an immutable review audit trail.
-- [ ] Prevent `Save all` from inserting unapproved or `needs_review` drafts into the
-      canonical rule table.
-- [ ] Preserve source text and extraction metadata through draft approval.
-- [ ] Transition alphanumeric and Property Set checks to `ifcopenshell.ids` validation.
-      Partial progress (2026-09-11): `app/services/ids_validation_service.py`
-      now executes a ruleset's IDS-exportable rows against a project's IFC
-      model for real via `ifctester.ids` (`Ids.validate()`), wired as the
-      Tier 2 signal for CDE Gate 1 promotion
-      (`app/api/cde_integration.py::promote_gate1`). The existing
-      `property_check` engine path is untouched — this is IDS running
-      alongside it as a gate check, not yet a replacement of those checks.
-- [ ] Map IDS validation results into the shared issue and BCF model.
-      `IDSValidationResult`/`IDSSpecificationResult` above give per-specification
-      pass/fail and failed-entity counts, but nothing yet turns a failed
-      specification into an `Issue`/BCF topic.
-- [ ] Validate imported/exported IDS documents with the buildingSMART IDS schema.
-- [x] Retire TF-IDF, dependency-parser, confidence-scorer, and BERT routing now that
-      the single LLM extraction path (`LlamaIndexRuleGenerator`) covers the one
-      capability the legacy path had and it lacked (multiple rules per clause).
-      Deleted `table_rule_builder.py`, `keyword_filter.py`, `dependency_parser.py`,
-      `confidence_scorer.py`, `tfidf_analyzer.py`, `bert_classifier.py`, and the
-      orphaned `enhanced_orchestrator.py`; none were reachable from any live API
-      route or service. `RuleExtractionService` now defaults to
-      `LlamaIndexRuleGenerator` directly — `rule_extractor.py` (`LiteLLMRuleExtractor`)
-      and `BIM_GUARD_RULE_EXTRACTION_PROVIDER` are removed.
-- [ ] Add precision, recall, F1, and confusion-matrix evaluation for extraction.
-- [x] Expose the architectural rule folder selector in `ArchAnalyzeView.svelte` UI dropdown (backend endpoint already supports `rule_folder`). Owner: Marc / Osama.
-- [ ] Review and retire non-production rule folders (`door_mock`, `test`,
-      `test_folder`), or exclude them from the folder picker.
-- [x] Document that selecting a named rule folder excludes the built-in seeded code
-      rules rather than narrowing them; update help text in UI.
-
-Owner: Osama.
-
-## Priority 4: Background Processing and Progress
-
-- [ ] Select and document the queue architecture (Celery, Supabase Queues/pgmq, or
-      external n8n orchestration).
-- [ ] Add a persistent job repository with queued, running, completed, failed, and
-      cancelled states.
-- [ ] Move IFC parsing, geometry extraction, compliance analysis, enhancement, and
-      report generation out of request handlers into dedicated background workers.
-- [ ] Add retry, idempotency, timeout, cancellation, and worker recovery behavior.
-- [x] Add authenticated Server-Sent Events endpoints for job progress (`GET /api/events/{project_id}`).
-- [x] Replace polling and HTMX swaps with Server-Sent Events (SSE) stream in FastAPI gateway and Svelte client.
-
-## Priority 4.1: FastAPI Gateway & Decoupled Svelte 5 SPA Architecture
-
-- [x] Add `fastapi>=0.115.0` to backend dependencies (`pyproject.toml`).
-- [x] Formalize strict Pydantic data contracts for Project, Rule, Analysis, Workflow, and Revit Sync entities (`app/modules/contracts.py`).
-- [x] Synchronize TypeScript types in `frontend/src/lib/types.ts` with Pydantic contracts.
-- [x] Initialize FastAPI API Gateway under `app/api/` with CORS and OpenAPI documentation (`/api/docs`).
-- [x] Implement REST routers: `projects.py`, `rules.py`, `analyze.py`, `events.py`, `documents.py`, `settings.py`, and `dashboard.py`.
-- [x] Implement EventBroadcaster and async queue subscription in `pipeline_tracker.py` for real-time SSE streaming.
-- [x] Decommission and purge all legacy FastHTML and MonsterUI residuals (`app/components/`, `app/routes/`, `app/views/`, `app/compat/`), reducing technical debt by 14,500+ lines of Python code.
-- [x] Refactor `app/main.py` into a pure FastAPI application serving API routes and the built Svelte 5 SPA fallback.
-- [x] Scaffold and build standalone Vite + Svelte 5 SPA client under `frontend/` (zero build errors).
-- [x] Implement typed API client (`frontend/src/lib/api.ts`) and SSE subscriber (`frontend/src/lib/sse.ts`).
-- [x] Build comprehensive Svelte 5 views:
-  - `ProjectsView.svelte` (project catalog, creation modal, delete confirmation)
-  - `AnalyzeView.svelte` (MEP/corrosion pipeline, stage runner, issue table, BCF export)
-  - `ArchAnalyzeView.svelte` (architectural compliance, building summary, spatial checks, 3D element inspector)
-  - `RulesView.svelte` (ruleset folder sidebar, rule editor modal, bulk actions, seed action, IDS export)
-  - `RuleExtractionView.svelte` (document upload, raw text parsing, rule extraction preview)
-  - `DocumentsView.svelte` (project standards and client documents catalog and upload)
-  - `ViewerView.svelte` (standalone 3D OpenBIM model viewer)
-  - `WorkflowView.svelte` (live pipeline dashboard with per-engine stage tracking)
-  - `DashboardView.svelte` (system overview KPIs, database connection health, quick navigation)
-  - `SettingsView.svelte` (runtime settings management, persistent theme configuration)
-  - `RevitSyncView.svelte` (bidirectional pyRevit live element synchronization)
-  - `ReportsView.svelte`, `ModelingManualView.svelte`, and `UserManualView.svelte`
-- [x] Implement persistent dark/light theme switching with smooth transitions (`ThemeToggle.svelte` and `settings_service.py`).
-- [x] Remove artificial max-width constraints on route view containers for fluid high-density layouts.
-- [x] Implement native `@thatopen/components` Svelte wrapper in `IfcViewer.svelte` to retire iframe embedding.
-- [ ] Add user authentication (Supabase Auth / JWT) across FastAPI endpoints and Svelte client.
-      See Priority 9 for OAuth and RBAC, planned as a later-stage follow-on.
-
-## Priority 5: 3D OpenBIM Viewer Integration
-
-- [x] Port 3D OpenBIM viewer from legacy iframe embed to native Svelte component (`IfcViewer.svelte`).
-- [x] Implement lifecycle management via Svelte `onMount` and `onDestroy` (releasing renderers, loaders, and WebGL contexts).
-- [x] Provide reactive properties for `projectId`, `elementGuid`, and `bcfArtifactId`.
-- [x] Implement camera viewpoint navigation and highlight framing from compliance issue selection.
-- [x] Add direct local IFC file upload and client-side rendering.
-- [ ] Add desktop/mobile Playwright checks for nonblank rendering, framing, loading,
-      interaction, and overlap.
-- [ ] Profile and optimize WebGL memory usage for multi-model loading sessions.
-
-## Priority 6: Analysis and Reporting UX
-
-- [x] Fully implement "Architectural Analysis" User Interface (`ArchAnalyzeView.svelte`). Owner: Malak / Team.
-- [x] Fully implement "MEP Analysis" User Interface (`AnalyzeView.svelte`). Owner: Shane / Team.
-- [x] Consolidate BCF report generation and export behind `ReportArtifactService` and `app/api/analyze.py` endpoints (`/api/analyze/bcf/*`).
-- [x] Fix BCF topic viewpoints and camera GUID synchronization for seamless 3D navigation.
-- [x] Add color-coded severity badges (Critical, High, Medium, Low) to rules presentation in `RulesView.svelte` and issues in `AnalyzeView.svelte`.
-- [x] Support multi-format compliance report exports: BCF 2.1 zip, CSV, and JSON (`/api/analyze/export`).
-- [x] Surface ARCH compliance BCF artifacts table, live project filtering, and direct downloads in `ReportsView.svelte`.
-- [ ] Add coordination heatmaps after report contracts are stable.
-- [ ] Add formal automated BCF regression tests for topic IDs, element GUIDs, viewpoints, metadata, and archive validity.
-
-## Priority 7: Architecture Documentation
-
-- [x] Update `docs/architecture.md` to Version 2.0 covering the decoupled FastAPI + Svelte 5 SPA architecture.
-- [x] Update `CLAUDE.md`, `AGENTS.md`, `DESIGN.md`, and `README.md` to reflect the pure FastAPI backend and Svelte 5 frontend conventions.
-- [ ] Create `docs/adr/` and add it to `docs/README.md`.
-- [ ] ADR: immutable audit pipeline versus versioned enhancement pipeline.
-- [ ] ADR: IDS for property/alphanumeric checks and custom engines for geometry/topology.
-- [ ] ADR: evaluator and repository dependency-injection boundaries.
-- [ ] ADR: queue, worker, job-state, and SSE architecture.
-- [ ] ADR: native Svelte 3D viewer component lifecycle and state management.
-- [ ] ADR: environment-owned versus database-owned configuration.
-
-## Priority 8: IFC Ingestion Correctness
-
-- [x] Coerce numeric strings before the `isinstance(value, (int, float))` guard in
-      Module 2's unit-conversion pass. Quantities stored as `IfcLabel('1.2')` currently
-      skip conversion and are compared raw, so a 1.2 m window is evaluated as 1.2 mm and
-      fails every dimensional rule. Fixed in `_resolve_element_property`'s Pass 8
-      (`app/modules/ifc_reader/__init__.py`): a string value is coerced with
-      `float()` before the numeric-type check, so a non-numeric string (e.g.
-      `FireRating`) still passes through untouched. Covered by
-      `tests/test_ifc_property_resolution.py::TestNumericStringUnitConversion`.
-- [ ] Log a warning when a length-typed or length-named property is found but skipped
-      by unit conversion, so silent misreporting is visible in the run log.
-- [ ] Surface the `_get_length_unit_scale_mm` fallback-to-1.0 path as an explicit model
-      warning instead of a silent default. Read from source, not reproduced — the reference
-      models both declare a valid `LENGTHUNIT`.
-- [x] Investigate `ClearWidth` and `OverallWidth` resolving to 2,125 mm on `IfcDoor`
-      in the same report where `Width` correctly resolves to 950 mm; 2,125 mm is the door
-      height. `_GEOMETRY_PROPERTY_MAP` maps `overallwidth` to the width extractor and
-      `clearwidth` to the corridor-width extractor, so the mapping alone does not explain
-      it. Reproduction: golden reference model, Doors card, rule folder "All folders".
-      **Found and fixed one real defect**: when a door/window has neither a Pset value
-      nor a populated `OverallWidth`/`OverallHeight` attribute, `ClearWidth` fell through
-      to Pass 7 geometry, which mapped it to `get_corridor_width_mm()` — the _shortest_
-      side of the element's own bounding footprint. That algorithm is correct for a
-      room/corridor (its narrow passable dimension) but wrong for a door/window leaf,
-      whose own footprint is a thin panel: the shortest side there is the frame/leaf
-      _thickness_, not the openable width (confirmed against a synthetic 950×50×2125 mm
-      door: `ClearWidth` came back 50 mm, the thickness, not 2,125 mm). Fixed in
-      `get_geometry_value()` (`app/modules/ifc_reader/ifc_geometry.py`) to route
-      `IfcDoor`/`IfcDoorStandardCase`/`IfcWindow`/`IfcWindowStandardCase` through the same
-      width extractor as `OverallWidth` instead, matching the precedence already
-      documented in `docs/ifc-property-mapping.md` ("ClearWidth → OverallWidth, closest
-      available"). Covered by
-      `tests/test_ifc_geometry_units.py::test_clear_width_on_door_uses_overall_width_not_leaf_thickness`
-      (and `test_corridor_width_still_used_for_rooms` for the non-regression case).
-      **Not reproduced**: the exact reported symptom — both `OverallWidth` and
-      `ClearWidth` resolving to precisely the door _height_ (2,125 mm), with `Width`
-      correctly resolving to 950 mm in the same run — could not be reproduced against
-      synthetic Pset, Qto, direct-attribute, type-vs-instance-precedence, or axis-aligned
-      geometry scenarios (all resolved correctly in isolation; see session notes). This
-      needs the actual golden reference model or the live rule definitions used in that
-      report to pin down further — re-open if it still reproduces after this fix.
-- [ ] Confirm precedence between a declared property value and the geometry
-      bounding-box fallback. `Pset_DoorCommon_Egress.ClearWidth` is declared as
-      `IFCREAL(0.95)` on the reference model but does not appear as 950 mm in the report.
-- [x] Add `requiredheadroom` to `_LENGTH_DIRECT_ATTRS`; the list contains
-      `requireheadroom`, so `Pset_StairCommon.RequiredHeadroom` only converts when it
-      carries an explicit measure type. Fixed the typo in both
-      `app/modules/ifc_reader/__init__.py`'s `_LENGTH_DIRECT_ATTRS` and the same
-      typo in `ifc_geometry.py`'s `_GEOMETRY_PROPERTY_MAP` (the header comment on
-      `_LENGTH_DIRECT_ATTRS` explicitly requires the two stay in sync). Covered by
-      `tests/test_ifc_property_resolution.py::TestRequiredHeadroomTypo`.
-
-Owner: unassigned.
-
-## Priority 9: OAuth and RBAC (Later Stage)
-
-Deferred until core pipeline, rules, and background-processing priorities stabilize.
-Builds on the base Supabase Auth / JWT work in Priority 4.1.
-
-- [x] Add OAuth login (Google via Supabase Auth) for FastAPI endpoints and the
-      Svelte 5 SPA (`app/auth.py`, `frontend/src/lib/supabaseClient.ts`).
-- [x] Define roles (owner, admin, member) and organizations/memberships schema
-      (`supabase/migrations/20260904235344_create_organizations_and_memberships.sql`).
-- [x] Enforce organization-scoped access via FastAPI dependency injection
-      (`get_authorized_project` in `app/api/projects.py`, `MembershipService`).
-      Row Level Security is enabled but locked to `service_role` only — enforcement
-      is entirely at the API layer, not yet via Postgres RLS policies.
-- [ ] Reflect role-gated actions and views in the Svelte client beyond Org
-      Settings (e.g. hide/disable enhancement, rule editing, admin views for
-      unauthorized roles project-wide, not just the org member table).
-- [x] Add tests proving unauthorized roles/organizations cannot invoke
-      restricted API operations (`tests/test_rbac_groups_and_rulesets.py`).
-
-### Enterprise RBAC: Groups and Resource Grants
-
-Two matrices, per the multi-tenant/enterprise-grade ask: a superadmin controls
-which rulesets each _organization_ may use at all; an org owner controls which
-_projects_ each _group_ within their org may access. A brand-new project or
-organization starts with nothing bound — "zero bindings unless assigned" is an
-empty grant table, not a flag.
-
-- [x] `organizations` <-> `rulesets` grant (`organization_ruleset_grants`,
-      superadmin-only via `PUT /api/organizations/{id}/ruleset-grants`) — the
-      one platform resource that was genuinely global/shared; projects,
-      models, and documents are already scoped by `organization_id` on the
-      row itself and needed no equivalent grant.
-- [x] `groups` <-> `projects` grant (one group per user per org via
-      `memberships.group_id`; `group_project_grants`, owner/admin via
-      `app/api/organizations.py`'s group endpoints). An org owner/admin still
-      sees every project in their own org; a plain member sees only their
-      group's granted projects, none if ungrouped.
-- [x] `project_ruleset_bindings`: which of an org's granted rulesets are
-      curated/assigned to one project (owner-controlled, always a subset of
-      the org's grants — `RulesetAccessService.set_project_bindings`). A
-      fresh project has none. This is a curation aid surfaced via the
-      Dashboard's "Rule Assignments" modal, not a run-time gate:
-      `ArchAnalysisService.run_analysis` only requires `rule_folder` to be
-      granted to the project's *organization* (`organization_ruleset_grants`),
-      so any model can be tested against any ruleset the org has access to,
-      bound or not.
-- [x] Backfill: the pre-existing default organization and its projects were
-      grandfathered into full access to every ruleset that existed at
-      migration time, so today's single-tenant behavior didn't regress; only
-      new organizations/projects start with zero bindings.
-- [x] Frontend: superadmin org<->ruleset matrix (`SuperadminRulesetsView.svelte`,
-      reachable from the user menu when `profile.is_superadmin`), owner group
-      management (groups + member group assignment + group<->project grants
-      in `OrgSettingsView.svelte`), and a per-project "Rule Assignments" modal
-      (`ProjectRulesetBindingsModal.svelte`, from each project row in
-      `ProjectsView.svelte`). Needed one new backend endpoint,
-      `GET /api/organizations` (superadmin-only, lists every org), to back
-      the matrix screen.
-- [x] Project pickers already respect group-based visibility with no
-      frontend change needed: `GET /api/projects` filters server-side by
-      `accessible_project_ids`, so `ProjectSwitcher`/`ProjectsView` only ever
-      see what the backend already decided they may.
-- [ ] Not verified end-to-end in a real signed-in browser session this pass
-      (no test Google credentials available) — covered instead by
-      `svelte-check`/`eslint` passing clean, the OpenAPI schema generating
-      correctly with every new route present, and the full pytest suite
-      (1471) passing. Worth a manual pass with a real signed-in session
-      before calling this done.
-
-### Enterprise RBAC: Cross-Org Project Sharing and Document Grants
-
-Same two-level grant pattern extended to two more cases: projects (unlike
-rulesets) already had a single owning `organization_id`, so this adds a
-second, additive way in — a superadmin-controlled grant of _extra_ access on
-top of ownership — plus giving documents the same org-grant/project-binding
-treatment rulesets already had.
-
-- [x] `organization_project_grants` (superadmin-only via
-      `PUT /api/organizations/{id}/project-grants`): projects shared into an
-      org beyond what it owns. `projects.organization_id` remains the
-      immutable owner column; this is purely additive. `member_can_access_project`
-      needed no change — it already only checks role/group within a given org,
-      never whether that org owns the row — so the only new logic is computing
-      the candidate org set (`MembershipService.organizations_with_project_access`
-      = owner union grants) before running that same check across each one.
-- [x] `organization_document_grants` + `project_document_bindings`
-      (`app/services/document_access_service.py`, exact mirror of
-      `RulesetAccessService`): which documents an org may use at all, and
-      which of those are bound to one project. Backfilled the default org's
-      grant to every pre-existing document id; no binding backfill needed
-      since documents never had a binding concept before.
-- [x] Migration:
-      `supabase/migrations/20260905123245_project_and_document_access_grants.sql`.
-- [x] Frontend: superadmin org<->project matrix (`SuperadminProjectGrantsView.svelte`,
-      owner's own cell shown locked/checked since ownership isn't managed
-      here) and org<->document matrix (`SuperadminDocumentGrantsView.svelte`),
-      both reachable from the user menu when `profile.is_superadmin`, alongside
-      a per-project "Document Assignments" modal
-      (`ProjectDocumentBindingsModal.svelte`, from each project row in
-      `ProjectsView.svelte` next to the existing Rule Assignments button).
-- [x] Tests: `tests/test_rbac_groups_and_rulesets.py` covers project
-      invisibility with no grant, visibility after a superadmin grant, a plain
-      member of the grantee org still needing its own group grant, and grant
-      revocation removing access — full suite at 1475 passing.
-- [ ] Not verified end-to-end in a real signed-in browser session this pass,
-      same caveat as above — covered by `svelte-check`/`eslint` clean and the
-      full pytest suite passing.
-
-Owner: unassigned.
-
-### ISO 19650-5 Security-Minded Information Management (Not Started)
-
-Found during an ISO 19650 requirements gap review (`docs/ISO19650/BIMGuard-ISO19650-Requirements.md`):
-today's authorization is coarse org/project/group RBAC (`MembershipService`,
-Priority 9 above); none of the ISO 19650-5 security-governance controls the
-requirements doc describes exist yet. Scoped here for a future dedicated
-pass rather than bundled into the CDE/IDS/naming fixes above, since it's the
-largest single item and deserves its own design review.
-
-- [ ] No Attribute-Based Access Control (ABAC) or per-entity security
-      clearance model. Grep for "ABAC"/"clearance"/"security_level" across
-      `app/` and `supabase/migrations/` returns nothing beyond unrelated
-      physical "clearance distance" domain terms; authorization today is
-      entirely coarse org/project/group RBAC.
-- [ ] No security classification taxonomy or tagging (Public / Commercial
-      Sensitive / Infrastructure Restricted / High Security Restricted) at
-      container, IFC element, or zone granularity. `suitability_code`/
-      `cde_state` are workflow-state classification, not security-sensitivity
-      classification.
-- [ ] No dynamic IFC redaction by clearance on view or download.
-      `app/api/models.py`'s `download_model` and the primary
-      `GET /api/projects/{project_id}/ifc` route serve the full file once
-      project membership passes — access is all-or-nothing, with no
-      filtering of `IfcProduct` entities, geometry, or property sets
-      (e.g. `Pset_SecurityProperties`) by viewer clearance.
-- [ ] No hash-chained, tamper-evident audit ledger. Only CDE-transition
-      lineage logging (`model_enhancement_lineage`, via
-      `SupabaseModelLineageRepository.record_cde_transition`) and ordinary
-      content-integrity SHA-256 hashing (for dedup/caching) exist; no record
-      chains its hash to the previous record's hash, and no ledger covers
-      uploads/downloads/views generally.
-- [ ] Real Postgres RLS policies. 35+ migrations `ENABLE ROW LEVEL SECURITY`
-      but pair it with `REVOKE ALL FROM anon, authenticated` and grant only
-      to `service_role` — zero `CREATE POLICY` statements exist anywhere
-      (confirmed via `list_migrations`/file grep). RLS today is a PostgREST
-      anonymous-deny backstop, not the row-level security the ISO 19650-5
-      requirements assume.
-
-Owner: unassigned.
-
-## Priority 10: AI Framework Integration: LlamaIndex & LangGraph Architecture
-
-### Module 1 & 1b: Document Ingestion & NLP Annotation (LlamaIndex Core)
-
-- [x] Integrate LlamaIndex as the primary ingestion engine for BEP PDFs, ISO 19650
-      guidelines, and regulatory codes (e.g., DIN 4149, NZ Seismic). Layered on top
-      of the existing Docling-based extraction pipeline, gated behind
-      `BIM_GUARD_USE_LLAMAINDEX_INGESTION`.
-- [x] Implement table- and layout-aware document chunking to prevent fragmentation
-      of complex engineering tables, schedules, and nested matrices
-      (`LlamaIndexIngestor`, `app/modules/document_parsing/llamaindex_ingestor.py`).
-- [x] Attach granular clause metadata (clause ID, page numbers, parent section
-      headers) to all extracted nodes to maintain traceability in generated BCF
-      issue reports (`ClauseMetadata`, `DocumentNodeContract`; `document_nodes` table).
-- [x] Implement deontic entity extraction via LlamaIndex Pydantic extractors to
-      isolate normative requirements ("shall", "must", "should") into typed
-      intermediate schemas (`DeonticStatement`, `llamaindex_program.py`).
-
-### Module 3: Deterministic Rule Generation & IDS Export (LlamaIndex)
-
-- [x] Use LlamaIndex structured data extraction to translate unstructured clause
-      chunks into machine-readable rule definitions (`LlamaIndexRuleGenerator`,
-      implements the existing `RuleExtractionProvider` protocol as a drop-in
-      alternative to `LiteLLMRuleExtractor`). Extracted rules persist as
-      `pending_review` drafts (`rule_extraction_drafts` table, `RuleDraftService`)
-      with an approve/reject/edit workflow before promotion into `public.rules`.
-- [x] Build an automated translation pipeline from extracted rule schemas into
-      buildingSMART IDS (Information Delivery Specification) XML schemas.
-      `ids_exporter.py`'s export path now builds through `ifctester.ids`
-      (buildingSMART's own IDS 1.0 implementation) instead of hand-built
-      `ElementTree`, so exported IDS is schema-correct; import tries the same
-      strict parser first and falls back to the original lenient parser for
-      XML this module produced before the refactor.
-- [x] Connect project scope terminology directly to the central buildingSMART
-      Data Dictionary (bSDD) API so standardized terms and codes are available
-      throughout the project. `app/api/bsdd.py` exposes `BSDDClient`
-      (dictionaries, class search, class lookup, property search) at
-      `/api/bsdd/*`; the client's live-network paths were corrected against
-      buildingSMART/bSDD's own OpenAPI spec (Dictionary v1 response is
-      `{"dictionaries": [...]}` not a bare array; Class v1 takes a full `Uri`,
-      not `dictionaryUri`+`code`; TextSearch is v2, not v1) so real bSDD
-      calls parse correctly instead of always silently falling back offline.
-- [x] Let users select a project classification standard, such as Uniclass or
-      CCI, directly from project settings. `projects.classification_standard`
-      (migration `20260902160000_add_classification_standard_to_projects.sql`)
-      stores a bSDD dictionary code, editable from `ProjectEditModal.svelte`
-      and the wizard's Scope step, both populated from `GET /api/bsdd/dictionaries`.
-- [x] Add bSDD-powered autocomplete suggestions in the scope module for
-      correctly coded element and property names as users type.
-      `BsddAutocomplete.svelte` backs the rule builder's new Target IFC Class
-      field and Property Name field (`RuleForm.svelte`), debounced against
-      `/api/bsdd/classes/search` and `/api/bsdd/properties/search`; picking a
-      property suggestion also fills its property set and unit.
-      `target_ifc_class` is now a first-class field on the rule create/update
-      API and response contracts (it already existed on the `rules` table and
-      in `RuleService`, but was not reachable from the REST layer or UI).
-- [x] Translate human-readable information requirements into machine-readable
-      IDS XML files that software can test and verify. Already covered by the
-      `ids_exporter.py` work above (`build_ids_document` / `import_ids_ruleset`,
-      wired to `POST /api/rules/import-ids`, `GET /api/rules/export-ids`, and
-      the drafts `ids-preview` endpoint).
-
-### Agent & CDE Orchestration (`app/agent`, Module 4 & Services) (LangGraph)
-
-- [x] Implement a LangGraph state machine for the Digital Inspector agent
-      to coordinate cyclical multi-tool execution (querying IFC
-      models, checking database cache, dispatching bSDD lookups, running
-      validation engines). New `app/digital_inspector/` package (separate from
-      the generic `app/agent/` OpenRouter coding assistant), built on LangGraph's
-      `create_react_agent`, exposed via `POST /api/projects/{id}/inspect`.
-- [x] Expose LlamaIndex retrieval and rule-extraction modules as callable tools
-      inside the LangGraph supervisor agent (`extract_rules_from_document` tool
-      wraps `RuleExtractionService.extract_rule_drafts`).
-- [x] Model ISO 19650 Common Data Environment (CDE) state transitions
-      (`WIP` → `Shared` → `Published` → `Archived`) as a LangGraph state graph
-      with automated compliance gates. `app/digital_inspector/cde_graph.py` is a
-      thin wrapper whose nodes call the existing, already-tested
-      `CDEStateMachine.evaluate_transition()` for every gate decision — the real
-      transactional `transition_project()` write path is untouched; exposed as
-      the `check_cde_transition` agent tool.
-- [ ] Implement LangChain-compatible webhook handlers for asynchronous
-      notifications to external issue-tracking platforms (e.g., ACC, BIM Track).
-      Deferred: no existing integration point, credentials, or chosen platform
-      (ACC vs BIM Track) exists yet; needs its own scoping conversation.
-
-Owner: unassigned.
-
-Completion evidence (2026-09-02):
-
-- Added `llama-index-core`, `llama-index-llms-litellm`, `langgraph`,
-  `langchain-core`, `langchain-litellm`, and `ifctester` as required
-  dependencies (`pyproject.toml`).
-- New migrations: `20260902120000_create_document_nodes.sql`,
-  `20260902130000_create_rule_extraction_drafts.sql`.
-- New contracts in `app/modules/contracts.py`: `ClauseMetadata`,
-  `DeonticStatement`, `DocumentNodeContract`, `DocumentIngestResponse`,
-  `RuleDraftStatus`, `RuleExtractionDraft`, `RuleExtractionDraftListResponse`,
-  `RuleDraftReviewRequest`, `InspectorQueryRequest`, `InspectorToolCallContract`,
-  `InspectorResponse`.
-- New endpoints: `POST /api/documents/{id}/ingest`,
-  `POST /api/documents/{id}/rules/extract-drafts`,
-  `GET /api/documents/{id}/rules/drafts`,
-  `GET /api/documents/{id}/rules/drafts/ids-preview`,
-  `PATCH /api/rules/drafts/{draft_id}`, `POST /api/rules/drafts/{draft_id}/promote`,
-  `POST /api/projects/{id}/inspect`. Existing `POST /api/rules/extract` and
-  `POST /api/rules/bulk` are unchanged.
-- LlamaIndex ingestion is flag-gated (`BIM_GUARD_USE_LLAMAINDEX_INGESTION`).
-  Rule extraction itself has since been consolidated onto a single path,
-  `LlamaIndexRuleGenerator` (2026-09-04) — see Priority 3 above;
-  `LiteLLMRuleExtractor` and `BIM_GUARD_RULE_EXTRACTION_PROVIDER` no longer exist.
-- 984 tests pass (+26 new: `test_llamaindex_ingestion.py`,
-  `test_rule_draft_workflow.py`, `test_ids_export.py`, `test_digital_inspector.py`,
-  `test_cde_graph.py`; 2 pre-existing IDS tests and 1 settings test updated for
-  the corrected schema-valid XML shape and the two new settings keys).
-
-## Priority 11: Enterprise UX — Multi-Tenant Workspace, Landing Page & Site Structure
-
-Follows the Tenant & Workspace Blueprint (UX architecture artifact, 2026-09-05):
-evolving the sidebar-and-breadcrumb shell into role-based workspaces with a
-first-class organization layer, plus a public-facing entry point and a clearer
-home for reference content that currently lives in the app sidebar.
-
-### Multi-tenant workspace (in progress)
-
-- [x] Organization switcher in the header, backed by `profiles.default_organization_id`
-      (`OrgSwitcher.svelte`, `auth.svelte.ts`).
-- [x] Blocking org picker for a multi-org user who hasn't chosen a default yet
-      (`OrgPickerGate.svelte`).
-- [x] Org-scoped project filtering in `ProjectSwitcher.svelte`.
-- [x] Org Settings screen: members (search/sort/bulk role change/remove) and
-      pending invites (create/revoke) (`OrgSettingsView.svelte`,
-      `app/api/organizations.py`).
-- [x] Sidebar regrouped into role-based workspaces (My Home, Model Coordination,
-      Compliance, Rules & Standards, Integrations, Admin) without changing routes.
-- [ ] Customizable "My Home" dashboard: a grid layout (library TBD — no
-      React in this stack, so not literally `react-grid-layout`; evaluate a
-      Svelte-native drag/resize grid) with widgets for Clearance Violations by
-      Severity, Live BCF Issue Feed, Recent IFC Models, and Overdue/Due-in-7-Days.
-      Needs new backend aggregation endpoints — none of these summaries exist yet.
-- [ ] Split-screen coordination view: 3D viewer + issue register side by side,
-      resizable divider, bidirectional selection (`IfcViewer.svelte` + `IssueTable`).
-- [ ] Floating contextual action menu anchored to the current selection (3D
-      element, table row, widget) instead of a single global "Create New" menu.
-- [ ] Slide-out inspector drawer for full compliance-matrix detail, anchored
-      right over the viewer instead of replacing it (`Modal.svelte` variant).
-- [ ] `OrgBadge` component for any list that can span tenants (superadmin
-      "All organizations" view), consistent with `SeverityBadge` sizing.
-- [ ] Tests proving the "last owner" guard in `app/api/organizations.py` and
-      org-scoped member/invite endpoints reject cross-organization access.
-
-### Landing page & site structure
-
-- [x] Public landing page (marketing/entry point) shown to signed-out visitors
-      instead of going straight to `LoginView` — product overview, sign-in CTA
-      (`LandingView.svelte`). Renders full-bleed (no sidebar/header chrome),
-      same as `LoginView` now does — see `App.svelte`'s `showAppShell`.
-- [x] Move the Manuals group (User Manual, Modeling Manual, bSDD Wiki) out of
-      the primary app sidebar into a "Resources" menu in the top navbar
-      (`ResourcesMenu.svelte`), reachable from every view. Existing view ids
-      and routes unchanged.
-- [ ] Decide and build out whatever other top-level pages the improved IA calls
-      for beyond the landing page and relocated manuals (e.g. a dedicated
-      pricing/about page if this becomes customer-facing, a changelog, etc.) —
-      scope with the user before building further.
-- [ ] The landing page's feature copy and CTA are a first pass — revisit once
-      there's real product marketing direction (screenshots, testimonials,
-      pricing) rather than the current text-only feature grid.
-
-Owner: unassigned.
-
-## Priority 12: AI Implementation Opportunities
-
-- [ ] Add a feedback loop in the UI (`ArchAnalyzeView.svelte`) for users to flag false positives and train an Active Learning classifier to score new issues.
-- [ ] Expand the Digital Inspector agent's tools to convert natural language queries into dynamic `ifcopenshell` geometric queries (e.g., semantic spatial querying).
-- [ ] Embed a multi-modal conversational AI overlay in `IfcViewer.svelte` to query NotebookLM and explain compliance failures contextually on the 3D model.
-- [ ] Implement Automated Generative Remediation in the enhancement pipeline to propose physical routing fixes (e.g., via A\* pathfinding) for detected clearance clashes.
-- [ ] Utilize Vision-Language Models (VLMs) to automatically audit generated BCF clash snapshots and filter out false positives before they reach human review.
-- [ ] Apply Graph Neural Networks (GNNs) on extracted IFC spatial relationship graphs (like those in `ifc_egress.py` and `ifc_spatial.py`) to infer missing connectivity, room usages, or system topologies when metadata is absent.
-- [ ] Implement a Predictive Cost & Schedule Impact ML model in `cost_model.py` to replace static CSV lookups, dynamically forecasting remediation costs and programme delays based on issue context and historical resolution data.
-- [ ] Introduce a Natural Language Dashboard Assistant (Text-to-SQL/PostgREST) allowing users to query project analytics conversationally (e.g., "Show me all critical clearance issues on Level 3").
-- [ ] Create an LLM-driven Synthetic IFC Data Generator that procedurally creates thousands of edge-case `IfcModel` examples (with predefined clashes or compliance failures) to robustly train and benchmark the physics engines.
-- [ ] Implement a 2D-to-3D Vision-Language Model (VLM) pipeline to extract topological relationships and material specifications directly from P&ID schematics and automatically cross-check them against the 3D IFC model for undocumented deviations.
-- [ ] AI-Powered Semantic bSDD Mapper: Use NLP to automatically map unstandardized local model properties and custom Revit families to the official buildingSMART Data Dictionary (bSDD) classifications (e.g., Uniclass, OmniClass), ensuring global interoperability without manual tagging.
-- [ ] AI-Powered Title Block OCR for ISO 19650 Compliance: Use computer vision and LLMs to automatically extract document numbering, originators, suitability codes, and revisions directly from 2D drawing title blocks upon CDE upload, enforcing ISO 19650 naming conventions automatically.
-- [ ] Multi-Agent Workflow Orchestration: Refactor the sequential compliance pipeline in `orchestrator.py` into a dynamic, multi-agent LangGraph architecture where specialized agents (e.g., Structural Agent, MEP Agent, Arch Agent) autonomously negotiate clash resolutions and delegate validation tasks.
-- [ ] Generative IDS (Information Delivery Specification): Use LLMs to read unstructured project EIRs (Exchange Information Requirements) and automatically generate valid buildingSMART IDS XML validation schemas, extending `ids_exporter.py` with generative authoring.
-
-Owner: unassigned.
-
-## Priority 13: AI Infrastructure Rollout
-
-Based on the 15 opportunities identified above, the overarching AI architecture has been designed and scaffolded in `app/ai/`. It adheres to SOLID principles, isolating probabilistic models from the deterministic physical engines.
-
-**Rollout Strategy:**
-
-- [x] Scaffold AI namespace (`app/ai/core/`), Protocols (`IVisionModel`, `IPredictiveModel`, etc.), Factory Registry, and Feature Flags.
-- [ ] Phase 1 (High-Impact, Low-Friction): Implement UI-adjacent, non-blocking tools (Predictive Cost ML, Title Block OCR, Natural Language Dashboard Assistant).
-- [ ] Phase 2 (Pipeline Augmentation): Implement human-in-the-loop validation tools (VLM BCF Auditing, Semantic bSDD Mapper, Intelligent System Inference).
-- [ ] Phase 3 (Deep Orchestration): Refactor the backend to support LangGraph multi-agent orchestration, GNN topologies, and Generative 3D Remediation.
-
-Owner: unassigned.
-
-## Priority 14: Graph Database Integration
-
-Based on architectural bottlenecks identified in the current Python/NetworkX graph implementation, a dedicated graph database or embedded graph engine is required to handle massive IFC space-connectivity and semantic rule relationships.
-
-- [x] Create a provider-agnostic `GraphDatabaseProvider` and `GraphService` abstraction in `app/services/graph_database.py`.
-- [x] Implemented `KuzuDatabaseProvider` in `app/services/kuzu_provider.py` as an embedded graph engine, injected into `GraphService` via `app/bootstrap.py`. (Ready for networkx replacement and GraphRAG).
-- [ ] Wire the `GraphService` into `LlamaIndexRuleGenerator` (Rules Extraction & NLP) for GraphRAG, explicitly mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
-- [ ] Proof of Concept: Execute complex topological rules natively via Cypher queries instead of hardcoded Python logic (e.g. `MATCH (p:IfcPipeSegment)-[:INTERSECTS]->(w:IfcWall {FireRating: '2h'})`).
-
-Owner: unassigned.
-
-## Priority 15: Agent-Callable Infrastructure (Pivot — Later Phases)
-
-Later-phase work to turn BIM Guard from an app that agents merely *browse*
-into infrastructure other agents can *call into* — discover its API, log in,
-invoke tools, and delegate work. Deferred until the core product pivot is
-committed; each item below assumes the previous ones exist.
-
-Already done (see `frontend/public/`, `app/main.py`): `robots.txt` with
-`Content-Signal`, `.well-known/api-catalog`, `auth.md`, and a `Link` header
-advertising all three on every response.
-
-- [ ] **Sitemap**: low priority while the SPA is auth-gated past the login
-      screen — revisit only if a public marketing/docs surface is added.
-- [ ] **Markdown Negotiation**: serve `text/markdown` for public pages via
-      `Accept` header content negotiation — same caveat as Sitemap, needs
-      public content to negotiate first.
-- [ ] **AI Crawler Rules**: this is a Cloudflare dashboard / bot-management
-      setting on the `bim-guard.xyz` zone, not app code — configure once the
-      domain is on Cloudflare.
-- [ ] **OAuth Discovery** (RFC 8414 authorization server metadata): Supabase
-      is the actual IdP here, so this would need to proxy or mirror
-      Supabase's own OAuth metadata rather than being authored locally.
-- [ ] **OAuth Protected Resource** (RFC 9728): publish `.well-known/oauth-protected-resource`
-      describing the `/api/*` resource server and required scopes, once API
-      scopes beyond "authenticated Supabase user" actually exist.
-- [ ] **Skills Index**: publish a machine-readable list of BIM Guard's
-      callable capabilities (project analysis, rule extraction, BCF export,
-      etc.) — natural next step once the API catalog above is load-bearing.
-- [ ] **A2A Agent Card** (`/.well-known/agent-card.json`): expose BIM Guard's
-      internal terminal agent (`BIM_GUARD_AGENT_MODEL`) as an Agent2Agent
-      endpoint other agents can delegate tasks to — real product surface,
-      not a config tweak.
-- [ ] **MCP Server Card**: wrap the analysis/rules/documents API as an MCP
-      server so agent clients (e.g. Claude, other MCP hosts) can call BIM
-      Guard's tools directly instead of hitting REST. Biggest lift on this
-      list; likely the centerpiece of the pivot.
-- [ ] **Web Bot Auth**: sign outbound requests made by BIM Guard's own
-      terminal agent (web search, tool calls) per the emerging Web Bot Auth
-      spec — relevant once that agent is calling third-party sites on a
-      user's behalf at scale.
-- [ ] **WebMCP**: expose in-browser tools from the Svelte SPA itself — still
-      an experimental spec; revisit once it stabilizes.
-- [ ] **DNS-AID**: DNS TXT record advertising BIM Guard's agent endpoints —
-      registrar/DNS config for `bim-guard.xyz`, not app code; do this last,
-      once the endpoints it would advertise (Agent Card, MCP server) exist.
-
-Owner: unassigned.
-
-## Priority 16: Architectural Evolution & Background Compute Strategy
-
-### Microservices Evaluation & Strategy Assessment
-- **Architecture Strategy**: Retain the current **Modular Monolith** architecture (FastAPI Gateway + Svelte 5 SPA + pure Python compute engines). Decomposing the codebase into independent microservices across network boundaries is rejected.
-- **Key Rationale**:
-  - *Data Locality & In-Memory IFC Graphs*: IFC models are large (50 MB–1 GB+). Microservices would introduce severe network and serialization/deserialization penalties when passing element graphs, bounding boxes, and geometry across HTTP/gRPC boundaries.
-  - *Engineering & Organizational Fit*: The current team size and single deployment target would suffer from the distributed systems tax (distributed tracing, API contract versioning across repos, multi-service deployment pipelines).
-  - *Process Separation over Service Separation*: The actual architectural need is **process-level decoupling** (Web I/O vs. Async Worker Execution), not microservice domain decomposition.
-
-### Architectural Improvements Roadmap
-
-- [ ] **1. Dedicated Asynchronous Compute Worker Pool (Task Queue)**:
-  - Migrate long-running compliance runs (`run_analysis`, `ArchAnalysisService`), heavy IFC parsing, and physics simulations from in-process FastAPI `BackgroundTasks` to a dedicated asynchronous worker pool (e.g. Celery, ARQ, or SAQ backed by Redis).
-  - Isolate CPU-bound and memory-intensive `ifcopenshell` C++ operations from the Uvicorn web gateway, preventing worker thread starvation and Out-Of-Memory (OOM) web server crashes.
-  - Implement durable, database-backed job states (`queued`, `running`, `completed`, `failed`, `cancelled`) with retry policies and timeouts.
-
-- [ ] **2. Distributed Pub/Sub for Pipeline Tracker & Real-Time SSE**:
-  - Transition `PipelineTracker` from in-memory `asyncio.Queue` and local contextvars to a distributed Pub/Sub broker (e.g. Redis Pub/Sub, or Supabase Postgres `LISTEN`/`NOTIFY`).
-  - Eliminate the multi-worker reporting gap where SSE clients connected to Uvicorn Worker A cannot receive progression events emitted by an analysis executing on Worker B.
-
-- [ ] **3. Streaming & Direct-to-Storage Model Ingestion**:
-  - Replace full in-memory buffering (`content = await ifc_file.read()`) in `/api/analyze/upload` with chunked streaming or pre-signed direct-to-storage upload URLs to Supabase Storage.
-  - Mitigate process RAM spikes when users upload large (300 MB+) IFC model files.
-
-- [ ] **4. Pre-Parsed Intermediate Model Representation (Extracted Cache Layer)**:
-  - Extract and cache structured element metadata, spatial containment hierarchies, property sets, and bounding boxes into a fast intermediate representation (DuckDB, Parquet, or PostgreSQL JSONB tables) upon initial IFC upload.
-  - Allow subsequent compliance evaluations, parameter variations, and rule re-runs to execute in milliseconds against pre-extracted data without repeatedly parsing raw IFC files from disk.
-
-- [ ] **5. Transactional Unit-of-Work for CDE Governance**:
-  - Wrap ISO 19650 Common Data Environment (CDE) state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) and audit event logging inside an explicit transactional unit-of-work (or Supabase Postgres RPC transaction) to ensure atomic state updates.
-
-- [ ] **6. Semantic Caching & Rate-Limiting for LLM Rule Extraction**:
-  - Introduce SHA-256 clause content hashing and semantic caching for `RuleExtractionService` / `LlamaIndexRuleGenerator` to avoid redundant LLM invocations and token costs on re-analyzed standard documents.
+# BIM-Guard Engineering Roadmap & TODO
+
+Last reviewed: 2026-09-29  
+Status: Active Monolith (FastAPI + Decoupled Svelte 5 SPA + Pure Python Compute Engines + Self-Hosted Supabase)
+
+---
+
+## Priority 1: AI Opportunities & Machine Learning Roadmap
+
+The AI subsystem operates on the periphery of the deterministic compliance engines under `app/ai/`, isolating probabilistic models from deterministic building code evaluations (`app/engines/`).
+
+### Recommended Next Implementation (Top Priority)
+
+- [ ] **Active Learning False-Positive Classifier & Feedback Loop**:
+  - **Context & Motivation**: Deterministic geometry and spatial checks unavoidably flag edge cases (e.g. doors in recessed alcoves, custom partition wall assemblies, angled stair landings). Reviewers suffer from alert fatigue when examining repetitive, non-actionable defects.
+  - **Existing Foundation**: `EvaluationService` (`capture_results`), `public.evaluation_findings` database table, `frontend/src/routes/EvaluationView.svelte`, and the evaluation scoring harness in `maicen/bim-guard-evaluation` (`eval/score_evaluation_findings.py`) are already fully operational.
+  - **Implementation**:
+    1. Implement concrete `FalsePositiveClassifier` under `app/ai/ml/` fulfilling `IPredictiveModel` (`predict(features: Dict[str, Any]) -> Dict[str, Any]`).
+    2. Extract normalized feature vectors from `evaluation_findings.rule_snapshot`, IFC class, storey, spatial envelope, and bounding box dimensions.
+    3. Train/calibrate a lightweight classifier (logistic regression / XGBoost / scikit-learn) on expert human verdicts (`PASS` vs `FAIL` ground truth) to predict `p(false_positive)`.
+    4. Enrich compliance issues in `ArchAnalysisService` with a `confidence_score` and `predicted_fp_risk` badge.
+    5. Add an inline "Flag False Positive" feedback action in `ArchAnalyzeView.svelte` and `AnalyzeView.svelte` that logs directly to `evaluation_findings` and triggers incremental model recalibration.
+
+### High-Priority Follow-on AI Opportunities
+
+- [ ] **AI-Powered Semantic bSDD Mapper**:
+  - Automatically map unstandardized model property names and custom Revit family parameters to official buildingSMART Data Dictionary (bSDD) classifications (e.g. Uniclass, OmniClass, standard IFC Property Sets).
+  - Builds on existing `BSDDClient` (`app/services/bsdd_client.py`), `/api/bsdd/*` endpoints, `projects.classification_standard`, and `BsddAutocomplete.svelte`.
+- [ ] **Generative IDS (Information Delivery Specification) from Natural Language EIRs**:
+  - Use LLMs to read unstructured Exchange Information Requirements (EIRs) or BIM Execution Plans (BEPs) and automatically generate schema-valid buildingSMART IDS 1.0 XML files.
+  - Extends `LlamaIndexRuleGenerator` and `ids_exporter.py` (`ifctester.ids`) with generative requirement authoring.
+- [ ] **Vision-Language Models (VLM) for BCF Snapshot Auditing**:
+  - Implement concrete `IVisionModel` in `app/ai/vision/` to visually audit rendered 3D camera viewpoints and clash snapshots, automatically filtering out non-physical or acceptable conditions before human dispatch.
+
+### Exploratory & Long-Term AI Research
+
+- [ ] **Digital Inspector NL-to-Geometry Query Translation**: Expand the LangGraph `DigitalInspector` agent tools to convert natural language queries into dynamic `ifcopenshell` semantic spatial queries.
+- [ ] **Natural Language Dashboard Assistant**: Text-to-SQL / PostgREST assistant allowing natural language queries over project compliance analytics.
+- [ ] **Synthetic IFC Data Generator**: Procedurally generate IFC edge-case models with planted compliance failures to benchmark rule coverage and physics engines.
+- [ ] **Graph Neural Networks (GNNs) on IFC Spatial Graphs**: Infer missing topological connectivity, room usages, or circulation paths when IFC metadata is unpopulated.
+- [ ] **Predictive Cost & Schedule Impact Model**: ML forecasting in `app/ai/ml/` to predict remediation costs and schedule delays from issue features and historical resolution data.
+- [ ] **Automated Generative Remediation**: Propose physical routing and clearance adjustments (e.g. via 3D A* pathfinding) for detected clearance clashes.
+- [ ] **Multi-Agent Compliance Orchestration**: Multi-agent LangGraph workflow where domain agents (Architectural, Structural, MEP) negotiate clash resolution and delegate validation tasks.
+
+---
+
+## Priority 2: Architectural Evolution & Background Compute Strategy
+
+### Asynchronous Worker Pool & Job Queue
+
+- [ ] **Dedicated Async Compute Worker Pool (Task Queue)**:
+  - Migrate long-running compliance evaluations (`ArchAnalysisService.run_analysis`), heavy IFC parsing, and geometry extraction out of FastAPI request handlers into a dedicated worker pool (Celery, ARQ, or SAQ backed by Redis).
+  - Isolate CPU-bound and memory-intensive `ifcopenshell` C++ operations from the Uvicorn web gateway to eliminate worker thread starvation and Out-Of-Memory (OOM) web process crashes.
+  - Implement durable, database-backed job states (`queued`, `running`, `completed`, `failed`, `cancelled`) with retry policies, timeouts, and worker recovery.
+- [ ] **Distributed Pub/Sub for Pipeline Tracker & Real-Time SSE**:
+  - Transition `PipelineTracker` from in-process `asyncio.Queue` to a distributed broker (Redis Pub/Sub or Supabase PostgreSQL `LISTEN`/`NOTIFY`).
+  - Resolve the multi-worker reporting gap where SSE clients connected to Uvicorn Worker A do not receive progression events emitted on Worker B.
+- [ ] **Streaming & Direct-to-Storage Model Ingestion**:
+  - Replace in-memory buffering (`await ifc_file.read()`) in `/api/analyze/upload` and `/api/projects/{id}/models` with chunked streaming or pre-signed direct-to-storage upload URLs to Supabase Storage, mitigating memory spikes on large (300 MB+) IFC models.
+- [ ] **Pre-Parsed Intermediate Model Representation (Extracted Cache Layer)**:
+  - Extract and cache structured element metadata, spatial containment hierarchies, property sets, and bounding boxes into an intermediate cache layer (DuckDB, Parquet, or PostgreSQL JSONB tables) upon initial IFC upload.
+  - Allow subsequent compliance re-runs and parameter variations to execute in milliseconds without re-parsing raw IFC files from disk.
+- [ ] **Semantic Caching & Rate-Limiting for LLM Rule Extraction**:
+  - Introduce SHA-256 clause content hashing and semantic caching for `RuleExtractionService` / `LlamaIndexRuleGenerator` to avoid redundant LLM invocations and token spend on re-analyzed standard documents.
   - Implement token budget guards and rate-limiting across document extraction routes.
-
-Owner: unassigned.
-
-## Validation Gates
-
-- [x] Audit tests prove the source IFC hash is unchanged.
-- [x] Enhancement tests prove the source and generated storage references differ.
-- [x] Concurrent enhancement tests prove project versions cannot collide.
-- [x] Database-driven rule workflow tests pass (`tests/test_db_rules_workflow.py`).
-- [x] Svelte 5 frontend production build compiles with zero errors (`npm run build`).
-- [x] Supabase security and performance advisors have no unresolved high-severity items.
-- [ ] Evaluator contract tests cover every registered engine.
-- [ ] IDS conformance tests cover representative property, range, enumeration, and
-      applicability checks.
-- [ ] Review workflow tests prove unapproved drafts cannot enter canonical rules.
-- [ ] Queue tests cover retry, duplicate submission, cancellation, and worker failure.
-- [ ] Playwright tests verify 3D viewer rendering and lifecycle cleanup on desktop and mobile.
-- [ ] Add the golden/broken reference IFC pair as regression fixtures. The golden model
-      must pass its architectural checks; the broken model must report all four planted
-      faults.
-- [ ] Assert unit conversion end to end: a 1.2 m window height on a metre-based model
-      must evaluate as 1200 mm.
-- [ ] Assert that fire separation reports a missing `FireRating` on a party wall, and
-      that its absent-boundary path is reported as "not checked" rather than as a pass.
-
-## Product Ownership and Delivery
-
-- [ ] Leticia to manage milestones, dependencies, acceptance criteria, and delivery
-      reporting as product manager.
-- [x] Confirm Marc's ownership area and deliverables — architectural slice: reference
-      models, architectural rule set, IFC modelling and export guidance, and validation of
-      the ARCH pipeline.
-- [ ] Assign an owner and target milestone to every unchecked priority item.
+- [ ] **Transactional Unit-of-Work for CDE Governance**:
+  - Wrap ISO 19650 Common Data Environment (CDE) state transitions (`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`) and audit event logging inside an explicit transactional unit-of-work to guarantee atomic state progression.
 
 ---
 
-### Completion Evidence (2026-08-29)
+## Priority 3: Architectural Compliance Engine & Rules Governance
 
-- **FastAPI API Gateway**: Fully operational at `/api` with REST routers for `projects`, `rules`, `analyze`, `documents`, `settings`, and `dashboard`, backed by OpenAPI interactive docs (`/api/docs`).
-- **Decoupled Svelte 5 SPA**: Built cleanly via Vite with 14 functional route views, persistent Dark/Light theme switching, reactive store synchronization, and full responsive design.
-- **FastHTML Decommissioning**: Deleted legacy Python UI files under `app/components/`, `app/routes/`, `app/views/`, and `app/compat/`, reducing the backend codebase by over 14,500 lines.
-- **Native 3D Viewer**: `IfcViewer.svelte` natively integrates `@thatopen/components` into the DOM with camera viewpoint transitions and BCF 2.1 guideline synchronization, eliminating legacy iframe embeds.
-- **Database-Driven Rules**: Galvanic, crevice, and microbiological engines dynamically consume thresholds, scoring models, and velocity classes from Supabase Postgres; in-memory catalogs reload seamlessly on execution (`tests/test_db_rules_workflow.py`).
-- **Real-Time Streaming**: Server-Sent Events (`/api/events/{project_id}`) stream stage transitions and duration metrics directly to `PipelineProgress.svelte`.
-- **ARCH Audit Ruleset Scoping & Manual Trigger**: Added dynamic ruleset folder selection loaded via `rulesApi.folders()` in `ArchAnalyzeView.svelte`, replaced auto-runs on mount and project change with intentional manual execution, and added real-time BCF save status indicators with direct download and 3D ThatOpen viewer transitions.
-- **ARCH Compliance BCF Reports**: Expanded `ReportsView.svelte` with a dedicated, filterable ARCH BCF artifacts table sourced from `GET /api/analyze/bcf/list`, showing issue counts, file sizes, timestamps, and one-click 3D viewer and `.bcfzip` download actions.
-- **Typed BCF Contracts**: Added `BcfArtifact` schema to `frontend/src/lib/types.ts` and typed `analyzeApi.listBcfArtifacts()` in `frontend/src/lib/api.ts`.
-
----
-
-## Priority: Logging Improvements
-
-- [ ] Implement Request IDs (Correlation IDs) using `contextvars` to trace requests through the system.
-- [ ] Transition from plain text logging to structured JSON logging for production environments to improve aggregator parsing.
-- [ ] Elevate `RequestLoggingMiddleware` API request logs to `INFO` level to capture traffic baselines in production.
-- [ ] Consider migrating to `structlog` for easier contextual binds throughout the codebase.
+- [ ] **Cross-Element Relative Property Bounds**:
+  - Extend `value_min_property` / `value_max_property` resolution in `app/modules/ifc_reader/__init__.py::extract_for_compliance` to reference properties on a DIFFERENT element than the one targeted (e.g. "exit doors shall be separated by not less than one-half of the building's maximum diagonal").
+  - Requires resolving the target element's containing space/building diagonal and applying the existing scale/offset operators on top.
+- [ ] **Map IDS Validation Failures to Shared Issues and BCF Topics**:
+  - `IDSValidationService` executes `ifctester.ids` (`Ids.validate()`), but failed specifications are not yet converted into typed `Issue` records or BCF topics for 3D navigation.
+- [ ] **Validate Imported/Exported IDS with buildingSMART Schema**:
+  - Add schema validation checks to ensure exported and imported IDS XML strictly conforms to buildingSMART IDS 1.0 XSD schemas.
+- [ ] **Retire Non-Production Rule Folders**:
+  - Review and archive non-production rule folders (`door_mock`, `test`, `test_folder`) or exclude them from the folder picker in `ArchAnalyzeView.svelte`.
+- [ ] **Unit Conversion Edge-Case Warnings**:
+  - Log an explicit warning when a length-typed or length-named property is found but skipped by unit conversion.
+  - Surface `_get_length_unit_scale_mm` fallback-to-1.0 as a visible model warning rather than a silent default.
+- [ ] **Property vs. Geometry Precedence Resolution**:
+  - Clarify and test precedence between declared property values and bounding-box geometry fallbacks (e.g. `Pset_DoorCommon_Egress.ClearWidth` vs. calculated geometry).
 
 ---
 
-20260909
+## Priority 4: Graph Database Integration (Kùzu & Neo4j)
 
-### 4. Phased Implementation Strategy
-
-#### Phase 1: Immediate Payload & Query Optimization (Zero Schema Changes)
-
-- [x] **Lightweight List Projection**: Exclude full `doclang_xml` and `extracted_text` from `GET /api/documents`. Return slim metadata (`has_doclang: bool`). Reserve full XML for detail view and dedicated stream endpoints. _(Implemented in commit `26bfc45`; the `doclang_size_bytes` field mentioned here was never actually computed — hardcoded to `0` — and has since been removed.)_
-- [x] **Selective Database Query Projection**: Added `select_projected(columns)` to `DatabaseAdapter` and `SupabaseTableAdapter`, querying only `DOCUMENT_SUMMARY_COLUMNS` during `list_documents()` to eliminate PostgreSQL TOAST table scans. _(Implemented in commit `c468922`)_
-- [x] **HTTP Compression & Caching**: Added Starlette `GZipMiddleware(minimum_size=1024)` in `app/main.py` for automatic 70%–90% payload compression in transit. Added `Cache-Control: private, max-age=3600, stale-while-revalidate=86400` to DocLang XML and `.dclx` endpoints. _(Implemented in commit `ff68fab`)_
-
-#### Phase 2: Hybrid DB / Object Storage Tiering
-
-- [x] **Supabase DB Migration**: Created and applied `20260909183000_optimize_doclang_indexes_and_storage_path.sql` adding `doclang_storage_path` column to `public.documents`. _(Implemented in commit `88a92e6`)_
-- [x] **Relational & Semantic Query Indexes**: Created composite index on `(document_id, node_type)` and GIN index on `section_path jsonb_path_ops` on `public.document_nodes`. _(Implemented in commit `88a92e6`)_
-- [x] **Threshold-Based Storage Offload**: Implemented `DOCLANG_OFFLOAD_THRESHOLD_BYTES = 256 * 1024` in `DocumentService`. XMLs larger than 256 KB automatically upload to Supabase Storage (`sb://bim-guard-artifacts/doclang/{doc_id}/document.xml.gz`) while smaller XMLs remain in Postgres with transparent dual-mode fallback via `get_doclang_content()`. _(Implemented in commit `5718b5a`)_
-
-#### Phase 3: DocLang Multimodal & OTSL Artifact Bundling
-
-- [x] **Standardized `.dclx` Archive Export Endpoint**: Created `GET /api/documents/{id}/export-doclang` generating zip archives containing `document.xml` and `manifest.json` with ISO 19650 metadata. _(Implemented in commit `44e057f` & `ff68fab`)_
-- [x] **Pre-Ingestion `.dclx` Persistence in Supabase Storage**: Added migration `20260909185000_add_doclang_archive_path.sql` (applied to Supabase DB). Document creation and metadata updates automatically pre-build and persist `archive_{id}.dclx` in Supabase Storage (`sb://bim-guard-artifacts/doclang/archive_{id}.dclx`) and delete cached archives on document deletion.
-- [x] **Pre-Signed & Cached Storage Streaming for `.dclx`**: Updated `GET /api/documents/{id}/export-doclang` with `redirect=true` support issuing 307 temporary redirects to Supabase Storage signed URLs, and serving pre-cached archive bytes from object storage to prevent in-memory re-zipping.
-- [x] **Multimodal Asset Extraction Support**: Implemented `DocLangAssetManager` in `app/modules/document_parsing/doclang_asset_manager.py` to decouple inline base64 image data URIs from DocLang XML, offload them to Supabase Storage (`sb://bim-guard-artifacts/doclang/{id}/assets/`), sanitize XML with relative asset paths (`assets/asset_1.png`), and bundle assets directly into `.dclx` archives.
+- [ ] **Wire `GraphService` into `LlamaIndexRuleGenerator` for GraphRAG**:
+  - Connect the embedded `KuzuDatabaseProvider` (`app/services/kuzu_provider.py`) into the document extraction pipeline, mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
+- [ ] **Execute Complex Topological Rules via Native Cypher**:
+  - Implement a Proof of Concept evaluating multi-element spatial relationships via native Cypher queries (e.g., `MATCH (p:IfcSpace)-[:ADJACENT_TO]->(c:IfcSpace) WHERE ...`) rather than ad-hoc Python loops.
 
 ---
 
-20260914
+## Priority 5: ISO 19650-5 Security & Enterprise Governance
 
-## Stale branches needing manual triage — Owner: Shane
-
-Two remote branches predate the 2026-08-29 legacy-UI removal (`a48a4f1`,
-"eliminate FastHTML and MonsterUI residuals in favor of decoupled Svelte 5
-SPA") and build features entirely on top of the now-deleted `app/components/`
-/ `app/routes/` FastHTML/MonsterUI stack. They do not merge cleanly against
-the current FastAPI (`app/api/`) + Svelte SPA architecture and were left
-undeleted pending a decision on whether any of the underlying feature ideas
-are still wanted (rebuilt against the current stack) before the branches
-themselves are deleted:
-
-- [ ] `claude/wizard-ifc-upload-integration-6ih4n0` — wizard IFC upload
-      integration, multi-model viewer routes, sidebar nav for all analysis
-      types. Built on `app/components/project_setup_wizard.py`,
-      `app/components/viewer_ui.py`, `app/routes/viewer_routes.py`,
-      `app/routes/workflow_page.py` — all removed.
-- [ ] `ready/fmp-async-tracking` — 5-step project setup wizard, seismic (Blue
-      Halo) analysis page, piping/corrosion analysis page, multi-select
-      analysis types, project nav restructure. Built on
-      `app/components/project_setup_wizard.py`,
-      `app/components/piping_analysis_ui.py`,
-      `app/components/seismic_analysis_ui.py`, `app/routes/analyze.py`,
-      `app/routes/piping_routes.py`, `app/routes/seismic_routes.py`,
-      `app/routes/wizard_routes.py` — all removed. Also carries its own
-      `UPSTREAM_BLOCKING_ISSUES.md` noting known blockers from when the
-      branch was last active.
-
-Decide per branch: reimplement the feature against `app/api/` +
-`frontend/src/routes/` (if still wanted) or delete outright.
+- [ ] **Attribute-Based Access Control (ABAC)**:
+  - Implement per-entity security clearance and classification models across projects, models, and compliance reports.
+- [ ] **Security Classification Taxonomy**:
+  - Implement security labeling (Public / Commercial Sensitive / Infrastructure Restricted / High Security Restricted) at container, IFC element, and zone granularity.
+- [ ] **Dynamic IFC Redaction by Clearance**:
+  - Redact sensitive IFC elements, property sets (e.g. `Pset_SecurityProperties`), and geometry on download or 3D viewing based on the requesting user's clearance.
+- [ ] **Hash-Chained Audit Ledger**:
+  - Deploy a tamper-evident audit ledger where each mutation records a SHA-256 hash chained to the preceding record's hash.
+- [ ] **PostgreSQL Row Level Security (RLS) Policies**:
+  - Replace `service_role`-only locks with real Postgres RLS policies enforcing tenant isolation directly at the database tier for authenticated user roles.
 
 ---
 
-20260915
+## Priority 6: Enterprise UX & 3D Coordination
 
-## Compliance roadmap (SOC 2 / ISO 27001) — Phase 2/3 remaining
+- [ ] **Customizable "My Home" Dashboard**:
+  - Grid layout with configurable widgets: Clearance Violations by Severity, Live BCF Issue Feed, Recent IFC Models, and Pending CDE Transitions.
+  - Implement backend aggregation endpoints to power dashboard metrics.
+- [ ] **Split-Screen Model Coordination View**:
+  - 3D ThatOpen viewer + Issue Register side-by-side with a resizable split divider and bidirectional selection synchronization (`IfcViewer.svelte` + `IssueTable`).
+- [ ] **Slide-Out Inspector Drawer**:
+  - Replace blocking modal overlays with a slide-out drawer anchored to the right of the 3D viewport for detailed compliance inspection.
+- [ ] **Floating Contextual Action Menu**:
+  - Contextual action menu anchored to the active selection (3D element, table row, card).
+- [ ] **3D Viewer Automated Playwright E2E & Performance**:
+  - Automated tests for nonblank WebGL canvas rendering, framing, camera viewpoints, and memory lifecycle cleanup.
+  - Profile and optimize WebGL memory usage for multi-model sessions.
+- [ ] **Automated BCF Regression Testing**:
+  - Automated test suite validating topic IDs, element GUIDs, camera viewpoints, and BCF 2.1 zip structure integrity.
 
-Phase 1 technical controls (audit log, CI security scanning,
-`docs/architecture/security-controls.md`) and the GDPR privacy policy/DPA drafts
-(`docs/compliance/`) plus the graph/triplestore project-deletion cascade are done. What's
-left is mostly organizational, not code — see the full roadmap context in
-`docs/architecture/security-controls.md` and the compliance drafts in
-`docs/compliance/` for what these depend on:
+---
 
-- [ ] Fill in the bracketed placeholders in `docs/compliance/gdpr-privacy-policy.md` and
-      `docs/compliance/data-processing-agreement.md` (legal entity name, address,
-      contact, sub-processor hosting regions/transfer mechanisms) and get both reviewed
-      by qualified legal counsel before publishing or sending to any customer.
-- [ ] Stand up an ISMS skeleton for ISO 27001: asset inventory, risk register, access
-      review cadence — typically via a compliance automation platform (Vanta, Drata,
-      etc.) rather than hand-built.
-- [ ] Select a SOC 2 auditor and compliance automation tool; begin the Type II
-      observation window (3–12 months, calendar-gated) once Phase 1 controls have been
-      live long enough to produce evidence.
-- [ ] Decide whether to pursue CSA STAR (builds on ISO 27001; only worth it once that's
-      done, and only if a specific cloud-focused enterprise deal calls for it).
-- [ ] Revisit PCI-DSS scope only if/when BIM-Guard adds direct payment handling beyond a
-      hosted third-party checkout (Stripe Elements/Checkout keeps scope at SAQ-A).
-- [ ] Extend `AuditLogService` coverage beyond the current representative set (org role
-      changes, permission-matrix edits, project/document deletion) to other
-      sensitive mutations as they're identified — e.g. document/ruleset access-grant
-      changes, LLM/parsing engine credential edits. Call
-      `AuditLogService.record(...)` from the relevant route after the mutation
-      succeeds, per the existing call sites in `app/api/organizations.py`,
-      `app/api/permissions.py`, `app/api/documents.py`, `app/api/projects.py`.
-- [ ] Set a concrete audit-log retention/purge policy (`public.audit_log` is currently
-      unbounded) if a fixed retention period is required for compliance purposes.
+## Priority 7: Agent-Callable Infrastructure & MCP Server
+
+Turn BIM-Guard into an agent-callable infrastructure platform for external AI agents:
+
+- [ ] **Model Context Protocol (MCP) Server**:
+  - Wrap BIM-Guard's compliance analysis, rule extraction, and document APIs as a dedicated MCP server so agent clients (Claude, Cursor, external tools) can execute checks natively.
+- [ ] **Agent-to-Agent (A2A) Agent Card**:
+  - Expose BIM-Guard's inspector agent via `/.well-known/agent-card.json`.
+- [ ] **OAuth Discovery & Protected Resource Metadata**:
+  - Publish RFC 8414 OAuth authorization metadata and RFC 9728 `.well-known/oauth-protected-resource` describing `/api/*` resource scopes.
+- [ ] **Skills Index**:
+  - Publish machine-readable catalog of BIM-Guard capabilities (analysis, rule drafting, BCF export).
+- [ ] **LangChain / Webhook Integrations**:
+  - External issue-tracking platform notification webhooks (Autodesk Construction Cloud / ACC, BIM Track).
+
+---
+
+## Priority 8: SOC 2 & ISO 27001 Compliance Roadmap
+
+- [ ] **Fill Legal Placeholders in Compliance Docs**:
+  - Complete placeholders in `docs/compliance/gdpr-privacy-policy.md` and `docs/compliance/data-processing-agreement.md` and obtain legal review.
+- [ ] **ISO 27001 ISMS Skeleton**:
+  - Establish asset inventory, risk register, and access review cadences via compliance automation (e.g. Vanta/Drata).
+- [ ] **SOC 2 Type II Observation Window**:
+  - Select SOC 2 auditor and initiate 3–12 month observation window.
+- [ ] **AuditLogService Expansion**:
+  - Extend `AuditLogService.record(...)` to document access grants, ruleset bindings, and LLM credential mutations.
+- [ ] **Audit Log Retention Policy**:
+  - Define bounded retention and purge policies for `public.audit_log`.
+
+---
+
+## Priority 9: Validation Gates & Logging Improvements
+
+- [ ] **Validation Gates**:
+  - Evaluator contract tests covering every registered engine.
+  - Review workflow tests proving unapproved drafts cannot enter canonical rules.
+  - Automated queue tests covering retries, timeouts, and worker recovery.
+  - Golden/broken reference IFC pair fixtures verifying architectural pass/fail counts.
+- [ ] **Logging Improvements**:
+  - Implement Request IDs (Correlation IDs) using `contextvars` to trace requests across the gateway and background tasks.
+  - Transition from plain text logging to structured JSON logging for production log aggregators.
+  - Elevate `RequestLoggingMiddleware` API request logs to `INFO` level.
+
+---
+
+## Appendix: Historical Milestone Archive
+
+Key milestones completed in previous development cycles:
+
+* **FastAPI API Gateway & Pure Svelte 5 SPA**: Migrated from FastHTML/MonsterUI to a pure FastAPI API Gateway (`app/api/`) and decoupled Vite + Svelte 5 SPA (`frontend/`), removing 14,500+ lines of legacy code.
+* **Production Pipeline Separation**: Clean boundary between read-only audit analysis (`ArchAnalysisService`) and transactional model enhancement lineage (`SupabaseModelLineageRepository`).
+* **Dependency Inversion**: Strict Pydantic contracts (`app/modules/contracts.py`), direct engine evaluator protocol implementation, and central container injection (`app/bootstrap.py`).
+* **Dynamic Database-Driven Rules**: Architectural code rules (Part 9 Building Code) stored in Supabase PostgreSQL with runtime catalog reloading and relative property bounds.
+* **LlamaIndex NLP & Document Parsing**: Table-aware layout chunking, clause metadata tagging, and structured rule extraction drafts (`rule_extraction_drafts`) with human review workflow before canonical promotion.
+* **buildingSMART openBIM Standards**: Native `ifctester.ids` 1.0 XML export/import, live bSDD API client integration (`/api/bsdd/*`), and autocomplete components.
+* **Digital Inspector Agent**: LangGraph state machine with 9 specialized tools for model querying, geometry extraction, compliance verification, and ISO 19650 CDE transitions.
+* **Enterprise RBAC**: Multi-tenant organizations, groups, superadmin ruleset/project/document grant matrices, and Google OAuth integration.
+* **DocLang Multimodal Pipeline**: Chunked storage offload, `.dclx` archive streaming, and multimodal image extraction.
+* **Embedded Graph Database**: `GraphDatabaseProvider` and `KuzuDatabaseProvider` integrated via application container.
