@@ -571,6 +571,7 @@
           "Live BCF 2.1 Topics",
           "Issues exchanged live over the BCF REST API — create, edit and track them.",
           `${bcfTopics.length} topic${bcfTopics.length === 1 ? "" : "s"}`,
+          "border-info-border bg-info-bg text-info",
         )}
         {@render reportOption(
           "artifacts",
@@ -578,6 +579,7 @@
           "BCF Zip Files",
           "BCF files saved from each audit run, ready to open in any BCF viewer.",
           `${artifacts.bcf.length} saved`,
+          "border-accent/40 bg-accent/15 text-accent",
         )}
       </div>
 
@@ -842,6 +844,7 @@
           "PDF Reports",
           "The formatted report to read, print or send.",
           `${artifacts.pdf.length} saved`,
+          "border-critical-border bg-critical-bg text-critical",
         )}
         {@render reportOption(
           "xlsx_artifacts",
@@ -849,6 +852,7 @@
           "Excel Reports",
           "A summary sheet plus one sheet per element type, for tracking fixes.",
           `${artifacts.xlsx.length} saved`,
+          "border-success-border bg-success-bg text-success",
         )}
         {@render reportOption(
           "csv_artifacts",
@@ -856,6 +860,7 @@
           "CSV Exports",
           "One flat table of every result, for loading into other tools.",
           `${artifacts.csv.length} saved`,
+          "border-warning-border bg-warning-bg text-warning",
         )}
       </div>
 
@@ -874,7 +879,14 @@
 </div>
 
 <!-- One boxed, clickable report type; opens its details underneath, click again to close. -->
-{#snippet reportOption(id: string, Icon: typeof FileText, title: string, description: string, count: string)}
+{#snippet reportOption(
+  id: string,
+  Icon: typeof FileText,
+  title: string,
+  description: string,
+  count: string,
+  tone: string,
+)}
   {@const selected = activeTab === id}
   <button
     type="button"
@@ -886,7 +898,9 @@
   >
     <div class="flex w-full items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <Icon class="h-4 w-4 {selected ? 'text-accent' : 'text-fg-secondary'}" />
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border {tone}">
+          <Icon class="h-4 w-4" />
+        </span>
         <span class="text-sm font-bold text-fg-primary">{title}</span>
       </div>
       {#if selected}
