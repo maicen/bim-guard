@@ -537,6 +537,7 @@ class RuleCheckCategoryResponse(BaseModel):
 
     id: int
     name: str
+    description: str = Field(default="", description="What rules in this category test")
     sort_order: int = 0
 
 class RuleBulkDeleteRequest(BaseModel):

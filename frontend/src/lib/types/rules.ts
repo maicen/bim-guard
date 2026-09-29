@@ -179,6 +179,8 @@ export interface RuleBulkUpdatePayload {
 export interface RuleCheckCategory {
   id: number;
   name: string;
+  /** What rules in this category test; shown under its heading. */
+  description: string;
   sort_order: number;
 }
 

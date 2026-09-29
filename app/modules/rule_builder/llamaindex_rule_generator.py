@@ -139,7 +139,7 @@ def _candidate_to_draft(
     *,
     deontic: DeonticStatement | None = None,
     class_candidates: list[dict] | None = None,
-    check_categories: list[str] | None = None,
+    check_categories: dict[str, str] | None = None,
 ) -> RuleExtractionDraft | None:
     """Map a validated LLM candidate onto a RuleExtractionDraft, or None if empty.
 
@@ -227,7 +227,7 @@ class LlamaIndexRuleGenerator:
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
-        check_categories: list[str] | None = None,
+        check_categories: dict[str, str] | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -246,9 +246,10 @@ class LlamaIndexRuleGenerator:
                 and clause-dependency edges are shown to the LLM as part of
                 the prompt (see _format_kg_context), instead of only being
                 used to correct the LLM's answer after the fact.
-            check_categories: Allowed check-category names (from
-                ``rule_check_categories``); the LLM picks one per rule, guided
-                by the clause's section heading. None/empty skips categorisation.
+            check_categories: Allowed check categories as ``{name:
+                description}`` (from ``rule_check_categories``); the LLM picks
+                one per rule, guided by the descriptions and the clause's
+                section heading. None/empty skips categorisation.
         """
         from llama_index.core.llms import ChatMessage, MessageRole
         from llama_index.core.program import LLMTextCompletionProgram
@@ -275,7 +276,7 @@ class LlamaIndexRuleGenerator:
             llm=build_llm(model, organization_id=organization_id),
         )
         check_category_context = format_check_category_context(
-            categories=check_categories or [],
+            categories=check_categories or {},
             section_heading=node.metadata.parent_section if node.metadata else None,
         )
         result: _LLMRuleExtractionResult = await program.acall(

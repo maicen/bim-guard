@@ -153,6 +153,7 @@
 
   interface CheckCategoryGroup {
     name: string;
+    description: string;
     rules: RuleComplianceResult[];
     failCount: number;
     missingCount: number;
@@ -180,6 +181,7 @@
       .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
       .map(([name, groupRules]) => ({
         name,
+        description: checkCategories.find((c) => c.name === name)?.description || "",
         rules: groupRules,
         failCount: groupRules.filter((r) => r.status === "FAIL").length,
         missingCount: groupRules.filter((r) => ["MISSING_DATA", "PARTIAL"].includes(r.status || ""))
@@ -1558,10 +1560,15 @@
               {:else}
                 {#each groupByCheckCategory(activeRules) as group (group.name)}
                   <section class="space-y-2" aria-label={group.name}>
-                    <div class="flex items-center justify-between gap-2 px-1 pt-2">
-                      <h4 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
-                        {group.name}
-                      </h4>
+                    <div class="flex items-start justify-between gap-2 px-1 pt-2">
+                      <div class="min-w-0">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
+                          {group.name}
+                        </h4>
+                        {#if group.description}
+                          <p class="mt-0.5 text-micro text-fg-muted">{group.description}</p>
+                        {/if}
+                      </div>
                       <span
                         class="shrink-0 rounded-md border px-2 py-0.5 text-micro font-semibold {group.failCount
                           ? 'border-critical-border bg-critical-bg text-critical'

@@ -4,7 +4,10 @@ import pytest
 
 from app.modules.contracts import ClauseMetadata, DocumentNodeContract
 from app.modules.rule_builder._extraction_prompts import format_check_category_context
-from app.modules.rule_builder.llamaindex_rule_generator import _candidate_to_draft, _LLMRuleCandidate
+from app.modules.rule_builder.llamaindex_rule_generator import (
+    _candidate_to_draft,
+    _LLMRuleCandidate,
+)
 from app.services.persistence import PersistenceService
 from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.services.rules_service import RuleService
@@ -12,6 +15,7 @@ from app.services.rules_service import RuleService
 pytestmark = pytest.mark.rules
 
 CATEGORIES = ["Fire and Smoke Protection", "Emergency Escape", "Energy Performance"]
+DESCRIPTIONS = {name: f"Tests about {name.lower()}." for name in CATEGORIES}
 
 
 class _FakeCategoriesRepo:
@@ -94,18 +98,18 @@ def _node() -> DocumentNodeContract:
 
 def test_candidate_category_is_mapped_to_stored_spelling():
     candidate = _LLMRuleCandidate(description="Rated windows", check_category="FIRE AND SMOKE PROTECTION")
-    draft = _candidate_to_draft(candidate, _node(), check_categories=CATEGORIES)
+    draft = _candidate_to_draft(candidate, _node(), check_categories=DESCRIPTIONS)
     assert draft.proposed_rule.check_category == "Fire and Smoke Protection"
 
 
 def test_invented_candidate_category_is_dropped():
     candidate = _LLMRuleCandidate(description="Rated windows", check_category="Fire Resistance")
-    draft = _candidate_to_draft(candidate, _node(), check_categories=CATEGORIES)
+    draft = _candidate_to_draft(candidate, _node(), check_categories=DESCRIPTIONS)
     assert draft.proposed_rule.check_category is None
 
 
 def test_category_context_lists_names_and_heading():
-    block = format_check_category_context(categories=CATEGORIES, section_heading="3. Fire and Smoke")
-    assert all(f"  - {name}" in block for name in CATEGORIES)
+    block = format_check_category_context(categories=DESCRIPTIONS, section_heading="3. Fire and Smoke")
+    assert all(f"  - {name}: {DESCRIPTIONS[name]}" in block for name in CATEGORIES)
     assert '"3. Fire and Smoke"' in block
-    assert format_check_category_context(categories=[], section_heading="x") == ""
+    assert format_check_category_context(categories={}, section_heading="x") == ""

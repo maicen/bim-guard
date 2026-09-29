@@ -13,6 +13,7 @@ from app.services.persistence import PersistenceService
 _CATEGORY_COLUMNS = {
     "id": int,
     "name": str,
+    "description": str,
     "sort_order": int,
     "created_at": str,
 }
@@ -37,6 +38,14 @@ class RuleCheckCategoryService:
     def names(self) -> list[str]:
         """Return the category names in display order."""
         return [str(r["name"]) for r in self.list_categories() if r.get("name")]
+
+    def descriptions(self) -> dict[str, str]:
+        """Return ``{name: description}`` in display order (for the extraction prompt)."""
+        return {
+            str(r["name"]): str(r.get("description") or "")
+            for r in self.list_categories()
+            if r.get("name")
+        }
 
     def resolve(self, value: str | None) -> str | None:
         """Map a user- or LLM-supplied name to its stored spelling, or None.

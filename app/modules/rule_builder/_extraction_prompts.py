@@ -129,7 +129,7 @@ CLAUSE TEXT:
 # ── Check-category formatter ──────────────────────────────────────────────────
 
 
-def format_check_category_context(*, categories: list[str], section_heading: str | None) -> str:
+def format_check_category_context(*, categories: dict[str, str], section_heading: str | None) -> str:
     """Render the allowed check categories as a prompt block, or "" if there are none.
 
     Pure function, injected into ``{check_category_context}`` in ``RULE_PROMPT``.
@@ -138,13 +138,16 @@ def format_check_category_context(*, categories: list[str], section_heading: str
     category outright (e.g. "3. Fire and Smoke Protection").
 
     Args:
-        categories: Allowed category names, in display order.
+        categories: ``{name: description}`` of the allowed categories, in display order.
         section_heading: Nearest enclosing section heading of the clause, if known.
     """
     if not categories:
         return ""
     lines = ["CHECK CATEGORIES (pick exactly one name for check_category, or \"\"):"]
-    lines.extend(f"  - {name}" for name in categories)
+    lines.extend(
+        f"  - {name}: {description}" if description else f"  - {name}"
+        for name, description in categories.items()
+    )
     if section_heading:
         lines.append(f'The clause sits under the section heading: "{section_heading}".')
     lines.append("")

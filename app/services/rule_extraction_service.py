@@ -191,7 +191,7 @@ class RuleDraftGenerator(Protocol):
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
-        check_categories: list[str] | None = None,
+        check_categories: dict[str, str] | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Generate zero or more rule drafts from one clause-annotated node."""
         ...
@@ -714,8 +714,8 @@ class RuleExtractionService:
         # Read once per run, not per clause; the LLM assigns one per rule.
         # Only passed when configured, so generators predating the argument
         # keep working.
-        category_names = self._check_categories.names()
-        category_kwargs = {"check_categories": category_names} if category_names else {}
+        categories = self._check_categories.descriptions()
+        category_kwargs = {"check_categories": categories} if categories else {}
 
         extraction_progress.start(document_id, total=len(nodes))
         semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
