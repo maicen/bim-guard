@@ -553,7 +553,7 @@
   {#if selectedProjectId}
     <!-- ═══ BCF Deliverables & Live Topics Hub ═══ -->
     <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
-      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div class="flex flex-col items-start gap-3">
         <div>
           <div class="flex items-center gap-2">
             <FolderArchive class="h-4 w-4 text-blue-400" />
