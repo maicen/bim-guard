@@ -23,6 +23,10 @@
     ArrowDown,
     Search,
     Network,
+    ChevronDown,
+    ChevronRight,
+    Sheet,
+    Table2,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, bcfApi, rulesApi, graphApi } from "../lib/api";
   import { downloadText, downloadDirectWithToken } from "../lib/utils/download";
@@ -44,7 +48,6 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
-  import TabStrip, { type TabStripItem } from "../lib/components/TabStrip.svelte";
   import { Select, type SelectOption } from "../lib/components/ui";
   import Alert from "../lib/components/Alert.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -61,14 +64,6 @@
     xlsx: { tab: "xlsx_artifacts", typeLabel: "Excel", downloadLabel: "Excel" },
     csv: { tab: "csv_artifacts", typeLabel: "CSV", downloadLabel: "CSV" },
   };
-
-  const reportTabs: TabStripItem[] = [
-    { id: "live_bcf", label: "Live BCF 2.1 Topics" },
-    { id: "artifacts", label: "BCF Zip Artifacts" },
-    { id: "pdf_artifacts", label: "PDF Reports" },
-    { id: "xlsx_artifacts", label: "Excel Reports" },
-    { id: "csv_artifacts", label: "CSV Exports" },
-  ];
 
   const statusFilterOptions: SelectOption[] = [
     { value: "ALL", label: "All Statuses" },
@@ -193,7 +188,8 @@
   // Live BCF REST Topics
   let bcfTopics: BCFTopicResponse[] = $state([]);
   let isTopicsLoading = $state(false);
-  let activeTab: string = $state("live_bcf");
+  // The report type whose details are open ("" = none; each box opens on click).
+  let activeTab: string = $state("");
   let activeArtifactType = $derived(artifactTypeForTab(activeTab));
   // Topic search, filter, sort, paginate and select.
   const topicTable = createTableState<BCFTopicResponse, string>({
@@ -553,67 +549,41 @@
   {/if}
 
   {#if selectedProjectId}
-    <!-- ═══ BCF Deliverables & Live Topics Hub ═══ -->
+    <!-- ═══ buildingSMART BCF Collaboration Hub: Live topics + BCF zips ═══ -->
     <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
-      <div class="flex flex-col items-start gap-3">
-        <div>
-          <div class="flex items-center gap-2">
-            <FolderArchive class="h-4 w-4 text-blue-400" />
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              buildingSMART BCF Collaboration Hub
-            </h2>
-            <span
-              class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold text-fg-secondary"
-            >
-              {activeArtifactType
-                ? `${artifacts[activeArtifactType].length} Artifacts`
-                : `${bcfTopics.length} Live Topics`}
-            </span>
-          </div>
-          <p class="mt-1 text-xs text-fg-muted">
-            Bidirectional BCF REST API v2.1/v3.0 live topics exchange and persisted BCF zip
-            deliverables with ISO 19650 governance tags.
-          </p>
+      <div>
+        <div class="flex items-center gap-2">
+          <FolderArchive class="h-5 w-5 text-accent" />
+          <h2 class="text-lg font-bold tracking-tight text-fg-primary">
+            buildingSMART BCF Collaboration Hub
+          </h2>
         </div>
-
-        <!-- Tab & Action Controls -->
-        <div class="flex shrink-0 flex-wrap items-center gap-2.5">
-          <TabStrip
-            tabs={reportTabs}
-            active={activeTab}
-            onSelect={(id) => (activeTab = id)}
-            ariaLabel="Deliverables Views"
-          />
-
-          {#if activeTab === "live_bcf"}
-            <button
-              type="button"
-              onclick={() => (isTopicCreateModalOpen = true)}
-              class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-blue-500"
-            >
-              <Plus class="h-3.5 w-3.5" />
-              <span>Create Topic</span>
-            </button>
-          {/if}
-
-          <button
-            type="button"
-            onclick={() => {
-              if (activeArtifactType) loadReportArtifacts(activeArtifactType);
-              else loadBcfTopics();
-            }}
-            disabled={isTopicsLoading || anyArtifactsLoading}
-            class="rounded-xl border border-border-interactive bg-surface-overlay p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
-            title="Refresh Deliverables"
-          >
-            <RefreshCw
-              class="h-3.5 w-3.5 {isTopicsLoading || anyArtifactsLoading
-                ? 'animate-spin'
-                : ''}"
-            />
-          </button>
-        </div>
+        <p class="mt-1 text-xs text-fg-muted">
+          Bidirectional BCF REST API v2.1/v3.0 live topics exchange and persisted BCF zip
+          deliverables with ISO 19650 governance tags. Choose one to open it.
+        </p>
       </div>
+
+      <div class="grid gap-3 sm:grid-cols-2">
+        {@render reportOption(
+          "live_bcf",
+          MessageSquare,
+          "Live BCF 2.1 Topics",
+          "Issues exchanged live over the BCF REST API — create, edit and track them.",
+          `${bcfTopics.length} topic${bcfTopics.length === 1 ? "" : "s"}`,
+        )}
+        {@render reportOption(
+          "artifacts",
+          FolderArchive,
+          "BCF Zip Files",
+          "BCF files saved from each audit run, ready to open in any BCF viewer.",
+          `${artifacts.bcf.length} saved`,
+        )}
+      </div>
+
+      {#if activeTab === "live_bcf" || activeTab === "artifacts"}
+        {@render openPanelToolbar()}
+      {/if}
 
       {#if activeTab === "live_bcf"}
         <!-- ── TAB 1: LIVE BCF 2.1 TOPICS ── -->
@@ -823,44 +793,24 @@
             }}
           />
         {/if}
-      {:else if activeArtifactType}
-        <!-- ── SAVED REPORT TABS: BCF zip, PDF, Excel, CSV ── -->
-        {@const type = activeArtifactType}
-        {#key type}
-          <ReportArtifactsTable
-            artifacts={artifacts[type]}
-            tableState={artifactTables[type]}
-            typeLabel={ARTIFACT_TABS[type].typeLabel}
-            downloadLabel={ARTIFACT_TABS[type].downloadLabel}
-            {projects}
-            isLoading={artifactsLoading[type]}
-            {selectedProjectId}
-            filterToSelectedProject={filterToSelected[type]}
-            onFilterToggle={(v) => (filterToSelected[type] = v)}
-            onDownload={(a) => downloadReportArtifact(type, a.id)}
-            onDeleteOne={(a) => promptDeleteArtifact(type, a)}
-            onBulkDelete={() => promptBulkDeleteArtifacts(type)}
-            onBulkExport={() => exportArtifactsToCsv(type)}
-            onViewIn3d={type === "bcf" && onSelectProjectForViewer
-              ? (a) => onSelectProjectForViewer!(a.project_id, undefined, a.id)
-              : undefined}
-          />
-        {/key}
+      {:else if activeTab === "artifacts"}
+        {@render artifactTable("bcf")}
       {/if}
     </div>
 
-    <!-- ═══ PDF Compliance Report ═══ -->
+    <!-- ═══ Compliance Report: PDF, Excel, CSV ═══ -->
     <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6">
       <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <div class="flex items-center gap-2">
-            <FileText class="h-4 w-4 text-accent" />
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">PDF Compliance Report</h2>
+            <FileText class="h-5 w-5 text-accent" />
+            <h2 class="text-lg font-bold tracking-tight text-fg-primary">Compliance Report</h2>
           </div>
           <p class="mt-1 text-xs text-fg-muted">
             A deterministic, database-driven report for {currentProject?.name || "this project"} —
             cover, executive summary, priority findings, findings register and full rule
-            traceability, generated from the latest analysis run. No LLM is used.
+            traceability, generated from the latest analysis run. No LLM is used. Choose a format
+            to see its saved reports.
           </p>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2.5">
@@ -884,6 +834,35 @@
           </button>
         </div>
       </div>
+
+      <div class="grid gap-3 sm:grid-cols-3">
+        {@render reportOption(
+          "pdf_artifacts",
+          FileText,
+          "PDF Reports",
+          "The formatted report to read, print or send.",
+          `${artifacts.pdf.length} saved`,
+        )}
+        {@render reportOption(
+          "xlsx_artifacts",
+          Sheet,
+          "Excel Reports",
+          "A summary sheet plus one sheet per element type, for tracking fixes.",
+          `${artifacts.xlsx.length} saved`,
+        )}
+        {@render reportOption(
+          "csv_artifacts",
+          Table2,
+          "CSV Exports",
+          "One flat table of every result, for loading into other tools.",
+          `${artifacts.csv.length} saved`,
+        )}
+      </div>
+
+      {#if activeArtifactType && activeArtifactType !== "bcf"}
+        {@render openPanelToolbar()}
+        {@render artifactTable(activeArtifactType)}
+      {/if}
     </div>
   {:else}
     <div
@@ -893,6 +872,85 @@
     </div>
   {/if}
 </div>
+
+<!-- One boxed, clickable report type; opens its details underneath, click again to close. -->
+{#snippet reportOption(id: string, Icon: typeof FileText, title: string, description: string, count: string)}
+  {@const selected = activeTab === id}
+  <button
+    type="button"
+    aria-pressed={selected}
+    onclick={() => (activeTab = selected ? "" : id)}
+    class="flex h-full flex-col gap-2 rounded-xl border p-4 text-left transition-colors {selected
+      ? 'border-accent bg-surface-selected'
+      : 'border-border-default bg-surface-overlay hover:border-border-interactive hover:bg-surface-hover'}"
+  >
+    <div class="flex w-full items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <Icon class="h-4 w-4 {selected ? 'text-accent' : 'text-fg-secondary'}" />
+        <span class="text-sm font-bold text-fg-primary">{title}</span>
+      </div>
+      {#if selected}
+        <ChevronDown class="h-4 w-4 text-accent" />
+      {:else}
+        <ChevronRight class="h-4 w-4 text-fg-muted" />
+      {/if}
+    </div>
+    <p class="text-xs text-fg-secondary">{description}</p>
+    <span class="font-mono text-micro text-fg-muted">{count}</span>
+  </button>
+{/snippet}
+
+<!-- Actions for whichever report type is open: refresh, plus Create Topic for live BCF. -->
+{#snippet openPanelToolbar()}
+  <div class="flex flex-wrap items-center justify-end gap-2.5 border-t border-border-subtle pt-4">
+    {#if activeTab === "live_bcf"}
+      <button
+        type="button"
+        onclick={() => (isTopicCreateModalOpen = true)}
+        class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-accent-hover"
+      >
+        <Plus class="h-3.5 w-3.5" />
+        <span>Create Topic</span>
+      </button>
+    {/if}
+    <button
+      type="button"
+      onclick={() => {
+        if (activeArtifactType) loadReportArtifacts(activeArtifactType);
+        else loadBcfTopics();
+      }}
+      disabled={isTopicsLoading || anyArtifactsLoading}
+      aria-label="Refresh"
+      class="rounded-xl border border-border-interactive bg-surface-overlay p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
+    >
+      <RefreshCw class="h-3.5 w-3.5 {isTopicsLoading || anyArtifactsLoading ? 'animate-spin' : ''}" />
+    </button>
+  </div>
+{/snippet}
+
+<!-- Saved reports of one type (BCF zip, PDF, Excel or CSV). -->
+{#snippet artifactTable(type: ArtifactType)}
+  {#key type}
+    <ReportArtifactsTable
+      artifacts={artifacts[type]}
+      tableState={artifactTables[type]}
+      typeLabel={ARTIFACT_TABS[type].typeLabel}
+      downloadLabel={ARTIFACT_TABS[type].downloadLabel}
+      {projects}
+      isLoading={artifactsLoading[type]}
+      {selectedProjectId}
+      filterToSelectedProject={filterToSelected[type]}
+      onFilterToggle={(v) => (filterToSelected[type] = v)}
+      onDownload={(a) => downloadReportArtifact(type, a.id)}
+      onDeleteOne={(a) => promptDeleteArtifact(type, a)}
+      onBulkDelete={() => promptBulkDeleteArtifacts(type)}
+      onBulkExport={() => exportArtifactsToCsv(type)}
+      onViewIn3d={type === "bcf" && onSelectProjectForViewer
+        ? (a) => onSelectProjectForViewer!(a.project_id, undefined, a.id)
+        : undefined}
+    />
+  {/key}
+{/snippet}
 
 <!-- ═══ MODALS ═══ -->
 {#if selectedProjectId}
