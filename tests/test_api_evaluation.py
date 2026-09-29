@@ -177,3 +177,39 @@ def test_bulk_delete_removes_findings(evaluation_service):
 
     findings = client.get("/api/evaluation/findings", params={"project_id": 1}).json()["findings"]
     assert findings == []
+
+
+def test_get_evaluation_matrix_computes_confusion_and_kappa(evaluation_service):
+    """Confirm /api/evaluation/matrix accurately tabulates TP/FP/FN/TN and agreement metrics."""
+    # Capture canned 2 findings (1 PASS, 1 FAIL)
+    client.post("/api/evaluation/capture", json={"project_id": 1, "rule_folder": "TEST-RULESET"})
+    findings = client.get("/api/evaluation/findings", params={"project_id": 1}).json()["findings"]
+    assert len(findings) == 2
+
+    # Before review: reviewed=0, metrics=None
+    pre = client.get("/api/evaluation/matrix", params={"project_id": 1}).json()
+    assert pre["total_findings"] == 2
+    assert pre["reviewed_findings"] == 0
+    assert pre["confusion_matrix"] == {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    assert pre["metrics"]["accuracy"] is None
+
+    # Review finding 1 (status FAIL) with human verdict FAIL -> True Positive
+    fail_f = next(f for f in findings if f["bimguard_verdict"] == "FAIL")
+    pass_f = next(f for f in findings if f["bimguard_verdict"] == "PASS")
+
+    client.patch(f"/api/evaluation/findings/{fail_f['id']}", json={"human_verdict": "FAIL"})
+    client.patch(f"/api/evaluation/findings/{pass_f['id']}", json={"human_verdict": "PASS"})
+
+    post = client.get("/api/evaluation/matrix", params={"project_id": 1}).json()
+    assert post["total_findings"] == 2
+    assert post["reviewed_findings"] == 2
+    assert post["unreviewed_findings"] == 0
+    assert post["confusion_matrix"] == {"tp": 1, "fp": 0, "fn": 0, "tn": 1}
+    assert post["metrics"]["accuracy"] == 1.0
+    assert post["metrics"]["precision"] == 1.0
+    assert post["metrics"]["recall"] == 1.0
+    assert post["metrics"]["specificity"] == 1.0
+    assert post["metrics"]["f1"] == 1.0
+    assert post["metrics"]["cohens_kappa"] == 1.0
+    assert post["cross_tabulation"]["FAIL"]["FAIL"] == 1
+    assert post["cross_tabulation"]["PASS"]["PASS"] == 1

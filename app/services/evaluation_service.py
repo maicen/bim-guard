@@ -16,7 +16,13 @@ from __future__ import annotations
 from typing import Any
 
 from app.logging_config import get_logger
-from app.modules.contracts import EvaluationBulkReviewRequest, EvaluationFindingReviewRequest
+from app.modules.contracts import (
+    EvaluationBulkReviewRequest,
+    EvaluationConfusionMatrix,
+    EvaluationFindingReviewRequest,
+    EvaluationMatrixResponse,
+    EvaluationMetrics,
+)
 from app.services.arch_analysis_service import ArchAnalysisService
 from app.services.persistence import PersistenceService
 from app.utils import now_iso_utc
@@ -203,3 +209,102 @@ class EvaluationService:
         self._findings.delete_many(finding_ids)
         logger.info("Deleted %d evaluation findings", len(finding_ids))
         return len(finding_ids)
+
+    def compute_evaluation_matrix(self, project_id: int) -> EvaluationMatrixResponse:
+        """Compute the 2x2 confusion matrix, statistical metrics, and cross-tabulation for a project."""
+        rows = list(self._findings.rows)
+        project_rows = [row for row in rows if int(row.get("project_id") or 0) == project_id]
+        total_findings = len(project_rows)
+
+        reviewed_rows = [r for r in project_rows if r.get("human_verdict")]
+        reviewed_count = len(reviewed_rows)
+        unreviewed_count = total_findings - reviewed_count
+
+        # Build cross-tabulation: [bg_verdict][human_verdict] = count
+        cross_tab: dict[str, dict[str, int]] = {}
+        for r in reviewed_rows:
+            bg_v = str(r.get("bimguard_verdict") or "NOT_APPLICABLE").upper()
+            hv = str(r.get("human_verdict") or "").upper()
+            if bg_v not in cross_tab:
+                cross_tab[bg_v] = {}
+            cross_tab[bg_v][hv] = cross_tab[bg_v].get(hv, 0) + 1
+
+        # Binary confusion matrix at compliance action threshold (violation detection):
+        # Positive = FAIL, Negative = PASS
+        tp = 0
+        fp = 0
+        fn = 0
+        tn = 0
+        for r in reviewed_rows:
+            bg_v = str(r.get("bimguard_verdict") or "").upper()
+            hv = str(r.get("human_verdict") or "").upper()
+            if bg_v == "FAIL" and hv == "FAIL":
+                tp += 1
+            elif bg_v == "FAIL" and hv == "PASS":
+                fp += 1
+            elif bg_v == "PASS" and hv == "FAIL":
+                fn += 1
+            elif bg_v == "PASS" and hv == "PASS":
+                tn += 1
+
+        binary_total = tp + fp + fn + tn
+        accuracy = (tp + tn) / binary_total if binary_total > 0 else None
+        precision = tp / (tp + fp) if (tp + fp) > 0 else None
+        recall = tp / (tp + fn) if (tp + fn) > 0 else None
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else None
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision is not None and recall is not None and (precision + recall) > 0)
+            else None
+        )
+
+        # Cohen's Kappa over all reviewed rows mapping bimguard verdict to human vocabulary
+        # Vocabulary: PASS, FAIL, NOT_APPLICABLE, INDETERMINATE
+        bimguard_to_human = {
+            "PASS": "PASS",
+            "FAIL": "FAIL",
+            "MISSING": "INDETERMINATE",
+            "WAIVED": "NOT_APPLICABLE",
+            "NOT_APPLICABLE": "NOT_APPLICABLE",
+        }
+        cohens_kappa = None
+        if reviewed_count > 0:
+            agreed = 0
+            cat_counts_bg: dict[str, int] = {}
+            cat_counts_human: dict[str, int] = {}
+            for r in reviewed_rows:
+                bg_raw = str(r.get("bimguard_verdict") or "").upper()
+                bg_mapped = bimguard_to_human.get(bg_raw, bg_raw)
+                hv = str(r.get("human_verdict") or "").upper()
+                if bg_mapped == hv:
+                    agreed += 1
+                cat_counts_bg[bg_mapped] = cat_counts_bg.get(bg_mapped, 0) + 1
+                cat_counts_human[hv] = cat_counts_human.get(hv, 0) + 1
+
+            p_o = agreed / reviewed_count
+            all_cats = set(cat_counts_bg.keys()) | set(cat_counts_human.keys())
+            p_e = sum(
+                (cat_counts_bg.get(c, 0) / reviewed_count) * (cat_counts_human.get(c, 0) / reviewed_count)
+                for c in all_cats
+            )
+            if abs(1.0 - p_e) < 1e-9:
+                cohens_kappa = 1.0 if abs(p_o - 1.0) < 1e-9 else 0.0
+            else:
+                cohens_kappa = (p_o - p_e) / (1.0 - p_e)
+
+        return EvaluationMatrixResponse(
+            project_id=project_id,
+            total_findings=total_findings,
+            reviewed_findings=reviewed_count,
+            unreviewed_findings=unreviewed_count,
+            confusion_matrix=EvaluationConfusionMatrix(tp=tp, fp=fp, fn=fn, tn=tn),
+            metrics=EvaluationMetrics(
+                accuracy=round(accuracy, 4) if accuracy is not None else None,
+                precision=round(precision, 4) if precision is not None else None,
+                recall=round(recall, 4) if recall is not None else None,
+                specificity=round(specificity, 4) if specificity is not None else None,
+                f1=round(f1, 4) if f1 is not None else None,
+                cohens_kappa=round(cohens_kappa, 4) if cohens_kappa is not None else None,
+            ),
+            cross_tabulation=cross_tab,
+        )

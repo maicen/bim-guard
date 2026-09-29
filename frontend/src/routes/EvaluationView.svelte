@@ -1,6 +1,15 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { ClipboardCheck, RefreshCw, Search } from "lucide-svelte";
+  import {
+    BarChart3,
+    ChevronDown,
+    ChevronUp,
+    ClipboardCheck,
+    Download,
+    FileSpreadsheet,
+    RefreshCw,
+    Search,
+  } from "lucide-svelte";
   import { evaluationApi } from "../lib/api";
   import { Select } from "../lib/components/ui";
   import BulkActionBar from "../lib/components/BulkActionBar.svelte";
@@ -37,6 +46,157 @@
   let errorLog: ErrorLogEntry[] = $state([]);
   let isBulkDeleteModalOpen = $state(false);
   let isBulkConfirming = $state(false);
+  let showMatrixCard = $state(true);
+
+  // Live reactive confusion matrix computed directly from findings
+  const reviewedFindings = $derived(findings.filter((f) => !!f.human_verdict));
+
+  const matrixStats = $derived.by(() => {
+    let tp = 0;
+    let fp = 0;
+    let fn = 0;
+    let tn = 0;
+    let agreed = 0;
+
+    const bgCounts: Record<string, number> = {};
+    const humanCounts: Record<string, number> = {};
+
+    for (const f of reviewedFindings) {
+      const bg = f.bimguard_verdict;
+      const hv = f.human_verdict;
+      if (!hv) continue;
+      const bgMapped = BIMGUARD_TO_HUMAN[bg];
+
+      if (bgMapped === hv) agreed++;
+
+      bgCounts[bgMapped] = (bgCounts[bgMapped] || 0) + 1;
+      humanCounts[hv] = (humanCounts[hv] || 0) + 1;
+
+      // Positive = FAIL (non-compliance), Negative = PASS (compliance)
+      if (bg === "FAIL" && hv === "FAIL") tp++;
+      else if (bg === "FAIL" && hv === "PASS") fp++;
+      else if (bg === "PASS" && hv === "FAIL") fn++;
+      else if (bg === "PASS" && hv === "PASS") tn++;
+    }
+
+    const n = reviewedFindings.length;
+    const binaryTotal = tp + fp + fn + tn;
+    const accuracy = binaryTotal > 0 ? (tp + tn) / binaryTotal : null;
+    const precision = tp + fp > 0 ? tp / (tp + fp) : null;
+    const recall = tp + fn > 0 ? tp / (tp + fn) : null;
+    const specificity = tn + fp > 0 ? tn / (tn + fp) : null;
+    const f1 =
+      precision !== null && recall !== null && precision + recall > 0
+        ? (2 * precision * recall) / (precision + recall)
+        : null;
+
+    let kappa: number | null = null;
+    if (n > 0) {
+      const po = agreed / n;
+      const allCats = new Set([...Object.keys(bgCounts), ...Object.keys(humanCounts)]);
+      let pe = 0;
+      for (const cat of allCats) {
+        pe += ((bgCounts[cat] || 0) / n) * ((humanCounts[cat] || 0) / n);
+      }
+      if (Math.abs(1.0 - pe) < 1e-9) {
+        kappa = Math.abs(po - 1.0) < 1e-9 ? 1.0 : 0.0;
+      } else {
+        kappa = (po - pe) / (1.0 - pe);
+      }
+    }
+
+    return {
+      n,
+      tp,
+      fp,
+      fn,
+      tn,
+      agreed,
+      accuracy,
+      precision,
+      recall,
+      specificity,
+      f1,
+      kappa,
+    };
+  });
+
+  function kappaDescription(k: number | null): string {
+    if (k === null) return "No data";
+    if (k >= 0.81) return "Almost Perfect Agreement";
+    if (k >= 0.61) return "Substantial Agreement";
+    if (k >= 0.41) return "Moderate Agreement";
+    if (k >= 0.21) return "Fair Agreement";
+    if (k >= 0.0) return "Slight Agreement";
+    return "Poor / Chance Agreement";
+  }
+
+  function exportMatrixCsv() {
+    const s = matrixStats;
+    const csv = [
+      "Metric,Value",
+      `Total Findings,${findings.length}`,
+      `Reviewed Findings,${s.n}`,
+      `True Positives (TP),${s.tp}`,
+      `False Positives (FP),${s.fp}`,
+      `False Negatives (FN),${s.fn}`,
+      `True Negatives (TN),${s.tn}`,
+      `Accuracy,${s.accuracy !== null ? (s.accuracy * 100).toFixed(1) + "%" : "N/A"}`,
+      `Precision,${s.precision !== null ? (s.precision * 100).toFixed(1) + "%" : "N/A"}`,
+      `Recall (Sensitivity),${s.recall !== null ? (s.recall * 100).toFixed(1) + "%" : "N/A"}`,
+      `Specificity,${s.specificity !== null ? (s.specificity * 100).toFixed(1) + "%" : "N/A"}`,
+      `F1 Score,${s.f1 !== null ? (s.f1 * 100).toFixed(1) + "%" : "N/A"}`,
+      `Cohen's Kappa,${s.kappa !== null ? s.kappa.toFixed(4) : "N/A"}`,
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `validation_matrix_project_${selectedProjectId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toasts.success("Validation matrix CSV exported successfully.");
+  }
+
+  function exportMatrixSvg() {
+    const s = matrixStats;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 380" width="540" height="380" style="background:#0f172a;font-family:ui-sans-serif,system-ui,sans-serif;color:#f8fafc">
+      <text x="24" y="36" font-size="16" font-weight="700" fill="#f8fafc">BIMGuard Validation Matrix (Project #${selectedProjectId})</text>
+      <text x="24" y="58" font-size="12" fill="#94a3b8">Reviewed: ${s.n} / ${findings.length} | Cohen's κ: ${s.kappa !== null ? s.kappa.toFixed(3) : "N/A"} (${kappaDescription(s.kappa)})</text>
+      
+      <text x="140" y="85" font-size="11" font-weight="600" fill="#94a3b8">Expert: FAIL</text>
+      <text x="310" y="85" font-size="11" font-weight="600" fill="#94a3b8">Expert: PASS</text>
+
+      <text x="24" y="135" font-size="11" font-weight="600" fill="#94a3b8">Tool: FAIL</text>
+      <rect x="140" y="95" width="160" height="85" fill="#064e3b" stroke="#059669" rx="8"/>
+      <text x="155" y="120" font-size="11" font-weight="700" fill="#6ee7b7">True Positive (TP)</text>
+      <text x="155" y="158" font-size="28" font-weight="800" fill="#ffffff">${s.tp}</text>
+
+      <rect x="310" y="95" width="160" height="85" fill="#7f1d1d" stroke="#dc2626" rx="8"/>
+      <text x="325" y="120" font-size="11" font-weight="700" fill="#fca5a5">False Positive (FP)</text>
+      <text x="325" y="158" font-size="28" font-weight="800" fill="#ffffff">${s.fp}</text>
+
+      <text x="24" y="235" font-size="11" font-weight="600" fill="#94a3b8">Tool: PASS</text>
+      <rect x="140" y="195" width="160" height="85" fill="#7c2d12" stroke="#ea580c" rx="8"/>
+      <text x="155" y="220" font-size="11" font-weight="700" fill="#fdba74">False Negative (FN)</text>
+      <text x="155" y="258" font-size="28" font-weight="800" fill="#ffffff">${s.fn}</text>
+
+      <rect x="310" y="195" width="160" height="85" fill="#1e293b" stroke="#475569" rx="8"/>
+      <text x="325" y="220" font-size="11" font-weight="700" fill="#cbd5e1">True Negative (TN)</text>
+      <text x="325" y="258" font-size="28" font-weight="800" fill="#ffffff">${s.tn}</text>
+
+      <text x="24" y="315" font-size="11" fill="#94a3b8">Accuracy: ${s.accuracy !== null ? (s.accuracy * 100).toFixed(1) + "%" : "N/A"} | Precision: ${s.precision !== null ? (s.precision * 100).toFixed(1) + "%" : "N/A"}</text>
+      <text x="24" y="335" font-size="11" fill="#94a3b8">Recall: ${s.recall !== null ? (s.recall * 100).toFixed(1) + "%" : "N/A"} | Specificity: ${s.specificity !== null ? (s.specificity * 100).toFixed(1) + "%" : "N/A"} | F1: ${s.f1 !== null ? (s.f1 * 100).toFixed(1) + "%" : "N/A"}</text>
+    </svg>`;
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `validation_matrix_project_${selectedProjectId}.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toasts.success("Validation matrix SVG exported successfully.");
+  }
 
   // A rule's "correct" outcome maps onto a smaller human vocabulary: a
   // missing property means the reviewer genuinely can't tell (INDETERMINATE),
@@ -221,6 +381,187 @@
       description='Run a compliance audit, then use "Capture for Evaluation" to snapshot its results here for review.'
     />
   {:else}
+    <!-- Tool-vs-Expert Validation Matrix Card -->
+    <div class="rounded-2xl border border-border-default bg-surface-card p-5 shadow-xs transition-all">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <BarChart3 class="h-4 w-4" />
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-fg-primary">Tool-vs-Expert Validation Matrix</h3>
+              <span class="rounded-full bg-surface-overlay px-2 py-0.5 text-[11px] font-medium text-fg-muted border border-border-subtle">
+                {matrixStats.n} / {findings.length} Reviewed
+              </span>
+            </div>
+            <p class="text-xs text-fg-muted">
+              Empirical confusion matrix and Cohen's κ inter-rater agreement for active architectural rules.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          {#if matrixStats.n > 0}
+            <button
+              type="button"
+              onclick={exportMatrixSvg}
+              class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+              title="Export 2x2 confusion matrix as SVG graphic"
+            >
+              <Download class="h-3.5 w-3.5 text-accent" />
+              SVG
+            </button>
+            <button
+              type="button"
+              onclick={exportMatrixCsv}
+              class="inline-flex items-center gap-1.5 rounded-xl border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+              title="Export statistical validation metrics as CSV"
+            >
+              <FileSpreadsheet class="h-3.5 w-3.5 text-accent" />
+              CSV
+            </button>
+          {/if}
+          <button
+            type="button"
+            onclick={() => (showMatrixCard = !showMatrixCard)}
+            class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border-interactive bg-surface-overlay text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+            aria-label={showMatrixCard ? "Collapse Matrix" : "Expand Matrix"}
+          >
+            {#if showMatrixCard}
+              <ChevronUp class="h-4 w-4" />
+            {:else}
+              <ChevronDown class="h-4 w-4" />
+            {/if}
+          </button>
+        </div>
+      </div>
+
+      {#if showMatrixCard}
+        <div class="pt-4 space-y-4">
+          <!-- 2x2 Matrix & Metrics Split -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <!-- 2x2 Confusion Grid -->
+            <div class="lg:col-span-6 space-y-2">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-fg-muted mb-1">
+                Classification Matrix (Binary Action Threshold: FAIL)
+              </div>
+              <div class="overflow-hidden rounded-xl border border-border-default bg-surface-overlay/50">
+                <table class="w-full text-xs text-center border-collapse">
+                  <thead>
+                    <tr class="border-b border-border-default bg-surface-overlay text-fg-muted">
+                      <th class="p-2.5 text-left font-medium">BIM-Guard \ Expert</th>
+                      <th class="p-2.5 font-semibold text-critical">Expert: FAIL (Violation)</th>
+                      <th class="p-2.5 font-semibold text-success">Expert: PASS (Compliant)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="border-b border-border-subtle">
+                      <td class="p-2.5 text-left font-semibold text-critical bg-surface-overlay/30">
+                        Tool: FAIL (Flagged)
+                      </td>
+                      <td class="p-3 bg-success-bg/20 border-r border-border-subtle">
+                        <div class="text-xs font-semibold text-success">True Positive (TP)</div>
+                        <div class="text-xl font-bold text-fg-primary mt-0.5">{matrixStats.tp}</div>
+                        <div class="text-[10px] text-fg-muted">Accurate violation</div>
+                      </td>
+                      <td class="p-3 bg-critical-bg/20">
+                        <div class="text-xs font-semibold text-critical">False Positive (FP)</div>
+                        <div class="text-xl font-bold text-fg-primary mt-0.5">{matrixStats.fp}</div>
+                        <div class="text-[10px] text-fg-muted">False alarm</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="p-2.5 text-left font-semibold text-success bg-surface-overlay/30">
+                        Tool: PASS (Cleared)
+                      </td>
+                      <td class="p-3 bg-caution-bg/20 border-r border-border-subtle">
+                        <div class="text-xs font-semibold text-caution">False Negative (FN)</div>
+                        <div class="text-xl font-bold text-fg-primary mt-0.5">{matrixStats.fn}</div>
+                        <div class="text-[10px] text-fg-muted">Missed violation</div>
+                      </td>
+                      <td class="p-3 bg-surface-card">
+                        <div class="text-xs font-semibold text-fg-secondary">True Negative (TN)</div>
+                        <div class="text-xl font-bold text-fg-primary mt-0.5">{matrixStats.tn}</div>
+                        <div class="text-[10px] text-fg-muted">Accurate pass</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Statistical Metrics Cards -->
+            <div class="lg:col-span-6 space-y-2">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-fg-muted mb-1">
+                Inter-Rater & Evaluation Metrics
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">Cohen's Kappa (κ)</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.kappa !== null ? matrixStats.kappa.toFixed(3) : "—"}
+                  </div>
+                  <div class="text-[10px] text-accent truncate font-medium">
+                    {kappaDescription(matrixStats.kappa)}
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">Precision (PPV)</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.precision !== null ? (matrixStats.precision * 100).toFixed(1) + "%" : "—"}
+                  </div>
+                  <div class="text-[10px] text-fg-muted">TP / (TP + FP)</div>
+                </div>
+
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">Recall (Sensitivity)</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.recall !== null ? (matrixStats.recall * 100).toFixed(1) + "%" : "—"}
+                  </div>
+                  <div class="text-[10px] text-fg-muted">TP / (TP + FN)</div>
+                </div>
+
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">Specificity (TNR)</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.specificity !== null ? (matrixStats.specificity * 100).toFixed(1) + "%" : "—"}
+                  </div>
+                  <div class="text-[10px] text-fg-muted">TN / (TN + FP)</div>
+                </div>
+
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">F1 Score</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.f1 !== null ? (matrixStats.f1 * 100).toFixed(1) + "%" : "—"}
+                  </div>
+                  <div class="text-[10px] text-fg-muted">Harmonic Mean</div>
+                </div>
+
+                <div class="rounded-xl border border-border-default bg-surface-overlay/60 p-3">
+                  <div class="text-[11px] text-fg-muted font-medium">Overall Accuracy</div>
+                  <div class="text-lg font-bold text-fg-primary mt-0.5">
+                    {matrixStats.accuracy !== null ? (matrixStats.accuracy * 100).toFixed(1) + "%" : "—"}
+                  </div>
+                  <div class="text-[10px] text-fg-muted">
+                    {matrixStats.agreed} / {matrixStats.n || 0} Agreed
+                  </div>
+                </div>
+              </div>
+
+              {#if matrixStats.n === 0}
+                <div class="rounded-xl border border-border-subtle bg-surface-overlay/40 p-2.5 text-center text-xs text-fg-muted">
+                  Review findings in the table below to populate real-time validation matrix & kappa metrics.
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
+    </div>
+
     <div class="flex flex-wrap items-center gap-3">
       <div class="relative w-full max-w-xs">
         <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />

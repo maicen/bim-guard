@@ -5,6 +5,7 @@ import type {
   EvaluationFinding,
   EvaluationFindingListResponse,
   EvaluationFindingReviewRequest,
+  EvaluationMatrixResponse,
 } from "../types";
 import { API_BASE, apiFetch, handleResponse } from "./client";
 
@@ -17,6 +18,12 @@ export const evaluationApi = {
       body: JSON.stringify(payload),
     });
     return handleResponse<EvaluationCaptureResponse>(res);
+  },
+
+  /** Get live 2x2 confusion matrix and agreement metrics for a project's reviewed findings. */
+  async getMatrix(projectId: number): Promise<EvaluationMatrixResponse> {
+    const res = await apiFetch(`${API_BASE}/evaluation/matrix?project_id=${projectId}`);
+    return handleResponse<EvaluationMatrixResponse>(res);
   },
 
   async listFindings(

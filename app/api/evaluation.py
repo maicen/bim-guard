@@ -24,6 +24,7 @@ from app.modules.contracts import (
     EvaluationFindingContract,
     EvaluationFindingListResponse,
     EvaluationFindingReviewRequest,
+    EvaluationMatrixResponse,
 )
 from app.services.evaluation_service import EvaluationService
 
@@ -48,6 +49,21 @@ def capture_evaluation_results(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return EvaluationCaptureResponse(captured_count=count)
+
+
+@router.get(
+    "/matrix",
+    response_model=EvaluationMatrixResponse,
+    summary="Compute evaluation confusion matrix and agreement metrics for a project",
+)
+def get_evaluation_matrix(
+    project_id: Annotated[int, Query()],
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    service: Annotated[EvaluationService, Depends(get_evaluation_service)],
+) -> EvaluationMatrixResponse:
+    """Compute 2x2 confusion matrix, Cohen's kappa, precision, recall, and F1 over reviewed findings."""
+    project_access(project_id)
+    return service.compute_evaluation_matrix(project_id=project_id)
 
 
 @router.get("/findings", response_model=EvaluationFindingListResponse, summary="List captured evaluation findings")

@@ -8,7 +8,19 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-__all__ = ['EvaluationHumanVerdict', 'EvaluationCaptureRequest', 'EvaluationCaptureResponse', 'EvaluationFindingContract', 'EvaluationFindingListResponse', 'EvaluationFindingReviewRequest', 'EvaluationBulkReviewRequest', 'EvaluationBulkDeleteRequest']
+__all__ = [
+    'EvaluationHumanVerdict',
+    'EvaluationCaptureRequest',
+    'EvaluationCaptureResponse',
+    'EvaluationFindingContract',
+    'EvaluationFindingListResponse',
+    'EvaluationFindingReviewRequest',
+    'EvaluationBulkReviewRequest',
+    'EvaluationBulkDeleteRequest',
+    'EvaluationConfusionMatrix',
+    'EvaluationMetrics',
+    'EvaluationMatrixResponse',
+]
 
 class EvaluationHumanVerdict(str, Enum):
     """Reviewer-confirmed correct verdict for one captured evaluation finding."""
@@ -17,6 +29,7 @@ class EvaluationHumanVerdict(str, Enum):
     FAIL = "FAIL"
     NOT_APPLICABLE = "NOT_APPLICABLE"
     INDETERMINATE = "INDETERMINATE"
+
 
 class EvaluationCaptureRequest(BaseModel):
     """Payload to snapshot a ruleset run's current PASS/FAIL results into the evaluation set."""
@@ -87,3 +100,38 @@ class EvaluationBulkDeleteRequest(BaseModel):
     """Payload to remove several captured findings from the evaluation set."""
 
     finding_ids: list[int] = Field(..., min_length=1)
+
+
+class EvaluationConfusionMatrix(BaseModel):
+    """Binary 2x2 confusion matrix (positive = violation / FAIL, negative = compliance / PASS)."""
+
+    tp: int = Field(default=0, description="True Positives: BIM-Guard FAIL confirmed by human FAIL")
+    fp: int = Field(default=0, description="False Positives: BIM-Guard FAIL refuted by human PASS")
+    fn: int = Field(default=0, description="False Negatives: BIM-Guard PASS refuted by human FAIL")
+    tn: int = Field(default=0, description="True Negatives: BIM-Guard PASS confirmed by human PASS")
+
+
+class EvaluationMetrics(BaseModel):
+    """Standard statistical validation metrics."""
+
+    accuracy: Optional[float] = Field(default=None, description="(TP + TN) / Total")
+    precision: Optional[float] = Field(default=None, description="TP / (TP + FP)")
+    recall: Optional[float] = Field(default=None, description="Sensitivity: TP / (TP + FN)")
+    specificity: Optional[float] = Field(default=None, description="TN / (TN + FP)")
+    f1: Optional[float] = Field(default=None, description="Harmonic mean of precision and recall")
+    cohens_kappa: Optional[float] = Field(default=None, description="Inter-rater agreement metric above chance")
+
+
+class EvaluationMatrixResponse(BaseModel):
+    """Response containing the confusion matrix, metrics, and cross-tabulation for a project."""
+
+    project_id: int
+    total_findings: int
+    reviewed_findings: int
+    unreviewed_findings: int
+    confusion_matrix: EvaluationConfusionMatrix
+    metrics: EvaluationMetrics
+    cross_tabulation: dict[str, dict[str, int]] = Field(
+        default_factory=dict,
+        description="Full cross-tabulation: row=bimguard_verdict, col=human_verdict",
+    )

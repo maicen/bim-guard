@@ -52,3 +52,29 @@ export interface EvaluationBulkReviewRequest {
   human_verdict: EvaluationHumanVerdict;
   review_notes?: string | null;
 }
+
+export interface EvaluationConfusionMatrix {
+  tp: number;
+  fp: number;
+  fn: number;
+  tn: number;
+}
+
+export interface EvaluationMetrics {
+  accuracy?: number | null;
+  precision?: number | null;
+  recall?: number | null;
+  specificity?: number | null;
+  f1?: number | null;
+  cohens_kappa?: number | null;
+}
+
+export interface EvaluationMatrixResponse {
+  project_id: number;
+  total_findings: number;
+  reviewed_findings: number;
+  unreviewed_findings: number;
+  confusion_matrix: EvaluationConfusionMatrix;
+  metrics: EvaluationMetrics;
+  cross_tabulation: Record<string, Record<string, number>>;
+}
