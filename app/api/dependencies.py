@@ -35,6 +35,7 @@ from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.regulatory_graph_service import RegulatoryGraphService
 from app.services.report_service import ReportService
+from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.services.rules_service import RuleService
 from app.services.ruleset_access_service import RulesetAccessService
 from app.services.scim_service import ScimService
@@ -71,6 +72,11 @@ def get_bsdd_ontology() -> BSDDOntologyRepository:
 def get_rules_service() -> RuleService:
     """Return the configured RuleService instance."""
     return get_container().rules_service
+
+
+def get_rule_check_category_service() -> RuleCheckCategoryService:
+    """Return the configured RuleCheckCategoryService instance."""
+    return get_container().rule_check_category_service
 
 
 def get_ifc_pipeline_service() -> IFCPipelineService:

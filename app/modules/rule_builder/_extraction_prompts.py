@@ -36,6 +36,7 @@ matching the requested schema only — no commentary, no markdown fences.
 # ── User/rule prompt ──────────────────────────────────────────────────────────
 # Template variables (filled by LlamaIndex ChatPromptTemplate):
 #   {kg_context}   — KG-grounded candidate block, or "" when no index exists
+#   {check_category_context} — allowed check categories block, or "" when none are configured
 #   {clause_text}  — The raw clause text to analyse
 
 RULE_PROMPT = """\
@@ -116,10 +117,38 @@ For each rule found, fill in:
 - kg_candidate_used: the uri of the KNOWN-GOOD CANDIDATE (if any were shown
   above) that target_ifc_class came from, or "" if none were shown or none
   were used.
-
+- check_category: the CHECK CATEGORY (if any are listed below) this rule
+  belongs to, copied exactly from that list, or "" if none are listed or none
+  fits.
+{check_category_context}
 CLAUSE TEXT:
 {clause_text}
 """
+
+
+# ── Check-category formatter ──────────────────────────────────────────────────
+
+
+def format_check_category_context(*, categories: list[str], section_heading: str | None) -> str:
+    """Render the allowed check categories as a prompt block, or "" if there are none.
+
+    Pure function, injected into ``{check_category_context}`` in ``RULE_PROMPT``.
+    The clause's enclosing section heading is shown alongside because source
+    documents commonly group their requirements under headings that name the
+    category outright (e.g. "3. Fire and Smoke Protection").
+
+    Args:
+        categories: Allowed category names, in display order.
+        section_heading: Nearest enclosing section heading of the clause, if known.
+    """
+    if not categories:
+        return ""
+    lines = ["CHECK CATEGORIES (pick exactly one name for check_category, or \"\"):"]
+    lines.extend(f"  - {name}" for name in categories)
+    if section_heading:
+        lines.append(f'The clause sits under the section heading: "{section_heading}".')
+    lines.append("")
+    return "\n".join(lines)
 
 
 # ── KG-context formatter ──────────────────────────────────────────────────────

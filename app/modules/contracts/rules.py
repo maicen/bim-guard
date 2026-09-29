@@ -69,6 +69,13 @@ class RuleCreateRequest(BaseModel):
     ruleset_id: Optional[str] = Field(default=None, description="Group or folder ruleset identifier")
     rule_category: Optional[str] = Field(default="property_check", description="Rule classification")
     category: Optional[str] = Field(default=None, description="Domain category: Arch")
+    check_category: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the rule_check_categories entry (e.g. 'Fire and Smoke "
+            "Protection') this rule's results are grouped under; null = uncategorized."
+        ),
+    )
     target_ifc_class: Optional[str] = Field(
         default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow), often bSDD-sourced"
     )
@@ -153,6 +160,10 @@ class RuleUpdateRequest(BaseModel):
     severity: Optional[str] = None
     needs_review: Optional[int] = None
     category: Optional[str] = None
+    check_category: Optional[str] = Field(
+        default=None,
+        description="Check category name; omit to leave unchanged, '' to clear.",
+    )
     applies_when: Optional[dict] = Field(
         default=None,
         description=(
@@ -191,6 +202,13 @@ class RuleResponse(TimestampFields):
     ruleset_id: Optional[str] = None
     rule_category: Optional[str] = None
     category: Optional[str] = Field(default="Arch", description="Domain category: Arch")
+    check_category: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the rule_check_categories entry (e.g. 'Fire and Smoke "
+            "Protection') this rule's results are grouped under; null = uncategorized."
+        ),
+    )
     target_ifc_class: Optional[str] = Field(
         default=None, description="Target IFC entity type (e.g. IfcDoor, IfcWindow)"
     )
@@ -510,6 +528,16 @@ class RuleBulkUpdateRequest(BaseModel):
     severity: Optional[str] = Field(default=None, description="Severity: Critical, High, Medium, Low")
     needs_review: Optional[int] = Field(default=None, description="Needs review flag: 0 or 1")
     property_set: Optional[str] = Field(default=None, description="Property set name")
+    check_category: Optional[str] = Field(
+        default=None, description="Check category name to assign; '' clears it"
+    )
+
+class RuleCheckCategoryResponse(BaseModel):
+    """One entry of the ordered check-category list (rule_check_categories)."""
+
+    id: int
+    name: str
+    sort_order: int = 0
 
 class RuleBulkDeleteRequest(BaseModel):
     """Payload for deleting multiple rules in bulk."""

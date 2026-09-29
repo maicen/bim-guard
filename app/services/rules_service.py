@@ -7,6 +7,7 @@ from postgrest.exceptions import APIError
 
 from app.services.documents_service import DocumentService
 from app.services.persistence import PersistenceService
+from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.utils import (
     cache_db_query,
     invalidate_cache,
@@ -82,6 +83,10 @@ _META_COLUMNS = {
     "rule_category": str,  # "property_check" | "threshold_band" | "material_property"
     # | "scoring_model" | "mitigation" | "reference_config"
     "category": str,  # "Arch"
+    # Name of a rule_check_categories row (e.g. "Fire and Smoke Protection")
+    # that groups this rule's results under each element type; "" / NULL =
+    # uncategorized. Distinct from rule_category above, which is the mechanism.
+    "check_category": str,
 }
 
 _FOLDER_COLUMNS = {
@@ -132,6 +137,7 @@ class RuleService:
         rules_repo=None,
         folders_repo=None,
         documents_service: DocumentService | None = None,
+        check_categories: RuleCheckCategoryService | None = None,
         db=None,
     ):
         """Initialize the rules table with required schema columns and dependency injection.
@@ -142,6 +148,9 @@ class RuleService:
         database. Used for test isolation.
         """
         self._documents_service = documents_service if documents_service is not None else DocumentService()
+        self._check_categories = (
+            check_categories if check_categories is not None else RuleCheckCategoryService()
+        )
         all_required = {**_RICH_COLUMNS, **_META_COLUMNS}
         self._rules = (
             rules_repo
@@ -433,6 +442,7 @@ class RuleService:
         ruleset_id: str = "",
         rule_category: str = "property_check",
         category: str = "",
+        check_category: str | None = None,
         rule_id: str = "",
         # RASE (Requirement/Applicability/Selection/Exception) provenance
         rase_requirement: str | None = None,
@@ -443,6 +453,7 @@ class RuleService:
         """Build a rule row dict (no I/O) shared by single and bulk create paths."""
         ref = (rule_id or reference or "").strip()
         now = now_iso_utc()
+        resolved_check_category = self.resolve_check_category(check_category)
         norm_cat = self.normalize_category(category, default="") or self.infer_category(
             {
                 "mechanism": mechanism,
@@ -499,6 +510,9 @@ class RuleService:
             "rase_exception": rase_exception or None,
             "created_at": now,
             "updated_at": now,
+            # Only written when set, so an uncategorized rule never names the
+            # column: a database without it would otherwise reject every insert.
+            **({"check_category": resolved_check_category} if resolved_check_category else {}),
         }
 
     def create_rule(self, **kwargs) -> dict:
@@ -559,6 +573,8 @@ class RuleService:
         ruleset_id: str = "",
         rule_category: str = "",
         category: str = "",
+        # None leaves the stored check category untouched; "" clears it.
+        check_category: str | None = None,
         # ifc target
         property_set: str = "",
         property_name: str = "",
@@ -642,6 +658,8 @@ class RuleService:
             updates["category"] = self.normalize_category(category)
         if applies_when is not None:
             updates["applies_when"] = json.dumps(applies_when)
+        if check_category is not None:
+            updates["check_category"] = self.resolve_check_category(check_category)
 
         self._rules.update(
             updates=updates,
@@ -656,6 +674,20 @@ class RuleService:
         if old_normalized and old_normalized != new_normalized:
             self._drop_folder_if_orphan(old_normalized)
         invalidate_cache("bimguard:rules")
+
+    def resolve_check_category(self, value: str | None) -> str | None:
+        """Return the stored spelling of a check category, or None when blank.
+
+        Raises ValueError for a name that is not in ``rule_check_categories``:
+        the column is a foreign key, and writing an unknown name would fail
+        the insert/update outright.
+        """
+        if not (value or "").strip():
+            return None
+        resolved = self._check_categories.resolve(value)
+        if resolved is None:
+            raise ValueError(f"Unknown check category {value!r}.")
+        return resolved
 
     def patch_rule_columns(self, rule_id: int, columns: dict[str, Any]) -> None:
         """Overwrite the given columns of one rule and leave every other column as stored.
@@ -1113,6 +1145,8 @@ class RuleService:
             cleaned_updates["needs_review"] = int(updates["needs_review"])
         if "property_set" in updates and updates["property_set"] is not None:
             cleaned_updates["property_set"] = updates["property_set"].strip()
+        if "check_category" in updates and updates["check_category"] is not None:
+            cleaned_updates["check_category"] = self.resolve_check_category(updates["check_category"])
 
         updated_ids: list[int] = []
         for rule_id in rule_ids:
@@ -1340,6 +1374,9 @@ class RuleService:
                 ruleset_id=ruleset_id,
                 rule_category=str(rule.get("rule_category") or "property_check"),
                 category=str(rule.get("category") or top_category),
+                # A file from another deployment may name a category this one
+                # doesn't have; that rule imports uncategorized, not as a failure.
+                check_category=self._check_categories.resolve(rule.get("check_category")),
                 parameters=json.dumps(rule.get("parameters") or {}),
             )
             saved += 1
@@ -1379,6 +1416,7 @@ class RuleService:
                 "ref": r.get("reference") or r.get("rule_id") or "",
                 "rule_type": r.get("rule_type") or "numeric_comparison",
                 "rule_category": r.get("rule_category") or "",
+                "check_category": r.get("check_category") or "",
                 "desc": r.get("description") or "",
                 "target": r.get("target_ifc_class") or "",
                 "source_text": r.get("source_text") or "",

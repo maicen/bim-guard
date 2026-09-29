@@ -872,6 +872,7 @@ class ComplianceComparator:
             "rule_ref":        item.get("rule_ref", ""),
             "rule_desc":       item.get("rule_desc", ""),
             "ruleset_id":      item.get("ruleset_id"),
+            "check_category":  item.get("check_category"),
             "source_text":     item.get("source_text"),
             "source_document_id": item.get("source_document_id"),
             "source_page_number": item.get("source_page_number"),

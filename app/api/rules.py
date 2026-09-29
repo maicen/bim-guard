@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from app.api.dependencies import (
     get_membership_service,
     get_profile_service,
+    get_rule_check_category_service,
     get_rules_service,
     get_ruleset_access_service,
 )
@@ -37,6 +38,7 @@ from app.modules.contracts import (
     RuleBulkCreateResponse,
     RuleBulkDeleteRequest,
     RuleBulkUpdateRequest,
+    RuleCheckCategoryResponse,
     RuleCreateRequest,
     RuleDraftConflictDetectionRequest,
     RuleDraftConflictDetectionResponse,
@@ -68,6 +70,7 @@ from app.modules.contracts import (
 )
 from app.services.membership_service import MembershipService
 from app.services.profile_service import ProfileService
+from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.services.rule_extraction_service import RuleExtractionService
 from app.services.rule_formatter_service import RuleFormatterService
 from app.services.rule_snapshot_service import RuleSnapshotService
@@ -233,6 +236,22 @@ def list_rules(
         ]
 
     return [_rule_response(r) for r in rules]
+
+
+@router.get(
+    "/check-categories",
+    response_model=list[RuleCheckCategoryResponse],
+    summary="List the check categories rule results are grouped under",
+)
+def list_rule_check_categories(
+    categories: Annotated[RuleCheckCategoryService, Depends(get_rule_check_category_service)],
+) -> list[RuleCheckCategoryResponse]:
+    """Return the ordered check-category list from ``rule_check_categories``.
+
+    The analysis view groups each element type's rule results under these, in
+    this order; rules with no category are shown last as "Uncategorized".
+    """
+    return [RuleCheckCategoryResponse(**row) for row in categories.list_categories()]
 
 
 @router.get("/folders", response_model=list[RuleFolderResponse], summary="List ruleset folders")
@@ -961,7 +980,7 @@ def bulk_update_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
     ruleset_check: Annotated[RulesetAccessChecker, Depends(get_ruleset_access_checker)],
 ) -> RuleBulkActionResponse:
-    """Update ruleset folder, category, mechanism, severity, property set, or review status across multiple rules."""
+    """Update ruleset folder, category, check category, mechanism, severity, property set, or review status across multiple rules."""
     affected_ruleset_ids = {
         row.get("ruleset_id") for row in (service.get_rule(rid) for rid in payload.rule_ids) if row
     }
@@ -985,8 +1004,13 @@ def bulk_update_rules(
         updates["needs_review"] = payload.needs_review
     if payload.property_set is not None:
         updates["property_set"] = payload.property_set
+    if payload.check_category is not None:
+        updates["check_category"] = payload.check_category
 
-    updated_ids = service.bulk_update_rules(payload.rule_ids, updates)
+    try:
+        updated_ids = service.bulk_update_rules(payload.rule_ids, updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return RuleBulkActionResponse(
         success_count=len(updated_ids),
         affected_ids=updated_ids,
@@ -1213,6 +1237,7 @@ def create_rule(
             ruleset_id=payload.ruleset_id,
             rule_category=payload.rule_category or "property_check",
             category=payload.category or "",
+            check_category=payload.check_category,
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "manual",
             needs_review=payload.needs_review,
@@ -1248,7 +1273,10 @@ def update_rule(
     ruleset_check(existing.get("ruleset_id"))
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
-    updated = service.update_rule(rule_id, **updates)
+    try:
+        updated = service.update_rule(rule_id, **updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _rule_response(updated or service.get_rule(rule_id))
 
 
@@ -1472,6 +1500,7 @@ def bulk_create_rules(
             mechanism=payload.mechanism or "CODE",
             ruleset_id=payload.ruleset_id,
             rule_category=payload.rule_category or "property_check",
+            check_category=payload.check_category,
             confidence=payload.confidence or "1.0",
             extraction_method=payload.extraction_method or "ai_extracted",
             needs_review=payload.needs_review,

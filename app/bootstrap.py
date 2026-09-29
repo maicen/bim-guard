@@ -55,6 +55,7 @@ from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
 from app.services.report_service import ReportService
+from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.services.rules_service import (
     _FOLDER_COLUMNS,
     _META_COLUMNS,
@@ -116,6 +117,7 @@ class ApplicationContainer:
     projects_service: ProjectsService
     models_service: ModelsService
     rules_service: RuleService
+    rule_check_category_service: RuleCheckCategoryService
     documents_service: DocumentService
     settings_service: SettingsService
     github_repo_service: GitHubRepoService
@@ -609,10 +611,13 @@ def build_default_container() -> ApplicationContainer:
         storage=storage,
     )
 
+    rule_check_category_service = RuleCheckCategoryService()
+
     rules_service = RuleService(
         rules_repo=rules_repo,
         folders_repo=folders_repo,
         documents_service=documents_service,
+        check_categories=rule_check_category_service,
     )
 
     settings_service = SettingsService(
@@ -905,6 +910,7 @@ def build_default_container() -> ApplicationContainer:
         projects_service=projects_service,
         models_service=models_service,
         rules_service=rules_service,
+        rule_check_category_service=rule_check_category_service,
         documents_service=documents_service,
         settings_service=settings_service,
         github_repo_service=github_repo_service,

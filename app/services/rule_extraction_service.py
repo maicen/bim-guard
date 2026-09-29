@@ -18,6 +18,7 @@ from app.services.bsdd_ontology_repository import (
 )
 from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
 from app.services.document_pages_service import DocumentPagesService
+from app.services.rule_check_category_service import RuleCheckCategoryService
 
 #: Node-level LLM calls to run concurrently during draft extraction. Bounded
 #: rather than unbounded asyncio.gather so a 100-section document doesn't
@@ -190,6 +191,7 @@ class RuleDraftGenerator(Protocol):
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
+        check_categories: list[str] | None = None,
     ) -> list[contracts.RuleExtractionDraft]:
         """Generate zero or more rule drafts from one clause-annotated node."""
         ...
@@ -209,6 +211,7 @@ class RuleExtractionService:
         generator: RuleDraftGenerator | None = None,
         draft_service: Any | None = None,
         pages_service: DocumentPagesService | None = None,
+        check_categories: RuleCheckCategoryService | None = None,
         max_concurrent_nodes: int = _MAX_CONCURRENT_NODES,
     ):
         """Initialize the extraction provider dependency.
@@ -223,6 +226,8 @@ class RuleExtractionService:
                 ingested clause node's page_number), for tests that inject
                 fakes for the ingestor/generator too and shouldn't otherwise
                 hit the real `document_pages` table.
+            check_categories: Injectable RuleCheckCategoryService -- supplies
+                the allowed category names the LLM assigns each draft to.
             ontology: Injectable BSDDOntologyRepository -- bSDD grounding
                 (_ground_draft_with_bsdd) checks this local, in-process
                 ontology first and only falls back to the live `bsdd_client`
@@ -246,6 +251,7 @@ class RuleExtractionService:
         self._generator = generator or LlamaIndexRuleGenerator()
         self._draft_service = draft_service
         self._pages_service = pages_service or DocumentPagesService()
+        self._check_categories = check_categories or RuleCheckCategoryService()
         self._max_concurrent_nodes = max_concurrent_nodes
 
     def _search_properties_grounded(self, prop_name: str) -> list[contracts.BSDDPropertyItem]:
@@ -705,6 +711,12 @@ class RuleExtractionService:
         # ruleset_id the LLM itself proposed per-node.
         batch_ruleset_id = f"EXTRACTED-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
 
+        # Read once per run, not per clause; the LLM assigns one per rule.
+        # Only passed when configured, so generators predating the argument
+        # keep working.
+        category_names = self._check_categories.names()
+        category_kwargs = {"check_categories": category_names} if category_names else {}
+
         extraction_progress.start(document_id, total=len(nodes))
         semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
         failures: list[Exception] = []
@@ -725,6 +737,7 @@ class RuleExtractionService:
                             model=model,
                             organization_id=organization_id,
                             clause_grounding=self._clause_grounding,
+                            **category_kwargs,
                         )
                 except Exception as exc:  # noqa: BLE001 - one bad node must not abort the batch
                     logger.warning("Rule generation failed node_id=%s error=%s", node.node_id, exc)

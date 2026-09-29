@@ -33,6 +33,7 @@ from app.modules.document_parsing.llamaindex_program import build_llm
 from app.modules.rule_builder._extraction_prompts import (
     RULE_PROMPT,
     SYSTEM_PROMPT,
+    format_check_category_context,
     format_kg_context,
 )
 from app.services.clause_grounding_index import ClauseGroundingIndex, get_clause_grounding_index
@@ -97,6 +98,13 @@ class _LLMRuleCandidate(BaseModel):
             "instead of only inferable from a post-hoc string match."
         ),
     )
+    check_category: str = Field(
+        default="",
+        description=(
+            "One name copied from the prompt's CHECK CATEGORIES list, or '' if "
+            "none were listed or none fits."
+        ),
+    )
 
 
 class _LLMRuleExtractionResult(BaseModel):
@@ -131,6 +139,7 @@ def _candidate_to_draft(
     *,
     deontic: DeonticStatement | None = None,
     class_candidates: list[dict] | None = None,
+    check_categories: list[str] | None = None,
 ) -> RuleExtractionDraft | None:
     """Map a validated LLM candidate onto a RuleExtractionDraft, or None if empty.
 
@@ -148,6 +157,13 @@ def _candidate_to_draft(
     applies_when = {"material_any_of": materials} if materials else None
 
     confidence = _kg_calibrated_confidence(candidate, class_candidates or [])
+
+    # Only a name from the allowed list is kept (in its stored spelling): the
+    # rules column is a foreign key, so an invented category can't be saved.
+    wanted = candidate.check_category.strip().casefold()
+    check_category = next(
+        (name for name in check_categories or [] if wanted and name.casefold() == wanted), None
+    )
 
     proposed_rule = RuleCreateRequest(
         rule_id=candidate.rule_id.strip() or (node.metadata.clause_id or node.node_id[:8]),
@@ -178,6 +194,7 @@ def _candidate_to_draft(
         rase_selection=candidate.rase_selection or None,
         rase_exception=candidate.rase_exception or None,
         kg_candidate_used=candidate.kg_candidate_used.strip() or None,
+        check_category=check_category,
     )
 
     return RuleExtractionDraft(
@@ -210,6 +227,7 @@ class LlamaIndexRuleGenerator:
         model: str | None = None,
         organization_id: int | None = None,
         clause_grounding: ClauseGroundingIndex | None = None,
+        check_categories: list[str] | None = None,
     ) -> list[RuleExtractionDraft]:
         """Run the Pydantic program over one node's text; [] if no rule found.
 
@@ -228,6 +246,9 @@ class LlamaIndexRuleGenerator:
                 and clause-dependency edges are shown to the LLM as part of
                 the prompt (see _format_kg_context), instead of only being
                 used to correct the LLM's answer after the fact.
+            check_categories: Allowed check-category names (from
+                ``rule_check_categories``); the LLM picks one per rule, guided
+                by the clause's section heading. None/empty skips categorisation.
         """
         from llama_index.core.llms import ChatMessage, MessageRole
         from llama_index.core.program import LLMTextCompletionProgram
@@ -253,10 +274,24 @@ class LlamaIndexRuleGenerator:
             prompt=chat_prompt,
             llm=build_llm(model, organization_id=organization_id),
         )
-        result: _LLMRuleExtractionResult = await program.acall(clause_text=node.text, kg_context=kg_context)
+        check_category_context = format_check_category_context(
+            categories=check_categories or [],
+            section_heading=node.metadata.parent_section if node.metadata else None,
+        )
+        result: _LLMRuleExtractionResult = await program.acall(
+            clause_text=node.text,
+            kg_context=kg_context,
+            check_category_context=check_category_context,
+        )
 
         drafts = [
-            _candidate_to_draft(candidate, node, deontic=deontic, class_candidates=class_candidates)
+            _candidate_to_draft(
+                candidate,
+                node,
+                deontic=deontic,
+                class_candidates=class_candidates,
+                check_categories=check_categories,
+            )
             for candidate in result.rules
         ]
         return [draft for draft in drafts if draft is not None]
