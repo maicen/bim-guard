@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **Research Validation Deliverables Relocated:**
-> All empirical research analysis artifacts (including confusion matrices, 38-model validation sweep results, CSV summary tables 1–7, figures B1–B4, and NLP annotation benchmarks) have been moved to the dedicated companion repository:
+> All empirical research analysis artifacts (including confusion matrices, architecture engine benchmarks for ARCH-EGRESS-001 & ARCH-SPATIAL-001, Wilson score confidence intervals, and NLP annotation benchmarks) are maintained in the dedicated companion repository:
 >
 > **[maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**
 

@@ -326,5 +326,5 @@ Docstring policy for contributors:
 
 ## Related Repositories
 
-- **[bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: Dedicated evaluation companion repository. Houses all scoring harnesses, linguistic NLP annotation capabilities, multi-model validation sweeps (`test_all_38_models.py`), and research analysis (confusion matrices, standards sensitivity curves, and thesis tables/figures).
+- **[bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation)**: Dedicated evaluation companion repository. Houses all scoring harnesses, linguistic NLP annotation capabilities, architecture engine benchmarks (`score_arch_engines.py` for ARCH-EGRESS-001 & ARCH-SPATIAL-001), rule extraction accuracy suites, and empirical research analysis (confusion matrices, Wilson score confidence intervals, and thesis validation tables).
 - **[bimguard-analytics](https://github.com/maicen/bimguard-analytics)**: Dedicated analytics layer containing Power BI project files (`.pbip`), star schema specifications (`issues.csv` fact table + dimension tables), and DAX measures.

@@ -34,7 +34,7 @@ as historical reference, not as current capability.
 
 - Contains methodology documents, dataset notes, and standard research matrices.
 - `data/`: JSON/CSV summaries and configs from validation sweeps.
-- **Dedicated Evaluation Companion Repository**: [maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation) — all empirical research analysis (confusion matrices, 38-model validation sweeps, accuracy scoring, and NLP annotation capabilities) is conducted and maintained in this dedicated repo, not here.
+- **Dedicated Evaluation Companion Repository**: [maicen/bim-guard-evaluation](https://github.com/maicen/bim-guard-evaluation) — all empirical research analysis (confusion matrices, architecture engine benchmarks for ARCH-EGRESS-001 & ARCH-SPATIAL-001, accuracy scoring, and NLP annotation capabilities) is conducted and maintained in this dedicated repo, not here.
 
 ## Defect Reports (`defects/`)
 
