@@ -28,8 +28,15 @@ class _FakeCategoriesRepo:
         ]
 
 
+class _FakePropertyMapRepo:
+    rows = [{"id": 1, "target_ifc_class": "IfcWindow", "property_name": "FireRating",
+             "check_category": "Fire and Smoke Protection"}]
+
+
 def _category_service() -> RuleCheckCategoryService:
-    return RuleCheckCategoryService(categories_repo=_FakeCategoriesRepo(CATEGORIES))
+    return RuleCheckCategoryService(
+        categories_repo=_FakeCategoriesRepo(CATEGORIES), property_map_repo=_FakePropertyMapRepo()
+    )
 
 
 def _rule_service(tmp_path) -> RuleService:
@@ -113,3 +120,26 @@ def test_category_context_lists_names_and_heading():
     assert all(f"  - {name}: {DESCRIPTIONS[name]}" in block for name in CATEGORIES)
     assert '"3. Fire and Smoke"' in block
     assert format_check_category_context(categories={}, section_heading="x") == ""
+
+
+def test_property_map_lookup_is_case_insensitive_and_class_scoped():
+    service = _category_service()
+    assert service.category_for_property("ifcwindow", "firerating") == "Fire and Smoke Protection"
+    assert service.category_for_property("IfcDoor", "FireRating") is None
+    assert service.category_for_property("IfcWindow", "") is None
+
+
+def test_rule_without_category_is_categorised_from_property_map(tmp_path):
+    service = _rule_service(tmp_path)
+    mapped = service.create_rule(
+        rule_id="W-7", description="x", target_ifc_class="IfcWindow", property_name="FireRating"
+    )
+    explicit = service.create_rule(
+        rule_id="W-8",
+        description="x",
+        target_ifc_class="IfcWindow",
+        property_name="FireRating",
+        check_category="Emergency Escape",
+    )
+    assert service.get_rule(mapped["id"])["check_category"] == "Fire and Smoke Protection"
+    assert service.get_rule(explicit["id"])["check_category"] == "Emergency Escape"

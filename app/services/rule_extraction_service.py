@@ -254,6 +254,18 @@ class RuleExtractionService:
         self._check_categories = check_categories or RuleCheckCategoryService()
         self._max_concurrent_nodes = max_concurrent_nodes
 
+    def _apply_mapped_check_category(self, draft: contracts.RuleExtractionDraft) -> contracts.RuleExtractionDraft:
+        """Replace the LLM's category with the mapped one when the draft's class + property is mapped.
+
+        Runs after bSDD grounding, which can correct the property name the
+        lookup depends on.
+        """
+        rule = draft.proposed_rule
+        mapped = self._check_categories.category_for_property(rule.target_ifc_class, rule.property_name)
+        if not mapped or mapped == rule.check_category:
+            return draft
+        return draft.model_copy(update={"proposed_rule": rule.model_copy(update={"check_category": mapped})})
+
     def _search_properties_grounded(self, prop_name: str) -> list[contracts.BSDDPropertyItem]:
         """Local ontology first (in-process DuckDB, <1ms, offline), live bSDD only on a local miss.
 
@@ -746,14 +758,16 @@ class RuleExtractionService:
                 finally:
                     extraction_progress.increment(document_id)
                 return [
-                    self._ground_draft_with_bsdd(
-                        draft.model_copy(
-                            update={
-                                "source_snippet": node.text,
-                                "proposed_rule": draft.proposed_rule.model_copy(
-                                    update={"ruleset_id": batch_ruleset_id}
-                                ),
-                            }
+                    self._apply_mapped_check_category(
+                        self._ground_draft_with_bsdd(
+                            draft.model_copy(
+                                update={
+                                    "source_snippet": node.text,
+                                    "proposed_rule": draft.proposed_rule.model_copy(
+                                        update={"ruleset_id": batch_ruleset_id}
+                                    ),
+                                }
+                            )
                         )
                     )
                     for draft in node_drafts

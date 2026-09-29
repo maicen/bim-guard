@@ -453,7 +453,10 @@ class RuleService:
         """Build a rule row dict (no I/O) shared by single and bulk create paths."""
         ref = (rule_id or reference or "").strip()
         now = now_iso_utc()
-        resolved_check_category = self.resolve_check_category(check_category)
+        # An explicit category wins; otherwise the class + property map decides.
+        resolved_check_category = self.resolve_check_category(
+            check_category
+        ) or self._check_categories.category_for_property(target_ifc_class, property_name)
         norm_cat = self.normalize_category(category, default="") or self.infer_category(
             {
                 "mechanism": mechanism,
