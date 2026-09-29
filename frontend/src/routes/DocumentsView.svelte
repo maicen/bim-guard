@@ -15,6 +15,7 @@
     FileCode,
     Plus,
     Route,
+    ChevronRight,
   } from "lucide-svelte";
   import Icon from "@iconify/svelte";
   import { documentsApi, parsingEnginesApi, orgParsingEnginesApi } from "../lib/api";
@@ -633,11 +634,19 @@
                     <button
                       type="button"
                       onclick={() => openConvertModal(doc)}
-                      class="inline-flex items-center gap-1 rounded-full border border-warning-border/60 bg-warning-bg/40 px-2.5 py-0.5 text-caption font-medium text-warning transition-colors hover:bg-warning-bg hover:border-warning-border"
-                      title="Not converted — click to configure and convert to DocLang"
+                      class="group flex cursor-pointer flex-col items-start gap-0.5 text-left"
+                      aria-label="Not converted — click to configure and convert to DocLang"
                     >
-                      <Sparkles class="h-3 w-3" />
-                      Convert
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning-bg px-2.5 py-0.5 text-caption font-semibold text-warning shadow-xs transition-colors group-hover:border-warning group-hover:bg-warning-bg/70 group-focus-visible:ring-2 group-focus-visible:ring-accent"
+                      >
+                        <Sparkles class="h-3 w-3" />
+                        Convert
+                        <ChevronRight class="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                      <span class="pl-1 text-micro text-fg-muted underline-offset-2 group-hover:text-warning group-hover:underline">
+                        Click here to convert
+                      </span>
                     </button>
                   {/if}
                 </td>
