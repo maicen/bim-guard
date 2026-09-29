@@ -51,12 +51,22 @@
   import { createTableState } from "../lib/tableState.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
-  type ArtifactType = "bcf" | "pdf" | "csv";
+  type ArtifactType = "bcf" | "pdf" | "xlsx" | "csv";
+  const ARTIFACT_TYPES: ArtifactType[] = ["bcf", "pdf", "xlsx", "csv"];
+
+  /** Each saved-report tab, keyed by the artifact type it lists. */
+  const ARTIFACT_TABS: Record<ArtifactType, { tab: string; typeLabel: string; downloadLabel: string }> = {
+    bcf: { tab: "artifacts", typeLabel: "BCF", downloadLabel: "Zip" },
+    pdf: { tab: "pdf_artifacts", typeLabel: "PDF", downloadLabel: "PDF" },
+    xlsx: { tab: "xlsx_artifacts", typeLabel: "Excel", downloadLabel: "Excel" },
+    csv: { tab: "csv_artifacts", typeLabel: "CSV", downloadLabel: "CSV" },
+  };
 
   const reportTabs: TabStripItem[] = [
     { id: "live_bcf", label: "Live BCF 2.1 Topics" },
     { id: "artifacts", label: "BCF Zip Artifacts" },
     { id: "pdf_artifacts", label: "PDF Reports" },
+    { id: "xlsx_artifacts", label: "Excel Reports" },
     { id: "csv_artifacts", label: "CSV Exports" },
   ];
 
@@ -113,82 +123,78 @@
   let error = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
 
-  // ARCH Report Artifacts -- BCF, PDF and CSV each get their own list, own
-  // loading flag and own project filter, but share one delete-confirmation
-  // flow and one table-state shape (BcfArtifact covers all three; it's the
+  // ARCH Report Artifacts -- BCF, PDF, Excel and CSV each get their own list,
+  // own loading flag and own project filter, but share one delete-confirmation
+  // flow and one table-state shape (BcfArtifact covers all of them; it's the
   // generic report_artifacts row).
-  let bcfArtifacts: BcfArtifact[] = $state([]);
-  let pdfArtifacts: BcfArtifact[] = $state([]);
-  let csvArtifacts: BcfArtifact[] = $state([]);
-  let isBcfLoading = $state(false);
-  let isPdfLoading = $state(false);
-  let isCsvLoading = $state(false);
-  let bcfFilterToSelected = $state(false);
-  let pdfFilterToSelected = $state(false);
-  let csvFilterToSelected = $state(false);
+  let artifacts: Record<ArtifactType, BcfArtifact[]> = $state({ bcf: [], pdf: [], xlsx: [], csv: [] });
+  let artifactsLoading: Record<ArtifactType, boolean> = $state({
+    bcf: false,
+    pdf: false,
+    xlsx: false,
+    csv: false,
+  });
+  let filterToSelected: Record<ArtifactType, boolean> = $state({
+    bcf: false,
+    pdf: false,
+    xlsx: false,
+    csv: false,
+  });
+  let anyArtifactsLoading = $derived(ARTIFACT_TYPES.some((t) => artifactsLoading[t]));
   let isDeleteArtifactModalOpen = $state(false);
   let artifactToDelete: { type: ArtifactType; artifact: BcfArtifact } | null = $state(null);
   let isBulkDeleteArtifactsModalOpen = $state(false);
   let bulkDeleteType: ArtifactType = $state("bcf");
 
   function artifactsFor(type: ArtifactType): BcfArtifact[] {
-    return type === "bcf" ? bcfArtifacts : type === "pdf" ? pdfArtifacts : csvArtifacts;
+    return artifacts[type];
   }
 
   function setArtifactsFor(type: ArtifactType, rows: BcfArtifact[]): void {
-    if (type === "bcf") bcfArtifacts = rows;
-    else if (type === "pdf") pdfArtifacts = rows;
-    else csvArtifacts = rows;
+    artifacts[type] = rows;
   }
 
   function tableFor(type: ArtifactType) {
-    return type === "bcf" ? bcfArtifactTable : type === "pdf" ? pdfArtifactTable : csvArtifactTable;
+    return artifactTables[type];
   }
 
   function filterToSelectedFor(type: ArtifactType): boolean {
-    return type === "bcf" ? bcfFilterToSelected : type === "pdf" ? pdfFilterToSelected : csvFilterToSelected;
+    return filterToSelected[type];
   }
 
   function setFilterToSelectedFor(type: ArtifactType, v: boolean): void {
-    if (type === "bcf") bcfFilterToSelected = v;
-    else if (type === "pdf") pdfFilterToSelected = v;
-    else csvFilterToSelected = v;
+    filterToSelected[type] = v;
+  }
+
+  function artifactTypeForTab(tab: string): ArtifactType | undefined {
+    return ARTIFACT_TYPES.find((t) => ARTIFACT_TABS[t].tab === tab);
   }
 
   // Artifact search, sort, paginate and select -- one table-state instance
   // per artifact type, each scoped to its own project-filter toggle.
-  const bcfArtifactTable = createTableState<BcfArtifact, number>({
-    rows: () =>
-      bcfFilterToSelected && selectedProjectId
-        ? bcfArtifacts.filter((a) => a.project_id === selectedProjectId)
-        : bcfArtifacts,
-    getId: (a) => a.id,
-    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
-    initialSort: { field: "id", asc: false },
-  });
-  const pdfArtifactTable = createTableState<BcfArtifact, number>({
-    rows: () =>
-      pdfFilterToSelected && selectedProjectId
-        ? pdfArtifacts.filter((a) => a.project_id === selectedProjectId)
-        : pdfArtifacts,
-    getId: (a) => a.id,
-    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
-    initialSort: { field: "id", asc: false },
-  });
-  const csvArtifactTable = createTableState<BcfArtifact, number>({
-    rows: () =>
-      csvFilterToSelected && selectedProjectId
-        ? csvArtifacts.filter((a) => a.project_id === selectedProjectId)
-        : csvArtifacts,
-    getId: (a) => a.id,
-    searchFields: (a) => [a.filename, getProjectName(a.project_id)],
-    initialSort: { field: "id", asc: false },
-  });
+  function createArtifactTable(type: ArtifactType) {
+    return createTableState<BcfArtifact, number>({
+      rows: () =>
+        filterToSelected[type] && selectedProjectId
+          ? artifacts[type].filter((a) => a.project_id === selectedProjectId)
+          : artifacts[type],
+      getId: (a) => a.id,
+      searchFields: (a) => [a.filename, getProjectName(a.project_id)],
+      initialSort: { field: "id", asc: false },
+    });
+  }
+  const artifactTables = {
+    bcf: createArtifactTable("bcf"),
+    pdf: createArtifactTable("pdf"),
+    xlsx: createArtifactTable("xlsx"),
+    csv: createArtifactTable("csv"),
+  };
 
   // Live BCF REST Topics
   let bcfTopics: BCFTopicResponse[] = $state([]);
   let isTopicsLoading = $state(false);
-  let activeTab: "live_bcf" | "artifacts" | "pdf_artifacts" | "csv_artifacts" = $state("live_bcf");
+  let activeTab: string = $state("live_bcf");
+  let activeArtifactType = $derived(artifactTypeForTab(activeTab));
   // Topic search, filter, sort, paginate and select.
   const topicTable = createTableState<BCFTopicResponse, string>({
     rows: () => bcfTopics || [],
@@ -223,9 +229,7 @@
   $effect(() => {
     const orgId = authState.activeOrganizationId;
     untrack(() => {
-      loadReportArtifacts("bcf", orgId);
-      loadReportArtifacts("pdf", orgId);
-      loadReportArtifacts("csv", orgId);
+      for (const type of ARTIFACT_TYPES) loadReportArtifacts(type, orgId);
       projectsApi.list({ organization_id: orgId }).then((data) => {
         if (authState.activeOrganizationId !== orgId) return;
         projects = data.projects || [];
@@ -267,9 +271,7 @@
   }
 
   function setLoadingFor(type: ArtifactType, v: boolean): void {
-    if (type === "bcf") isBcfLoading = v;
-    else if (type === "pdf") isPdfLoading = v;
-    else isCsvLoading = v;
+    artifactsLoading[type] = v;
   }
 
   async function loadReportArtifacts(
@@ -563,13 +565,9 @@
             <span
               class="rounded-md border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-semibold text-fg-secondary"
             >
-              {activeTab === "live_bcf"
-                ? `${bcfTopics.length} Live Topics`
-                : activeTab === "artifacts"
-                  ? `${bcfArtifacts.length} Artifacts`
-                  : activeTab === "pdf_artifacts"
-                    ? `${pdfArtifacts.length} Artifacts`
-                    : `${csvArtifacts.length} Artifacts`}
+              {activeArtifactType
+                ? `${artifacts[activeArtifactType].length} Artifacts`
+                : `${bcfTopics.length} Live Topics`}
             </span>
           </div>
           <p class="mt-1 text-xs text-fg-muted">
@@ -583,7 +581,7 @@
           <TabStrip
             tabs={reportTabs}
             active={activeTab}
-            onSelect={(id) => (activeTab = id as any)}
+            onSelect={(id) => (activeTab = id)}
             ariaLabel="Deliverables Views"
           />
 
@@ -601,17 +599,15 @@
           <button
             type="button"
             onclick={() => {
-              if (activeTab === "live_bcf") loadBcfTopics();
-              else if (activeTab === "artifacts") loadReportArtifacts("bcf");
-              else if (activeTab === "pdf_artifacts") loadReportArtifacts("pdf");
-              else loadReportArtifacts("csv");
+              if (activeArtifactType) loadReportArtifacts(activeArtifactType);
+              else loadBcfTopics();
             }}
-            disabled={isTopicsLoading || isBcfLoading || isPdfLoading || isCsvLoading}
+            disabled={isTopicsLoading || anyArtifactsLoading}
             class="rounded-xl border border-border-interactive bg-surface-overlay p-2 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50"
             title="Refresh Deliverables"
           >
             <RefreshCw
-              class="h-3.5 w-3.5 {isTopicsLoading || isBcfLoading || isPdfLoading || isCsvLoading
+              class="h-3.5 w-3.5 {isTopicsLoading || anyArtifactsLoading
                 ? 'animate-spin'
                 : ''}"
             />
@@ -827,60 +823,29 @@
             }}
           />
         {/if}
-      {:else if activeTab === "artifacts"}
-        <!-- ── TAB 2: ARCHIVED BCF ZIP ARTIFACTS ── -->
-        <ReportArtifactsTable
-          artifacts={bcfArtifacts}
-          tableState={bcfArtifactTable}
-          typeLabel="BCF"
-          downloadLabel="Zip"
-          {projects}
-          isLoading={isBcfLoading}
-          {selectedProjectId}
-          filterToSelectedProject={bcfFilterToSelected}
-          onFilterToggle={(v) => (bcfFilterToSelected = v)}
-          onDownload={(a) => downloadReportArtifact("bcf", a.id)}
-          onDeleteOne={(a) => promptDeleteArtifact("bcf", a)}
-          onBulkDelete={() => promptBulkDeleteArtifacts("bcf")}
-          onBulkExport={() => exportArtifactsToCsv("bcf")}
-          onViewIn3d={onSelectProjectForViewer
-            ? (a) => onSelectProjectForViewer!(a.project_id, undefined, a.id)
-            : undefined}
-        />
-      {:else if activeTab === "pdf_artifacts"}
-        <!-- ── TAB 3: SAVED PDF REPORTS ── -->
-        <ReportArtifactsTable
-          artifacts={pdfArtifacts}
-          tableState={pdfArtifactTable}
-          typeLabel="PDF"
-          downloadLabel="PDF"
-          {projects}
-          isLoading={isPdfLoading}
-          {selectedProjectId}
-          filterToSelectedProject={pdfFilterToSelected}
-          onFilterToggle={(v) => (pdfFilterToSelected = v)}
-          onDownload={(a) => downloadReportArtifact("pdf", a.id)}
-          onDeleteOne={(a) => promptDeleteArtifact("pdf", a)}
-          onBulkDelete={() => promptBulkDeleteArtifacts("pdf")}
-          onBulkExport={() => exportArtifactsToCsv("pdf")}
-        />
-      {:else}
-        <!-- ── TAB 4: SAVED CSV EXPORTS ── -->
-        <ReportArtifactsTable
-          artifacts={csvArtifacts}
-          tableState={csvArtifactTable}
-          typeLabel="CSV"
-          downloadLabel="CSV"
-          {projects}
-          isLoading={isCsvLoading}
-          {selectedProjectId}
-          filterToSelectedProject={csvFilterToSelected}
-          onFilterToggle={(v) => (csvFilterToSelected = v)}
-          onDownload={(a) => downloadReportArtifact("csv", a.id)}
-          onDeleteOne={(a) => promptDeleteArtifact("csv", a)}
-          onBulkDelete={() => promptBulkDeleteArtifacts("csv")}
-          onBulkExport={() => exportArtifactsToCsv("csv")}
-        />
+      {:else if activeArtifactType}
+        <!-- ── SAVED REPORT TABS: BCF zip, PDF, Excel, CSV ── -->
+        {@const type = activeArtifactType}
+        {#key type}
+          <ReportArtifactsTable
+            artifacts={artifacts[type]}
+            tableState={artifactTables[type]}
+            typeLabel={ARTIFACT_TABS[type].typeLabel}
+            downloadLabel={ARTIFACT_TABS[type].downloadLabel}
+            {projects}
+            isLoading={artifactsLoading[type]}
+            {selectedProjectId}
+            filterToSelectedProject={filterToSelected[type]}
+            onFilterToggle={(v) => (filterToSelected[type] = v)}
+            onDownload={(a) => downloadReportArtifact(type, a.id)}
+            onDeleteOne={(a) => promptDeleteArtifact(type, a)}
+            onBulkDelete={() => promptBulkDeleteArtifacts(type)}
+            onBulkExport={() => exportArtifactsToCsv(type)}
+            onViewIn3d={type === "bcf" && onSelectProjectForViewer
+              ? (a) => onSelectProjectForViewer!(a.project_id, undefined, a.id)
+              : undefined}
+          />
+        {/key}
       {/if}
     </div>
 

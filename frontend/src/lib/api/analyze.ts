@@ -270,7 +270,7 @@ export const analyzeApi = {
     return handleResponse<BcfArtifact[]>(res);
   },
 
-  async deleteReportArtifact(artifactType: "bcf" | "pdf" | "csv", artifactId: number): Promise<void> {
+  async deleteReportArtifact(artifactType: "bcf" | "pdf" | "csv" | "xlsx", artifactId: number): Promise<void> {
     const res = await apiFetch(`${API_BASE}/analyze/report-artifacts/${artifactType}/${artifactId}`, {
       method: "DELETE",
     });
