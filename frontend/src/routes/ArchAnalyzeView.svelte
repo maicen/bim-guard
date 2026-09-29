@@ -1027,19 +1027,19 @@
         <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
+            class="relative flex w-full items-center justify-center px-12 py-5 transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
-            <div class="flex items-center gap-3">
-              <Footprints class="h-4 w-4 text-amber-400" />
-              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
+            <div class="flex flex-wrap items-center justify-center gap-3">
+              <Footprints class="h-5 w-5 text-amber-400" />
+              <h3 class="text-xl font-bold tracking-tight text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {eBadge.cls}"
                 >{eBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
-                class="h-4 w-4 text-fg-muted"
+            {#if isOpen}<ChevronDown class="absolute right-4 h-5 w-5 text-fg-muted" />{:else}<ChevronRight
+                class="absolute right-4 h-5 w-5 text-fg-muted"
               />{/if}
           </button>
 
@@ -1051,7 +1051,7 @@
                 <div>
                   <button
                     type="button"
-                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
+                    class="mb-2 flex w-full items-center gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5 text-left text-sm font-bold text-fg-primary"
                     onclick={() => toggleSection("exit-count")}
                   >
                     {#if openSections["exit-count"]}<ChevronDown
@@ -1115,7 +1115,7 @@
                 <div>
                   <button
                     type="button"
-                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
+                    class="mb-2 flex w-full items-center gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5 text-left text-sm font-bold text-fg-primary"
                     onclick={() => toggleSection("travel-dist")}
                   >
                     {#if openSections["travel-dist"]}<ChevronDown
@@ -1196,19 +1196,19 @@
         <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
+            class="relative flex w-full items-center justify-center px-12 py-5 transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
-            <div class="flex items-center gap-3">
-              <Droplets class="h-4 w-4 text-cyan-400" />
-              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
+            <div class="flex flex-wrap items-center justify-center gap-3">
+              <Droplets class="h-5 w-5 text-cyan-400" />
+              <h3 class="text-xl font-bold tracking-tight text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {pBadge.cls}"
                 >{pBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
-                class="h-4 w-4 text-fg-muted"
+            {#if isOpen}<ChevronDown class="absolute right-4 h-5 w-5 text-fg-muted" />{:else}<ChevronRight
+                class="absolute right-4 h-5 w-5 text-fg-muted"
               />{/if}
           </button>
           {#if isOpen && Object.keys(fc).length}
@@ -1246,19 +1246,19 @@
         <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
+            class="relative flex w-full items-center justify-center px-12 py-5 transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
-            <div class="flex items-center gap-3">
-              <Car class="h-4 w-4 text-fg-secondary" />
-              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
+            <div class="flex flex-wrap items-center justify-center gap-3">
+              <Car class="h-5 w-5 text-fg-secondary" />
+              <h3 class="text-xl font-bold tracking-tight text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {gBadge.cls}"
                 >{gBadge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
-                class="h-4 w-4 text-fg-muted"
+            {#if isOpen}<ChevronDown class="absolute right-4 h-5 w-5 text-fg-muted" />{:else}<ChevronRight
+                class="absolute right-4 h-5 w-5 text-fg-muted"
               />{/if}
           </button>
           {#if isOpen && gResults.length}
@@ -1344,25 +1344,25 @@
         <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
           <button
             type="button"
-            class="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-surface-hover"
+            class="relative flex w-full items-center justify-center px-12 py-5 transition-colors hover:bg-surface-hover"
             onclick={() => toggleDomain(domain.key)}
           >
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-center gap-3">
               <SvelteComponent
-                class="h-4 w-4 {domain.key === 'fire'
+                class="h-5 w-5 {domain.key === 'fire'
                   ? 'text-rose-400'
                   : domain.key === 'windows'
                     ? 'text-cyan-400'
                     : 'text-fg-secondary'}"
               />
-              <h3 class="text-sm font-bold text-fg-primary">{domain.label}</h3>
+              <h3 class="text-xl font-bold tracking-tight text-fg-primary">{domain.label}</h3>
               <span
                 class="inline-block rounded-md border px-2.5 py-0.5 text-caption font-semibold {badge.cls}"
                 >{badge.label}</span
               >
             </div>
-            {#if isOpen}<ChevronDown class="h-4 w-4 text-fg-muted" />{:else}<ChevronRight
-                class="h-4 w-4 text-fg-muted"
+            {#if isOpen}<ChevronDown class="absolute right-4 h-5 w-5 text-fg-muted" />{:else}<ChevronRight
+                class="absolute right-4 h-5 w-5 text-fg-muted"
               />{/if}
           </button>
 
@@ -1377,7 +1377,7 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
+                      class="mb-2 flex w-full items-center gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5 text-left text-sm font-bold text-fg-primary"
                       onclick={() => toggleSection("daylight")}
                     >
                       {#if openSections["daylight"]}<ChevronDown
@@ -1455,7 +1455,7 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
+                      class="mb-2 flex w-full items-center gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5 text-left text-sm font-bold text-fg-primary"
                       onclick={() => toggleSection("fire-sep")}
                     >
                       {#if openSections["fire-sep"]}<ChevronDown
@@ -1527,7 +1527,7 @@
                   <div>
                     <button
                       type="button"
-                      class="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-secondary"
+                      class="mb-2 flex w-full items-center gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5 text-left text-sm font-bold text-fg-primary"
                       onclick={() => toggleSection("alarms")}
                     >
                       {#if openSections["alarms"]}<ChevronDown
@@ -1560,13 +1560,15 @@
               {:else}
                 {#each groupByCheckCategory(activeRules) as group (group.id)}
                   <section class="space-y-2" aria-label={group.name}>
-                    <div class="flex items-start justify-between gap-2 px-1 pt-2">
+                    <div
+                      class="mt-2 flex items-start justify-between gap-2 rounded-lg border border-border-default bg-surface-overlay px-3 py-2.5"
+                    >
                       <div class="min-w-0">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-fg-primary">
                           {group.name}
                         </h4>
                         {#if group.description}
-                          <p class="mt-0.5 text-micro text-fg-muted">{group.description}</p>
+                          <p class="mt-0.5 text-xs text-fg-secondary">{group.description}</p>
                         {/if}
                       </div>
                       <span
