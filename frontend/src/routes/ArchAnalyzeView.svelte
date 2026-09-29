@@ -30,7 +30,7 @@
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
   import Alert from "../lib/components/Alert.svelte";
-  import { Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
+  import { Button, Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import type {
@@ -529,9 +529,19 @@
     openDomains = openDomains;
   }
 
-  function toggleRule(key: string) {
-    openRules[key] = !openRules[key];
-    openRules = openRules;
+  /** Failing and missing-data rules start open until the user collapses them. */
+  function ruleKey(domainKey: string, rule: RuleComplianceResult): string {
+    return `${domainKey}-${rule.rule_ref || rule.property_name}`;
+  }
+
+  function isRuleOpen(key: string, rule: RuleComplianceResult): boolean {
+    return openRules[key] ?? (rule.status === "FAIL" || rule.status === "MISSING_DATA");
+  }
+
+  /** Collapse every rule in a category when any is open; otherwise expand them all. */
+  function toggleCategoryRules(domainKey: string, rules: RuleComplianceResult[]) {
+    const anyOpen = rules.some((r) => isRuleOpen(ruleKey(domainKey, r), r));
+    for (const r of rules) openRules[ruleKey(domainKey, r)] = !anyOpen;
   }
 
   function toggleSection(key: string) {
@@ -1571,20 +1581,30 @@
                           <p class="mt-0.5 text-xs text-fg-secondary">{group.description}</p>
                         {/if}
                       </div>
-                      <span
-                        class="shrink-0 rounded-md border px-2 py-0.5 text-micro font-semibold {group.failCount
-                          ? 'border-critical-border bg-critical-bg text-critical'
-                          : group.missingCount
-                            ? 'border-warning-border bg-warning-bg text-warning'
-                            : 'border-success-border bg-success-bg text-success'}"
-                      >
-                        {group.rules.length} rule{group.rules.length === 1 ? "" : "s"}
-                        {#if group.failCount}· {group.failCount} failed{:else if group.missingCount}· {group.missingCount} missing data{:else}· all pass{/if}
-                      </span>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <span
+                          class="rounded-md border px-2 py-0.5 text-micro font-semibold {group.failCount
+                            ? 'border-critical-border bg-critical-bg text-critical'
+                            : group.missingCount
+                              ? 'border-warning-border bg-warning-bg text-warning'
+                              : 'border-success-border bg-success-bg text-success'}"
+                        >
+                          {group.rules.length} rule{group.rules.length === 1 ? "" : "s"}
+                          {#if group.failCount}· {group.failCount} failed{:else if group.missingCount}· {group.missingCount} missing data{:else}· all pass{/if}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onclick={() => toggleCategoryRules(domain.key, group.rules)}
+                        >
+                          {group.rules.some((r) => isRuleOpen(ruleKey(domain.key, r), r))
+                            ? "Collapse all"
+                            : "Expand all"}
+                        </Button>
+                      </div>
                     </div>
                     {#each group.rules as rule (rule)}
-                      {@const rKey = `${domain.key}-${rule.rule_ref || rule.property_name}`}
-                      {@const rStatus = rule.status || ""}
+                      {@const rKey = ruleKey(domain.key, rule)}
                       {@const failC = rule.fail_count || 0}
                       {@const passC = rule.pass_count || 0}
                       {@const missC = rule.missing_count || 0}
@@ -1594,12 +1614,9 @@
                           ? `${failC} fail · ${passC} pass · ${missC} missing`
                           : `${passC}/${totalC} pass`}
                       {@const ruleLabel = `${rule.rule_ref || ""}  ${(rule.rule_desc || "").slice(0, 65)}`}
-                      {@const isRuleOpen =
-                        openRules[rKey] || rStatus === "FAIL" || rStatus === "MISSING_DATA"}
-
                       <CollapsibleRoot
-                        open={isRuleOpen}
-                        onOpenChange={() => toggleRule(rKey)}
+                        open={isRuleOpen(rKey, rule)}
+                        onOpenChange={(open) => (openRules[rKey] = open)}
                         class="overflow-hidden rounded-xl border border-border-subtle"
                       >
                         <CollapsibleTrigger
