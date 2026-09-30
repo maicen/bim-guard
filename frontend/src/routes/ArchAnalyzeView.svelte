@@ -24,9 +24,13 @@
     Save,
     AlertTriangle,
     ClipboardCheck,
+    UploadCloud,
+    ShieldAlert,
+    Eye,
   } from "lucide-svelte";
   import { projectsApi, analyzeApi, lineageApi, rulesApi, evaluationApi } from "../lib/api";
   import ProjectEnhancementsModal from "../lib/components/ProjectEnhancementsModal.svelte";
+  import UploadModelsModal from "../lib/components/UploadModelsModal.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
   import Alert from "../lib/components/Alert.svelte";
@@ -85,10 +89,11 @@
     })),
   );
 
-  // Enhanced model gate
+  // Enhanced model status & modal controls
   let hasEnhancedModel: boolean | null = $state(null);
   let isCheckingEnhancement = $state(false);
   let showEnhancementsModal = $state(false);
+  let showUploadModal = $state(false);
 
   // Report save tracking, shared by BCF (backend auto-persists on every run;
   // we just reflect the status), and PDF/CSV/Excel (persisted on demand by
@@ -192,7 +197,10 @@
 
   /** Check for enhanced model only — do NOT run analysis. */
   async function checkEnhancedModel() {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || !hasIfcFile) {
+      hasEnhancedModel = false;
+      return;
+    }
     isCheckingEnhancement = true;
     hasEnhancedModel = null;
     try {
@@ -211,25 +219,32 @@
     error = "";
     reportSaveMessage = "";
     await checkEnhancedModel();
-    if (!hasEnhancedModel) {
-      showEnhancementsModal = true;
-    }
   }
 
   /**
-   * Main run entrypoint — validates enhanced model, then runs the ARCH audit.
-   * Only called by the Run button, never automatically.
+   * Main run entrypoint — runs the ARCH audit.
+   * If the project has no IFC file attached, prompts to attach one.
    */
   async function handleRunClick() {
     if (!selectedProjectId) return;
-    if (!hasEnhancedModel) {
-      await checkEnhancedModel();
-      if (!hasEnhancedModel) {
-        showEnhancementsModal = true;
-        return;
-      }
+    if (!hasIfcFile) {
+      showUploadModal = true;
+      return;
     }
     await runCheck();
+  }
+
+  async function handleModelsUploaded() {
+    showUploadModal = false;
+    try {
+      projectsApi.clearCache();
+      const projectData = await projectsApi.list();
+      projects = projectData.projects || [];
+      await checkEnhancedModel();
+    } catch (err: any) {
+      error = err.message || "Failed to refresh projects after model upload";
+      errorLog = [toErrorLogEntry(err, "refresh projects after model upload")];
+    }
   }
 
   // Opens the 3D Viewer in its own browser tab instead of navigating away
@@ -551,6 +566,7 @@
   }
 
   let selectedProject = $derived(projects.find((p) => p.id === selectedProjectId) || null);
+  let hasIfcFile = $derived(Boolean(selectedProject?.ifc_file_path));
   // ── Reactive derivations ────────────────────────────────────────────────
 
   let summary = $derived(result?.rule_compliance_summary || {});
@@ -747,13 +763,16 @@
       disabled={isRunning || isCheckingEnhancement || !selectedProjectId}
       onclick={handleRunClick}
       class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50"
+      title={!hasIfcFile && selectedProjectId ? "Attach an IFC model to this project to run compliance audits" : "Run architectural compliance audit"}
     >
       <Play class="h-4 w-4" />
       {isRunning
         ? `Auditing… ${runProgress}%`
         : isCheckingEnhancement
           ? "Checking model…"
-          : "Run Compliance Audit"}
+          : !hasIfcFile && selectedProjectId
+            ? "Attach IFC Model to Audit"
+            : "Run Compliance Audit"}
     </button>
   </div>
 
@@ -765,11 +784,11 @@
     <div
       class="flex items-center gap-2 rounded-xl p-3.5 text-xs
       {reportSaveType === 'success'
-        ? 'border border-emerald-800 bg-emerald-950/40 text-emerald-300'
-        : 'border border-rose-800 bg-rose-950/40 text-rose-300'}"
+        ? 'border border-success-border bg-success-bg text-success'
+        : 'border border-critical-border bg-critical-bg text-critical'}"
     >
       <CheckCircle2
-        class="h-4 w-4 shrink-0 {reportSaveType === 'success' ? 'text-emerald-400' : 'text-rose-400'}"
+        class="h-4 w-4 shrink-0 {reportSaveType === 'success' ? 'text-success' : 'text-critical'}"
       />
       <span>{reportSaveMessage}</span>
       {#if lastSavedArtifact}
@@ -779,7 +798,7 @@
             lastSavedArtifact?.type === "bcf"
               ? downloadBcfArtifact(lastSavedArtifact.id)
               : window.location.assign(analyzeApi.getReportArtifactUrl(lastSavedArtifact!.type, lastSavedArtifact!.id))}
-          class="ml-auto inline-flex items-center gap-1 rounded-lg border border-emerald-700 bg-emerald-900/60 px-2.5 py-1 text-emerald-200 transition-colors hover:bg-emerald-800"
+          class="ml-auto inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-overlay px-2.5 py-1 text-fg-primary transition-colors hover:bg-surface-hover"
         >
           <Download class="h-3 w-3" />
           Download {lastSavedArtifact.type.toUpperCase()}
@@ -797,30 +816,77 @@
     </div>
   {/if}
 
-  {#if hasEnhancedModel === false && !isCheckingEnhancement}
-    <!-- No enhanced model warning banner -->
+  {#if selectedProject && !hasIfcFile}
+    <!-- No IFC model attached warning banner -->
     <div
-      class="flex items-start gap-3 rounded-2xl border border-purple-800/60 bg-purple-950/40 p-4"
+      class="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-bg p-4 sm:flex-row sm:items-center sm:justify-between"
     >
-      <div
-        class="shrink-0 rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400"
-      >
-        <Sparkles class="h-4 w-4" />
+      <div class="flex items-start gap-3">
+        <div class="shrink-0 rounded-xl border border-warning/20 bg-warning/10 p-2 text-warning">
+          <ShieldAlert class="h-4 w-4" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-fg-primary">No IFC Model Attached</p>
+          <p class="mt-0.5 text-xs text-fg-secondary">
+            This project does not have an attached IFC building model. Upload or attach an IFC file to run architectural code compliance audits.
+          </p>
+        </div>
       </div>
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-semibold text-purple-200">Enhanced model required</p>
-        <p class="mt-0.5 text-xs text-purple-400">
-          ARCH analysis runs on an enhanced/improved model. This project doesn't have one yet.
-          Generate an improved model version to unlock the full compliance audit.
-        </p>
+      <button
+        type="button"
+        onclick={() => (showUploadModal = true)}
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover"
+      >
+        <UploadCloud class="h-3.5 w-3.5" />
+        Attach IFC Model
+      </button>
+    </div>
+  {:else if selectedProject && hasIfcFile && hasEnhancedModel}
+    <!-- Quality-Improved model active banner -->
+    <div
+      class="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex items-center gap-3">
+        <div class="shrink-0 rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
+          <Sparkles class="h-4 w-4" />
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-fg-primary">Quality-Improved Model Active</p>
+          <p class="text-caption text-fg-muted">Audit runs on normalized geometry, property sets, and element linkages.</p>
+        </div>
       </div>
       <button
         type="button"
         onclick={() => (showEnhancementsModal = true)}
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:scale-[1.02] hover:bg-purple-500"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border-default bg-surface-overlay px-3.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+      >
+        <Eye class="h-3.5 w-3.5" />
+        Improvement History
+      </button>
+    </div>
+  {:else if selectedProject && hasIfcFile && hasEnhancedModel === false && !isCheckingEnhancement}
+    <!-- Optional enhancement recommendation banner -->
+    <div
+      class="flex flex-col gap-3 rounded-2xl border border-purple-500/20 bg-purple-950/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex items-start gap-3">
+        <div class="shrink-0 rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
+          <Sparkles class="h-4 w-4" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-fg-primary">IFC Quality Improvement (Optional)</p>
+          <p class="mt-0.5 text-xs text-fg-secondary">
+            You can run architectural compliance directly on your original IFC model, or run an automated quality pass to normalize geometric properties and element GUIDs without mutating the source file.
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onclick={() => (showEnhancementsModal = true)}
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-600/20 px-4 py-2 text-xs font-semibold text-purple-300 transition-all hover:bg-purple-600/30 hover:text-white"
       >
         <Sparkles class="h-3.5 w-3.5" />
-        Run Improvements
+        Enhance Model
       </button>
     </div>
   {/if}
@@ -1790,9 +1856,21 @@
   {/if}
 </div>
 
-<!-- Quality Improvements modal (shown when no enhanced model exists) -->
+<!-- Quality Improvements modal -->
 <ProjectEnhancementsModal
   isOpen={showEnhancementsModal}
   project={selectedProject}
   onClose={handleEnhancementsModalClose}
+  onAttachModel={() => {
+    showEnhancementsModal = false;
+    showUploadModal = true;
+  }}
+/>
+
+<!-- Upload / Attach Models modal -->
+<UploadModelsModal
+  isOpen={showUploadModal}
+  projectId={selectedProjectId}
+  onClose={() => (showUploadModal = false)}
+  onUploaded={handleModelsUploaded}
 />

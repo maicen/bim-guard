@@ -9,6 +9,7 @@
     CheckCircle2,
     ShieldAlert,
     Eye,
+    UploadCloud,
   } from "lucide-svelte";
   import { lineageApi } from "../api";
   import { withAuthToken } from "../authToken";
@@ -20,9 +21,10 @@
     isOpen?: boolean;
     project?: Project | null;
     onClose: () => void;
+    onAttachModel?: () => void;
   }
 
-  let { isOpen = false, project = null, onClose }: Props = $props();
+  let { isOpen = false, project = null, onClose, onAttachModel }: Props = $props();
 
   let isRunning = $state(false);
   let message = $state("");
@@ -113,9 +115,9 @@
           />
         {:else if message}
           <div
-            class="flex items-center gap-2 rounded-xl border border-emerald-800 bg-emerald-950/40 p-3.5 text-xs text-emerald-300"
+            class="flex items-center gap-2 rounded-xl border border-success-border bg-success-bg p-3.5 text-xs text-success"
           >
-            <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-400" />
+            <CheckCircle2 class="h-4 w-4 shrink-0 text-success" />
             <span>{message}</span>
           </div>
         {/if}
@@ -142,9 +144,19 @@
             </button>
 
             {#if !project.ifc_file_path}
-              <div class="flex items-center gap-1.5 text-caption text-amber-400">
-                <ShieldAlert class="h-3.5 w-3.5" />
+              <div class="flex flex-wrap items-center gap-2 text-caption text-warning">
+                <ShieldAlert class="h-3.5 w-3.5 shrink-0" />
                 <span>Cannot enhance: this project does not have an attached IFC file.</span>
+                {#if onAttachModel}
+                  <button
+                    type="button"
+                    onclick={onAttachModel}
+                    class="inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+                  >
+                    <UploadCloud class="h-3.5 w-3.5" />
+                    Attach Model
+                  </button>
+                {/if}
               </div>
             {/if}
           </div>
@@ -185,7 +197,7 @@
                         >
                         <td class="px-4 py-3">
                           <span
-                            class="inline-block rounded-md border border-emerald-800/60 bg-emerald-950/50 px-2 py-0.5 text-micro font-semibold text-emerald-400"
+                            class="inline-block rounded-md border border-success-border bg-success-bg px-2 py-0.5 text-micro font-semibold text-success"
                           >
                             {row.status}
                           </span>
