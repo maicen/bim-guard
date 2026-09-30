@@ -172,7 +172,7 @@ class GitHubRepoService:
 
             # Filter for model files or zip files containing models
             ext = Path(path_str).suffix.lower()
-            if ext in {".ifc", ".zip"}:
+            if ext in {".ifc", ".ifczip", ".zip"}:
                 parts = path_str.split("/")
                 category = parts[1] if len(parts) > 2 and parts[0] == "models" else (parts[0] if len(parts) > 1 else "general")
                 categories_set.add(category)

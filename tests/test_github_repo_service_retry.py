@@ -88,6 +88,23 @@ def test_exhausts_retries_on_connection_error_then_falls_back(monkeypatch):
     assert tree == []
 
 
+def test_repo_structure_lists_ifczip_models():
+    """Compressed .ifcZIP models are listed alongside .ifc and .zip; other files are not."""
+    svc = _service()
+    svc.get_repo = lambda _id: {"owner": "o", "name": "r", "branch": "main"}
+    svc._fetch_git_tree = lambda *_a: [
+        {"path": "models/residential/a.ifc", "type": "blob", "size": 1},
+        {"path": "models/residential/b.ifcZIP", "type": "blob", "size": 1},
+        {"path": "models/residential/c_ifc.zip", "type": "blob", "size": 1},
+        {"path": "README.md", "type": "blob", "size": 1},
+    ]
+
+    structure = svc.get_repo_structure(1)
+
+    assert [item.name for item in structure.items] == ["a.ifc", "b.ifcZIP", "c_ifc.zip"]
+    assert structure.categories == ["residential"]
+
+
 def test_transient_failure_uses_the_static_fallback_tree(monkeypatch):
     """The one repo with a hardcoded fallback still gets it once retries exhaust."""
     monkeypatch.setattr("app.services.github_repo_service.time.sleep", lambda _s: None)
