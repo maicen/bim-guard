@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Select as SelectPrimitive } from "bits-ui";
-  import { Check, ChevronDown } from "lucide-svelte";
+  import { ChevronDown, Square, SquareCheck } from "lucide-svelte";
   import { cn } from "../../utils/cn";
   import Button from "./Button.svelte";
   import type { SelectOption } from "./Select.svelte";
@@ -10,6 +10,8 @@
     value?: string[];
     /** Shown in the trigger when nothing is selected. */
     placeholder?: string;
+    /** Hint shown above the options, telling the user several can be picked. */
+    hint?: string;
     disabled?: boolean;
     class?: string;
     triggerClass?: string;
@@ -22,6 +24,7 @@
     options,
     value = $bindable([]),
     placeholder = "Select options…",
+    hint = "Select one or more",
     disabled = false,
     class: className,
     triggerClass,
@@ -69,18 +72,21 @@
       )}
       sideOffset={4}
     >
+      <div class="px-2.5 pt-1 pb-1.5 text-micro text-fg-muted">{hint}</div>
       {#each options as option (option.value)}
         <SelectPrimitive.Item
           value={option.value}
           label={option.label}
           disabled={option.disabled}
-          class="relative flex cursor-pointer select-none items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs text-fg-secondary outline-hidden transition-colors data-highlighted:bg-surface-hover data-highlighted:text-fg-primary data-disabled:cursor-not-allowed data-disabled:opacity-40"
+          class="relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-fg-secondary outline-hidden transition-colors data-highlighted:bg-surface-hover data-highlighted:text-fg-primary data-disabled:cursor-not-allowed data-disabled:opacity-40"
         >
           {#snippet children({ selected })}
-            <span>{option.label}</span>
             {#if selected}
-              <Check class="h-3.5 w-3.5 text-accent" />
+              <SquareCheck class="h-3.5 w-3.5 shrink-0 text-accent" />
+            {:else}
+              <Square class="h-3.5 w-3.5 shrink-0 text-fg-muted" />
             {/if}
+            <span>{option.label}</span>
           {/snippet}
         </SelectPrimitive.Item>
       {/each}

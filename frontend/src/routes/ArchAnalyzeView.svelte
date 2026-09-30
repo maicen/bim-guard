@@ -649,13 +649,14 @@
           options={folderOptions}
           bind:value={selectedFolders}
           placeholder={isFoldersLoading ? "Loading folders…" : "All Rules"}
+          hint="Tick one or more rulesets to test together"
           disabled={isFoldersLoading}
           triggerClass="w-full bg-surface-overlay border-border-interactive"
         />
       </div>
       {#if selectedFolders.length}
         <span class="shrink-0 text-micro text-fg-muted"
-          >Selected: <span class="font-mono text-fg-secondary">{selectedFolders.join(", ")}</span>
+          >Selected: <span class="font-mono text-fg-secondary">{selectedFolderDisplayName}</span>
           {selectedFolders.length > 1
             ? "(each rule is checked under its own ruleset)"
             : "(scopes audit to this ruleset only)"}</span
