@@ -176,8 +176,8 @@
             class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border-interactive bg-surface-canvas/40 p-3 text-center transition-colors hover:border-border-interactive"
           >
             <UploadCloud class="h-4 w-4 text-fg-muted" />
-            <span class="text-xs font-medium text-fg-secondary">Click to choose a replacement .ifc file</span>
-            <input type="file" accept=".ifc" class="hidden" onchange={handleReplacementInput} />
+            <span class="text-xs font-medium text-fg-secondary">Click to choose a replacement .ifc or .ifcZIP file</span>
+            <input type="file" accept=".ifc,.ifczip,.zip" class="hidden" onchange={handleReplacementInput} />
           </label>
         {/if}
       </div>

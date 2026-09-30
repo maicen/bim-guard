@@ -79,7 +79,7 @@ def simple_ifc() -> bytes:
 
 @pytest.fixture
 def parsed(simple_ifc: bytes) -> ParsedIFC:
-    """The parse result for :func:`simple_ifc`."""
+    """Return the parse result for :func:`simple_ifc`."""
     return parse_ifc_bytes(simple_ifc, source_ref="uploads/ifc/simple.ifc")
 
 
@@ -448,3 +448,49 @@ class TestSummarise:
         summary = summarise(parse_ifc_bytes(b"garbage"))
         assert summary["ifc_error"]
         assert summary["ifc_element_count"] == 0
+
+
+class TestIfcZipSupport:
+    """Verify that zipped IFC models (.ifcZIP / .zip) parse seamlessly."""
+
+    def test_parses_zipped_ifc_identically_to_raw_ifc(self):
+        import io
+        import zipfile
+
+        raw_bytes = build_ifc("IFC4", [("IfcPipeSegment", "PIPE-ZIP-01")])
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("model.ifc", raw_bytes)
+        zipped_bytes = buf.getvalue()
+
+        # Compression achieved
+        assert len(zipped_bytes) > 0
+
+        raw_parsed = parse_ifc_bytes(raw_bytes)
+        zip_parsed = parse_ifc_bytes(zipped_bytes)
+
+        assert zip_parsed["quality"]["valid"] is True
+        assert zip_parsed["schema"] == raw_parsed["schema"]
+        assert zip_parsed["element_count"] == raw_parsed["element_count"]
+        assert zip_parsed["type_counts"] == raw_parsed["type_counts"]
+        assert [e.guid for e in zip_parsed["elements"]] == [e.guid for e in raw_parsed["elements"]]
+
+    def test_handles_zip_archive_without_ifc(self):
+        import io
+        import zipfile
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("readme.txt", b"not an ifc model")
+        zipped_bytes = buf.getvalue()
+
+        parsed = parse_ifc_bytes(zipped_bytes)
+        assert parsed["quality"]["valid"] is False
+        assert "does not contain an .ifc model" in str(parsed["quality"]["error"])
+
+    def test_handles_corrupt_zip_archive(self):
+        corrupt_zip = b"PK\x03\x04" + b"corrupt random trailing bytes"
+        parsed = parse_ifc_bytes(corrupt_zip)
+        assert parsed["quality"]["valid"] is False
+        assert "compressed IFC archive could not be read" in str(parsed["quality"]["error"])
+

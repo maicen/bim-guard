@@ -88,7 +88,7 @@ class ObjectStorage:
             import httpx
             url_hash = hashlib.md5(reference.encode("utf-8")).hexdigest()
             filename = Path(reference.split("?")[0]).name or "model.ifc"
-            if not filename.endswith(".ifc") and not filename.endswith(".zip"):
+            if not filename.endswith(".ifc") and not filename.endswith(".zip") and not filename.endswith(".ifczip"):
                 filename += ".ifc"
             cache_file = self._cache_dir / "http" / f"{url_hash}_{filename}"
             cache_file.parent.mkdir(parents=True, exist_ok=True)

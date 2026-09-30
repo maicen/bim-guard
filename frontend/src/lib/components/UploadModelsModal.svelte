@@ -103,8 +103,8 @@
       class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-border-interactive"
     >
       <UploadCloud class="h-5 w-5 text-fg-muted" />
-      <span class="text-xs font-medium text-fg-secondary">Click to choose .ifc files</span>
-      <input type="file" accept=".ifc" multiple class="hidden" onchange={handleFileInput} />
+      <span class="text-xs font-medium text-fg-secondary">Click to choose .ifc or .ifcZIP files</span>
+      <input type="file" accept=".ifc,.ifczip,.zip" multiple class="hidden" onchange={handleFileInput} />
     </label>
 
     {#if selectedFiles.length > 0}

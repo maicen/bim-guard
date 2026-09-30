@@ -211,8 +211,43 @@ def parse_ifc_bytes(content: bytes, *, source_ref: str = "") -> ParsedIFC:
 
     source_sha256 = sha256_of(content)
 
+    raw_ifc_bytes = content
+    if content.startswith(b"PK\x03\x04"):
+        try:
+            import io
+            import zipfile
+
+            with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                candidate = None
+                for n in zf.namelist():
+                    if n.lower().endswith(".ifc") and not n.startswith("__MACOSX/"):
+                        candidate = n
+                        break
+                if not candidate:
+                    for n in zf.namelist():
+                        if not n.startswith("__MACOSX/") and not n.endswith("/"):
+                            with zf.open(n) as member:
+                                probe = member.read(256).lstrip(b"\xef\xbb\xbf \t\n\r")
+                                if probe.startswith(b"ISO-10303-21;"):
+                                    candidate = n
+                                    break
+                if not candidate:
+                    return _empty_result(
+                        source_ref,
+                        source_sha256,
+                        "The compressed archive does not contain an .ifc model.",
+                    )
+                raw_ifc_bytes = zf.read(candidate)
+        except Exception as exc:
+            logger.warning("IFC zip decompression failed source_ref=%s error=%s", source_ref, exc)
+            return _empty_result(
+                source_ref,
+                source_sha256,
+                f"The compressed IFC archive could not be read: {exc}",
+            )
+
     try:
-        text = content.decode("utf-8", errors="replace")
+        text = raw_ifc_bytes.decode("utf-8", errors="replace")
     except Exception as exc:  # pragma: no cover - decode with replace does not raise
         logger.warning("IFC decode failed source_ref=%s error=%s", source_ref, exc)
         return _empty_result(source_ref, source_sha256, f"The IFC file could not be decoded: {exc}")

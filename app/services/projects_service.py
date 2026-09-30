@@ -191,7 +191,8 @@ class ProjectsService:
             return "", ""
 
         filename = safe_upload_name(ifc_file.filename)
-        if not filename.lower().endswith(".ifc"):
+        lower_name = filename.lower()
+        if not (lower_name.endswith(".ifc") or lower_name.endswith(".ifczip") or lower_name.endswith(".zip")):
             logger.warning("Rejected non-IFC project upload filename=%s", filename)
             return "", ""
 
@@ -200,7 +201,39 @@ class ProjectsService:
             logger.warning("Rejected empty IFC upload filename=%s", filename)
             return "", ""
 
-        header_probe = content[:256].lstrip(b"\xef\xbb\xbf \t\n\r")
+        is_zip = content.startswith(b"PK\x03\x04") or lower_name.endswith((".ifczip", ".zip"))
+        if is_zip:
+            try:
+                import io
+                import zipfile
+
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    ifc_names = [
+                        n
+                        for n in zf.namelist()
+                        if n.lower().endswith(".ifc") and not n.startswith("__MACOSX/")
+                    ]
+                    if not ifc_names:
+                        names = [
+                            n
+                            for n in zf.namelist()
+                            if not n.startswith("__MACOSX/") and not n.endswith("/")
+                        ]
+                        if len(names) == 1:
+                            ifc_names = names
+                    if not ifc_names:
+                        logger.warning("Rejected ZIP upload with no IFC model inside filename=%s", filename)
+                        return "", ""
+                    with zf.open(ifc_names[0]) as member:
+                        header_probe = member.read(256).lstrip(b"\xef\xbb\xbf \t\n\r")
+            except Exception as exc:
+                logger.warning(
+                    "Rejected corrupted compressed IFC upload filename=%s error=%s", filename, exc
+                )
+                return "", ""
+        else:
+            header_probe = content[:256].lstrip(b"\xef\xbb\xbf \t\n\r")
+
         if not header_probe.startswith(b"ISO-10303-21;"):
             logger.warning("Rejected IFC upload with invalid signature filename=%s", filename)
             return "", ""

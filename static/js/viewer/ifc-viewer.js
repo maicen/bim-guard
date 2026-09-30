@@ -1371,8 +1371,29 @@ export async function initViewer(mounts) {
                 })
                 : urlOrFile;
             const data = await file.arrayBuffer();
-            const buffer = new Uint8Array(data);
-            await fragmentIfcLoader.load(buffer, true, file.name.replace(/\.ifc$/i, ""));
+            let buffer = new Uint8Array(data);
+            if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) {
+                console.log("[bimguard-3d] Compressed IFC archive detected, decompressing in browser...");
+                const zip = await new JSZip().loadAsync(buffer);
+                let ifcEntry = null;
+                zip.forEach((relativePath, entry) => {
+                    if (!entry.dir && relativePath.toLowerCase().endsWith(".ifc") && !relativePath.startsWith("__MACOSX/")) {
+                        ifcEntry = entry;
+                    }
+                });
+                if (!ifcEntry) {
+                    zip.forEach((relativePath, entry) => {
+                        if (!entry.dir && !relativePath.startsWith("__MACOSX/")) {
+                            ifcEntry = entry;
+                        }
+                    });
+                }
+                if (ifcEntry) {
+                    buffer = await ifcEntry.async("uint8array");
+                    console.log(`[bimguard-3d] Decompressed ${ifcEntry.name}: ${data.byteLength} compressed bytes -> ${buffer.byteLength} raw bytes`);
+                }
+            }
+            await fragmentIfcLoader.load(buffer, true, file.name.replace(/\.(ifc|ifczip|zip)$/i, ""));
             // load() only resolves once the model's bounding box is final, so
             // the camera can be framed straight away — no need to wait for the
             // remaining geometry to stream in.

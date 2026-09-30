@@ -71,13 +71,13 @@ def _validated_ifc_names(files: list[UploadFile]) -> list[str]:
     if not files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one .ifc file is required.",
+            detail="At least one .ifc, .ifczip, or .zip file is required.",
         )
 
     names: list[str] = []
     for upload in files:
         name = (upload.filename or "").strip()
-        if not name.lower().endswith(".ifc"):
+        if not name.lower().endswith((".ifc", ".ifczip", ".zip")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"{name or 'A file'} is not an .ifc model; nothing was uploaded.",

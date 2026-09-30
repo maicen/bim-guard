@@ -313,7 +313,7 @@
     const candidates = Array.from(incoming ?? []);
     if (!candidates.length) return;
 
-    const ifcCandidates = candidates.filter((file) => /\.ifc$/i.test(file.name));
+    const ifcCandidates = candidates.filter((file) => /\.(ifc|ifczip|zip)$/i.test(file.name));
     const rejectedCount = candidates.length - ifcCandidates.length;
     const { accepted, oversized } = partitionByUploadSize(ifcCandidates);
 
@@ -341,7 +341,7 @@
     const notices: string[] = [];
     if (rejectedCount) {
       notices.push(
-        `${rejectedCount} file${rejectedCount === 1 ? "" : "s"} skipped — only .ifc models are accepted.`,
+        `${rejectedCount} file${rejectedCount === 1 ? "" : "s"} skipped — only .ifc and .ifcZIP models are accepted.`,
       );
     }
     if (duplicateCount) {
@@ -918,10 +918,10 @@
                 <label
                   class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-interactive bg-surface-overlay px-4 py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
                 >
-                  <span>Browse Files (.ifc)</span>
+                  <span>Browse Files (.ifc, .ifcZIP)</span>
                   <input
                     type="file"
-                    accept=".ifc"
+                    accept=".ifc,.ifczip,.zip"
                     multiple
                     onchange={handleFileChange}
                     class="hidden"

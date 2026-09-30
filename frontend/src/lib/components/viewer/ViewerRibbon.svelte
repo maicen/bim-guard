@@ -242,7 +242,7 @@
         </span>
       {/if}
 
-      <Tooltip text="Open a local IFC model directly">
+      <Tooltip text="Open a local IFC or .ifcZIP model directly">
         {#snippet trigger()}
           <button
             type="button"
@@ -256,7 +256,7 @@
       </Tooltip>
       <input
         type="file"
-        accept=".ifc"
+        accept=".ifc,.ifczip,.zip"
         bind:this={fileInputEl}
         onchange={handleLocalFileUpload}
         class="hidden"

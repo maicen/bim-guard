@@ -204,10 +204,10 @@ async def analyze_upload_ifc(
 ) -> IfcUploadAttachResponse:
     """Upload and attach an IFC model to a project."""
     project_access(project_id)
-    if not ifc_file.filename or not ifc_file.filename.lower().endswith(".ifc"):
+    if not ifc_file.filename or not ifc_file.filename.lower().endswith((".ifc", ".ifczip", ".zip")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A valid .ifc file is required.",
+            detail="A valid .ifc, .ifczip, or .zip file is required.",
         )
 
     content = await ifc_file.read()

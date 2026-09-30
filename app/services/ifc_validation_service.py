@@ -139,8 +139,50 @@ class IFCValidationService:
         """Stage 1: Validate ISO 10303-21 STEP physical header and structure."""
         issues: list[IFCValidationIssue] = []
 
+        raw_bytes = content
+        if content.startswith(b"PK\x03\x04"):
+            try:
+                import io
+                import zipfile
+
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    ifc_names = [
+                        n
+                        for n in zf.namelist()
+                        if n.lower().endswith(".ifc") and not n.startswith("__MACOSX/")
+                    ]
+                    if not ifc_names:
+                        names = [
+                            n
+                            for n in zf.namelist()
+                            if not n.startswith("__MACOSX/") and not n.endswith("/")
+                        ]
+                        if len(names) == 1:
+                            ifc_names = names
+                    if not ifc_names:
+                        issues.append(
+                            IFCValidationIssue(
+                                rule_code="IFC-SYN-001",
+                                stage="syntax",
+                                severity="fatal",
+                                message="Compressed archive does not contain an .ifc model.",
+                            )
+                        )
+                        return issues, None
+                    raw_bytes = zf.read(ifc_names[0])
+            except Exception as exc:
+                issues.append(
+                    IFCValidationIssue(
+                        rule_code="IFC-SYN-001",
+                        stage="syntax",
+                        severity="fatal",
+                        message=f"Corrupted or invalid compressed IFC archive: {exc}",
+                    )
+                )
+                return issues, None
+
         try:
-            text = content.decode("utf-8")
+            text = raw_bytes.decode("utf-8")
         except UnicodeDecodeError:
             try:
                 text = content.decode("latin-1")
