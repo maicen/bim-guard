@@ -42,11 +42,14 @@ class ArchAnalysisService:
         self._registry = engine_registry if engine_registry is not None else DEFAULT_ENGINE_REGISTRY
         self._ruleset_access = ruleset_access_service
 
-    def _run_orchestrator(self, project_id: int, rule_folder: str) -> dict:
+    def _run_orchestrator(self, project_id: int, rule_folder: str | list[str]) -> dict:
         """Validate ruleset access and run the orchestrator, returning its raw payload.
 
+        *rule_folder* is one ruleset id or a list of them; the model is checked
+        against the rules of every selected ruleset in one run.
+
         Raises:
-            ValueError: if *rule_folder* is given but isn't granted to this
+            ValueError: if any selected ruleset isn't granted to this
                 project's organization (see ``RulesetAccessService`` /
                 ``organization_ruleset_grants``). Any ruleset the org has
                 been granted may be used to test any of its projects --
@@ -58,31 +61,37 @@ class ArchAnalysisService:
         """
         from app.services.pipeline_services import PipelineOrchestratorService
 
-        if rule_folder and self._ruleset_access is not None:
+        rule_folders = RuleService.normalize_ruleset_ids(rule_folder)
+        if rule_folders and self._ruleset_access is not None:
             project = self._projects.get_project(project_id)
             organization_id = (project or {}).get("organization_id")
             granted = self._ruleset_access.list_org_grants(organization_id) if organization_id is not None else []
-            if rule_folder not in granted:
-                raise ValueError(
-                    f"Ruleset {rule_folder!r} is not granted to this project's organization. "
-                    "Ask a superadmin to grant it first."
-                )
+            for folder in rule_folders:
+                if folder not in granted:
+                    raise ValueError(
+                        f"Ruleset {folder!r} is not granted to this project's organization. "
+                        "Ask a superadmin to grant it first."
+                    )
 
         return PipelineOrchestratorService.orchestrate_workflow(
             project_id=project_id,
             analysis_theme="Architecture",
-            rule_folder=rule_folder,
+            rule_folder=rule_folders,
         )
 
-    def resolve_ruleset_name(self, rule_folder: str) -> str:
-        """Display-name snapshot for ``rule_folder``, or ``""`` when unscoped."""
-        if not rule_folder:
-            return ""
-        folder = self._rules.get_folder(rule_folder)
-        return str((folder or {}).get("display_name") or "")
+    def resolve_ruleset_name(self, rule_folder: str | list[str]) -> str:
+        """Display-name snapshot for the selected ruleset(s), or ``""`` when unscoped.
+
+        Several rulesets are joined with ", " in selection order.
+        """
+        names = []
+        for folder_id in RuleService.normalize_ruleset_ids(rule_folder):
+            folder = self._rules.get_folder(folder_id)
+            names.append(str((folder or {}).get("display_name") or folder_id))
+        return ", ".join(names)
 
     def compute_rule_compliance(
-        self, project_id: int, rule_folder: str = ""
+        self, project_id: int, rule_folder: str | list[str] = ""
     ) -> tuple[list[dict], dict]:
         """Return ``(rule_compliance, rule_compliance_summary)`` for a ruleset-scoped run.
 
@@ -100,7 +109,7 @@ class ArchAnalysisService:
     def run_analysis(
         self,
         project_id: int,
-        rule_folder: str = "",
+        rule_folder: str | list[str] = "",
         *,
         created_by: str | None = None,
         created_by_email: str | None = None,
@@ -130,7 +139,7 @@ class ArchAnalysisService:
                 persisted = self._report_svc.persist_bcf(
                     project_id,
                     bcf_topics,
-                    rule_folder=rule_folder,
+                    rule_folder=", ".join(RuleService.normalize_ruleset_ids(rule_folder)),
                     ruleset_name=self.resolve_ruleset_name(rule_folder),
                     created_by=created_by,
                     created_by_email=created_by_email,
@@ -159,5 +168,6 @@ class ArchAnalysisService:
             egress_checks=result.get("egress_checks", {}) or {},
             rule_compliance=result.get("rule_compliance", []),
             rule_folder=result.get("rule_folder", ""),
+            rule_folders=result.get("rule_folders", []),
             ifc_element_count=result.get("ifc_element_count", 0),
         )

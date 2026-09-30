@@ -149,6 +149,9 @@ class ArchAnalysisResponse(BaseModel):
     egress_checks: dict[str, Any] = Field(default_factory=dict)
     rule_compliance: list[dict[str, Any]] = Field(default_factory=list)
     rule_folder: Optional[str] = None
+    rule_folders: list[str] = Field(
+        default_factory=list, description="Ruleset ids the run was checked against; empty means all rules"
+    )
     ifc_element_count: Optional[int] = 0
 
 # ---------------------------------------------------------------------------

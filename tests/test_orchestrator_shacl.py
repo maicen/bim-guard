@@ -118,7 +118,7 @@ def test_run_rule_compliance_survives_rules_service_failure_before_library_rules
 
     result = app._run_rule_compliance(
         rules_service=None,
-        rule_folder="",
+        rule_folders=[],
         selected_theme="Architecture",
         ifc={"m2_reader": None, "ifc_error": None, "ifc_type_counts": {}},
         project_id=1,

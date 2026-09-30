@@ -62,6 +62,7 @@ from app.services.report_csv import render_report_csv
 from app.services.report_excel import render_report_excel
 from app.services.report_rendering import render_report_html, render_report_pdf
 from app.services.report_service import ReportService
+from app.services.rules_service import RuleService
 from app.services.workflow_status import status_snapshot
 
 logger = get_logger(__name__)
@@ -610,14 +611,19 @@ def run_arch_analysis(
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     rule_folder: Annotated[str, Form()] = "",
+    rule_folders: Annotated[list[str] | None, Form()] = None,
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
 ) -> ArchAnalysisResponse:
-    """Run architectural compliance checks (egress, daylight, fire separations, clearances) against the active building-code ruleset."""
+    """Run architectural compliance checks against the selected ruleset(s).
+
+    ``rule_folders`` (repeatable) selects several rulesets for one run; the
+    single ``rule_folder`` field is still accepted. Selecting none runs all rules.
+    """
     project_access(project_id)
     try:
         return arch_service.run_analysis(
             project_id=project_id,
-            rule_folder=rule_folder,
+            rule_folder=[rule_folder, *(rule_folders or [])],
             created_by=current_user.id,
             created_by_email=current_user.email,
         )
@@ -844,13 +850,14 @@ def persist_report_artifact(
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     rule_folder: Annotated[str, Form()] = "",
+    rule_folders: Annotated[list[str] | None, Form()] = None,
     arch_service: ArchAnalysisService = Depends(get_arch_analysis_service),
     report_service: ReportService = Depends(get_report_service),
 ) -> dict[str, Any]:
     """Render and persist a ruleset-scoped PDF, CSV or Excel report.
 
     Backs the audit page's "PDF" / "CSV" / "Excel" save-and-download buttons.
-    Scoped to whatever ``rule_folder`` was run (blank means "All Rules"), the
+    Scoped to whatever ruleset(s) were run (none means "All Rules"), the
     same way BCF already is -- built from
     ``ArchAnalysisService.compute_rule_compliance``, which runs the
     orchestrator fresh for this ruleset without the side effect of also
@@ -865,13 +872,15 @@ def persist_report_artifact(
 
     from app.services.report_artifacts import ReportArtifactService
 
+    selected_folders = RuleService.normalize_ruleset_ids([rule_folder, *(rule_folders or [])])
+    rule_folder = ", ".join(selected_folders)
     try:
-        rule_compliance, rule_compliance_summary = arch_service.compute_rule_compliance(project_id, rule_folder)
+        rule_compliance, rule_compliance_summary = arch_service.compute_rule_compliance(project_id, selected_folders)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
     model = report_service.build_report_model_from_run(project_id, rule_compliance, rule_compliance_summary)
-    ruleset_name = arch_service.resolve_ruleset_name(rule_folder)
+    ruleset_name = arch_service.resolve_ruleset_name(selected_folders)
     issue_count = model.executive_summary.failed
     report_svc = ReportArtifactService()
 

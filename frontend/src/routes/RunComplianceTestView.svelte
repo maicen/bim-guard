@@ -154,7 +154,7 @@
     runError = "";
     runErrorLog = [];
     try {
-      await analyzeApi.runArch(project.id, selectedFolder);
+      await analyzeApi.runArch(project.id, selectedFolder ? [selectedFolder] : []);
       // A one-shot builder for a URL string, never read reactively, so the
       // plain built-in is correct here.
       // eslint-disable-next-line svelte/prefer-svelte-reactivity

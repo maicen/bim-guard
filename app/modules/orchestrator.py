@@ -60,7 +60,7 @@ class BIMGuard_App:
         project_id: int,
         doc_ids: list[int],
         analysis_theme: str = "Architecture",
-        rule_folder: str = "",
+        rule_folder: str | list[str] = "",
         include_openings: bool = True,
         include_spaces: bool = True,
         include_type_definitions: bool = False,
@@ -130,7 +130,8 @@ class BIMGuard_App:
             self._analysis_service if self._analysis_service is not None else AnalysisService()
         )
         selected_theme = RuleService.normalize_theme(analysis_theme)
-        rule_folder = (rule_folder or "").strip()
+        rule_folders = RuleService.normalize_ruleset_ids(rule_folder)
+        rule_folder = ", ".join(rule_folders)
         log_progress(0, "request-started", documents=len(doc_ids), rule_folder=rule_folder or "all")
         logger.info(
             "Starting compliance workflow project_id=%d theme=%s documents=%d rule_folder=%s",
@@ -177,7 +178,7 @@ class BIMGuard_App:
 
         rule_result = self._run_rule_compliance(
             rules_svc,
-            rule_folder,
+            rule_folders,
             selected_theme,
             ifc,
             project_id,
@@ -232,6 +233,7 @@ class BIMGuard_App:
             "project": project,
             "analysis_theme": selected_theme,
             "rule_folder": rule_folder,
+            "rule_folders": rule_folders,
             "ifc_element_count": ifc_element_count,
             "ifc_type_counts": ifc["ifc_type_counts"],
             "ifc_totals": ifc["ifc_totals"],
@@ -543,7 +545,7 @@ class BIMGuard_App:
     @staticmethod
     def _run_rule_compliance(
         rules_service,
-        rule_folder: str,
+        rule_folders: list[str],
         selected_theme: str,
         ifc: dict,
         project_id: int,
@@ -575,8 +577,13 @@ class BIMGuard_App:
             from .comparator import ComplianceComparator
             from .reporter import ComplianceReporter
 
-            if rule_folder:
-                library_rules = rules_service.list_by_ruleset(rule_folder)
+            if rule_folders:
+                # Each selected ruleset is loaded and checked as-is; rules from
+                # different rulesets are never merged or reconciled, and every
+                # result keeps its own ruleset_id.
+                library_rules = [
+                    rule for folder in rule_folders for rule in rules_service.list_by_ruleset(folder)
+                ]
             else:
                 library_rules = rules_service.list_by_theme(selected_theme)
             log_progress(70, "rules-loaded", rules=len(library_rules))

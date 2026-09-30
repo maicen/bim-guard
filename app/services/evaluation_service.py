@@ -91,7 +91,7 @@ class EvaluationService:
         )
 
     def capture_results(
-        self, project_id: int, rule_folder: str, captured_by_email: str | None
+        self, project_id: int, rule_folder: str | list[str], captured_by_email: str | None
     ) -> int:
         """Snapshot the current rule_compliance run's PASS/FAIL verdicts for review.
 

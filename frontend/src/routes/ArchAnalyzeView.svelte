@@ -30,7 +30,8 @@
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import ElementResultsTable from "../lib/components/ElementResultsTable.svelte";
   import Alert from "../lib/components/Alert.svelte";
-  import { Button, Select, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
+  import Badge from "../lib/components/Badge.svelte";
+  import { Button, MultiSelect, CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "../lib/components/ui";
   import { pipelineTracker, avgPipelineProgress } from "../lib/stores/activePipelines.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
   import type {
@@ -69,20 +70,20 @@
   let errorLog: ErrorLogEntry[] = $state([]);
   let result: ArchAnalysisResult | null = $state(null);
 
-  // Rule folder selection — '' means "All rules"
+  // Ruleset selection — an empty list means "All rules". Several rulesets
+  // are checked together in one run, each rule keeping its own ruleset.
   let ruleFolders: RuleFolder[] = $state([]);
-  let selectedFolder = $state(""); // '' = All
+  let selectedFolders: string[] = $state([]);
   // Ordered headings each element type's rule results are grouped under.
   let checkCategories = $state.raw<RuleCheckCategory[]>([]);
   let isFoldersLoading = $state(false);
 
-  let folderOptions = $derived([
-    { value: "", label: isFoldersLoading ? "Loading folders…" : "All Rules" },
-    ...ruleFolders.map((folder) => ({
+  let folderOptions = $derived(
+    ruleFolders.map((folder) => ({
       value: folder.ruleset_id,
       label: folder.display_name,
     })),
-  ]);
+  );
 
   // Enhanced model gate
   let hasEnhancedModel: boolean | null = $state(null);
@@ -272,7 +273,7 @@
     try {
       const { captured_count } = await evaluationApi.capture({
         project_id: selectedProjectId,
-        rule_folder: selectedFolder,
+        rule_folders: selectedFolders,
       });
       evaluationCaptureMessage = `Captured ${captured_count} result(s) for evaluation.`;
     } catch (err: any) {
@@ -294,7 +295,7 @@
     setBusy(true);
     reportSaveMessage = "";
     try {
-      const artifact = await analyzeApi.persistReportArtifact(selectedProjectId, selectedFolder, artifactType);
+      const artifact = await analyzeApi.persistReportArtifact(selectedProjectId, selectedFolders, artifactType);
       reportSaveMessage = "Report saved in Reports & Exports tab";
       reportSaveType = "success";
       lastSavedArtifact = { type: artifactType, id: artifact.id };
@@ -317,7 +318,7 @@
     // mid-run still sees progress in the header and gets a completion toast.
     pipelineTracker.track(selectedProjectId, selectedProject?.name || `Project ${selectedProjectId}`);
     try {
-      result = await analyzeApi.runArch(selectedProjectId, selectedFolder);
+      result = await analyzeApi.runArch(selectedProjectId, selectedFolders);
       if (result) {
         initDomainState(result);
         if (result.bcf_artifact_id) {
@@ -331,7 +332,7 @@
       }
     } catch (err: any) {
       error = err.message || "Architectural compliance check failed.";
-      errorLog = [toErrorLogEntry(err, `project #${selectedProjectId}, ruleset ${selectedFolder || "(all)"}`)];
+      errorLog = [toErrorLogEntry(err, `project #${selectedProjectId}, ruleset ${selectedFolders.join(", ") || "(all)"}`)];
     } finally {
       isRunning = false;
       pipelineTracker.untrack(selectedProjectId);
@@ -531,7 +532,7 @@
 
   /** Failing and missing-data rules start open until the user collapses them. */
   function ruleKey(domainKey: string, rule: RuleComplianceResult): string {
-    return `${domainKey}-${rule.rule_ref || rule.property_name}`;
+    return `${domainKey}-${rule.ruleset_id ?? ""}-${rule.rule_ref || rule.property_name}`;
   }
 
   function isRuleOpen(key: string, rule: RuleComplianceResult): boolean {
@@ -560,14 +561,17 @@
   let totalRules = $derived(summary.total_rules || 0);
   let buildingSummary = $derived(result?.building_summary);
   let folderNote = $derived(
-    result?.rule_folder ? ` · ${result.rule_folder}` : selectedFolder ? ` · ${selectedFolder}` : "",
+    result?.rule_folder ? ` · ${result.rule_folder}` : selectedFolders.length ? ` · ${selectedFolders.join(", ")}` : "",
   );
+  function folderDisplayName(rulesetId: string): string {
+    return ruleFolders.find((f) => f.ruleset_id === rulesetId)?.display_name || rulesetId;
+  }
   // The subtitle used to be a hardcoded building-code-name claim, which goes
   // wrong the moment someone scopes the audit to a custom ruleset (e.g.
   // door_mock) that has nothing to do with any specific building code.
-  let selectedFolderDisplayName = $derived(
-    ruleFolders.find((f) => f.ruleset_id === selectedFolder)?.display_name || selectedFolder,
-  );
+  let selectedFolderDisplayName = $derived(selectedFolders.map(folderDisplayName).join(", "));
+  // Label each rule with its ruleset only when the last run mixed several.
+  let showRulesetPerRule = $derived((result?.rule_folders?.length ?? 0) > 1);
 
   // Live progress for the Run button itself — echoing it right where the
   // user clicked keeps their attention anchored there instead of requiring
@@ -589,10 +593,10 @@
       {/if}
     </h1>
     <p class="mt-1 text-xs text-fg-muted sm:text-sm">
-      {#if selectedFolder}
+      {#if selectedFolders.length}
         Domain-based compliance check against the <strong class="font-mono text-fg-secondary"
           >{selectedFolderDisplayName}</strong
-        > ruleset.
+        > {selectedFolders.length > 1 ? "rulesets" : "ruleset"}.
       {:else}
         Domain-based compliance check against every loaded architectural ruleset.
       {/if}
@@ -637,21 +641,24 @@
     >
       <div class="flex shrink-0 items-center gap-2">
         <FolderOpen class="h-4 w-4 text-accent" />
-        <span class="text-xs font-bold text-fg-secondary">Ruleset</span>
+        <span class="text-xs font-bold text-fg-secondary">Rulesets</span>
       </div>
       <div class="relative flex-1 sm:max-w-xs">
-        <Select
-          ariaLabel="Ruleset"
+        <MultiSelect
+          ariaLabel="Rulesets"
           options={folderOptions}
-          bind:value={selectedFolder}
+          bind:value={selectedFolders}
+          placeholder={isFoldersLoading ? "Loading folders…" : "All Rules"}
           disabled={isFoldersLoading}
           triggerClass="w-full bg-surface-overlay border-border-interactive"
         />
       </div>
-      {#if selectedFolder}
+      {#if selectedFolders.length}
         <span class="shrink-0 text-micro text-fg-muted"
-          >Selected: <span class="font-mono text-fg-secondary">{selectedFolder}</span> (scopes audit to this
-          ruleset only)</span
+          >Selected: <span class="font-mono text-fg-secondary">{selectedFolders.join(", ")}</span>
+          {selectedFolders.length > 1
+            ? "(each rule is checked under its own ruleset)"
+            : "(scopes audit to this ruleset only)"}</span
         >
       {:else}
         <span class="shrink-0 text-micro text-fg-muted"
@@ -1627,6 +1634,9 @@
                               class="h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-200 group-data-[state=open]:rotate-90"
                             />
                             <span class="truncate text-xs font-bold text-accent">{ruleLabel}</span>
+                            {#if showRulesetPerRule && rule.ruleset_id}
+                              <span class="shrink-0"><Badge variant="neutral">{folderDisplayName(rule.ruleset_id)}</Badge></span>
+                            {/if}
                           </div>
                           <span class="ml-2 shrink-0 font-mono text-micro text-fg-muted"
                             >{summaryTxt} · {ruleRequiredText(rule)}</span
@@ -1759,8 +1769,8 @@
         class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent"
       ></div>
       <p>
-        {#if selectedFolder}
-          Running "{selectedFolderDisplayName}" ruleset compliance analysis…
+        {#if selectedFolders.length}
+          Running "{selectedFolderDisplayName}" compliance analysis…
         {:else}
           Running architectural compliance analysis…
         {/if}

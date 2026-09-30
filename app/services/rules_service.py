@@ -189,6 +189,21 @@ class RuleService:
         return " ".join((value or "").split())
 
     @staticmethod
+    def normalize_ruleset_ids(value: str | list[str] | None) -> list[str]:
+        """Normalize one ruleset id or a list of them into ordered, de-duplicated ids.
+
+        Blank entries are dropped, so ``""``, ``None`` and ``[]`` all mean
+        "no ruleset selected" (the built-in code rules).
+        """
+        values = [value] if isinstance(value, str) or value is None else value
+        ids: list[str] = []
+        for item in values:
+            normalized = RuleService.normalize_ruleset_id(item)
+            if normalized and normalized not in ids:
+                ids.append(normalized)
+        return ids
+
+    @staticmethod
     def _normalize_mechanism_scope(value: str | None) -> str:
         """Normalize folder scope to known mechanism values (or blank)."""
         normalized = (value or "").strip().upper()

@@ -36,6 +36,9 @@ class EvaluationCaptureRequest(BaseModel):
 
     project_id: int
     rule_folder: str = Field(default="", description="Ruleset slug to capture; empty runs built-in code rules")
+    rule_folders: list[str] = Field(
+        default_factory=list, description="Several ruleset slugs to capture together, in addition to rule_folder"
+    )
 
 class EvaluationCaptureResponse(BaseModel):
     """Result of a capture request."""

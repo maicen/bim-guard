@@ -11,6 +11,7 @@ export type EvaluationHumanVerdict = "PASS" | "FAIL" | "NOT_APPLICABLE" | "INDET
 export interface EvaluationCaptureRequest {
   project_id: number;
   rule_folder?: string;
+  rule_folders?: string[];
 }
 
 export interface EvaluationCaptureResponse {

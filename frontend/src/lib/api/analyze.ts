@@ -208,10 +208,11 @@ export const analyzeApi = {
     return withAuthToken(`${API_BASE}/analyze/bcf/latest/${projectId}`);
   },
 
-  async runArch(projectId: number, ruleFolder = ""): Promise<any> {
+  /** Run the architectural check against the given rulesets; an empty list runs all rules. */
+  async runArch(projectId: number, ruleFolders: string[] = []): Promise<any> {
     const form = new FormData();
     form.append("project_id", projectId.toString());
-    if (ruleFolder) form.append("rule_folder", ruleFolder);
+    for (const folder of ruleFolders) form.append("rule_folders", folder);
 
     const res = await apiFetch(`${API_BASE}/analyze/arch`, {
       method: "POST",
@@ -242,12 +243,12 @@ export const analyzeApi = {
    */
   async persistReportArtifact(
     projectId: number,
-    ruleFolder: string,
+    ruleFolders: string[],
     artifactType: "pdf" | "csv" | "xlsx",
   ): Promise<BcfArtifact> {
     const form = new FormData();
     form.append("project_id", projectId.toString());
-    if (ruleFolder) form.append("rule_folder", ruleFolder);
+    for (const folder of ruleFolders) form.append("rule_folders", folder);
 
     const res = await apiFetch(`${API_BASE}/analyze/report-artifacts/${artifactType}`, {
       method: "POST",

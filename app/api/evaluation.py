@@ -43,7 +43,7 @@ def capture_evaluation_results(
     try:
         count = service.capture_results(
             project_id=payload.project_id,
-            rule_folder=payload.rule_folder,
+            rule_folder=[payload.rule_folder, *payload.rule_folders],
             captured_by_email=current_user.email,
         )
     except ValueError as exc:

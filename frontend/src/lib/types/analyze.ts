@@ -149,7 +149,7 @@ export interface BcfArtifact {
   sha256?: string;
   issue_count: number;
   created_at?: string;
-  /** Ruleset id the run was scoped to, or blank for an unscoped ("All Rules") run. */
+  /** Ruleset id(s) the run was scoped to (comma-separated when several), or blank for an unscoped ("All Rules") run. */
   rule_folder?: string | null;
   /** Ruleset display-name snapshot taken at save time. */
   ruleset_name?: string | null;
@@ -217,6 +217,8 @@ export interface RuleElementResult {
 export interface RuleComplianceResult {
   rule_ref?: string;
   rule_id?: number;
+  /** Ruleset the rule belongs to; tells results apart when a run covers several rulesets. */
+  ruleset_id?: string | null;
   rule_desc?: string;
   /** Check category the rule is grouped under within its element type; null = uncategorized. */
   check_category_id?: number | null;
@@ -315,6 +317,8 @@ export interface ArchAnalysisResult {
   egress_checks?: Record<string, any>;
   rule_compliance?: RuleComplianceResult[];
   rule_folder?: string;
+  /** Ruleset ids the run was checked against; empty means all rules. */
+  rule_folders?: string[];
   ifc_element_count?: number;
 }
 
