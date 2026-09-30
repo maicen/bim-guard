@@ -30,6 +30,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from app.logging_config import get_logger
 from app.services.object_storage import ObjectStorage
@@ -46,7 +47,7 @@ SUBDIR_BY_KIND: dict[str, str] = {
 
 #: Accepted extensions per kind. An empty tuple means "accept anything".
 EXTENSIONS_BY_KIND: dict[str, tuple[str, ...]] = {
-    "ifc": (".ifc",),
+    "ifc": (".ifc", ".ifczip", ".zip"),
     "document": (".pdf", ".docx"),
     "standard": (".pdf", ".docx"),
 }

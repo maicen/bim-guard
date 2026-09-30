@@ -13,6 +13,8 @@ Run: uv run pytest tests/test_file_upload.py -v
 from __future__ import annotations
 
 import hashlib
+import io
+import zipfile
 
 import pytest
 
@@ -187,6 +189,13 @@ class TestValidation:
 
     def test_extension_check_is_case_insensitive(self, service):
         assert service.upload("MODEL.IFC", IFC_BYTES).success is True
+
+    @pytest.mark.parametrize("filename", ["model.ifcZIP", "model.ifczip", "model_ifc.zip"])
+    def test_compressed_ifc_is_accepted(self, service, filename):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("model.ifc", IFC_BYTES)
+        assert service.upload(filename, buf.getvalue()).success is True
 
 
 # ---------------------------------------------------------------------------
