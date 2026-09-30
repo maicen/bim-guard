@@ -5,6 +5,7 @@
     ListChecks,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     PlayCircle,
     Plus,
     Terminal,
@@ -39,7 +40,20 @@
     return `/${itemId}?org=${authState.activeOrganizationId}`;
   }
 
-  const NAV_SECTIONS = [
+  interface NavItem {
+    id: string;
+    label: string;
+    icon: typeof LayoutDashboard;
+    highlight?: boolean;
+  }
+
+  interface NavSection {
+    title: string;
+    collapsible?: boolean;
+    items: NavItem[];
+  }
+
+  const NAV_SECTIONS: NavSection[] = [
     {
       title: "My Home",
       items: [
@@ -69,6 +83,8 @@
     },
     {
       title: "Resources",
+      // Pinned to the bottom of the nav and collapsed until its header is pressed.
+      collapsible: true,
       items: [
         { id: "modeling-manual", label: "Modeling Manual", icon: Box },
         { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
@@ -76,6 +92,14 @@
       ],
     },
   ];
+
+  let resourcesOpen = $state(false);
+
+  // Reveal the Resources links when navigating straight to one of them.
+  $effect(() => {
+    const resources = NAV_SECTIONS.find((section) => section.collapsible);
+    if (resources?.items.some((item) => item.id === activeView)) resourcesOpen = true;
+  });
 </script>
 
 <!-- Scrim: only below md, and only while the drawer is open. -->
@@ -123,17 +147,35 @@
   </div>
 
   <!-- Nav Groups -->
-  <div class="flex-1 space-y-4 overflow-y-auto px-2 py-3">
+  <div class="flex flex-1 flex-col gap-4 overflow-y-auto px-2 py-3">
     {#each NAV_SECTIONS as section (section.title)}
-      <div class="space-y-1">
+      {@const sectionOpen = !section.collapsible || collapsed || resourcesOpen}
+      <div class="space-y-1 {section.collapsible ? 'mt-auto' : ''}">
         {#if !collapsed}
-          <div
-            class="text-nano font-bold uppercase tracking-wider text-fg-muted px-2.5 py-1"
-          >
-            {section.title}
-          </div>
+          {#if section.collapsible}
+            <button
+              type="button"
+              onclick={() => (resourcesOpen = !resourcesOpen)}
+              class="text-nano font-bold uppercase tracking-wider text-fg-muted hover:text-fg-primary hover:bg-surface-hover flex w-full items-center justify-between rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
+              aria-expanded={resourcesOpen}
+              aria-controls="sidebar-section-{section.title}"
+            >
+              {section.title}
+              <ChevronDown
+                class="h-3.5 w-3.5 shrink-0 transition-transform {resourcesOpen ? 'rotate-180' : ''}"
+              />
+            </button>
+          {:else}
+            <div
+              class="text-nano font-bold uppercase tracking-wider text-fg-muted px-2.5 py-1"
+            >
+              {section.title}
+            </div>
+          {/if}
         {/if}
 
+        {#if sectionOpen}
+        <div id="sidebar-section-{section.title}" class="space-y-1">
         {#each section.items as item (item.id)}
           {@const isActive = activeView === item.id}
           {#if item.id === "dashboard"}
@@ -211,6 +253,8 @@
             {@render navItemBtn()}
           {/if}
         {/each}
+        </div>
+        {/if}
       </div>
     {/each}
   </div>
