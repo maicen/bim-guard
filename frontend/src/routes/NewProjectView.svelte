@@ -53,6 +53,13 @@
   });
   let submitStatusMessage = $state("");
 
+  let isUngroupedMember = $derived.by(() => {
+    if (authState.isSuperadmin) return false;
+    const currentOrg = authState.activeOrganization;
+    if (!currentOrg) return false;
+    return currentOrg.role === "member" && !currentOrg.group_id;
+  });
+
   // Form State
   let clientName = $state("");
   let name = $state("");
@@ -349,6 +356,9 @@
    * and a project type. Checked in the same order the fields unlock.
    */
   function step1ValidationError(): string {
+    if (isUngroupedMember) {
+      return "Your account has the Member role without an assigned group in this organization. You cannot create projects until an organization owner or admin assigns you to a group or updates your role.";
+    }
     if (!clientName.trim()) return "Please provide a client name.";
     if (!name.trim()) return "Please provide a project name.";
     if (!shortName.trim() || shortName.trim().length < SHORT_NAME_MIN_LENGTH) {
@@ -550,6 +560,15 @@
             message={errorMessage}
             errors={errorLog}
             logTitle="New Project Error Log"
+          />
+        </div>
+      {/if}
+
+      {#if isUngroupedMember}
+        <div class="mb-4">
+          <Alert
+            type="warning"
+            message="Your account has the Member role without an assigned group in this organization. Organization owners or admins must assign you to a group or update your role to Admin before you can create projects."
           />
         </div>
       {/if}
@@ -975,6 +994,7 @@
       {#if currentStep < LAST_STEP}
         <button
           type="button"
+          disabled={isUngroupedMember}
           onclick={() => {
             if (currentStep === 1) {
               const error = step1ValidationError();
@@ -987,7 +1007,7 @@
             errorLog = [];
             currentStep += 1;
           }}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span>Next Step</span>
           <ArrowRight class="h-3.5 w-3.5" />
@@ -995,9 +1015,9 @@
       {:else}
         <button
           type="button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isUngroupedMember}
           onclick={handleFinish}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-xs shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-semibold text-white shadow-xs shadow-emerald-500/20 transition-all hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span
             >{isSubmitting

@@ -30,6 +30,9 @@ class OrganizationMembership(BaseModel):
         default="", description="ISO 19650 Originator Code for this organization"
     )
     role: OrgRole
+    group_id: Optional[int] = Field(
+        default=None, description="The user's assigned group in this organization, if any"
+    )
 
 class UserProfile(BaseModel):
     """Editable identity and preferences layered on top of auth.users."""

@@ -8,6 +8,7 @@ export interface OrganizationMembership {
   /** ISO 19650 Originator Code for this organization. */
   org_code: string;
   role: OrgRole;
+  group_id?: number | null;
 }
 
 /** Editable identity/preferences layered on auth.users. Mirrors UserProfile. */

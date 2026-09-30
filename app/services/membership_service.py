@@ -65,6 +65,7 @@ class MembershipService:
                     "slug": org["slug"],
                     "org_code": org.get("org_code", ""),
                     "role": membership["role"],
+                    "group_id": membership.get("group_id"),
                 }
             )
         return results
@@ -389,6 +390,13 @@ class MembershipService:
             else:
                 for row in to_insert:
                     self._group_project_grants.insert(row)
+
+    def add_group_project_grant(self, group_id: int, project_id: int) -> None:
+        """Grant a single project to *group_id* if not already granted."""
+        existing = self._group_project_grants.rows_where("group_id = ?", [group_id])
+        if any(r.get("project_id") == project_id for r in existing):
+            return
+        self._group_project_grants.insert({"group_id": group_id, "project_id": project_id})
 
     def member_can_access_project(self, organization_id: int, user_id: str, project_id: int) -> bool:
         """Whether a confirmed member of *organization_id* may access *project_id*.

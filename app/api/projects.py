@@ -127,6 +127,12 @@ def require_project_access(
     """
     project = service.get_project(project_id)
     if not project:
+        logger.warning(
+            "Project lookup failed: project_id=%s not found in database for user=%s (%s)",
+            project_id,
+            current_user.id,
+            current_user.email,
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found.",
@@ -134,6 +140,24 @@ def require_project_access(
     if profiles.is_superadmin(current_user.id):
         return project
     if not _can_access_project(project, current_user.id, memberships):
+        org_id = project.get("organization_id")
+        user_role = memberships.role_for_user(org_id, current_user.id) if org_id else None
+        caller_membership = (
+            memberships._membership_row(org_id, current_user.id)
+            if org_id and hasattr(memberships, "_membership_row")
+            else None
+        )
+        caller_group_id = caller_membership.get("group_id") if caller_membership else None
+        logger.warning(
+            "Project access denied: project_id=%s (org=%s) requested by user=%s (%s, role=%s, group_id=%s). "
+            "Returning HTTP 404 to withhold project existence.",
+            project_id,
+            org_id,
+            current_user.id,
+            current_user.email,
+            user_role,
+            caller_group_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found.",
@@ -464,6 +488,36 @@ def create_project(
     else:
         target_org_id = _primary_organization_id(current_user, memberships)
 
+    # RBAC: Verify project creation rights and handle group project grants.
+    # Owners and admins can create projects freely across their organization.
+    # Plain members must belong to a group so the newly created project can be granted
+    # to their group; an ungrouped member has no project access in the organization.
+    caller_role = (
+        memberships.role_for_user(target_org_id, current_user.id)
+        if hasattr(memberships, "role_for_user")
+        else "owner"
+    )
+    caller_membership = (
+        memberships._membership_row(target_org_id, current_user.id)
+        if hasattr(memberships, "_membership_row")
+        else None
+    )
+    caller_group_id = caller_membership.get("group_id") if caller_membership else None
+    is_admin_or_owner = profiles.is_superadmin(current_user.id) or caller_role in ("owner", "admin")
+
+    if not is_admin_or_owner and caller_group_id is None:
+        logger.warning(
+            "Project creation forbidden: user=%s (%s) is an ungrouped member in org=%s",
+            current_user.id,
+            current_user.email,
+            target_org_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to create projects in this organization. "
+                   "Plain members must be assigned to a group by an organization owner or admin.",
+        )
+
     # ISO 19650 Originator: default to the owning organization's own code when
     # the caller didn't specify one explicitly, so every project's container
     # naming carries an organization code without asking the wizard for one
@@ -507,9 +561,18 @@ def create_project(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
+    created_id = int(created["id"])
+    if caller_group_id is not None:
+        memberships.add_group_project_grant(caller_group_id, created_id)
+        logger.info(
+            "Granted newly created project_id=%s to creator group_id=%s",
+            created_id,
+            caller_group_id,
+        )
+
     _link_project_inputs(
         service,
-        int(created["id"]),
+        created_id,
         document_ids=payload.document_ids,
         standards_codes=payload.standards_codes,
     )
@@ -573,6 +636,33 @@ async def create_project_with_ifc(
             )
     else:
         target_org_id = _primary_organization_id(current_user, memberships)
+
+    # RBAC: Verify project creation rights and handle group project grants.
+    caller_role = (
+        memberships.role_for_user(target_org_id, current_user.id)
+        if hasattr(memberships, "role_for_user")
+        else "owner"
+    )
+    caller_membership = (
+        memberships._membership_row(target_org_id, current_user.id)
+        if hasattr(memberships, "_membership_row")
+        else None
+    )
+    caller_group_id = caller_membership.get("group_id") if caller_membership else None
+    is_admin_or_owner = profiles.is_superadmin(current_user.id) or caller_role in ("owner", "admin")
+
+    if not is_admin_or_owner and caller_group_id is None:
+        logger.warning(
+            "Project creation forbidden: user=%s (%s) is an ungrouped member in org=%s",
+            current_user.id,
+            current_user.email,
+            target_org_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to create projects in this organization. "
+                   "Plain members must be assigned to a group by an organization owner or admin.",
+        )
 
     ifc_file_path = ""
     ifc_md5_hash = ""
@@ -650,6 +740,13 @@ async def create_project_with_ifc(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     created_id = int(created["id"])
+    if caller_group_id is not None:
+        memberships.add_group_project_grant(caller_group_id, created_id)
+        logger.info(
+            "Granted newly created project_id=%s to creator group_id=%s",
+            created_id,
+            caller_group_id,
+        )
     if ifc_file_path:
         # So a project created with an IFC upload has a project_ifc_files row
         # from the start, rather than relying on the lazy legacy-adoption

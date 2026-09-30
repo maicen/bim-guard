@@ -105,6 +105,16 @@ def test_grouped_member_sees_only_granted_projects(memberships: MembershipServic
     assert memberships.member_can_access_project(10, "member-2", 1) is False
 
 
+def test_add_group_project_grant_is_idempotent(memberships: MembershipService) -> None:
+    group = memberships.create_group(10, "Designers")
+    memberships.set_member_group(10, "member-1", group["id"])
+    memberships.add_group_project_grant(group["id"], 42)
+    assert memberships.accessible_project_ids(10, "member-1") == {42}
+    # Second call should not duplicate or error
+    memberships.add_group_project_grant(group["id"], 42)
+    assert memberships.accessible_project_ids(10, "member-1") == {42}
+
+
 def test_group_names_are_unique_per_organization_case_insensitively(
     memberships: MembershipService,
 ) -> None:
