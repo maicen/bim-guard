@@ -9,6 +9,9 @@
     Plus,
     Terminal,
     Bot,
+    BookOpenCheck,
+    Box,
+    Download,
   } from "lucide-svelte";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -62,6 +65,14 @@
       items: [
         { id: "copilot", label: "Graph-RAG Copilot", icon: Bot },
         { id: "query-console", label: "Query Console", icon: Terminal },
+      ],
+    },
+    {
+      title: "Resources",
+      items: [
+        { id: "modeling-manual", label: "Modeling Manual", icon: Box },
+        { id: "user-manual", label: "User Manual", icon: BookOpenCheck },
+        { id: "ifc-export-setting", label: "Revit IFC Export Setting", icon: Download },
       ],
     },
   ];

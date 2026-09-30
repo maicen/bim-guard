@@ -4,7 +4,6 @@
   import { authState } from "../auth.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
-  import ResourcesMenu from "./ResourcesMenu.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
   import UserMenu from "./UserMenu.svelte";
   import { SidebarTrigger, Separator } from "./ui";
@@ -58,9 +57,9 @@
     evaluation: { section: "Analysis", title: "Compliance Evaluation" },
     "query-console": { section: "Coordination", title: "Graph Query Console" },
     "revit-sync": { section: "Integrations", title: "Autodesk Revit Direct Sync" },
-    "ifc-export-setting": { section: "Integrations", title: "IFC Export Setting for Architectural Model" },
-    "user-manual": { section: "Manuals", title: "User Workflow Manual" },
-    "modeling-manual": { section: "Manuals", title: "3D Modeling Reference" },
+    "ifc-export-setting": { section: "Resources", title: "IFC Export Setting for Architectural Model" },
+    "user-manual": { section: "Resources", title: "User Workflow Manual" },
+    "modeling-manual": { section: "Resources", title: "3D Modeling Reference" },
     settings: { section: "System", title: "Application Settings" },
     admin: { section: "Admin", title: "Organization Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
@@ -138,7 +137,6 @@
     <GlobalPipelineStatus onOpen={onOpenPipeline} />
 
     <IntegrationsMenu {activeView} />
-    <ResourcesMenu {activeView} />
 
     {#if authState.isSuperadmin || authState.activeOrganization?.role === 'owner' || authState.activeOrganization?.role === 'admin'}
       <button

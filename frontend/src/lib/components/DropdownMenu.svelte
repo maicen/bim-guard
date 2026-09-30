@@ -2,7 +2,7 @@
   DropdownMenu — thin bits-ui wrapper for a triggered menu popover.
 
   Consolidates the open/close/positioning boilerplate that IntegrationsMenu,
-  ResourcesMenu, UserMenu, and RulesView's Import/Export menu each hand-rolled
+  UserMenu, and RulesView's Import/Export menu each hand-rolled
   independently (a `$state` boolean plus a `svelte:document`/`window` click
   listener, with no Escape or arrow-key handling). bits-ui's `DropdownMenu`
   underneath supplies Escape/outside-click dismissal, focus trap/return, and

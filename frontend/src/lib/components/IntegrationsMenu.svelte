@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RefreshCw, Download, Plug, ChevronDown } from "lucide-svelte";
+  import { RefreshCw, Plug, ChevronDown } from "lucide-svelte";
   import { DropdownMenu as Menu } from "bits-ui";
   import { link } from "svelte-spa-router";
   import { authState } from "../auth.svelte";
@@ -11,13 +11,10 @@
 
   let { activeView }: Props = $props();
 
-  // Pulled out of the working sidebar into its own navbar menu, same
-  // treatment as Resources (see ResourcesMenu.svelte) — these are external
-  // sync/export destinations rather than day-to-day project work, so they
-  // don't need a permanent sidebar section.
+  // External sync destinations rather than day-to-day project work, so they
+  // live in a navbar menu instead of a permanent sidebar section.
   const ITEMS = [
     { id: "revit-sync", label: "Revit Direct Sync", icon: RefreshCw },
-    { id: "ifc-export-setting", label: "IFC Export Setting for Architectural Model", icon: Download },
   ];
 
   let isActive = $derived(ITEMS.some((item) => item.id === activeView));
