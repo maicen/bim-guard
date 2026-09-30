@@ -274,7 +274,17 @@ class RuleSemanticAlignmentService:
         *,
         include_threshold_discrepancies: bool = True,
     ) -> ConflictWarning | None:
-        """Compare two rules or drafts and return a ConflictWarning if contradictory, else None."""
+        """Compare two rules or drafts and return a ConflictWarning if contradictory, else None.
+
+        Rules in different rulesets never conflict: each ruleset is an
+        independent standard, and a project is checked against only the
+        ruleset selected for it.
+        """
+        if RuleService.normalize_ruleset_id(candidate.get("ruleset_id")) != RuleService.normalize_ruleset_id(
+            other.get("ruleset_id")
+        ):
+            return None
+
         target_a = _normalize(candidate.get("target_ifc_class"))
         target_b = _normalize(other.get("target_ifc_class"))
         if not target_a or not target_b or target_a != target_b:

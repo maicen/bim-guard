@@ -269,6 +269,19 @@ def test_detect_pair_conflict_threshold_mismatch():
     assert warn.conflicting_details["stricter_value"] == 1000.0
 
 
+def test_detect_pair_conflict_ignores_rules_in_a_different_ruleset():
+    service = _service()
+    cand = {"rule_id": "WR-001", "ruleset_id": "MY-RULESET", "target_ifc_class": "IfcWindow", "property_name": "OverallWidth", "operator": ">=", "check_value": "800"}
+    other = {"rule_id": "CODE 9.7.2", "reference": "CODE 9.7.2", "ruleset_id": "BUILDING-CODE-PART9", "target_ifc_class": "IfcWindow", "property_name": "OverallWidth", "operator": ">=", "check_value": "450"}
+
+    assert service.detect_pair_conflict(cand, other, include_threshold_discrepancies=True) is None
+
+    other["ruleset_id"] = "MY-RULESET"
+    warn = service.detect_pair_conflict(cand, other, include_threshold_discrepancies=True)
+    assert warn is not None
+    assert warn.conflict_type == "threshold_mismatch"
+
+
 def test_detect_pair_conflict_exact_value_mismatch():
     service = _service()
     cand = {"rule_id": "R-1", "target_ifc_class": "IfcWall", "property_name": "FireRating", "operator": "==", "check_value": "1HR"}
