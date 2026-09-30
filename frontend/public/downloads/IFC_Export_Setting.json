@@ -6,7 +6,7 @@
   "CategoryMapping": null,
   "IFCFileType": 0,
   "ActivePhaseId": -1,
-  "SpaceBoundaries": 1,
+  "SpaceBoundaries": 2,
   "SplitWallsAndColumns": false,
   "IncludeSteelElements": true,
   "ProjectAddress": {

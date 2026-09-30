@@ -7,6 +7,7 @@
     "Internal Revit and IFC common property sets exported",
     "Steel elements included, 2D elements excluded",
     "Max tessellation detail and solid model representation for accurate stair/railing mesh geometry",
+    "2nd-level space boundaries, so each door and window is linked to the rooms it connects",
     "Stable IFC GUIDs stored for reliable re-audits",
   ];
 </script>
