@@ -21,6 +21,7 @@
     "@supabase/supabase-js": "^2.115.0",
     "bits-ui": "^2.19.2",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
     "lucide-svelte": "^0.475.0",
     "pdfjs-dist": "^4.0.379",
     "svelte-spa-router": "^5.1.1",

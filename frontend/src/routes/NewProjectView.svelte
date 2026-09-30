@@ -3,7 +3,7 @@
   import { run, preventDefault } from "svelte/legacy";
 
   import { onMount, onDestroy } from "svelte";
-  import { Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2 } from "lucide-svelte";
+  import { Check, Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2, Loader2 } from "lucide-svelte";
   import { bsddApi, projectsApi, modelsApi, documentsApi, namingConfigApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import {
@@ -28,6 +28,7 @@
     partitionByUploadSize,
     describeOversizedFiles,
   } from "../lib/fileLimits";
+  import { compressIfcFiles } from "../lib/compressIfc";
   import Alert from "../lib/components/Alert.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
@@ -213,14 +214,41 @@
     }
   });
 
-  /** Add .ifc files, skipping non-IFC uploads and ones already in the list. */
-  function addIfcFiles(incoming: FileList | null | undefined) {
+  let isCompressingIfc = $state(false);
+  let ifcCompressionStatus = $state("");
+
+  /** Add .ifc files, automatically compressing raw .ifc to .ifcZIP, and skipping non-IFC uploads. */
+  async function addIfcFiles(incoming: FileList | null | undefined) {
     const candidates = Array.from(incoming ?? []);
     if (!candidates.length) return;
 
     const ifcCandidates = candidates.filter((file) => /\.(ifc|ifczip|zip)$/i.test(file.name));
     const rejectedCount = candidates.length - ifcCandidates.length;
-    const { accepted, oversized } = partitionByUploadSize(ifcCandidates);
+
+    let processedCandidates: File[] = [];
+    const needsCompression = ifcCandidates.some((f) => /\.ifc$/i.test(f.name));
+    if (needsCompression) {
+      isCompressingIfc = true;
+      try {
+        const { compressedFiles } = await compressIfcFiles(
+          ifcCandidates,
+          (cur, total, name) => {
+            ifcCompressionStatus = `Compressing ${name} to .ifcZIP (${cur}/${total})...`;
+          },
+        );
+        processedCandidates = compressedFiles;
+      } catch (err) {
+        console.warn("Client-side compression fallback:", err);
+        processedCandidates = ifcCandidates;
+      } finally {
+        isCompressingIfc = false;
+        ifcCompressionStatus = "";
+      }
+    } else {
+      processedCandidates = ifcCandidates;
+    }
+
+    const { accepted, oversized } = partitionByUploadSize(processedCandidates);
 
     const mergedFiles = [...ifcFiles];
     const mergedRoles = [...ifcRoles];
@@ -618,6 +646,13 @@
               <input type="file" accept=".ifc,.ifczip,.zip" multiple onchange={handleFileChange} class="hidden" />
             </label>
           </div>
+
+          {#if isCompressingIfc}
+            <div class="flex items-center justify-center gap-2 py-2 text-xs text-accent">
+              <Loader2 class="h-4 w-4 animate-spin" />
+              <span>{ifcCompressionStatus || "Compressing IFC model to .ifcZIP..."}</span>
+            </div>
+          {/if}
 
           {#if ifcNotice}
             <p class="text-caption text-amber-400">{ifcNotice}</p>

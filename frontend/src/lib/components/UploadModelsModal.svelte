@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { UploadCloud, X as XIcon } from "lucide-svelte";
+  import { UploadCloud, X as XIcon, Loader2 } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import Tooltip from "./Tooltip.svelte";
   import { RadioGroupRoot, RadioGroupItem, Select, type SelectOption } from "./ui";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
   import { partitionByUploadSize, describeOversizedFiles } from "../fileLimits";
+  import { compressIfcFiles } from "../compressIfc";
 
   interface Props {
     isOpen: boolean;
@@ -41,13 +42,41 @@
     errorMessage = "";
   }
 
-  function handleFileInput(e: Event) {
+  let isCompressing = $state(false);
+  let compressionStatus = $state("");
+
+  async function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    const { accepted, oversized } = partitionByUploadSize(Array.from(input.files || []));
+    const rawFiles = Array.from(input.files || []).filter((f) => /\.(ifc|ifczip|zip)$/i.test(f.name));
+    input.value = "";
+    if (!rawFiles.length) return;
+
+    let processedCandidates: File[] = [];
+    if (rawFiles.some((f) => /\.ifc$/i.test(f.name))) {
+      isCompressing = true;
+      try {
+        const { compressedFiles } = await compressIfcFiles(
+          rawFiles,
+          (cur, total, name) => {
+            compressionStatus = `Compressing ${name} to .ifcZIP (${cur}/${total})...`;
+          },
+        );
+        processedCandidates = compressedFiles;
+      } catch (err) {
+        console.warn("Client compression fallback:", err);
+        processedCandidates = rawFiles;
+      } finally {
+        isCompressing = false;
+        compressionStatus = "";
+      }
+    } else {
+      processedCandidates = rawFiles;
+    }
+
+    const { accepted, oversized } = partitionByUploadSize(processedCandidates);
     selectedFiles = [...selectedFiles, ...accepted];
     roles = [...roles, ...accepted.map(() => "context")];
     errorMessage = oversized.length ? describeOversizedFiles(oversized) : "";
-    input.value = "";
   }
 
   function removeFile(index: number) {
@@ -106,6 +135,13 @@
       <span class="text-xs font-medium text-fg-secondary">Click to choose .ifc or .ifcZIP files</span>
       <input type="file" accept=".ifc,.ifczip,.zip" multiple class="hidden" onchange={handleFileInput} />
     </label>
+
+    {#if isCompressing}
+      <div class="flex items-center justify-center gap-2 py-2 text-xs text-accent">
+        <Loader2 class="h-4 w-4 animate-spin" />
+        <span>{compressionStatus || "Compressing IFC model to .ifcZIP..."}</span>
+      </div>
+    {/if}
 
     {#if selectedFiles.length > 0}
       <div class="space-y-2">
