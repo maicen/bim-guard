@@ -232,6 +232,54 @@ A self-hosted GitHub Actions runner is configured on the host machine (`~/action
   ./svc.sh start    # Start runner service
   ```
 
+### Step 3d: Production Database Migrations & Multi-User Workflow
+
+The production PostgreSQL database runs self-hosted in the `supabase-db` Docker container behind the Cloudflare Tunnel. Database port 54322 is not exposed to the public internet.
+
+To allow team members and CI/CD pipelines to apply migrations safely without exposing database ports or requiring host access, a dedicated migration runner and GitHub Actions workflows are provided:
+
+#### 1. Automatic Migration on Push / PR Merge (Hands-Off)
+Whenever any developer merges a pull request or pushes new migration files (`supabase/migrations/*.sql`) to `main`, the `.github/workflows/deploy.yml` workflow automatically runs:
+```bash
+uv run python scripts/migrate_production.py --apply
+```
+This executes any pending migrations against `supabase-db`, records the migration version in `supabase_migrations.schema_migrations`, reloads the PostgREST schema cache via `NOTIFY pgrst, 'reload schema'`, and then restarts `bim-guard`.
+
+#### 2. On-Demand Remote Migration via GitHub Actions UI
+Any developer with repository access can trigger migrations on-demand without redeploying the app:
+1. Navigate to **GitHub &rarr; Actions &rarr; Migrate Production Database (Self-Hosted)**.
+2. Click **Run workflow**.
+3. Select the desired action:
+   - **`apply`** (default): Apply pending migrations and reload PostgREST.
+   - **`dry-run`**: Preview which migrations would be executed without modifying the database.
+   - **`status`**: Compare local migration files with remote applied versions.
+4. Optionally specify a feature branch to pull migrations from before they are merged to `main`.
+5. Click **Run workflow** and view real-time logs in GitHub Actions.
+
+#### 3. Remote Migration via GitHub CLI (`gh`)
+Developers can also trigger and monitor migrations directly from their local terminal:
+```bash
+# Check migration status
+gh workflow run migrate_production.yml -f action=status
+
+# Dry-run pending migrations
+gh workflow run migrate_production.yml -f action=dry-run
+
+# Apply migrations and reload PostgREST
+gh workflow run migrate_production.yml -f action=apply
+
+# Watch the execution in real-time
+gh run watch
+```
+
+#### 4. Local Host Execution
+When working directly on the host machine:
+```bash
+uv run python scripts/migrate_production.py --status
+uv run python scripts/migrate_production.py --dry-run
+uv run python scripts/migrate_production.py --apply
+```
+
 #### Branching Strategy & Best Practices: Does Deployment Need a Separate Branch?
 
 **Recommendation: No separate branch is needed.** BIM Guard follows **Trunk-Based Development** / **Continuous Delivery** from `main`:

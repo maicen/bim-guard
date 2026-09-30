@@ -52,6 +52,11 @@ jobs:
           echo "==> Updating working tree..."
           git merge --ff-only origin/main || git reset --hard origin/main
 
+      - name: Apply Database Migrations
+        run: |
+          echo "==> Applying Supabase database migrations..."
+          uv run python scripts/migrate_production.py --apply
+
       - name: Rebuild and Restart Services
         run: |
           TARGET="${{ github.event.inputs.target || 'bim-guard' }}"

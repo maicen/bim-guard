@@ -131,6 +131,11 @@ docker compose --profile tunnel up -d --build
 # Fast iterative update of app container only (keeps Neo4j, Docling, Cloudflared running)
 docker compose --profile tunnel up -d --build bim-guard
 
+# Check or apply self-hosted production Supabase database migrations
+uv run python scripts/migrate_production.py --status     # Inspect local vs remote migration status
+uv run python scripts/migrate_production.py --dry-run    # Preview pending migrations
+uv run python scripts/migrate_production.py --apply      # Apply pending migrations & reload PostgREST
+
 # Run automated tests and lint
 uv run ruff check .
 uv run pytest tests/ -m 'not slow' -v

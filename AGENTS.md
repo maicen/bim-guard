@@ -25,6 +25,7 @@ BIM-Guard uses a modern, decoupled architecture:
 - Run production stack (build + multi-worker): `./run_production_server.sh` (macOS/Linux) or `run_production_server.bat` (Windows)
 - Run Docker production stack at https://bim-guard.xyz: `docker compose --profile tunnel up -d --build`
 - Rebuild & re-serve app updates at https://bim-guard.xyz (fast path): `docker compose --profile tunnel up -d --build bim-guard`
+- Check / apply self-hosted production DB migrations: `uv run python scripts/migrate_production.py --status` (or `--dry-run`, `--apply`)
 
 The backend is available at `http://127.0.0.1:8000` (OpenAPI interactive docs at `/api/docs`).
 The Svelte dev server runs at `http://localhost:5173` (with `/api` proxy to backend).
