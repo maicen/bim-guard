@@ -602,8 +602,16 @@ class SupabaseTableAdapter(DatabaseAdapter):
     def _is_missing_table_error(exc: APIError) -> bool:
         """Return True when an APIError indicates the table does not exist in schema cache."""
         code = str(getattr(exc, "code", "") or "")
-        msg = str(getattr(exc, "message", "") or getattr(exc, "details", "") or "")
-        return code in {"PGRST205", "42P01"} or "schema cache" in msg or "does not exist" in msg
+        msg = str(getattr(exc, "message", "") or getattr(exc, "details", "") or "").lower()
+        # PGRST204 / 42703 indicate a missing or unrecognized column in the schema cache,
+        # which must never degrade the entire table into ephemeral in-process memory.
+        if code in {"PGRST204", "42703"} or "column" in msg:
+            return False
+        return (
+            code in {"PGRST205", "42P01"}
+            or ("table" in msg and "schema cache" in msg)
+            or ("relation" in msg and "does not exist" in msg)
+        )
 
 
     def _should_retry_insert_with_pk(self, exc: APIError, payload: dict[str, Any]) -> bool:

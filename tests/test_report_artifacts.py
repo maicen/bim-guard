@@ -83,3 +83,52 @@ def test_persist_bcf_uploads_zip_and_records_metadata() -> None:
         markup = ET.fromstring(archive.read(f"{folder}/markup.bcf").decode())
         assert markup.find("Topic").get("Guid") == folder
         assert "Source finding id: topic-guid" in markup.find("./Comment/Comment").text
+
+
+def test_persist_bcf_normalizes_created_by_uuid() -> None:
+    storage = FakeStorage()
+    table = FakeTable()
+    service = ReportArtifactService(storage=storage, table=table)
+
+    # Empty string should normalize to None
+    artifact1 = service.persist_bcf(
+        14,
+        [{"guid": "g1", "title": "t1", "description": "d1"}],
+        created_by="",
+    )
+    assert artifact1["created_by"] is None
+
+    # Invalid UUID string should normalize to None
+    artifact2 = service.persist_bcf(
+        14,
+        [{"guid": "g2", "title": "t2", "description": "d2"}],
+        created_by="not-a-uuid",
+    )
+    assert artifact2["created_by"] is None
+
+    # Valid UUID string should be preserved
+    valid_uuid = "12345678-1234-5678-1234-567812345678"
+    artifact3 = service.persist_bcf(
+        14,
+        [{"guid": "g3", "title": "t3", "description": "d3"}],
+        created_by=valid_uuid,
+    )
+    assert artifact3["created_by"] == valid_uuid
+
+
+def test_is_missing_table_error_distinguishes_column_from_table() -> None:
+    from postgrest.exceptions import APIError
+
+    from app.services.db_adapters import SupabaseTableAdapter
+
+    # Missing column (PGRST204) must NOT be considered a missing table error
+    col_err = APIError({"message": "Could not find the 'created_by' column of 'report_artifacts' in the schema cache", "code": "PGRST204"})
+    assert not SupabaseTableAdapter._is_missing_table_error(col_err)
+
+    # Missing table (PGRST205) must be considered a missing table error
+    tbl_err = APIError({"message": "Could not find the table 'missing_tbl' in the schema cache", "code": "PGRST205"})
+    assert SupabaseTableAdapter._is_missing_table_error(tbl_err)
+
+    # Postgres undefined_table (42P01) must be considered a missing table error
+    pg_err = APIError({"message": 'relation "public.missing_tbl" does not exist', "code": "42P01"})
+    assert SupabaseTableAdapter._is_missing_table_error(pg_err)

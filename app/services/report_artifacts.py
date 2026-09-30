@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,6 +17,20 @@ logger = get_logger(__name__)
 
 #: Recommended fix written for a finding whose topic payload carries none.
 DEFAULT_MITIGATION = "Review and resolve the compliance finding."
+
+
+def _clean_uuid(val: Any) -> str | None:
+    """Normalize a potential UUID string/object or return None if empty/invalid."""
+    if not val:
+        return None
+    val_str = str(val).strip()
+    if not val_str:
+        return None
+    try:
+        return str(uuid.UUID(val_str))
+    except (ValueError, AttributeError):
+        return None
+
 
 _REPORT_ARTIFACT_SCHEMA = {
     "id": int,
@@ -209,10 +224,10 @@ class ReportArtifactService:
                     "sha256": hashlib.sha256(content).hexdigest(),
                     "issue_count": issue_count,
                     "created_at": now_iso_utc(),
-                    "rule_folder": rule_folder or "",
-                    "ruleset_name": ruleset_name or "",
-                    "created_by": created_by or "",
-                    "created_by_email": created_by_email or "",
+                    "rule_folder": rule_folder or None,
+                    "ruleset_name": ruleset_name or None,
+                    "created_by": _clean_uuid(created_by),
+                    "created_by_email": created_by_email or None,
                 }
             )
         except Exception:
