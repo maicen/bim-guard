@@ -104,6 +104,8 @@
     return `specification_clauses_${new Date().toISOString().slice(0, 10)}.txt`;
   }
 
+  let uploadProgressPercent = $state<number | null>(null);
+
   async function handleUpload() {
     const fileToUpload =
       uploadFile ||
@@ -115,6 +117,7 @@
 
     if (!fileToUpload) return;
     isUploading = true;
+    uploadProgressPercent = 0;
     uploadError = "";
     uploadErrorLog = [];
     uploadAbortController = new AbortController();
@@ -125,6 +128,9 @@
         {
           generate_doclang: false,
           organization_id: authState.activeOrganizationId,
+          onUploadProgress: (percent) => {
+            uploadProgressPercent = percent;
+          }
         },
         uploadAbortController.signal,
       );
@@ -140,6 +146,7 @@
     } finally {
       uploadAbortController = null;
       isUploading = false;
+      uploadProgressPercent = null;
     }
   }
 </script>
@@ -307,7 +314,9 @@
         class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
       >
         {isUploading
-          ? "Uploading..."
+          ? uploadProgressPercent !== null
+            ? `Uploading... ${uploadProgressPercent}%`
+            : "Uploading..."
           : rawText.trim()
             ? "Add Document"
             : "Upload Document"}

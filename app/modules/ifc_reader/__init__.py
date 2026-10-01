@@ -57,12 +57,12 @@ except ImportError:
 try:
     from .ifc_spatial import (
         IFCSpatialAdjacency,
+        _element_matches_location,
         check_daylight_ratios,
-        check_fire_separation,
-        check_garage_separation,
         check_door_space_connection,
         check_egress_window_openings,
-        _element_matches_location,
+        check_fire_separation,
+        check_garage_separation,
     )
     _SPATIAL_AVAILABLE = True
 except ImportError:
@@ -81,7 +81,7 @@ except ImportError:
     _ROOMS_AVAILABLE = False
 
 try:
-    from .ifc_egress import IFCEgressGraph, check_exit_count, check_egress_travel_distance
+    from .ifc_egress import IFCEgressGraph, check_egress_travel_distance, check_exit_count
     _EGRESS_AVAILABLE = True
 except ImportError:
     _EGRESS_AVAILABLE = False
@@ -1015,7 +1015,8 @@ class IFCReader:
     def _door_space_rich_detail(door_space_connection: dict | None) -> dict:
         """Rich-metadata payload for ConnectedSpaces/ConnectedSpaceCount, for
         future display/debugging — the resolver only surfaces this data, it
-        never uses it to decide pass/fail (the rule's own operator does)."""
+        never uses it to decide pass/fail (the rule's own operator does).
+        """
         d = door_space_connection or {}
         return {
             "source": "IfcRelSpaceBoundary",

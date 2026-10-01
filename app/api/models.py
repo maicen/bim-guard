@@ -35,10 +35,14 @@ from app.logging_config import get_logger
 from app.modules.contracts import (
     AttachRepoModelsRequest,
     ModelAttachStatusResponse,
+    ModelConfirmRequest,
     ModelListResponse,
     ModelResponse,
     ModelUpdateRequest,
     ModelUploadResponse,
+    UploadUrlRequest,
+    UploadUrlResponse,
+    ModelReplaceConfirmRequest,
 )
 from app.services import model_attach_tracker
 from app.services.github_repo_service import GitHubRepoService
@@ -401,6 +405,169 @@ def _attach_files_in_background(
         model_attach_tracker.finish(project_id, error=str(exc))
 
 
+@router.post(
+    "/projects/{project_id}/models/upload-url",
+    response_model=UploadUrlResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Get a short-lived presigned URL to upload a model directly to storage",
+)
+def get_model_upload_url(
+    project_id: int,
+    payload: UploadUrlRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    # Use any service that gives us access to ObjectStorage; ModelsService doesn't directly
+    # expose it, but IFCPipelineService does via upload_service, or we can just import it.
+) -> UploadUrlResponse:
+    """Generate a direct-to-cloud upload URL for an IFC model.
+    
+    This avoids routing 50MB binaries through the FastAPI gateway. The client
+    PUTs the file to this URL, then calls `/confirm` to finalize the attachment.
+    """
+    if not payload.file_name.lower().endswith((".ifc", ".ifczip", ".zip")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{payload.file_name} is not an .ifc model.",
+        )
+        
+    from app.services.object_storage import ObjectStorage
+    storage = ObjectStorage()
+    
+    try:
+        res = storage.create_presigned_upload_url(payload.file_name, "ifc")
+        return UploadUrlResponse(
+            signed_url=res["signed_url"],
+            storage_reference=res["storage_reference"],
+            token=res["token"]
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to generate upload URL: {exc}"
+        )
+
+
+@router.post(
+    "/projects/{project_id}/models/confirm",
+    response_model=ModelUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Confirm a direct-to-cloud model upload and attach it",
+)
+async def confirm_model_upload(
+    project_id: int,
+    payload: ModelConfirmRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ModelsService, Depends(get_models_service)],
+    ifc_pipeline_service: Annotated[IFCPipelineService, Depends(get_ifc_pipeline_service)],
+    naming_service: Annotated[NamingConfigService, Depends(get_naming_config_service)],
+    background_tasks: BackgroundTasks,
+) -> ModelUploadResponse:
+    """Confirm an IFC model was uploaded to storage and start background attachment.
+    
+    Unlike the old `/models` multipart endpoint, this receives no bytes.
+    The client already uploaded the file to Supabase using the URL from `/upload-url`.
+    """
+    naming_config = naming_service.get_for_project(project_id)
+    is_configured = bool(naming_config and naming_config.get("is_configured"))
+    convention = naming_service.resolve_convention(naming_config) if is_configured else {}
+    separator = str(naming_config.get("separator") or convention.get("separator") or "-") if is_configured else "-"
+    expected_project_code = str(project.get("project_code") or "")
+
+    parsed, warning = _iso_fields_for(
+        payload.file_name,
+        separator=separator,
+        guess_separator=not is_configured,
+        expected_project_code=expected_project_code,
+        allow_project_code_mismatch=payload.allow_project_code_mismatch,
+    )
+    warnings = [warning] if warning else []
+    
+    if warning:
+        logger.warning("Model naming warning project_id=%d: %s", project_id, warning)
+
+    # Note: We must fetch the object from storage or trust the client. 
+    # To keep it completely in the background like the multipart upload:
+    model_attach_tracker.start(project_id, total=1)
+    
+    # We create a modified background task that skips the initial "upload" 
+    # since it's already in storage. But the pipeline expects to parse it.
+    background_tasks.add_task(
+        _attach_pre_uploaded_file_in_background,
+        project_id=project_id,
+        name=payload.file_name,
+        storage_reference=payload.storage_reference,
+        parsed=parsed,
+        role=payload.role or DEFAULT_MODEL_ROLE,
+        is_primary=payload.is_primary,
+        service=service,
+        ifc_pipeline_service=ifc_pipeline_service,
+    )
+
+    return ModelUploadResponse(
+        success=True, files=[], primary_id=None, processing=True, warnings=warnings
+    )
+
+
+def _attach_pre_uploaded_file_in_background(
+    *,
+    project_id: int,
+    name: str,
+    storage_reference: str,
+    parsed: dict,
+    role: str,
+    is_primary: bool,
+    service: ModelsService,
+    ifc_pipeline_service: IFCPipelineService,
+) -> None:
+    """Parse and attach a file already in storage, off the request/response cycle."""
+    try:
+        from app.services.object_storage import ObjectStorage
+        
+        # Verify it exists by materializing it
+        storage = ObjectStorage()
+        local_path = storage.materialize_local_path(storage_reference)
+        if not local_path or not local_path.exists():
+            raise FileNotFoundError(f"Uploaded file not found at {storage_reference}")
+            
+        stored = ifc_pipeline_service.upload_service.register_pre_uploaded_file(
+            filename=name, 
+            local_path=local_path,
+            storage_ref=storage_reference,
+            project_id=project_id, 
+            kind="ifc"
+        )
+        if not stored.success or stored.ref is None:
+            model_attach_tracker.finish(project_id, error=f"{name} could not be stored: {stored.error}")
+            return
+            
+        service.attach_model(
+            project_id,
+            file_path=stored.ref.storage_ref,
+            file_name=stored.ref.filename,
+            role=role,
+            is_primary=is_primary,
+            project_code=parsed.get("project_code"),
+            originator=parsed.get("originator"),
+            volume_system=parsed.get("volume_system"),
+            level=parsed.get("level"),
+            type_code=parsed.get("type"),
+            role_iso=parsed.get("role"),
+            number=parsed.get("number"),
+            cde_state="WIP",
+        )
+        model_attach_tracker.progress(project_id, attached=1)
+        
+        primary = service.get_primary(project_id)
+        logger.info(
+            "Project IFC model attached (presigned) project_id=%d primary=%s",
+            project_id,
+            (primary or {}).get("file_path"),
+        )
+        model_attach_tracker.finish(project_id)
+    except Exception as exc:
+        logger.exception("Background model attach failed project_id=%d", project_id)
+        model_attach_tracker.finish(project_id, error=str(exc))
+
+
 @router.get(
     "/projects/{project_id}/models/attach-status",
     response_model=ModelAttachStatusResponse,
@@ -587,6 +754,50 @@ async def replace_model(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=rejection)
 
     row = service.replace_model(project_id, model_id, content=content, file_name=name)
+    if row is None:
+        raise _not_found(project_id, model_id)
+    return ModelResponse(**{"project_id": project_id, **row})
+
+
+@router.post(
+    "/models/{model_id}/replace-confirm",
+    response_model=ModelResponse,
+    summary="Confirm a direct-to-cloud replacement of an attached model",
+)
+def replace_model_confirm(
+    model_id: int,
+    project_id: int,
+    payload: ModelReplaceConfirmRequest,
+    project: Annotated[dict, Depends(get_authorized_project)],
+    service: Annotated[ModelsService, Depends(get_models_service)],
+) -> ModelResponse:
+    """Swap an attached model's bytes using an already-uploaded direct-to-cloud file.
+    
+    Like the old `/replace` endpoint, but without routing the file through FastAPI.
+    """
+    from app.services.object_storage import ObjectStorage
+    
+    # Ensure it exists
+    storage = ObjectStorage()
+    local_path = storage.materialize_local_path(payload.storage_reference)
+    if not local_path or not local_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Uploaded file not found at {payload.storage_reference}"
+        )
+
+    # Validate it on disk
+    from app.modules.pipeline_io.file_upload import _validate_file
+    rejection = _validate_file(payload.file_name, local_path, kind="ifc")
+    if rejection:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=rejection)
+
+    row = service.replace_model_from_storage(
+        project_id, 
+        model_id, 
+        storage_reference=payload.storage_reference, 
+        file_name=payload.file_name
+    )
     if row is None:
         raise _not_found(project_id, model_id)
     return ModelResponse(**{"project_id": project_id, **row})

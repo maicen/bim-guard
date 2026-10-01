@@ -35,6 +35,7 @@
   let errorMessage = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
   let uploadAbortController: AbortController | null = null;
+  let uploadProgress = $state(0);
 
   onDestroy(() => {
     uploadAbortController?.abort();
@@ -55,6 +56,7 @@
       revisionCode = file.revision_code || "P01.01";
       replacement = null;
       errorMessage = "";
+      uploadProgress = 0;
     }
   });
 
@@ -85,7 +87,7 @@
     try {
       let updated: Model;
       if (replacement) {
-        updated = await modelsApi.replace(projectId, file.id, replacement, uploadAbortController.signal);
+        updated = await modelsApi.replace(projectId, file.id, replacement, uploadAbortController.signal, (p) => { uploadProgress = p; });
       }
       updated = await modelsApi.update(projectId, file.id, {
         file_name: fileName.trim(),
@@ -305,7 +307,7 @@
       disabled={isSaving || !projectId || file?.id == null}
       class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {isSaving ? "Saving…" : "Save Changes"}
+      {isSaving ? (replacement ? (uploadProgress < 100 ? `Uploading ${uploadProgress}%` : "Processing…") : "Saving…") : "Save Changes"}
     </button>
   {/snippet}
 </Modal>

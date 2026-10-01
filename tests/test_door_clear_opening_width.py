@@ -49,8 +49,8 @@ def _build_door_model(overall_width_mm: float, *, panel_width: float | None = No
 
 
 def _resolve(path, overall_width_mm, **kwargs):
-    from app.modules.ifc_reader import IFCReader
     from app.modules.comparator import ComplianceComparator
+    from app.modules.ifc_reader import IFCReader
 
     rule = {
         "rule_id": 1,

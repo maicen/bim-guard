@@ -1,5 +1,6 @@
 import time
 import urllib.error
+import httpx
 from unittest.mock import MagicMock, patch
 
 from app.services.bsdd_client import BSDDClient
@@ -17,9 +18,9 @@ def test_bsdd_outage_fallback_performance():
     
     start_time = time.time()
     
-    # 2. Mock network to raise a timeout (e.g. socket timeout converted to URLError)
-    with patch("urllib.request.urlopen") as mock_urlopen:
-        mock_urlopen.side_effect = urllib.error.URLError("timed out")
+    # 2. Mock network to raise a timeout
+    with patch("httpx.Client.get") as mock_get:
+        mock_get.side_effect = httpx.ReadTimeout("timed out")
         
         # 3. Request class that doesn't exist locally
         result = repo.get_class_cached(

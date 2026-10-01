@@ -745,7 +745,8 @@ def guard_opening_profile(
 def _min_rotated_rect_dims_mm(run, lateral) -> tuple[float, float] | None:
     """Return (short_side_mm, long_side_mm) of the min-rotated-rectangle
     enclosing the (run, lateral) point set, or None if shapely is unavailable
-    or the point set is degenerate."""
+    or the point set is degenerate.
+    """
     if not _SHAPELY_AVAILABLE:
         return None
     pts = list(zip(run.tolist(), lateral.tolist()))
@@ -1498,7 +1499,8 @@ class IFCStairEngine:
     def stair_flights(self, stair_guid: str) -> list[str]:
         """Flight GUIDs grouped under *stair_guid* (an IfcStair's GlobalId),
         or under its own GUID as a fallback key when a flight has no parent
-        IfcStair (see ``_parent_stair_guid``). Empty list if unknown."""
+        IfcStair (see ``_parent_stair_guid``). Empty list if unknown.
+        """
         return list(self._stair_flight_guids.get(stair_guid) or [])
 
     def get_stair_uniformity(self, flight_guid: str) -> dict | None:

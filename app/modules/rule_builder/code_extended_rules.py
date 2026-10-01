@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.services.static_data_service import StaticDataService
 
+
 def _load_extended_rules() -> list[dict]:
     """Read extended code rules from database static assets."""
     payload = StaticDataService().get_asset_json("ruleset:BUILDING-CODE-PART9-EXT")

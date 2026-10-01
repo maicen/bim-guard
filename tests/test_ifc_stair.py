@@ -147,7 +147,8 @@ class TestStepFormula:
     STEP and paired with that same transition's own riser/going -- not from
     the flight's separate min/max, which could pair a riser from one step
     with a going from a different one and describe a stride that doesn't
-    exist anywhere in the flight."""
+    exist anywhere in the flight.
+    """
 
     def test_uniform_stair_has_one_constant_value(self):
         run, _lateral, z = _synthetic_treads(n_treads=4, riser=175.0, going=280.0)
@@ -276,7 +277,8 @@ _V = np.array([0.0, 1.0])
 def _vertical_member_mesh(segments):
     """One flat quad face (2 triangles) per (x0, x1, z0, z1) segment, all at
     y=0 -- enough for guard_opening_gap_at_height, which only reads each
-    face's run- and Z-extent, never true 3D volume."""
+    face's run- and Z-extent, never true 3D volume.
+    """
     verts: list[tuple[float, float, float]] = []
     faces: list[list[int]] = []
     for x0, x1, z0, z1 in segments:
@@ -349,7 +351,8 @@ def _flat_face_candidate(guid, x0, x1, y0, y1, z, bbox=None):
     build_headroom_candidate_index would produce: {guid, class, bbox, verts,
     faces}. *bbox* defaults to the face's own footprint but can be widened
     to test the broad-phase-passes/narrow-phase-rejects case (the whole
-    point of the point-in-triangle narrow phase)."""
+    point of the point-in-triangle narrow phase).
+    """
     verts = np.array(
         [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]], dtype=float
     )
@@ -506,7 +509,8 @@ def _build_stair_model():
 def _build_stair_model_variant(include_risers: bool):
     """Same shape as ``_build_stair_model`` but lets the caller omit riser
     faces entirely, to prove open-riser detection fires on a genuinely open
-    stair and not just clears a closed one."""
+    stair and not just clears a closed one.
+    """
     from ifcopenshell.api import run
 
     model = ifcopenshell.file(schema="IFC4")
@@ -567,7 +571,8 @@ def _build_winder_like_model(lateral_shift_per_tread: float):
     range is shifted by *lateral_shift_per_tread* mm relative to the last --
     a stand-in for a winder's rotating walking line, sufficient to exercise
     the drift DETECTOR without modelling true winder/spiral geometry (a
-    bigger task deferred to v2 -- see the module docstring)."""
+    bigger task deferred to v2 -- see the module docstring).
+    """
     from ifcopenshell.api import run
 
     model = ifcopenshell.file(schema="IFC4")
@@ -696,7 +701,8 @@ def _box_triangles(x0, x1, y0, y1, z0, z1):
     isolated to z-constant points (slope 0) instead picked up the bottom
     face too (whose normal was accidentally also +Z), reading the box's
     own THICKNESS as slope. Caught by test_clear_dimensions_match_footprint
-    asserting slope_deg == 0 on a flat slab and getting ~5.7 degrees back."""
+    asserting slope_deg == 0 on a flat slab and getting ~5.7 degrees back.
+    """
     corners = {
         (0, 0, 0): (x0, y0, z0), (1, 0, 0): (x1, y0, z0),
         (1, 1, 0): (x1, y1, z0), (0, 1, 0): (x0, y1, z0),
@@ -742,6 +748,7 @@ def _base_model():
 class TestAnalyzeLanding:
     def test_clear_dimensions_match_footprint(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -764,6 +771,7 @@ class TestAnalyzeLanding:
 class TestAnalyzeRailing:
     def test_height_and_path_length(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -792,6 +800,7 @@ class TestAnalyzeRailing:
 
     def test_gap_in_rail_produces_two_segments(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -814,6 +823,7 @@ class TestAnalyzeRailing:
 
     def test_no_gap_reports_zero_length_not_missing(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -833,6 +843,7 @@ class TestAnalyzeRailing:
 
     def test_guardrail_carries_the_not_yet_computed_warning(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -855,6 +866,7 @@ class TestAnalyzeRailing:
 
     def test_unset_predefined_type_is_treated_as_possibly_a_guard(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -871,6 +883,7 @@ class TestAnalyzeRailing:
 
     def test_baluster_spacing_measured_from_real_geometry(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -899,6 +912,7 @@ class TestAnalyzeRailing:
 
     def test_bottom_clear_gap_when_bottom_rail_is_elevated(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -921,6 +935,7 @@ class TestAnalyzeRailing:
 
     def test_handrail_does_not_compute_opening_fields(self):
         from ifcopenshell.api import run
+
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         model, body, storey = _base_model()
@@ -1023,7 +1038,8 @@ def _build_flight_with_overhead_slab(slab_bottom_z: float):
     climbing z=175..1050) plus a flat slab spanning generously over its
     whole footprint, underside at *slab_bottom_z*. A flat overhead slab
     over a climbing flight means the LAST (highest) tread always has the
-    least headroom -- slab_bottom_z minus that tread's own elevation."""
+    least headroom -- slab_bottom_z minus that tread's own elevation.
+    """
     from ifcopenshell.api import run
 
     model, body, storey = _base_model()
@@ -1057,7 +1073,8 @@ def _build_two_stacked_flights(vertical_offset: float):
     """Two identical 6-tread flights at the same XY footprint, the second
     raised by *vertical_offset* -- a switchback stair's flight-above-flight
     case. Flight A's headroom must be limited by flight B's underside, not
-    by nothing (there is deliberately no slab in this model at all)."""
+    by nothing (there is deliberately no slab in this model at all).
+    """
     from ifcopenshell.api import run
 
     model, body, storey = _base_model()
@@ -1128,8 +1145,8 @@ class TestHeadroomEndToEnd:
         assert any("headroom" in w for w in result["warnings"])
 
     def test_min_headroom_resolves_through_the_full_pipeline(self, tmp_path_factory):
-        from app.modules.ifc_reader import IFCReader
         from app.modules.comparator import ComplianceComparator
+        from app.modules.ifc_reader import IFCReader
 
         slab_bottom_z = N_TREADS * RISER_MM + 1800.0  # deliberately below a 1980mm code minimum
         parts = _build_flight_with_overhead_slab(slab_bottom_z)
@@ -1194,9 +1211,10 @@ class TestCrossReferencing:
     def test_flight_stair_guid_resolves_end_to_end(self, built, tmp_path_factory):
         """A rule targeting IfcStairFlight and asking for ParentStairGlobalId
         must resolve through the real pipeline, not just the engine's own
-        cache."""
-        from app.modules.ifc_reader import IFCReader
+        cache.
+        """
         from app.modules.comparator import ComplianceComparator
+        from app.modules.ifc_reader import IFCReader
 
         parts, _engine = built
         path = tmp_path_factory.mktemp("xref") / "stair.ifc"
@@ -1220,7 +1238,8 @@ class TestEndToEndThroughIFCReader:
     stair-derived property (MinRiserHeight) resolves through
     IFCReader.extract_for_compliance() -> ComplianceComparator, the same
     path every other rule family takes -- not just through calling
-    ifc_stair functions directly."""
+    ifc_stair functions directly.
+    """
 
     @pytest.fixture(scope="class")
     def model_path(self, tmp_path_factory):
@@ -1231,8 +1250,8 @@ class TestEndToEndThroughIFCReader:
 
     @staticmethod
     def _evaluate(model_path, rules):
-        from app.modules.ifc_reader import IFCReader
         from app.modules.comparator import ComplianceComparator
+        from app.modules.ifc_reader import IFCReader
 
         extraction = IFCReader(model_path).extract_for_compliance(rules)
         results = ComplianceComparator().validate_metadata(extraction)
@@ -1282,7 +1301,8 @@ class TestEndToEndThroughIFCReader:
         computed the winder warning, but until now it was discarded inside
         rich_detail and never reached extract_for_compliance()'s output --
         so a PASS on a winder stair looked exactly like a PASS on a straight
-        one. This proves the warning survives the whole pipeline."""
+        one. This proves the warning survives the whole pipeline.
+        """
         model, _flight = _build_winder_like_model(lateral_shift_per_tread=40.0)
         path = tmp_path_factory.mktemp("winder") / "winder.ifc"
         model.write(str(path))
@@ -1311,7 +1331,8 @@ class TestEndToEndThroughIFCReader:
         """A straight flight must never get the winder/curvature caveat --
         it MAY still carry a headroom caveat, since this fixture is a lone
         flight with nothing else in the model to measure headroom against,
-        which is itself an honest, correct observation, not a bug."""
+        which is itself an honest, correct observation, not a bug.
+        """
         rule = {
             "rule_id": 5,
             "reference": "TEST-5",
@@ -1333,7 +1354,8 @@ class TestEndToEndThroughIFCReader:
         opposite direction (a rule spelled TreadLength finding a model that
         used TreadDepth) -- a rule literally spelled TreadDepth got no alias
         list at all and could never find a Pset authored under TreadLength,
-        the actual schema name every real export uses."""
+        the actual schema name every real export uses.
+        """
         from ifcopenshell.api import run
 
         model, _flight = _build_stair_model()
@@ -1357,7 +1379,8 @@ class TestEndToEndThroughIFCReader:
         """FlightStartElevation, NumberOfRisersDetected -- computed since the
         first stair-engine commit, only wired to a queryable property name
         just now. Prove they reach a real verdict, not just the raw
-        analysis dict."""
+        analysis dict.
+        """
         rule_elevation = {
             "rule_id": 8,
             "reference": "TEST-8",
@@ -1384,7 +1407,8 @@ class TestEndToEndThroughIFCReader:
         prove it reaches a real rule verdict through
         IFCReader.extract_for_compliance(), not just through calling
         ifc_stair.derive_flight_steps() directly. The model's real value is
-        2*175 + 280 = 630mm."""
+        2*175 + 280 = 630mm.
+        """
         rule_fails = {
             "rule_id": 10,
             "reference": "TEST-10",
@@ -1411,7 +1435,8 @@ class TestEndToEndThroughIFCReader:
         """GuardMaxOpening is a brand new derived property (baluster/opening
         analysis) -- prove it reaches a real rule verdict through
         IFCReader.extract_for_compliance(), not just through calling
-        ifc_stair.analyze_railing() directly."""
+        ifc_stair.analyze_railing() directly.
+        """
         from ifcopenshell.api import run as ifc_run
 
         model, body, storey = _base_model()
@@ -1464,7 +1489,8 @@ def _build_flight_with_extended_handrail(bottom_extension_mm: float, top_extensi
     (x=0 and x=(N_TREADS-1)*GOING_MM -- nosing-to-nosing, not the flight's
     full run, since the last tread's own depth extends past its nosing) by
     known amounts, so HandrailExtensionBottom/Top can be checked against an
-    exact expected value rather than just a sign."""
+    exact expected value rather than just a sign.
+    """
     from ifcopenshell.api import run
 
     model, body, storey = _base_model()
@@ -1502,7 +1528,8 @@ class TestHandrailExtension:
     its host flight's first/last detected tread nosing, projected onto the
     flight's own walking direction -- not the rail's own local frame, which
     is independently PCA-derived and not directly comparable to the
-    flight's (see the module docstring)."""
+    flight's (see the module docstring).
+    """
 
     def test_extension_matches_known_overhang_on_both_ends(self):
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
@@ -1529,7 +1556,8 @@ class TestHandrailExtension:
     def test_rail_shorter_than_flight_reports_negative_extension(self):
         """A rail that stops SHORT of the flight's own bottom/top nosing is a
         real, worse condition than merely 'no extension' -- it must report a
-        NEGATIVE value, not clip to zero, so a rule can tell the two apart."""
+        NEGATIVE value, not clip to zero, so a rule can tell the two apart.
+        """
         from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 
         parts = _build_flight_with_extended_handrail(
@@ -1544,9 +1572,10 @@ class TestHandrailExtension:
         """HandrailExtensionBottom is a brand new derived property -- prove
         it reaches a real rule verdict through
         IFCReader.extract_for_compliance(), not just the engine's own
-        cache."""
-        from app.modules.ifc_reader import IFCReader
+        cache.
+        """
         from app.modules.comparator import ComplianceComparator
+        from app.modules.ifc_reader import IFCReader
 
         parts = _build_flight_with_extended_handrail(
             bottom_extension_mm=300.0, top_extension_mm=300.0

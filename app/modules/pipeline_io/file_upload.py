@@ -112,6 +112,15 @@ def sha256_of(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def sha256_file(filepath: Path) -> str:
+    """Return the hex SHA-256 digest of a file on disk."""
+    hasher = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def _now_iso() -> str:
     """UTC timestamp in ISO 8601, second precision."""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -130,6 +139,30 @@ def _validate(filename: str, content: bytes, kind: str) -> str | None:
         return "The file is empty."
 
     if len(content) > MAX_UPLOAD_BYTES:
+        limit_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
+        return f"The file is larger than the {limit_mb} MB upload limit."
+
+    allowed = EXTENSIONS_BY_KIND.get(kind, ())
+    if allowed and not safe_name.lower().endswith(allowed):
+        return f"{safe_name} is not one of the accepted types: {', '.join(allowed)}."
+
+    return None
+
+
+def _validate_file(filename: str, filepath: Path, kind: str) -> str | None:
+    """Return a rejection reason, or ``None`` if the file on disk is acceptable."""
+    if kind not in SUBDIR_BY_KIND:
+        return f"Unknown upload kind {kind!r}."
+
+    safe_name = Path(filename or "").name
+    if not safe_name:
+        return "The file has no name."
+
+    if not filepath.exists() or filepath.stat().st_size == 0:
+        return "The file is empty."
+
+    size_bytes = filepath.stat().st_size
+    if size_bytes > MAX_UPLOAD_BYTES:
         limit_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
         return f"The file is larger than the {limit_mb} MB upload limit."
 
@@ -248,16 +281,94 @@ class FileUploadService:
         recorded = self._record(ref, project_id)
 
         logger.info(
-            "Upload stored filename=%s kind=%s bytes=%d sha256=%s ref=%s recorded=%s",
+            "Upload succeeded filename=%s bytes=%d hash=%s",
             safe_name,
-            kind,
             len(content),
             file_hash,
-            storage_ref,
-            recorded,
         )
+
         return UploadResponse(
-            success=True, ref=ref, recorded=recorded, validation_report=validation_report
+            success=True,
+            ref=ref,
+            recorded=recorded,
+            validation_report=validation_report,
+        )
+
+    def register_pre_uploaded_file(
+        self,
+        filename: str,
+        local_path: Path,
+        storage_ref: str,
+        *,
+        project_id: int | None = None,
+        kind: str = "ifc",
+        run_preflight: bool = True,
+    ) -> UploadResponse:
+        """Register an already-uploaded file without copying it to a new storage key.
+
+        Args:
+            filename: Original filename.
+            local_path: Local path to the materialized file.
+            storage_ref: The existing storage reference (e.g. sb://...).
+            project_id: Project the file belongs to.
+            kind: One of :data:`SUBDIR_BY_KIND`.
+            run_preflight: Whether to run IFC pre-flight syntax and schema checks.
+        """
+        rejection = _validate_file(filename, local_path, kind)
+        if rejection:
+            logger.warning(
+                "Upload rejected filename=%s kind=%s reason=%s", filename, kind, rejection
+            )
+            return UploadResponse(success=False, error=rejection)
+
+        safe_name = Path(filename.replace("\\", "/")).name
+        validation_report = None
+
+        if kind == "ifc" and run_preflight:
+            try:
+                from app.services.ifc_validation_service import DEFAULT_IFC_VALIDATION_SERVICE
+
+                validation_report = DEFAULT_IFC_VALIDATION_SERVICE.validate_file(
+                    local_path, filename=safe_name
+                )
+                if not validation_report.valid and validation_report.fatal_errors > 0:
+                    logger.warning(
+                        "Upload pre-flight validation failed filename=%s errors=%d",
+                        safe_name,
+                        validation_report.fatal_errors,
+                    )
+                    return UploadResponse(
+                        success=False,
+                        error=f"IFC Validation Failed: {validation_report.summary_message}",
+                        validation_report=validation_report,
+                    )
+            except Exception as exc:
+                logger.debug("IFC pre-flight check exception (non-fatal): %s", exc)
+
+        file_hash = sha256_file(local_path)
+        size_bytes = local_path.stat().st_size
+
+        ref = StoredFileRef(
+            storage_ref=storage_ref,
+            file_hash_sha256=file_hash,
+            filename=safe_name,
+            size_bytes=size_bytes,
+            kind=kind,
+        )
+        recorded = self._record(ref, project_id)
+
+        logger.info(
+            "Registered pre-uploaded file filename=%s bytes=%d hash=%s",
+            safe_name,
+            size_bytes,
+            file_hash,
+        )
+
+        return UploadResponse(
+            success=True,
+            ref=ref,
+            recorded=recorded,
+            validation_report=validation_report,
         )
 
     def _record(self, ref: StoredFileRef, project_id: int | None) -> bool:

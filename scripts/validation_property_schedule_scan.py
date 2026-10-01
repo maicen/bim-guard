@@ -55,8 +55,8 @@ if str(REPO_ROOT) not in sys.path:
 
 warnings.filterwarnings("ignore")
 
-import numpy as np  # noqa: E402
 import ifcopenshell  # noqa: E402
+import numpy as np  # noqa: E402
 from ifcopenshell.api import run  # noqa: E402
 
 Case = dict[str, Any]
@@ -152,8 +152,8 @@ def _space_boundary(model, space, element, physical="PHYSICAL"):
 
 def _resolve(model, target_class, property_name, tmp_dir: Path, name: str) -> tuple[str, Any]:
     """Run one `exists` rule through the real pipeline. Returns (status, actual)."""
-    from app.modules.ifc_reader import IFCReader
     from app.modules.comparator import ComplianceComparator
+    from app.modules.ifc_reader import IFCReader
 
     path = tmp_dir / f"{name}.ifc"
     model.write(str(path))
@@ -347,7 +347,8 @@ def _build_space_boundary_model():
     and window, a Living Room sharing a party wall with a neighbouring Unit,
     and a Garage sharing a wall+door with the Bedroom -- real
     IfcRelSpaceBoundary relationships throughout, the same relationship
-    every function in this section actually parses in production."""
+    every function in this section actually parses in production.
+    """
     model, body, storey = _base_model()
 
     def space(name, x0, x1, y0, y1, area_m2):
@@ -409,12 +410,20 @@ def _build_space_boundary_model():
 
 
 def space_boundary_cases(tmp_dir: Path) -> list[Case]:
-    from app.modules.ifc_reader.ifc_spatial import (
-        IFCSpatialAdjacency, check_daylight_ratios, check_fire_separation,
-        check_garage_separation, check_door_space_connection, check_egress_window_openings,
+    from app.modules.ifc_reader.ifc_egress import (
+        IFCEgressGraph,
+        check_egress_travel_distance,
+        check_exit_count,
     )
-    from app.modules.ifc_reader.ifc_egress import check_exit_count, check_egress_travel_distance, IFCEgressGraph
     from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+    from app.modules.ifc_reader.ifc_spatial import (
+        IFCSpatialAdjacency,
+        check_daylight_ratios,
+        check_door_space_connection,
+        check_egress_window_openings,
+        check_fire_separation,
+        check_garage_separation,
+    )
 
     parts = _build_space_boundary_model()
     model = parts["model"]

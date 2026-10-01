@@ -2,13 +2,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import app.modules.ifc_reader as ifc_read_module
+from app.services.models_service import ModelsService
 from app.services.persistence import PersistenceService, _MemoryClient
 from app.services.pipeline_services import (
     EnhancementService,
     enhance_model,
     execute_model_enhancement,
 )
-from app.services.models_service import ModelsService
 
 
 def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypatch):

@@ -5,9 +5,10 @@ import json
 import os
 import sys
 import time
-from pathlib import Path
-import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import httpx
 
 BASE_DIR = Path("/Users/sam/coding/bim-guard")
 DATA_DIR = BASE_DIR / "data" / "migration"

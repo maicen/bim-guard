@@ -104,7 +104,8 @@ def test_list_get_delete_round_trip():
 
 def test_get_snapshot_rules_returns_frozen_copy_not_live_reference():
     """The core requirement: a snapshot must survive later edits/deletes to
-    the source ruleset — it freezes a copy, not a live pointer."""
+    the source ruleset — it freezes a copy, not a live pointer.
+    """
     rules_by_ruleset = {"FOLDER-A": _rules()}
     service, _, rule_service = _service(rules_by_ruleset=rules_by_ruleset)
 
@@ -123,7 +124,8 @@ def test_get_snapshot_rules_returns_frozen_copy_not_live_reference():
 def test_get_snapshot_rules_decodes_json_string_from_sqlite_backend():
     """The SQLite adapter round-trips rules_json as a JSON string, not a
     native list (see rule_snapshot_service.get_snapshot_rules docstring) —
-    confirm the string case is handled, not just the native-list case."""
+    confirm the string case is handled, not just the native-list case.
+    """
     table = FakeTable()
     rule_service = FakeRuleService({"FOLDER-A": _rules()})
     service = RuleSnapshotService(snapshots_repo=table, rule_service=rule_service)

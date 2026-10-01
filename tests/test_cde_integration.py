@@ -91,6 +91,9 @@ def test_opencde_project_documents_list_and_etags(cde_test_project):
     assert cached_response.status_code == 304
 
 
+from unittest.mock import patch, MagicMock
+import httpx
+
 def test_opencde_documents_sync(cde_test_project):
     proj_id = cde_test_project("OpenCDE Sync Project", "US", "Arch")
 
@@ -99,9 +102,29 @@ def test_opencde_documents_sync(cde_test_project):
         "project_id": proj_id,
         "external_project_id": "ACC-PRJ-8829",
         "document_ids": ["MODEL-001", "SPEC-002"],
+        "access_token": "dummy_token"
     }
-    response = client.post(f"/api/cde/v1/projects/{proj_id}/documents/sync", json=payload)
-    assert response.status_code == 200
+    def mock_get(url, *args, **kwargs):
+        url_str = str(url)
+        if "/content" in url_str:
+            if "MODEL-001" in url_str:
+                return httpx.Response(200, headers={"Content-Disposition": 'attachment; filename="MODEL-001.pdf"', "Content-Type": "application/pdf"}, content=b"%PDF-1.4\nmock")
+            else:
+                return httpx.Response(200, headers={"Content-Disposition": 'attachment; filename="SPEC-002.pdf"', "Content-Type": "application/pdf"}, content=b"%PDF-1.4\nmock")
+        
+        return httpx.Response(
+            200, 
+            json={"data": [
+                {"id": "MODEL-001", "name": "MODEL-001.pdf", "title": "MODEL-001.pdf", "versions": [{"id": "v1", "size": 1024, "url": "https://cde.autodesk.com/download/1"}]}, 
+                {"id": "SPEC-002", "name": "SPEC-002.pdf", "title": "SPEC-002.pdf", "versions": [{"id": "v1", "size": 1024, "url": "https://cde.autodesk.com/download/2"}]}
+            ]},
+            request=httpx.Request("GET", "https://cde.autodesk.com/acc/v1/api/projects/ACC-PRJ-8829/documents")
+        )
+        
+    with patch("httpx.Client.get", side_effect=mock_get):
+        with patch("app.services.documents_service.DocumentService.ingest_uploaded_bytes", return_value=(MagicMock(), True)):
+            response = client.post(f"/api/cde/v1/projects/{proj_id}/documents/sync", json=payload)
+    assert response.status_code == 200, response.json()
     data = response.json()
     assert data["success"] is True
     assert data["synced_documents_count"] == 2

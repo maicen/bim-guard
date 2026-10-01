@@ -1,17 +1,15 @@
 """Tests for the SPARQL endpoint."""
 
-from fastapi.testclient import TestClient
-from app.main import app
-from app.bootstrap import get_container
-from app.services.graph_triplestore_service import GraphTriplestoreService
-from app.services.projects_service import ProjectsService
 import rdflib
+from fastapi.testclient import TestClient
+
+from app.bootstrap import get_container
+from app.main import app
 
 client = TestClient(app)
 
 def test_sparql_route_query(monkeypatch):
     """Test the POST /api/sparql/{project_id} route."""
-    
     container = get_container()
     
     # Pre-load graph for project 1

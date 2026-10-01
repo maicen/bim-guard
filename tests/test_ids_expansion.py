@@ -1,10 +1,10 @@
 """Tests for buildingSMART IDS (Information Delivery Specification) Expansion."""
 
+from app.modules.comparator.ids_verification import run_ids_loin_verification
 from app.modules.rule_builder.ids_exporter import (
     build_ids_document,
     import_ids_ruleset,
 )
-from app.modules.comparator.ids_verification import run_ids_loin_verification
 
 
 def test_build_ids_document_with_tolerances_and_cardinality():

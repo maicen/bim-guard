@@ -66,5 +66,5 @@ def test_storage_does_not_masquerade_local_files_as_cloud(monkeypatch) -> None:
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
     monkeypatch.setenv("SUPABASE_KEY", "")
 
-    with pytest.raises(RuntimeError, match="Supabase Storage requires"):
+    with pytest.raises(OSError, match="Supabase Storage requires"):
         ObjectStorage().save_upload("model.ifc", b"IFC", "uploads/ifc")

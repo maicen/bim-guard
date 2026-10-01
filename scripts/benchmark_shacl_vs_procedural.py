@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.bootstrap import get_container
 from app.environment import load_env_file
+from app.logging_config import get_logger
 from app.modules.contracts import RuleEvaluationRequest
 from app.modules.ifc_reader.bot_graph import IFC2BOT
-from app.logging_config import get_logger
 
 logger = get_logger("benchmark")
 

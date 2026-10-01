@@ -73,6 +73,14 @@ ALLOWED_DOCUMENT_MIME_BY_SUFFIX = {
 def md5_hex(content: bytes) -> str:
     return hashlib.md5(content).hexdigest()
 
+def md5_file(filepath: Path) -> str:
+    hasher = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 
 def safe_upload_name(filename: str | None) -> str:
     return Path(filename or "").name
@@ -121,6 +129,32 @@ def validate_document_upload(
     file_content: bytes,
 ) -> str | None:
     suffix = Path(filename).suffix.lower()
+    return _validate_document_bytes(suffix, content_type, len(file_content), file_content[:4096])
+
+
+def validate_document_file(
+    filename: str,
+    content_type: str | None,
+    filepath: Path,
+) -> str | None:
+    if not filepath.exists() or filepath.stat().st_size == 0:
+        return "Uploaded file is empty."
+    
+    size = filepath.stat().st_size
+    suffix = Path(filename).suffix.lower()
+    
+    with open(filepath, "rb") as f:
+        head = f.read(4096)
+        
+    return _validate_document_bytes(suffix, content_type, size, head)
+
+
+def _validate_document_bytes(
+    suffix: str,
+    content_type: str | None,
+    size_bytes: int,
+    head: bytes,
+) -> str | None:
     if suffix not in ALLOWED_DOCUMENT_SUFFIXES:
         return (
             "Unsupported file type. Supported formats: PDF, Word (.docx), Excel (.xlsx), "
@@ -133,34 +167,34 @@ def validate_document_upload(
     if normalized_content_type not in allowed_mime_types:
         return f"Invalid MIME type '{normalized_content_type or 'unknown'}' for {suffix} file."
 
-    if not file_content:
+    if not head:
         return "Uploaded file is empty."
 
-    if len(file_content) > MAX_DOCUMENT_UPLOAD_BYTES:
+    if size_bytes > MAX_DOCUMENT_UPLOAD_BYTES:
         return (
-            f"Uploaded file is too large ({len(file_content) / (1024 * 1024):.1f} MB). "
+            f"Uploaded file is too large ({size_bytes / (1024 * 1024):.1f} MB). "
             f"Maximum allowed size is {MAX_DOCUMENT_UPLOAD_BYTES // (1024 * 1024)} MB."
         )
 
-    if suffix == ".pdf" and not file_content.startswith(b"%PDF-"):
+    if suffix == ".pdf" and not head.startswith(b"%PDF-"):
         return "Uploaded file content does not match a valid PDF signature."
 
-    if suffix in {".docx", ".xlsx", ".pptx", ".dclx"} and not file_content.startswith(b"PK"):
+    if suffix in {".docx", ".xlsx", ".pptx", ".dclx"} and not head.startswith(b"PK"):
         return f"Uploaded file content does not match a valid {suffix} (zip) signature."
 
     if suffix in {".md", ".markdown", ".txt", ".csv", ".adoc", ".asciidoc", ".html", ".htm"} and not is_likely_text_content(
-        file_content
+        head
     ):
         return f"Uploaded {suffix} file appears to be binary content."
 
     image_signatures = _IMAGE_SIGNATURES.get(suffix)
-    if image_signatures and not file_content.startswith(image_signatures):
+    if image_signatures and not head.startswith(image_signatures):
         return f"Uploaded file content does not match a valid {suffix} image signature."
 
     if suffix in {".doclang", ".dclg"}:
-        if not is_likely_text_content(file_content):
+        if not is_likely_text_content(head):
             return f"Uploaded {suffix} file must be UTF-8 encoded XML text."
-        if not file_content.lstrip().startswith(b"<"):
+        if not head.lstrip().startswith(b"<"):
             return f"Uploaded {suffix} file does not look like DocLang XML (expected it to start with '<')."
 
     return None

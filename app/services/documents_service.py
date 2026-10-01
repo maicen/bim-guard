@@ -665,6 +665,87 @@ class DocumentService:
 
         self.delete_document(document_id)
 
+    def register_pre_uploaded_document(
+        self,
+        filename: str,
+        storage_reference: str,
+        *,
+        doc_type: str = "Specification",
+        project_code: str = "",
+        originator: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+        parser: str = "auto",
+        instance: dict | None = None,
+        generate_doclang: bool = False,
+    ) -> tuple[dict, bool]:
+        """Register a document that was already uploaded directly to storage."""
+        from app.document_upload_validation import md5_file
+        from app.modules.document_parsing.iso_validator import ISO19650Validator
+
+        local_path = self._storage.materialize_local_path(storage_reference)
+        if not local_path or not local_path.exists():
+            raise ValueError(f"Uploaded file not found at {storage_reference}")
+
+        file_md5 = md5_file(local_path)
+        existing = self.find_by_md5(file_md5)
+        if existing:
+            return existing, False
+
+        clean_doc_type = (doc_type or "").strip() or "Specification"
+
+        val = ISO19650Validator.validate_filename(filename)
+        if val.is_valid:
+            project_code = project_code or val.fields.get("project_code", "")
+            originator = originator or val.fields.get("originator", "")
+            suitability_code = (
+                suitability_code
+                if suitability_code != "S0"
+                else val.fields.get("suitability_code", "S0")
+            )
+            revision_code = (
+                revision_code
+                if revision_code != "P01.01"
+                else val.fields.get("revision_code", "P01.01")
+            )
+
+        doclang_xml = ""
+        archive_assets: list[dict] = []
+        element_bboxes: list[dict] = []
+        suffix = Path(filename).suffix.lower()
+        
+        # If the file is already DocLang, read it to populate DB
+        if suffix in {".doclang", ".dclg"}:
+            doclang_xml = local_path.read_text("utf-8")
+            self._warn_if_invalid_doclang(doclang_xml, filename)
+        elif suffix == ".dclx":
+            try:
+                doclang_xml, archive_assets = self.extract_doclang_archive(local_path.read_bytes())
+            except ValueError as exc:
+                raise ValueError(f"Invalid DocLang archive '{filename}': {exc}") from exc
+            self._warn_if_invalid_doclang(doclang_xml, filename)
+        elif generate_doclang:
+            _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
+                filename, local_path.read_bytes(), parser=parser, instance=instance, return_doclang=True
+            )
+
+        created = self.create_document(
+            md5_hash=file_md5,
+            filename=filename,
+            file_path=storage_reference,
+            doc_type=clean_doc_type,
+            project_code=project_code,
+            originator=originator,
+            suitability_code=suitability_code,
+            revision_code=revision_code,
+            cde_state="WIP",
+            doclang_xml=doclang_xml,
+            preloaded_assets=archive_assets,
+            element_bboxes=element_bboxes,
+        )
+
+        return created, True
+
     def ingest_uploaded_bytes(
         self,
         filename: str,

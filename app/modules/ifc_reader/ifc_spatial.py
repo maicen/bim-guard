@@ -794,7 +794,8 @@ def _resolve_window_operation_type(window) -> str | None:
     """Best-effort read of a window's sash operation, from any Pset key
     literally named OperationType/PanelOperation -- on the instance or its
     type, since ``get_psets(should_inherit=True)`` (the default) walks both.
-    Returns None (not a guess) when no such key is found anywhere."""
+    Returns None (not a guess) when no such key is found anywhere.
+    """
     if not _IFC_AVAILABLE:
         return None
     try:
@@ -815,7 +816,8 @@ def _get_floor_z_mm(element, geometry_extractor) -> float | None:
     """Storey floor elevation in mm, for measuring a window's sill height
     above its OWN floor rather than an arbitrary world Z=0 -- same
     ContainedInStructure walk and unit-scale convention already used
-    elsewhere in this codebase (see ifc_reader.__init__'s SillHeight path)."""
+    elsewhere in this codebase (see ifc_reader.__init__'s SillHeight path).
+    """
     try:
         for rel in getattr(element, "ContainedInStructure", []):
             container = rel.RelatingStructure

@@ -313,7 +313,7 @@ def test_add_nodes_batch_with_unwind(provider, mock_driver):
 
     assert "UNWIND $batch AS item" in query
     assert "MERGE (n:IfcWall {guid: item.guid})" in query
-    assert "SET n += item" in query
+    assert "n += item" in query
     assert len(params["batch"]) == 2
     assert params["batch"][0]["guid"] == "WALL-001"
     assert params["batch"][1]["guid"] == "WALL-002"

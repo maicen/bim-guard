@@ -117,15 +117,6 @@ export const projectsApi = {
     return created;
   },
 
-  async uploadWithIfc(formData: FormData): Promise<Project> {
-    const res = await apiFetch(`${API_BASE}/projects/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const created = await handleResponse<Project>(res);
-    _projectsStore.addOrUpdate(created);
-    return created;
-  },
 
   async update(id: number, payload: ProjectUpdatePayload): Promise<Project> {
     const res = await apiFetch(`${API_BASE}/projects/${id}`, {

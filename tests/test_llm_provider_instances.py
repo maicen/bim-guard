@@ -27,7 +27,7 @@ def _install_transport(monkeypatch, handler):
 def test_service_test_connection_success(monkeypatch):
     """Test candidate connection succeeds against a mock driver."""
     def handler(request):
-        assert str(request.url) == "http://ollama.test:11434/api/tags"
+        assert str(request.url) == "http://localhost:11434/api/tags"
         return httpx.Response(
             200,
             json={"models": [{"name": "qwen2.5:7b"}, {"name": "llama3.2:latest"}]},
@@ -37,7 +37,7 @@ def test_service_test_connection_success(monkeypatch):
 
     service = LLMProviderInstancesService(MagicMock())
     result = asyncio.run(
-        service.test_connection("ollama", api_base="http://ollama.test:11434")
+        service.test_connection("ollama", api_base="http://localhost:11434")
     )
     assert result.ok is True
     assert "2 model(s) available" in result.detail
@@ -83,7 +83,7 @@ def test_api_test_connection_endpoint(monkeypatch):
             "/api/organizations/1/llm-providers/test-connection",
             json={
                 "kind": "ollama",
-                "api_base": "http://ollama.test:11434",
+                "api_base": "http://localhost:11434",
             },
         )
         assert resp.status_code == 200

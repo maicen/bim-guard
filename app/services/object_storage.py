@@ -193,6 +193,37 @@ class ObjectStorage:
             logger.warning("Failed generating signed URL bucket=%s key=%s", bucket, key, exc_info=True)
             return None
 
+    def create_presigned_upload_url(self, filename: str, subdir: str) -> dict[str, str]:
+        """
+        Generate a short-lived URL for direct client-side upload to Supabase Storage.
+        Returns a dictionary with 'signed_url', 'storage_reference', and 'token'.
+        """
+        safe_name = Path(filename).name
+        object_name = f"{uuid.uuid4().hex}_{safe_name}"
+        key = "/".join(part.strip("/") for part in [subdir, object_name] if part).strip("/")
+
+        object_key = self._apply_prefix(key)
+        try:
+            res = self._supabase_client().storage.from_(self._bucket).create_signed_upload_url(object_key)
+            
+            signed_url = res.get("signed_url") or res.get("signedUrl")
+            token = res.get("token", "")
+            
+            if not signed_url:
+                raise ValueError("No signed URL returned from Supabase")
+                
+            storage_reference = f"sb://{self._bucket}/{object_key}"
+            
+            logger.info("Generated presigned upload URL bucket=%s key=%s", self._bucket, object_key)
+            return {
+                "signed_url": signed_url,
+                "storage_reference": storage_reference,
+                "token": token
+            }
+        except Exception as exc:
+            logger.exception("Failed generating presigned upload URL bucket=%s key=%s", self._bucket, object_key)
+            raise OSError(f"Could not generate upload URL: {exc}") from exc
+
 
     def delete(self, reference: str) -> None:
         """Delete a stored object using either backend."""

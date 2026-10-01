@@ -14,8 +14,8 @@ from typing import Dict
 
 try:
     import ifcopenshell
-    from ifcopenshell.util.element import get_psets
     from ifcopenshell.api import run
+    from ifcopenshell.util.element import get_psets
 
     _IFC_AVAILABLE = True
 except ImportError:

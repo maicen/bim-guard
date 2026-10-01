@@ -20,13 +20,13 @@ from app.bootstrap import (
     set_container,
 )
 from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
-from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
 from app.modules.comparator.engine_registry import (
     CallableRuleEvaluator,
     RuleEngineRegistry,
     RuleEvaluator,
     register_default_engines,
 )
+from app.modules.contracts import RuleEvaluationRequest, RuleEvaluationResult
 from app.services.db_adapters import DatabaseAdapter
 from app.services.documents_service import DocumentService
 from app.services.model_lineage import SupabaseModelLineageRepository

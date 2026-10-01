@@ -80,47 +80,139 @@ export const modelsApi = {
     return handleResponse<Model>(res);
   },
 
-  /** Replace an attached model's stored IFC file with a new upload, in place. */
-  async replace(projectId: number, modelId: number, file: File, signal?: AbortSignal): Promise<Model> {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await apiFetch(`${API_BASE}/models/${modelId}/replace?project_id=${projectId}`, {
+  /** Replace an attached model's stored IFC file with a new direct-to-cloud upload, in place. */
+  async replace(projectId: number, modelId: number, file: File, signal?: AbortSignal, onProgress?: (percent: number) => void): Promise<Model> {
+    // 1. Get presigned URL
+    const urlRes = await apiFetch(`${API_BASE}/projects/${projectId}/models/upload-url`, {
       method: "POST",
-      body: form,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: file.name, size_bytes: file.size, content_type: file.type || "application/octet-stream" }),
       signal,
     });
-    return handleResponse<Model>(res);
+    const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
+
+    // 2. Direct upload to Supabase via XHR for progress
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", signed_url);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          const percent = Math.round((e.loaded / file.size) * 100);
+          onProgress(percent);
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Storage upload failed: ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Storage network error"));
+      
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          xhr.abort();
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      }
+      xhr.send(file);
+    });
+
+    // 3. Confirm replace with backend
+    const confirmRes = await apiFetch(`${API_BASE}/models/${modelId}/replace-confirm?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storage_reference,
+        file_name: file.name,
+      }),
+      signal,
+    });
+    return handleResponse<Model>(confirmRes);
   },
 
   /**
-   * Attach IFC models to an existing project.
-   *
-   * `roles` goes over the wire as one repeated form entry per file, not as a
-   * JSON blob: the endpoint declares `roles: list[str] = Form()`, which FastAPI
-   * fills from repeated entries. A single JSON string would arrive as a
-   * one-element list and be rejected for not matching the file count.
+   * Attach IFC models to an existing project using direct-to-cloud presigned URLs.
    */
   async upload(
     projectId: number,
     files: File[],
     primaryIndex: number,
     roles: string[],
-    signal?: AbortSignal,
+    options?: {
+      signal?: AbortSignal;
+      onUploadProgress?: (percent: number) => void;
+    }
   ): Promise<ModelUploadResponse> {
-    const form = new FormData();
-    files.forEach((file) => form.append("files", file));
-    form.append("primary_index", String(primaryIndex));
-    roles.forEach((role) => form.append("roles", role));
+    let lastResponse: ModelUploadResponse | null = null;
+    let totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    let uploadedBytes = 0;
 
-    const res = await apiFetch(`${API_BASE}/projects/${projectId}/models`, {
-      method: "POST",
-      body: form,
-      signal,
-    });
-    // The primary is mirrored onto projects.ifc_file_path server-side, so a
-    // caller holding a project row fetched before this call should re-read it
-    // with { forceRefresh: true } -- the cache cannot know the column moved.
-    return handleResponse<ModelUploadResponse>(res);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const role = roles[i] || "";
+      const isPrimary = i === primaryIndex;
+
+      // 1. Get presigned URL
+      const urlRes = await apiFetch(`${API_BASE}/projects/${projectId}/models/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_name: file.name, size_bytes: file.size, content_type: file.type || "application/octet-stream" }),
+        signal: options?.signal,
+      });
+      const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
+
+      // 2. Direct upload to Supabase via XHR for progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", signed_url);
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        
+        const currentUploadedBeforeThisFile = uploadedBytes;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && options?.onUploadProgress) {
+            const overallPercent = Math.round(((currentUploadedBeforeThisFile + e.loaded) / totalBytes) * 100);
+            options.onUploadProgress(overallPercent);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            uploadedBytes += file.size;
+            resolve();
+          } else {
+            reject(new Error(`Storage upload failed: ${xhr.statusText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Storage network error"));
+        
+        if (options?.signal) {
+          options.signal.addEventListener("abort", () => {
+            xhr.abort();
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }
+        xhr.send(file);
+      });
+
+      // 3. Confirm upload with backend
+      const confirmRes = await apiFetch(`${API_BASE}/projects/${projectId}/models/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storage_reference,
+          file_name: file.name,
+          is_primary: isPrimary,
+          role: role,
+        }),
+        signal: options?.signal,
+      });
+      lastResponse = await handleResponse<ModelUploadResponse>(confirmRes);
+    }
+
+    return lastResponse || { success: true, files: [], primary_id: null, processing: false, warnings: [] };
   },
 
   /** Poll the background attach job started by `upload()`. */
@@ -131,13 +223,6 @@ export const modelsApi = {
 
   /**
    * Attach IFC models and wait for the background job to finish.
-   *
-   * `upload()` returns as soon as the request is validated -- storing and
-   * attaching the files runs after the response, because doing it inline
-   * routinely outran the Cloudflare Tunnel's ~100s idle timeout for large or
-   * multi-file attaches (HTTP 524). This polls attach-status until the job is
-   * done, surfacing progress through `onProgress`, and throws if the job
-   * reports an error.
    */
   async uploadAndWait(
     projectId: number,
@@ -145,19 +230,16 @@ export const modelsApi = {
     primaryIndex: number,
     roles: string[],
     options?: {
+      onUploadProgress?: (percent: number) => void;
       onProgress?: (attached: number, total: number) => void;
       pollMs?: number;
-      /**
-       * Stops the attach-status poll loop below when the caller unmounts
-       * (a modal closed, the user navigated away) -- without this, the
-       * `while (true)` loop below keeps polling forever with nothing left
-       * to report progress to, an orphaned network loop that outlives the
-       * component that started it.
-       */
       signal?: AbortSignal;
     },
   ): Promise<void> {
-    const initial = await modelsApi.upload(projectId, files, primaryIndex, roles, options?.signal);
+    const initial = await modelsApi.upload(projectId, files, primaryIndex, roles, {
+      signal: options?.signal,
+      onUploadProgress: options?.onUploadProgress,
+    });
     if (!initial.processing) return;
 
     const pollMs = options?.pollMs ?? 1500;
@@ -167,7 +249,9 @@ export const modelsApi = {
       await new Promise((resolve) => setTimeout(resolve, pollMs));
       if (options?.signal?.aborted) return;
       const job = await modelsApi.attachStatus(projectId);
-      options?.onProgress?.(job.attached, job.total);
+      // Wait, we queued multiple attachments but total might be wrong since we loop.
+      // But the progress callback still expects (attached, total).
+      options?.onProgress?.(job.attached, Math.max(job.total, files.length));
       if (job.error) {
         throw new Error(job.error);
       }

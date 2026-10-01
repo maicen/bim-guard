@@ -20,9 +20,9 @@ from fastapi import HTTPException
 from starlette.testclient import TestClient
 
 from app.api.dependencies import (
+    get_ifc_pipeline_service,
     get_models_service,
     get_naming_config_service,
-    get_ifc_pipeline_service,
 )
 from app.api.models import _iso_fields_for
 from app.api.projects import get_authorized_project

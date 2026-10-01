@@ -8,6 +8,11 @@ import pytest
 
 from app.bootstrap import get_container, reset_container
 from app.engines.bimguard_arch_engine import EgressAnalysisEngine, SpatialDaylightEngine
+from app.modules.comparator.engine_registry import (
+    RuleEngineRegistry,
+    RuleEvaluator,
+    register_default_engines,
+)
 from app.modules.contracts import RuleEvaluationResult
 from app.modules.ifc_reader.ifc_egress import (
     check_egress_travel_distance,
@@ -16,11 +21,6 @@ from app.modules.ifc_reader.ifc_egress import (
 from app.modules.ifc_reader.ifc_spatial import (
     check_daylight_ratios,
     check_fire_separation,
-)
-from app.modules.comparator.engine_registry import (
-    RuleEngineRegistry,
-    RuleEvaluator,
-    register_default_engines,
 )
 
 pytestmark = pytest.mark.slow
@@ -105,7 +105,8 @@ def _rule_service_with_rows(rows: list[dict]) -> RuleService:
     process-wide cache keyed only on the ruleset_id argument (not on which
     RuleService/mock instance is asking) -- callers MUST clear_cache() first
     or a stale result from a differently-seeded mock in an earlier test will
-    be returned instead of this one's."""
+    be returned instead of this one's.
+    """
     from app.services.cache import clear_cache
 
     clear_cache()
@@ -119,7 +120,8 @@ def test_egress_analysis_engine_implements_rule_evaluator():
     handles records, given BUILDING-CODE-PART9 rules explicitly configured
     for both thresholds it checks (9.9.10.1 travel distance, 9.9.4.1 min
     exits) -- there is no hardcoded fallback to rely on any more, so the
-    DB state a PASS/FAIL verdict depends on must be seeded here."""
+    DB state a PASS/FAIL verdict depends on must be seeded here.
+    """
     rules_svc = _rule_service_with_rows([
         {"id": 1, "reference": "CODE 9.9.10.1", "check_value": 25.0},
         {"id": 2, "reference": "CODE 9.9.4.1", "check_value": 1},
@@ -190,7 +192,8 @@ def test_egress_analysis_engine_not_assessed_when_unconfigured():
     engine must report NOT_ASSESSED rather than falling back to a hardcoded
     residential default (25m travel distance, 1 min exit) -- that fallback
     was removed on purpose so a check only ever reflects what's actually
-    configured."""
+    configured.
+    """
     rules_svc = _rule_service_with_rows([])  # nothing seeded
     engine = EgressAnalysisEngine(rules_service=rules_svc)
 
@@ -221,7 +224,8 @@ def test_spatial_daylight_engine_implements_rule_evaluator():
     handles records, given BUILDING-CODE-PART9 rules explicitly configured
     for both thresholds it checks (9.7.2.3 daylight ratio, 9.10.9/IfcWall
     fire rating) -- there is no hardcoded fallback to rely on any more, so
-    the DB state a PASS/FAIL verdict depends on must be seeded here."""
+    the DB state a PASS/FAIL verdict depends on must be seeded here.
+    """
     rules_svc = _rule_service_with_rows([
         {"id": 3, "reference": "CODE 9.7.2.3", "check_value": 0.10, "unit": "ratio"},
         {"id": 4, "reference": "CODE 9.10.9", "check_value": 45.0, "target_ifc_class": "IfcWall"},
@@ -292,7 +296,8 @@ def test_spatial_daylight_engine_not_assessed_when_unconfigured():
     hardcoded residential default (0.10 daylight ratio, 45 min fire rating)
     -- that fallback was removed on purpose. A wall with NO rating declared
     at all still FAILs regardless, since that's a data-completeness problem
-    independent of what threshold is configured."""
+    independent of what threshold is configured.
+    """
     rules_svc = _rule_service_with_rows([])  # nothing seeded
     engine = SpatialDaylightEngine(rules_service=rules_svc)
 

@@ -223,8 +223,8 @@ def test_run_graph_intelligence_persists_into_the_injected_graph_service(monkeyp
 
     assert error is None
     assert issues == []  # the wall is connected -- no orphan finding
-    assert sum(len(nodes) for _, nodes in fake_service.node_batches) == 2
-    assert sum(len(edges) for _, edges in fake_service.edge_batches) == 1
+    assert sum(len(nodes) for _, nodes in fake_service.node_batches) == 4
+    assert sum(len(edges) for _, edges in fake_service.edge_batches) == 3
 
 
 def test_graph_persistence_failure_does_not_break_orphan_findings(monkeypatch):

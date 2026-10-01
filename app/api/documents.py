@@ -40,6 +40,7 @@ from app.document_upload_validation import safe_upload_name, validate_document_u
 from app.logging_config import get_logger
 from app.modules.contracts import (
     CDEState,
+    DocumentConfirmRequest,
     DocumentDetailResponse,
     DocumentElementBbox,
     DocumentElementBboxesResponse,
@@ -65,6 +66,8 @@ from app.modules.contracts import (
     RuleSourceMapResponse,
     RuleSourceSummary,
     SectionGraphResponse,
+    UploadUrlRequest,
+    UploadUrlResponse,
 )
 from app.modules.document_parsing.doclang_chunker import DocLangChunker
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
@@ -427,101 +430,46 @@ def _no_parsing_engine_detail(
     )
 
 
-@router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Upload document")
-async def upload_document(
-    file: UploadFile = File(...),
-    doc_type: Annotated[str, Form()] = "Specification",
-    project_code: Annotated[str, Form()] = "",
-    originator: Annotated[str, Form()] = "",
-    suitability_code: Annotated[str, Form()] = "S0",
-    revision_code: Annotated[str, Form()] = "P01.01",
-    parser: Annotated[str, Form()] = "auto",
-    engine_instance: Annotated[str, Form()] = "",
-    generate_doclang: Annotated[bool, Form()] = False,
-    start_page: Annotated[Optional[int], Form()] = None,
-    end_page: Annotated[Optional[int], Form()] = None,
-    organization_id: Annotated[Optional[int], Form()] = None,
-    x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
-    service: Annotated[DocumentService, Depends(get_documents_service)] = None,
-    instances_service: Annotated[
-        ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)
-    ] = None,
-    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)] = None,
-    memberships: Annotated[MembershipService, Depends(get_membership_service)] = None,
-    profiles: Annotated[ProfileService, Depends(get_profile_service)] = None,
-    permissions: Annotated[PermissionService, Depends(get_permission_service)] = None,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)] = None,
+@router.post("/upload-url", response_model=UploadUrlResponse, status_code=status.HTTP_201_CREATED, summary="Get a short-lived presigned URL to upload a document directly to storage")
+def get_document_upload_url(
+    payload: UploadUrlRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> UploadUrlResponse:
+    """Generate a direct-to-cloud upload URL for a document."""
+    from app.services.object_storage import ObjectStorage
+    storage = ObjectStorage()
+    
+    try:
+        # We can store documents in the 'documents' namespace or default.
+        # Previously we stored them with just UUID + extension. We'll let ObjectStorage handle it.
+        # In ObjectStorage.upload(), it defaults to 'docs'. We passed 'ifc' for models.
+        # ObjectStorage doesn't enforce namespaces strictly, but we'll use 'docs'.
+        res = storage.create_presigned_upload_url(payload.file_name, "docs")
+        return UploadUrlResponse(
+            signed_url=res["signed_url"],
+            storage_reference=res["storage_reference"],
+            token=res["token"]
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to generate upload URL: {exc}"
+        )
+
+@router.post("/confirm", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Confirm document upload")
+async def confirm_document_upload(
+    payload: DocumentConfirmRequest,
+    service: Annotated[DocumentService, Depends(get_documents_service)],
+    instances_service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
+    document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
+    memberships: Annotated[MembershipService, Depends(get_membership_service)],
+    profiles: Annotated[ProfileService, Depends(get_profile_service)],
+    permissions: Annotated[PermissionService, Depends(get_permission_service)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> DocumentDetailResponse:
-    """Upload a specification document to storage.
-
-    Accepts every format Docling converts to DocLang (PDF, Word, Excel,
-    PowerPoint, HTML, AsciiDoc, Markdown, CSV, common image formats) plus
-    pre-converted DocLang files (``.dclg``, ``.dclx``, ``.doclang``) ingested
-    as-is, with no source PDF/DOCX required.
-
-    Document upload is decoupled from conversion: by default,
-    `generate_doclang` is False, so files are stored immediately with metadata
-    without triggering long-running CPU parsing or edge proxy timeouts (HTTP 524).
-    DocLang conversion can be triggered on-demand via `POST /{id}/generate-doclang`.
-    Pre-converted DocLang XML files are stored directly as DocLang ready.
-
-    `start_page`/`end_page` (1-based, inclusive) optionally trim a PDF
-    upload down to that page range before anything else happens. PDF-only.
-    """
-    if service is None:
-        service = DocumentService()
-    if instances_service is None:
-        from app.bootstrap import get_container
-
-        instances_service = get_container().parsing_engine_instances_service
-    if document_access is None:
-        from app.bootstrap import get_container
-
-        document_access = get_container().document_access_service
-    if memberships is None:
-        from app.bootstrap import get_container
-
-        memberships = get_container().membership_service
-    if profiles is None:
-        from app.bootstrap import get_container
-
-        profiles = get_container().profile_service
-    if permissions is None:
-        from app.bootstrap import get_container
-
-        permissions = get_container().permission_service
-
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
-
-    clean_filename = safe_upload_name(file.filename)
-
-    error_msg = validate_document_upload(clean_filename, file.content_type, content)
-    if error_msg:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
-
-    if start_page is not None or end_page is not None:
-        if start_page is None or end_page is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Both start_page and end_page are required to limit an upload to a page range.",
-            )
-        if not clean_filename.lower().endswith(".pdf"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A page range can only be applied to PDF uploads.",
-            )
-        if start_page < 1 or end_page < start_page:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="start_page must be 1 or greater and end_page must be >= start_page.",
-            )
-
-    target_org_id = organization_id
-    if target_org_id is None and x_org_id and x_org_id.strip().isdigit():
-        target_org_id = int(x_org_id.strip())
-
+    """Confirm a direct-to-cloud document upload."""
+    # Validation logic mirroring upload_document
+    target_org_id = payload.organization_id
     if current_user is not None and not profiles.is_superadmin(current_user.id):
         user_orgs = memberships.org_ids_for_user(current_user.id) if memberships else []
         if target_org_id is not None:
@@ -533,77 +481,68 @@ async def upload_document(
         elif user_orgs:
             target_org_id = next(iter(user_orgs))
 
-    resolved_instance = _resolve_parsing_instance(engine_instance, target_org_id, instances_service)
+    resolved_instance = _resolve_parsing_instance(payload.engine_instance, target_org_id, instances_service) if payload.generate_doclang else None
 
     # ISO 19650 Originator: default to the target organization's own code
     # when the caller didn't specify one explicitly, same as project
     # creation -- see app/api/projects.py create_project.
-    resolved_originator = originator or ""
+    resolved_originator = payload.originator or ""
     if not resolved_originator and target_org_id is not None and memberships is not None:
         org = memberships.get_organization(target_org_id)
         resolved_originator = (org or {}).get("org_code", "") or ""
 
-    clean_parser = (parser or "auto").strip().lower()
+
+    # 1. Fetch file from temporary storage to run extraction/validation and re-upload properly.
+    # For a robust implementation, the service accepts the reference.
     try:
-        # Docling extraction can take a few seconds — offload to a worker
-        # thread so it doesn't block the event loop for every other
-        # in-flight request. If inline DocLang generation takes longer than
-        # 60s (e.g. for large multi-hundred page building codes like SBC 201),
-        # timeout safely before Cloudflare's 100s edge timeout (HTTP 524)
-        # and store the document with DocLang generation deferred.
         row, _created = await asyncio.wait_for(
             run_in_threadpool(
-                service.ingest_uploaded_bytes,
-                clean_filename,
-                content,
-                doc_type=doc_type,
-                project_code=project_code,
+                service.register_pre_uploaded_document,
+                filename=payload.file_name,
+                storage_reference=payload.storage_reference,
+                doc_type=payload.doc_type,
+                project_code=payload.project_code,
                 originator=resolved_originator,
-                suitability_code=suitability_code,
-                revision_code=revision_code,
-                parser=clean_parser,
-                instance=resolved_instance,
-                generate_doclang=generate_doclang,
-                start_page=start_page,
-                end_page=end_page,
+                suitability_code=payload.suitability_code,
+                revision_code=payload.revision_code,
+                parser=payload.parser,
+                instance=resolved_instance if payload.generate_doclang else None,
+                generate_doclang=payload.generate_doclang,
             ),
             timeout=60.0,
         )
     except asyncio.TimeoutError:
         logger.warning(
             "DocLang extraction for '%s' exceeded 60s inline limit; storing file with DocLang deferred to avoid Cloudflare HTTP 524 timeout.",
-            clean_filename,
+            payload.file_name,
         )
         try:
             row, _created = await asyncio.wait_for(
                 run_in_threadpool(
-                    service.ingest_uploaded_bytes,
-                    clean_filename,
-                    content,
-                    doc_type=doc_type,
-                    project_code=project_code,
+                    service.register_pre_uploaded_document,
+                    filename=payload.file_name,
+                    storage_reference=payload.storage_reference,
+                    doc_type=payload.doc_type,
+                    project_code=payload.project_code,
                     originator=resolved_originator,
-                    suitability_code=suitability_code,
-                    revision_code=revision_code,
-                    parser=clean_parser,
-                    instance=resolved_instance,
+                    suitability_code=payload.suitability_code,
+                    revision_code=payload.revision_code,
+                    parser=payload.parser,
+                    instance=None,
                     generate_doclang=False,
-                    start_page=start_page,
-                    end_page=end_page,
                 ),
                 timeout=30.0,
             )
         except asyncio.TimeoutError:
             logger.error(
                 "Document storage fallback also timed out for '%s'; returning 504.",
-                clean_filename,
+                payload.file_name,
             )
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail=(
-                    f"'{clean_filename}' could not be stored within the time limit. "
-                    "This may indicate slow storage connectivity. Try again, or reduce the file size "
-                    "by uploading a page range."
+                    f"'{payload.file_name}' could not be stored within the time limit. "
+                    "This may indicate slow storage connectivity. Try again."
                 ),
             )
     except NoParsingEngineConfiguredError as exc:
@@ -616,20 +555,24 @@ async def upload_document(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"{exc} Check that the parsing service is running, or choose a different instance.",
             ) from exc
-        detail = _no_parsing_engine_detail(target_org_id, current_user, permissions)
+        detail = _no_parsing_engine_detail(payload.organization_id, current_user, permissions)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail) from exc
-    except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    if target_org_id is not None and document_access is not None and row and "id" in row:
-        try:
-            current_grants = document_access.list_org_grants(target_org_id)
-            if row["id"] not in current_grants:
-                document_access.set_org_grants(target_org_id, current_grants + [row["id"]])
-        except Exception as exc:
-            logger.warning("Could not auto-grant uploaded document to org %d: %s", target_org_id, exc)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+        
+    # Grant access
+    if payload.organization_id is not None:
+        document_access.grant_org_access(payload.organization_id, row["id"])
+    elif current_user is not None and not profiles.is_superadmin(current_user.id):
+        user_org_ids = memberships.org_ids_for_user(current_user.id)
+        if user_org_ids:
+            document_access.grant_org_access(user_org_ids[0], row["id"])
 
     return _row_to_detail_response(row, service)
+
 
 
 @router.post(

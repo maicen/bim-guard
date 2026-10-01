@@ -164,7 +164,7 @@ class TestStats:
 
 class TestThreadSafety:
     def test_concurrent_writes_do_not_corrupt_the_store(self):
-        """uvicorn serves from a thread pool, so this is a real access pattern."""
+        """Uvicorn serves from a thread pool, so this is a real access pattern."""
         cache = AnalysisCache(max_entries=50, ttl_seconds=60.0)
 
         def worker(offset: int):

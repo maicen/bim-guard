@@ -8,9 +8,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.documents import _no_parsing_engine_detail, upload_document
+from app.api.documents import _no_parsing_engine_detail, confirm_document_upload
 from app.modules.document_parsing.document_extractor import NoParsingEngineConfiguredError
 from app.modules.permissions import Action
+from app.modules.contracts import DocumentConfirmRequest
 
 
 class _FakePermissions:
@@ -41,14 +42,6 @@ def test_ask_admin_message_when_no_organization_context():
     assert "ask an organization owner or admin" in detail.lower()
 
 
-class _FakeUpload:
-    filename = "spec.pdf"
-    content_type = "application/pdf"
-
-    async def read(self) -> bytes:
-        return b"%PDF-1.4 minimal"
-
-
 class _FakeInstances:
     def get_default(self, organization_id):
         return {"name": "docling-local", "kind": "docling-local", "api_url": "http://localhost:5001"}
@@ -58,29 +51,25 @@ class _RaisingDocumentService:
     def __init__(self, exc: Exception):
         self._exc = exc
 
-    def ingest_uploaded_bytes(self, *args, **kwargs):
+    def register_pre_uploaded_document(self, *args, **kwargs):
         raise self._exc
 
 
 def _upload_with(exc: Exception) -> HTTPException:
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            upload_document(
-                file=_FakeUpload(),
-                # Called directly, not through FastAPI, so the Form()/Header()
-                # defaults aren't resolved -- pass every one explicitly.
-                doc_type="Specification",
-                project_code="",
-                originator="",
-                suitability_code="S0",
-                revision_code="P01.01",
-                parser="auto",
-                engine_instance="",
-                generate_doclang=True,
-                start_page=None,
-                end_page=None,
-                organization_id=None,
-                x_org_id=None,
+            confirm_document_upload(
+                payload=DocumentConfirmRequest(
+                    file_name="spec.pdf",
+                    storage_reference="some_ref",
+                    doc_type="Specification",
+                    project_code="",
+                    suitability_code="S0",
+                    revision_code="P01.01",
+                    parser="auto",
+                    generate_doclang=True,
+                    organization_id=None,
+                ),
                 service=_RaisingDocumentService(exc),
                 instances_service=_FakeInstances(),
                 document_access=object(),
@@ -246,7 +235,7 @@ class _TimingOutDocumentService:
     def __init__(self):
         self.calls = []
 
-    def ingest_uploaded_bytes(self, filename, content, **kwargs):
+    def register_pre_uploaded_document(self, filename, storage_reference, **kwargs):
         self.calls.append(kwargs)
         return {
             "id": 123,
@@ -271,7 +260,7 @@ class _TimingOutDocumentService:
 
 
 def test_upload_falls_back_to_deferred_doclang_on_timeout(monkeypatch):
-    """When inline DocLang generation times out, upload_document stores the file with DocLang deferred."""
+    """When inline DocLang generation times out, confirm_document_upload stores the file with DocLang deferred."""
     service = _TimingOutDocumentService()
 
     real_wait_for = asyncio.wait_for
@@ -293,20 +282,18 @@ def test_upload_falls_back_to_deferred_doclang_on_timeout(monkeypatch):
     monkeypatch.setattr(asyncio, "wait_for", fake_wait_for)
 
     resp = asyncio.run(
-        upload_document(
-            file=_FakeUpload(),
-            doc_type="Specification",
-            project_code="",
-            originator="",
-            suitability_code="S0",
-            revision_code="P01.01",
-            parser="auto",
-            engine_instance="",
-            generate_doclang=True,
-            start_page=None,
-            end_page=None,
-            organization_id=None,
-            x_org_id=None,
+        confirm_document_upload(
+            payload=DocumentConfirmRequest(
+                file_name="spec.pdf",
+                storage_reference="some_ref",
+                doc_type="Specification",
+                project_code="",
+                suitability_code="S0",
+                revision_code="P01.01",
+                parser="auto",
+                generate_doclang=True,
+                organization_id=None,
+            ),
             service=service,
             instances_service=_FakeInstances(),
             document_access=object(),
@@ -354,14 +341,11 @@ def test_generate_doclang_returns_504_on_timeout(monkeypatch):
 
 
 def test_upload_document_defaults_to_generate_doclang_false():
-    """upload_document defaults generate_doclang to False, separating upload from conversion."""
+    """DocumentConfirmRequest defaults generate_doclang to False, separating upload from conversion."""
     import inspect
-
-    from app.api.documents import upload_document
-
-    sig = inspect.signature(upload_document)
-    param = sig.parameters["generate_doclang"]
-    assert param.default is False or getattr(param.default, "default", None) is False
+    from app.modules.contracts import DocumentConfirmRequest
+    
+    assert DocumentConfirmRequest.model_fields["generate_doclang"].default is False
 
 
 def test_generate_doclang_passes_page_range():

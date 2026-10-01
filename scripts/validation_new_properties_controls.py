@@ -147,8 +147,8 @@ def _build_door(overall_width_mm, *, panel_width=None, number_of_panels=None):
 
 
 def _resolve_property(model, target_class, property_name, tmp_dir, name) -> Any:
-    from app.modules.ifc_reader import IFCReader
     from app.modules.comparator import ComplianceComparator
+    from app.modules.ifc_reader import IFCReader
 
     path = tmp_dir / f"{name}.ifc"
     model.write(str(path))

@@ -21,8 +21,8 @@ import pytest
 
 from app.modules.ifc_reader.ifc_spatial import (
     _is_sleeping_room,
-    compute_egress_clear_opening,
     check_egress_window_openings,
+    compute_egress_clear_opening,
 )
 
 ifcopenshell = pytest.importorskip("ifcopenshell")
@@ -94,7 +94,8 @@ class _FakeGeometryExtractor:
     """Fixed width/height/bottom-Z -- this suite is proving
     check_egress_window_openings' own threshold/classification logic, not
     ifc_geometry's mesh math (already covered by test_ifc_stair.py's
-    equivalent split)."""
+    equivalent split).
+    """
 
     def __init__(self, width_mm, height_mm, bottom_z_mm, unit_scale: float = 1.0):
         self._width_mm = width_mm

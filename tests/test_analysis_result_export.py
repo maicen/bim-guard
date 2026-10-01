@@ -939,7 +939,6 @@ class TestBCFViewpointTruthfulness:
 
     def test_a_caller_supplying_real_coordinates_still_gets_a_camera(self):
         from app.modules.reporter.bcf_generator import generate_bcf
-
         from tests.test_bcf_generator import create_test_bcf_issue
 
         archive = generate_bcf([create_test_bcf_issue()])

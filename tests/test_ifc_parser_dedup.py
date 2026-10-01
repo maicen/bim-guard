@@ -60,7 +60,7 @@ class TestOneEntityOneElement:
         assert len(elements) == 3
 
     def test_guids_are_unique(self):
-        """guid is the join key for every downstream Issue."""
+        """Guid is the join key for every downstream Issue."""
         elements = parse_ifc_model(
             model_with([("IfcPipeSegment", f"P-{i:02d}") for i in range(6)])
         )

@@ -581,6 +581,9 @@
         try {
           submitStatusMessage = "Attaching models...";
           await modelsApi.uploadAndWait(createdProject.id, ifcFiles, primaryIndex, ifcRoles, {
+            onUploadProgress: (percent) => {
+              submitStatusMessage = `Uploading models... ${percent}%`;
+            },
             onProgress: (attached, total) => {
               submitStatusMessage = `Attaching models... (${attached}/${total})`;
             },

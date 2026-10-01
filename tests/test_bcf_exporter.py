@@ -1,7 +1,6 @@
 """Test BCF 2.1 exporter functionality."""
 
 import sys
-import os
 from pathlib import Path
 
 # Add project root to path

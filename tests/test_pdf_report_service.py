@@ -53,7 +53,8 @@ def test_render_snapshot_pdf_with_no_rules_is_still_valid():
 def test_render_snapshot_pdf_handles_missing_optional_fields():
     """Rule dicts from the frozen rules_json may not carry every column
     (e.g. classification/material rows from IDS import have no value_min/
-    value_max) — None values must not raise."""
+    value_max) — None values must not raise.
+    """
     sparse_rules = [{"reference": "R-3", "target_ifc_class": "IfcDoor"}]
     pdf_bytes = render_snapshot_pdf(_snapshot(), sparse_rules)
     assert pdf_bytes[:5] == b"%PDF-"

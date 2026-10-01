@@ -100,6 +100,26 @@ export interface Model extends IsoGovernanceFieldsRequired {
   cde_approved_at?: string | null;
 }
 
+export interface UploadUrlRequest {
+  file_name: string;
+  content_type?: string | null;
+  size_bytes?: number | null;
+}
+
+export interface UploadUrlResponse {
+  signed_url: string;
+  storage_reference: string;
+  token?: string;
+}
+
+export interface ModelConfirmRequest {
+  storage_reference: string;
+  file_name: string;
+  is_primary?: boolean;
+  role?: string;
+  allow_project_code_mismatch?: boolean;
+}
+
 /** Outcome of attaching one or more IFC models. Mirrors ModelUploadResponse. */
 export interface ModelUploadResponse {
   success: boolean;

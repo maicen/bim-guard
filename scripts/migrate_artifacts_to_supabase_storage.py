@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 from supabase import Client, create_client
 
 

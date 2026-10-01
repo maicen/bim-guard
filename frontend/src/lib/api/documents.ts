@@ -77,31 +77,74 @@ export const documentsApi = {
       engine_instance?: string;
       generate_doclang?: boolean;
       organization_id?: number | null;
-      /** 1-based, inclusive -- trims a PDF upload to just these pages before storage/extraction. PDF-only; both must be set together. */
       start_page?: number | null;
       end_page?: number | null;
+      onUploadProgress?: (percent: number) => void;
     },
     signal?: AbortSignal,
   ): Promise<DocumentDetail> {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("doc_type", docType);
     const effectiveOrg = isoOptions?.organization_id !== undefined ? isoOptions.organization_id : getActiveOrgId();
-    if (effectiveOrg) form.append("organization_id", String(effectiveOrg));
-    if (isoOptions?.project_code) form.append("project_code", isoOptions.project_code);
-    if (isoOptions?.originator) form.append("originator", isoOptions.originator);
-    if (isoOptions?.suitability_code) form.append("suitability_code", isoOptions.suitability_code);
-    if (isoOptions?.revision_code) form.append("revision_code", isoOptions.revision_code);
-    if (isoOptions?.parser) form.append("parser", isoOptions.parser);
-    if (isoOptions?.engine_instance) form.append("engine_instance", isoOptions.engine_instance);
-    if (isoOptions?.generate_doclang !== undefined) {
-      form.append("generate_doclang", String(isoOptions.generate_doclang));
-    }
-    if (isoOptions?.start_page != null) form.append("start_page", String(isoOptions.start_page));
-    if (isoOptions?.end_page != null) form.append("end_page", String(isoOptions.end_page));
-    const res = await apiFetch(`${API_BASE}/documents`, {
+
+    // 1. Get presigned URL
+    const urlRes = await apiFetch(`${API_BASE}/documents/upload-url`, {
       method: "POST",
-      body: form,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: file.name, size_bytes: file.size, content_type: file.type || "application/octet-stream" }),
+      signal,
+    });
+    const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
+
+    // 2. Direct upload to Supabase via XHR for progress
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", signed_url);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && isoOptions?.onUploadProgress) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          isoOptions.onUploadProgress(percent);
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Storage upload failed: ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Storage network error"));
+      
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          xhr.abort();
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      }
+      xhr.send(file);
+    });
+
+    // 3. Confirm upload
+    const payload: Record<string, any> = {
+      storage_reference,
+      file_name: file.name,
+      doc_type: docType,
+    };
+    if (effectiveOrg) payload.organization_id = effectiveOrg;
+    if (isoOptions?.project_code) payload.project_code = isoOptions.project_code;
+    if (isoOptions?.originator) payload.originator = isoOptions.originator;
+    if (isoOptions?.suitability_code) payload.suitability_code = isoOptions.suitability_code;
+    if (isoOptions?.revision_code) payload.revision_code = isoOptions.revision_code;
+    if (isoOptions?.parser) payload.parser = isoOptions.parser;
+    if (isoOptions?.engine_instance) payload.engine_instance = isoOptions.engine_instance;
+    if (isoOptions?.generate_doclang !== undefined) payload.generate_doclang = isoOptions.generate_doclang;
+    if (isoOptions?.start_page != null) payload.start_page = isoOptions.start_page;
+    if (isoOptions?.end_page != null) payload.end_page = isoOptions.end_page;
+
+    const res = await apiFetch(`${API_BASE}/documents/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
       signal,
     });
     const created = await handleResponse<DocumentDetail>(res);

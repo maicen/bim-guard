@@ -19,6 +19,7 @@ router = APIRouter(prefix="/sparql", tags=["sparql"])
 
 class SparqlQueryRequest(BaseModel):
     """Payload for POST /api/sparql/{project_id}."""
+
     query: str
 
 

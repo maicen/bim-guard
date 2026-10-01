@@ -567,6 +567,68 @@ class ModelsService:
         logger.info("IFC file replaced project_id=%d file_id=%s ref=%s", project_id, file_id, new_file_path)
         return {**target, **updates}
 
+    def replace_model_from_storage(
+        self,
+        project_id: int,
+        file_id: int,
+        *,
+        storage_reference: str,
+        file_name: str,
+    ) -> dict | None:
+        """Replace the stored bytes of an attached model with an already-uploaded object.
+
+        Args:
+            project_id: Project owning the row.
+            file_id: ``project_ifc_files.id`` to replace.
+            storage_reference: Existing storage reference (e.g. from `/upload-url`).
+            file_name: Display name for the replacement.
+        """
+        target = next(
+            (row for row in self._read_rows(project_id) if row.get("id") == file_id),
+            None,
+        )
+        if target is None:
+            logger.warning(
+                "IFC file not replaced; no such file project_id=%d file_id=%s",
+                project_id,
+                file_id,
+            )
+            return None
+
+        old_file_path = target.get("file_path") or ""
+        new_file_path = storage_reference
+        summary = self._extract_summary(new_file_path)
+
+        updates = {
+            "file_path": new_file_path,
+            "file_name": (file_name or "").strip() or Path(new_file_path.replace("\\", "/")).name,
+            "ifc_schema": summary.schema,
+            "authoring_application": summary.authoring_application,
+            "storey_count": summary.storey_count,
+            "element_count": summary.element_count,
+            "discipline_summary": summary.discipline_summary,
+        }
+        self._ifc_files.update(updates=updates, pk_values=file_id)
+        self._invalidate(project_id)
+
+        if target.get("is_primary"):
+            self._mirror_attach(project_id, new_file_path)
+
+        if old_file_path and old_file_path != new_file_path:
+            try:
+                self._storage.delete(old_file_path)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "Old IFC object not deleted after replace project_id=%d file_id=%s ref=%s",
+                    project_id,
+                    file_id,
+                    old_file_path,
+                    exc_info=True,
+                )
+
+        logger.info("IFC file replaced from storage project_id=%d file_id=%s ref=%s", project_id, file_id, new_file_path)
+        return {**target, **updates}
+
     def delete_model(self, project_id: int, file_id: int) -> dict | None:
         """Detach and delete one of a project's models.
 

@@ -11,6 +11,7 @@ import argparse
 import os
 
 from dotenv import load_dotenv
+
 from supabase import Client, create_client
 
 
