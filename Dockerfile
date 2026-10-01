@@ -63,14 +63,14 @@ FROM python:3.12-slim-bookworm AS runtime
 
 # System dependencies:
 # - libgomp1: required by IfcOpenShell OpenCASCADE native bindings
-# Pre-create non-root user, playwright directory, and persistent runtime directories
+# Pre-create non-root user and persistent runtime directories
 # so ownership is established upfront, eliminating duplicate copy-on-write layers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 bimguard \
-    && mkdir -p /opt/ms-playwright /app/data/cache/supabase-storage /app/data/agent-sessions /app/data/logs \
-    && chown -R bimguard:bimguard /opt/ms-playwright /app
+    && mkdir -p /app/data/cache/supabase-storage /app/data/agent-sessions /app/data/logs \
+    && chown -R bimguard:bimguard /app
 
 WORKDIR /app
 
@@ -83,17 +83,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     BIM_GUARD_STORAGE_BACKEND=supabase \
     PORT=8000 \
-    HOST=0.0.0.0 \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
-
-# Chromium for the PDF compliance report (app/services/report_rendering.py).
-# Install only Chromium headless shell and its system dependencies.
-# Placed BEFORE application code copy so this heavy layer is 100% cached across
-# application source code updates, cutting rebuild times from minutes to seconds.
-# Purging /var/lib/apt/lists and /var/cache/apt immediately after install saves ~80MB.
-RUN playwright install --with-deps --only-shell chromium \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
-    && chown -R bimguard:bimguard /opt/ms-playwright
+    HOST=0.0.0.0
 
 # Copy compiled Svelte 5 SPA from frontend builder
 COPY --from=frontend-builder --chown=bimguard:bimguard /frontend/dist ./frontend/dist
