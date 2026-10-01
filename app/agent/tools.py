@@ -2,6 +2,7 @@
 
 import json
 import re
+import shutil
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -169,21 +170,37 @@ def _execute_tool(name: str, arguments: dict):
             ]
         }
     if name == "shell":
-        completed = subprocess.run(
-            ["pwsh", "-NoProfile", "-Command", arguments["command"]],
-            cwd=WORKSPACE_ROOT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=arguments.get("timeout", 30),
-            check=False,
+        raw_cmd = arguments.get("command", "")
+        if not isinstance(raw_cmd, str) or not raw_cmd.strip():
+            return {"exit_code": 1, "stdout": "", "stderr": "Command must be a non-empty string."}
+
+        forbidden = (
+            "rm -rf /", "rm -fr /", ":(){ :|:& };:", "mkfs", "dd if=",
+            "shutdown", "reboot", "init 0", "chmod -R 777 /"
         )
-        return {
-            "exit_code": completed.returncode,
-            "stdout": _trim(completed.stdout),
-            "stderr": _trim(completed.stderr),
-        }
+        if any(f in raw_cmd.lower() for f in forbidden):
+            return {"exit_code": 1, "stdout": "", "stderr": "Command rejected by security policy."}
+
+        shell_exe = "pwsh" if shutil.which("pwsh") else ("powershell" if shutil.which("powershell") else "bash")
+        shell_arg = "-Command" if "powershell" in shell_exe or shell_exe == "pwsh" else "-c"
+        try:
+            completed = subprocess.run(
+                [shell_exe, shell_arg, raw_cmd],
+                cwd=WORKSPACE_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=arguments.get("timeout", 30),
+                check=False,
+            )
+            return {
+                "exit_code": completed.returncode,
+                "stdout": _trim(completed.stdout),
+                "stderr": _trim(completed.stderr),
+            }
+        except FileNotFoundError:
+            return {"exit_code": 1, "stdout": "", "stderr": f"Shell executable '{shell_exe}' not found."}
     if name == "datetime":
         return {"utc": datetime.now(UTC).isoformat()}
     raise ValueError(f"Unknown tool: {name}")

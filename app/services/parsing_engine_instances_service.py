@@ -38,7 +38,13 @@ class ParsingEngineInstancesService:
 
     def list_instances(self, organization_id: int | None) -> list[dict[str, Any]]:
         """Retrieve every instance configured for *organization_id* (None = platform tier), oldest first."""
-        rows = [r for r in self._repo.rows if r.get("organization_id") == organization_id]
+        if hasattr(self._repo, "rows_where"):
+            if organization_id is None:
+                rows = self._repo.rows_where("organization_id IS NULL")
+            else:
+                rows = self._repo.rows_where("organization_id = ?", [organization_id])
+        else:
+            rows = [r for r in self._repo.rows if r.get("organization_id") == organization_id]
         return sorted(rows, key=lambda r: int(r.get("id") or 0))
 
     def get_instance(self, organization_id: int | None, instance_id: int) -> dict[str, Any] | None:
@@ -193,3 +199,4 @@ class ParsingEngineInstancesService:
         for row in self.list_instances(organization_id):
             if row.get("is_default"):
                 self._repo.update(updates={"is_default": False}, pk_values=row["id"])
+                break

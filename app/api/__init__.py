@@ -43,10 +43,12 @@ if not allowed_origins:
         "http://127.0.0.1:3000",
     ]
 
+allow_creds = "*" not in allowed_origins
+
 api_app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins if "*" not in allowed_origins else ["*"],
-    allow_credentials=True,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
 )

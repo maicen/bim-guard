@@ -332,51 +332,28 @@ def parse_ifc(ifc_path: str) -> list[ParsedElement]:
     return parse_ifc_model(model)
 
 
-def generate_synthetic_elements(n: int = 25) -> list[ParsedElement]:
-    """
-    Generates synthetic elements for demo use when no IFC file is available.
-    """
+def generate_synthetic_elements(n: int = 10) -> list[ParsedElement]:
+    """Generates synthetic architectural elements for demo and testing use."""
     scenarios = [
-        # (name, ifc_type, material)
-        ("CHW Supply Pipe", "IfcPipeSegment", "SS_316_passive"),
-        ("HWS Return Pipe", "IfcPipeSegment", "Copper"),
-        ("Pool Heating Pipe", "IfcPipeSegment", "SS_316_passive"),
-        ("Pool Plant Flange", "IfcPipeFitting", "SS_316_passive"),
-        ("Coastal Facade Fix", "IfcFastener", "Aluminum_alloy_6063"),
-        ("Roof Drainage Fix", "IfcFastener", "Galvanized_steel"),
-        ("Structural Bracket", "IfcMember", "Carbon_steel_mild"),
-        ("Cold Water Feed", "IfcPipeSegment", "Copper"),
-        ("SS Pipe Clamp", "IfcPipeSegment", "SS_316_passive"),
-        ("Unlined Pipe Clamp", "IfcPipeSegment", "SS_316_passive"),
-        ("HX Tube Joint", "IfcHeatExchanger", "SS_316_passive"),
-        ("Drainage Transition", "IfcPipeFitting", "Cast_iron"),
-        ("Gas Pipe Riser", "IfcPipeSegment", "Carbon_steel_mild"),
-        ("Marine Plant Pipe", "IfcPipeSegment", "SS_316_passive"),
-        ("Electrical Tray", "IfcDistributionElement", "Aluminum_alloy_6063"),
-        ("Vent Duct Bracket", "IfcDuctSegment", "Galvanized_steel"),
-        ("Condenser Pipe", "IfcPipeSegment", "Copper"),
-        ("Fix Plate Coastal", "IfcPlate", "SS_316_passive"),
-        ("Sprinkler Header", "IfcPipeSegment", "Carbon_steel_mild"),
-        ("Threaded SS Riser", "IfcPipeSegment", "SS_304_passive"),
-        ("Pool Valve Body", "IfcValve", "SS_304_passive"),
-        ("Industrial Flange", "IfcPipeFitting", "SS_316_passive"),
-        ("Lead Flashing Fix", "IfcFastener", "Aluminum_alloy_6063"),
-        ("Bronze Valve", "IfcValve", "Bronze"),
-        ("Stainless Header", "IfcPipeSegment", "SS_316_passive"),
+        ("Main Entry Door", "IfcDoor", "Wood"),
+        ("Corridor Egress Door", "IfcDoor", "Steel"),
+        ("Fire Exit Stair Flight", "IfcStairFlight", "Concrete"),
+        ("Exterior Curtain Wall", "IfcWall", "Glass"),
+        ("Interior Partition Wall", "IfcWallStandardCase", "Gypsum"),
+        ("Primary Structural Column", "IfcColumn", "Steel"),
+        ("Floor Slab Ground", "IfcSlab", "Concrete"),
+        ("Circulation Corridor Space", "IfcSpace", "Air"),
+        ("Office Room Space", "IfcSpace", "Air"),
+        ("Facade Glazing Window", "IfcWindow", "Glass"),
     ]
 
     elements = []
-    for name, ifc_type, material in scenarios[:n]:
+    for i in range(n):
+        name, ifc_type, material = scenarios[i % len(scenarios)]
         elements.append(
             ParsedElement(
-                # A real IfcGuid, not a sliced UUID. BCF's IfcGuid type is
-                # 22 characters drawn from [0-9A-Za-z_$]; truncating a UUID
-                # string hits the length but keeps the hyphens, so every
-                # viewpoint built from synthetic elements failed schema
-                # validation. ifcopenshell.guid.compress does the real
-                # base64 encoding IFC specifies.
                 guid=ifcopenshell.guid.compress(uuid.uuid4().hex),
-                name=name,
+                name=f"{name} {i + 1}" if n > len(scenarios) else name,
                 ifc_type=ifc_type,
                 description=IFC_SERVICE_LABELS.get(ifc_type, ifc_type),
                 material=material,

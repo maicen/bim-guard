@@ -51,6 +51,10 @@ def parse_where(where_sql: str, params: list[Any] | None = None) -> _WhereExpr:
     where = where_sql.strip()
     args = params or []
 
+    if where.upper().endswith(" IS NULL"):
+        field = where[:-8].strip()
+        return _WhereExpr(field=field, operator="is_null", value=None)
+
     if " LIKE ?" in where:
         field = where.split(" LIKE ?", 1)[0].strip()
         pattern = str(args[0]) if args else ""
@@ -126,6 +130,20 @@ class DatabaseAdapter(abc.ABC):
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """Query rows matching predicate."""
+
+    def update_where(
+        self,
+        *,
+        updates: dict[str, Any],
+        where_sql: str,
+        params: list[Any] | None = None,
+    ) -> None:
+        """Update rows matching predicate."""
+        for row in self.rows_where(where_sql, params):
+            pk_col = getattr(self, "_pk", "id")
+            pk_val = row.get(pk_col) if pk_col in row else row.get("id")
+            if pk_val is not None:
+                self.update(updates=updates, pk_values=pk_val)
 
     def save_report(self, report_data: dict[str, Any]) -> dict[str, Any]:
         """Persist a compliance report entity."""
@@ -483,7 +501,9 @@ class SupabaseTableAdapter(DatabaseAdapter):
             matching = []
             for row in self._memory_rows:
                 val = row.get(expr.field)
-                if expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
+                if expr.operator == "is_null" and val is None:
+                    matching.append(row)
+                elif expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
                     matching.append(row)
                 elif expr.operator == "like" and str(expr.value).lower().replace("%", "") in str(val or "").lower():
                     matching.append(row)
@@ -641,9 +661,43 @@ class SupabaseTableAdapter(DatabaseAdapter):
         except (TypeError, ValueError):
             return 1
 
+    def update_where(
+        self,
+        *,
+        updates: dict[str, Any],
+        where_sql: str,
+        params: list[Any] | None = None,
+    ) -> None:
+        """Update rows matching predicate in Supabase or fallback memory."""
+        if self._use_memory_fallback:
+            expr = parse_where(where_sql, params)
+            for row in self._memory_rows:
+                val = row.get(expr.field)
+                if (expr.operator == "is_null" and val is None) or (
+                    expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value))
+                ):
+                    row.update(updates)
+            return
+
+        expr = parse_where(where_sql, params)
+        try:
+            execute_with_retry(
+                lambda: self._apply_expr(self._client.table(self._table_name).update(updates), expr)
+            )
+            self._invalidate_cache()
+        except APIError as exc:
+            if self._is_missing_table_error(exc):
+                self._degrade_to_memory("update_where", exc)
+                self.update_where(updates=updates, where_sql=where_sql, params=params)
+                return
+            raise
+
     @staticmethod
     def _apply_expr(query: Any, expr: _WhereExpr) -> Any:
         """Apply parsed filter expression to a Supabase query."""
+        if expr.operator == "is_null":
+            return query.is_(expr.field, "null")
+
         if expr.operator == "eq":
             return query.eq(expr.field, expr.value)
 

@@ -79,8 +79,15 @@ class ProfileService:
         ``supabase/migrations/20260905091058_create_profiles.sql``), so a stale
         default would otherwise block the delete with a foreign-key violation.
         """
-        for row in self._profiles.rows_where("default_organization_id = ?", [organization_id]):
-            self._profiles.update(updates={"default_organization_id": None}, pk_values=row["id"])
+        if hasattr(self._profiles, "update_where"):
+            self._profiles.update_where(
+                updates={"default_organization_id": None},
+                where_sql="default_organization_id = ?",
+                params=[organization_id],
+            )
+        else:
+            for row in self._profiles.rows_where("default_organization_id = ?", [organization_id]):
+                self._profiles.update(updates={"default_organization_id": None}, pk_values=row["id"])
 
     def is_superadmin(self, user_id: str) -> bool:
         """Return whether *user_id* bypasses organization-membership checks entirely.

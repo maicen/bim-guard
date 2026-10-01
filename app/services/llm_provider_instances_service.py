@@ -30,7 +30,10 @@ class LLMProviderInstancesService:
 
     def list_instances(self, organization_id: int) -> list[dict[str, Any]]:
         """Retrieve every instance configured for *organization_id*, oldest first."""
-        rows = [r for r in self._repo.rows if int(r.get("organization_id") or 0) == organization_id]
+        if hasattr(self._repo, "rows_where"):
+            rows = self._repo.rows_where("organization_id = ?", [organization_id])
+        else:
+            rows = [r for r in self._repo.rows if int(r.get("organization_id") or 0) == organization_id]
         return sorted(rows, key=lambda r: int(r.get("id") or 0))
 
     def get_instance(self, organization_id: int, instance_id: int) -> dict[str, Any] | None:
@@ -217,3 +220,4 @@ class LLMProviderInstancesService:
         for row in self.list_instances(organization_id):
             if row.get("is_default"):
                 self._repo.update(updates={"is_default": False}, pk_values=row["id"])
+                break

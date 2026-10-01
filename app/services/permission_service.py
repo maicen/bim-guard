@@ -117,4 +117,8 @@ class PermissionService:
         return None
 
     def _rows_for(self, organization_id: int | None) -> list[dict[str, Any]]:
+        if hasattr(self._repo, "rows_where"):
+            if organization_id is None:
+                return self._repo.rows_where("organization_id IS NULL")
+            return self._repo.rows_where("organization_id = ?", [organization_id])
         return [r for r in self._repo.rows if r.get("organization_id") == organization_id]

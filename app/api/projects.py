@@ -7,13 +7,10 @@ from typing import Annotated, Optional
 from fastapi import (
     APIRouter,
     Depends,
-    File,
-    Form,
     Header,
     HTTPException,
     Query,
     Response,
-    UploadFile,
     status,
 )
 from fastapi.responses import FileResponse
@@ -23,7 +20,6 @@ from app.api.dependencies import (
     get_audit_log_service,
     get_document_access_service,
     get_membership_service,
-    get_models_service,
     get_permission_service,
     get_profile_service,
     get_projects_service,
@@ -34,18 +30,11 @@ from app.constants import (
     ANALYSIS_TYPES,
     BUILDING_CODES,
     COUNTRIES,
-    DEFAULT_ANALYSIS_TYPE,
-    DEFAULT_COUNTRY,
     PROJECT_TYPES,
     STANDARD_REFERENCES,
 )
 from app.logging_config import get_logger
 from app.modules.contracts import (
-    PROJECT_CODE_MAX_LENGTH,
-    PROJECT_CODE_MIN_LENGTH,
-    PROJECT_CODE_PATTERN,
-    SHORT_NAME_MAX_LENGTH,
-    SHORT_NAME_MIN_LENGTH,
     AnalysisInputItemContract,
     BuildingCodeOption,
     IsoNamingValidationResponse,
@@ -70,7 +59,6 @@ from app.modules.permissions import Action
 from app.services.audit_log_service import AuditLogService
 from app.services.document_access_service import DocumentAccessService
 from app.services.membership_service import MembershipService
-from app.services.models_service import ModelsService
 from app.services.permission_service import PermissionService
 from app.services.profile_service import ProfileService
 from app.services.project_orchestrator_service import ProjectOrchestratorService

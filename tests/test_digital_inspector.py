@@ -5,6 +5,7 @@ from app.digital_inspector.tools import (
     bsdd_lookup,
     check_cde_transition,
     check_db_cache,
+    extract_rules_from_document,
     query_ifc_model,
     run_validation,
 )
@@ -28,10 +29,18 @@ class FakeRulesService:
 
 
 class FakeContainer:
-    def __init__(self, *, projects_service=None, rules_service=None, arch_analysis_service=None):
+    def __init__(
+        self,
+        *,
+        projects_service=None,
+        rules_service=None,
+        arch_analysis_service=None,
+        documents_service=None,
+    ):
         self.projects_service = projects_service
         self.rules_service = rules_service
         self.arch_analysis_service = arch_analysis_service
+        self.documents_service = documents_service
 
 
 def test_query_ifc_model_found(monkeypatch):
@@ -123,6 +132,90 @@ def test_check_cde_transition_project_not_found(monkeypatch):
     result = check_cde_transition.invoke({"project_id": 999, "target_state": "SHARED"})
 
     assert result["error"] == "project not found"
+
+
+def test_extract_rules_from_document_not_found(monkeypatch):
+    class FakeDocService:
+        def get_document(self, doc_id):
+            return None
+
+    fake_container = FakeContainer(documents_service=FakeDocService())
+    monkeypatch.setattr("app.bootstrap.get_container", lambda: fake_container)
+
+    result = extract_rules_from_document.invoke({"document_id": 404})
+    assert result == {"document_id": 404, "error": "document not found"}
+
+
+def test_extract_rules_from_document_no_text(monkeypatch):
+    class FakeDocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "name": "spec.pdf"}
+
+        def get_document_text(self, doc):
+            return "   "
+
+    fake_container = FakeContainer(documents_service=FakeDocService())
+    monkeypatch.setattr("app.bootstrap.get_container", lambda: fake_container)
+
+    result = extract_rules_from_document.invoke({"document_id": 12})
+    assert result == {"document_id": 12, "error": "document has no extracted text"}
+
+
+def test_extract_rules_from_document_generation_failed(monkeypatch):
+    from app.services.rule_extraction_service import RuleGenerationFailedError
+
+    class FakeDocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "name": "spec.pdf"}
+
+        def get_document_text(self, doc):
+            return "Valid specification text about stairs and egress."
+
+    fake_container = FakeContainer(documents_service=FakeDocService())
+    monkeypatch.setattr("app.bootstrap.get_container", lambda: fake_container)
+
+    async def fail_extraction(self, doc_id, text):
+        raise RuleGenerationFailedError("API key quota exceeded")
+
+    monkeypatch.setattr(
+        "app.services.rule_extraction_service.RuleExtractionService.extract_rule_drafts",
+        fail_extraction,
+    )
+
+    result = extract_rules_from_document.invoke({"document_id": 15})
+    assert result == {"document_id": 15, "error": "API key quota exceeded"}
+
+
+def test_extract_rules_from_document_success(monkeypatch):
+    from types import SimpleNamespace
+
+    class FakeDocService:
+        def get_document(self, doc_id):
+            return {"id": doc_id, "name": "spec.pdf"}
+
+        def get_document_text(self, doc):
+            return "Valid specification text."
+
+    fake_container = FakeContainer(documents_service=FakeDocService())
+    monkeypatch.setattr("app.bootstrap.get_container", lambda: fake_container)
+
+    fake_draft = SimpleNamespace(
+        proposed_rule=SimpleNamespace(rule_id="ARCH-001", description="Door minimum width")
+    )
+
+    async def mock_extraction(self, doc_id, text):
+        return [fake_draft]
+
+    monkeypatch.setattr(
+        "app.services.rule_extraction_service.RuleExtractionService.extract_rule_drafts",
+        mock_extraction,
+    )
+
+    result = extract_rules_from_document.invoke({"document_id": 20})
+    assert result["document_id"] == 20
+    assert result["draft_count"] == 1
+    assert result["drafts_preview"][0]["rule_id"] == "ARCH-001"
+
 
 
 def test_bsdd_lookup_wraps_search_classes(monkeypatch):
