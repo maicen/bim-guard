@@ -73,7 +73,11 @@
   // wizard with ?doc_id=...&from=quick-test so it pre-selects that document
   // and offers to send the user back once rules are saved.
   let targetDocId: number | null = $derived.by(() => {
-    const raw = queryParams.get("doc_id");
+    const raw = queryParams.get("doc_id") || queryParams.get("document_id");
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  let targetPage: number | null = $derived.by(() => {
+    const raw = queryParams.get("page") || queryParams.get("page_number");
     return raw && /^\d+$/.test(raw) ? Number(raw) : null;
   });
   let fromQuickTest = $derived(queryParams.get("from") === "quick-test");
@@ -100,6 +104,17 @@
 
   $effect(() => {
     if (authGateBlocking) push("/");
+  });
+
+  // If visiting /documents with a ?doc_id=... deep link, normalize the URL to /document
+  // so the canonical viewer route is shown while preserving all parameters.
+  $effect(() => {
+    if (activeView === "documents" && targetDocId != null) {
+      untrack(() => {
+        const qs = router.querystring ? `?${router.querystring}` : "";
+        replace(`/document${qs}`);
+      });
+    }
   });
 
   // If the route's audit domain drifts from the selected project's own domain
@@ -612,10 +627,20 @@
             initialFileId={targetFileId}
             initialAnalysisSlug={targetAnalysisSlug}
           />
+        {:else if (activeView === "document" || activeView === "documents") && targetDocId != null}
+          <DocumentView
+            documentId={targetDocId}
+            initialPage={targetPage}
+            onBack={() => handleSelectView("documents")}
+          />
         {:else if activeView === "documents"}
           <DocumentsView />
         {:else if activeView === "document"}
-          <DocumentView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
+          <DocumentView
+            documentId={targetDocId}
+            initialPage={targetPage}
+            onBack={() => handleSelectView("documents")}
+          />
         {:else if activeView === "rule-source"}
           <RuleSourceView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
         {:else if activeView === "ruleset-source-map"}

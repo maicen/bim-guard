@@ -472,7 +472,12 @@ SELECT ?storey WHERE {
               <AiChatbot
                 projectId={selectedProjectId}
                 persistent={true}
-                onOpenDocument={(docId) => push(`/documents?project_id=${selectedProjectId}&doc_id=${docId}`)}
+                onOpenDocument={(docId, page) => {
+                  const pageParam = page ? `&page=${page}` : "";
+                  const orgParam = authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : "";
+                  const projParam = selectedProjectId ? `&project_id=${selectedProjectId}` : "";
+                  push(`/document?doc_id=${docId}${pageParam}${projParam}${orgParam}`);
+                }}
                 onIsolateElement={(guid) => push(`/viewer?project_id=${selectedProjectId}&guid=${guid}`)}
               />
             </div>

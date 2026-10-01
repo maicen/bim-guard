@@ -16,6 +16,7 @@
   import AiChatSidebar from "../lib/components/ai/AiChatSidebar.svelte";
   import AiChatbot from "../lib/components/ai/AiChatbot.svelte";
   import { copilotStore } from "../lib/stores/copilotStore.svelte";
+  import { authState } from "../lib/auth.svelte";
   import { projectsApi } from "../lib/api";
   import type { Project } from "../lib/types";
 
@@ -154,7 +155,9 @@
           persistent={true}
           onOpenDocument={(docId, page) => {
             const pageParam = page ? `&page=${page}` : "";
-            push(`/documents?project_id=${targetProjectId}&doc_id=${docId}${pageParam}`);
+            const orgParam = authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : "";
+            const projParam = targetProjectId ? `&project_id=${targetProjectId}` : "";
+            push(`/document?doc_id=${docId}${pageParam}${projParam}${orgParam}`);
           }}
           onIsolateElement={(guid) => {
             push(`/viewer?project_id=${targetProjectId}&guid=${encodeURIComponent(guid)}`);

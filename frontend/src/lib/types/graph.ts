@@ -242,6 +242,7 @@ export interface GraphRagCitation {
   title: string;
   reference: string;
   snippet: string;
+  document_id?: number | null;
   page_number?: number | null;
   element_guid?: string | null;
   ifc_type?: string | null;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { push } from "svelte-spa-router";
+  import { push, replace, router } from "svelte-spa-router";
   import { ArrowLeft, BookOpen, Route } from "lucide-svelte";
   import { documentsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
@@ -13,10 +13,20 @@
 
   interface Props {
     documentId: number | null;
+    initialPage?: number | null;
     onBack: () => void;
   }
 
-  let { documentId, onBack }: Props = $props();
+  let { documentId, initialPage = null, onBack }: Props = $props();
+
+  function handlePageChange(newPage: number) {
+    const params = new URLSearchParams(router.querystring || "");
+    if (params.get("page") !== String(newPage)) {
+      params.set("page", String(newPage));
+      const currentLoc = router.location === "/" ? "/dashboard" : router.location;
+      replace(`${currentLoc}?${params.toString()}`);
+    }
+  }
 
   function openRuleSourceMap() {
     if (documentId == null) return;
@@ -128,18 +138,32 @@
   </PageHeader>
 
   {#if documentId == null}
-    <EmptyState title="No document selected" description="Choose a document from the Documents list to preview it here." />
+    <EmptyState
+      title="No document selected"
+      description="Choose a document from the Documents list to preview it here."
+      actionLabel="Back to Documents"
+      onAction={onBack}
+    />
   {:else if loading && !doc}
     <LoadingState message="Loading document…" />
   {:else if loadError && !doc}
-    <EmptyState title="Could not load document" description={loadError} />
+    <EmptyState
+      title="Could not load document"
+      description={loadError}
+      actionLabel="Back to Documents"
+      onAction={onBack}
+    />
   {:else}
     <div
       bind:this={viewerContainerEl}
       style="height: {viewerHeight};"
       class="overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-xl"
     >
-      <DocumentViewer documentId={documentId!} />
+      <DocumentViewer
+        documentId={documentId!}
+        page={initialPage}
+        onPageChange={handlePageChange}
+      />
     </div>
   {/if}
 </div>

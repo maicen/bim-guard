@@ -357,6 +357,7 @@ class GraphRagCitation(BaseModel):
     title: str = Field(..., description="Human-readable citation title or element name")
     reference: str = Field(..., description="Clause number, document name, or element type")
     snippet: str = Field("", description="Text excerpt, property summary, or requirement spec")
+    document_id: Optional[int] = Field(None, description="Document ID if from document")
     page_number: Optional[int] = Field(None, description="Page number if from document")
     element_guid: Optional[str] = Field(None, description="IFC GlobalId if from model")
     ifc_type: Optional[str] = Field(None, description="IFC class name if from model")

@@ -45,6 +45,8 @@
     elementRuleCounts?: Record<string, number> | null;
     /** What the overlay's badge chip shows when badges are on: reading order (default) or `elementRuleCounts`. */
     badgeMode?: "order" | "rule-count";
+    /** Callback fired whenever the viewer changes the active page. */
+    onPageChange?: ((page: number) => void) | null;
   }
 
   let {
@@ -56,6 +58,7 @@
     onElementSelect = null,
     elementRuleCounts = null,
     badgeMode = "order",
+    onPageChange = null,
   }: Props = $props();
 
   // Single-page mode DOM refs
@@ -793,6 +796,7 @@
     if (pageNum !== currentPage) {
       currentPage = pageNum;
       pageInputValue = String(pageNum);
+      onPageChange?.(pageNum);
     }
     tick().then(() => {
       document
@@ -903,6 +907,10 @@
           "This PDF could not be rendered, and no extracted text is available for it either.";
         pdfFallbackNotice = null;
       }
+      if (page && page > 1) {
+        await tick();
+        goToPage(page);
+      }
       queueMicrotask(scrollToHighlightInText);
     } catch (err: any) {
       error = err?.message || "Failed to load document.";
@@ -928,6 +936,10 @@
     // against a not-yet-bound canvasEl and silently no-op.
     await tick();
     await renderCurrentPage();
+    if (currentPage > 1) {
+      await scrollReadingViewToPage(currentPage);
+      scrollDocLangToPage(currentPage);
+    }
   }
 
   function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
@@ -1038,6 +1050,7 @@
     }
     await scrollReadingViewToPage(target);
     scrollDocLangToPage(target);
+    onPageChange?.(target);
   }
 
   function handlePageInputSubmit() {
@@ -1161,6 +1174,16 @@
   $effect(() => {
     if (documentId !== loadedDocumentId) {
       load();
+    }
+  });
+
+  $effect(() => {
+    const target = page;
+    if (target != null && target >= 1 && !loading && totalPageCount > 0) {
+      const clamped = Math.min(Math.max(Math.trunc(target), 1), totalPageCount);
+      if (clamped !== currentPage) {
+        goToPage(clamped);
+      }
     }
   });
 </script>

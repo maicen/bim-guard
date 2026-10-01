@@ -75,21 +75,25 @@ class DocumentGraphRetriever:
                     cde_state = d.get("cde_state") or "SHARED"
                     ref_tag = f"Doc: {title}"
                     text_lines.append(f"- [{ref_tag}] Type: {dtype}, CDE State: {cde_state}")
+                    doc_id_num = int(doc_id) if str(doc_id).isdigit() else None
                     citations.append(
                         GraphRagCitation(
                             id=f"doc_inv_{doc_id}",
                             source_type="document",
+                            document_id=doc_id_num,
                             title=f"Specification: {title}",
                             reference=title,
                             snippet=f"Attached project specification '{title}' (Type: {dtype}, CDE State: {cde_state}).",
                             score=2.0,
                             retrieval_method="graph",
+                            properties={"doc_id": doc_id_num},
                         )
                     )
             elif graph_docs:
                 text_lines.append(f"### Knowledge Graph Document Specifications (Total: {len(graph_docs)}):")
                 for d in graph_docs:
                     doc_id = d.get("doc_id") or 1
+                    doc_id_num = int(doc_id) if str(doc_id).isdigit() else None
                     title = d.get("title") or f"Document {doc_id}"
                     sec_count = d.get("root_sections", 0)
                     ref_tag = f"Doc: {title}"
@@ -98,11 +102,13 @@ class DocumentGraphRetriever:
                         GraphRagCitation(
                             id=f"graph_doc_{doc_id}",
                             source_type="document",
+                            document_id=doc_id_num,
                             title=f"Document: {title}",
                             reference=title,
                             snippet=f"Specification '{title}' with {sec_count} sections.",
                             score=2.0,
                             retrieval_method="graph",
+                            properties={"doc_id": doc_id_num},
                         )
                     )
             else:
@@ -248,11 +254,14 @@ class DocumentGraphRetriever:
             page_tag = f", p. {page}" if page else ""
             text_lines.append(f"- [Doc: {ref_tag}{page_tag}] {title}: {summary}")
 
+            doc_id_val = sec.get("doc_id") or sec.get("document_id")
+            parsed_doc_id = int(doc_id_val) if doc_id_val and str(doc_id_val).isdigit() else None
             citation_id = f"doc_{sec_num}" if sec_num != "Sec" else f"doc_{sec.get('id')}"
             citations.append(
                 GraphRagCitation(
                     id=citation_id,
                     source_type="document",
+                    document_id=parsed_doc_id,
                     title=f"{ref_tag}: {title}",
                     reference=ref_tag,
                     snippet=summary,
@@ -263,6 +272,7 @@ class DocumentGraphRetriever:
                     properties={
                         "target_classes": target_classes or [],
                         "stream_ranks": sec.get("stream_ranks", {}),
+                        "doc_id": parsed_doc_id,
                     },
                 )
             )

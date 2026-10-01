@@ -173,9 +173,16 @@
             {/if}
 
             {#if citation.source_type === "document" && onOpenDocument}
+              {@const resolvedDocId =
+                citation.document_id ||
+                (citation.properties?.doc_id ? Number(citation.properties.doc_id) : null) ||
+                (citation.properties?.document_id ? Number(citation.properties.document_id) : null) ||
+                (citation.id?.startsWith("doc_inv_") ? Number(citation.id.replace("doc_inv_", "")) : null) ||
+                (citation.id?.startsWith("graph_doc_") ? Number(citation.id.replace("graph_doc_", "")) : null) ||
+                1}
               <button
                 type="button"
-                onclick={() => onOpenDocument?.(1, citation.page_number)}
+                onclick={() => onOpenDocument?.(resolvedDocId, citation.page_number)}
                 class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-info-bg text-info border border-info-border font-medium hover:bg-info/20 transition-colors"
               >
                 <FileText class="w-4 h-4" />
