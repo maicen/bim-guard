@@ -105,6 +105,10 @@ def test_graph_rag_service_hybrid_query():
     context = service.get_project_context_summary(project_id=42)
     assert isinstance(context, GraphRagContextSummary)
     assert context.project_id == 42
+    assert context.total_models == 0
+    assert context.is_graph_ready is True
+    assert context.has_ifc_model is True
+    assert context.total_elements == 12
 
     # 2. Test hybrid query
     req = GraphRagQueryRequest(
@@ -262,6 +266,13 @@ def test_graph_rag_model_inventory_query():
     assert len(response.citations) == 2
     assert "Hospital_Architectural.ifc" in response.citations[0].title
     assert "Hospital_Structural.ifc" in response.citations[1].title
+
+    # Verify context summary distinguishes attached models from ingested graph
+    summary = service.get_project_context_summary(project_id=5006)
+    assert summary.total_models == 2
+    assert summary.has_ifc_model is True
+    assert summary.is_graph_ready is False
+    assert summary.total_elements == 0
 
 
 def test_graph_rag_project_metadata_query():

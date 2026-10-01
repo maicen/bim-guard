@@ -141,8 +141,8 @@ class GraphRagService:
         except Exception as exc:
             logger.debug("Failed querying models for context summary: %s", exc)
 
-        if models_summary:
-            has_ifc_model = True
+        total_models = len(models_summary)
+        has_ifc_model = total_models > 0
 
         if not self.graph_service or not self.graph_service.provider:
             return GraphRagContextSummary(
@@ -152,6 +152,8 @@ class GraphRagService:
                 project_code=project_code,
                 status=status,
                 has_ifc_model=has_ifc_model,
+                total_models=total_models,
+                is_graph_ready=False,
                 total_elements=0,
                 total_storeys=0,
                 total_spaces=0,
@@ -175,7 +177,6 @@ class GraphRagService:
             """
             rows = self.graph_service.execute(cypher_classes, {"pid": pid_str})
             if rows:
-                has_ifc_model = True
                 for r in rows:
                     cname = r.get("class_name")
                     cnt = r.get("element_count", 0)
@@ -255,6 +256,9 @@ class GraphRagService:
         # 8. Check Active Rulesets
         rulesets = ["ARCH-EGRESS-001", "ARCH-SPATIAL-001", "IBC-2024", "ADA-2010"]
 
+        is_graph_ready = total_elements > 0
+        has_ifc_model = total_models > 0 or is_graph_ready
+
         return GraphRagContextSummary(
             project_id=project_id,
             project_name=project_name,
@@ -262,6 +266,8 @@ class GraphRagService:
             project_code=project_code,
             status=status,
             has_ifc_model=has_ifc_model,
+            total_models=total_models,
+            is_graph_ready=is_graph_ready,
             total_elements=total_elements,
             total_storeys=total_storeys,
             total_spaces=total_spaces,

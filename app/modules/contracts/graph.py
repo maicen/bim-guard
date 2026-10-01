@@ -461,10 +461,12 @@ class GraphRagContextSummary(BaseModel):
     client_name: Optional[str] = None
     project_code: Optional[str] = None
     status: Optional[str] = None
-    has_ifc_model: bool
-    total_elements: int = 0
-    total_storeys: int = 0
-    total_spaces: int = 0
+    has_ifc_model: bool = Field(default=False, description="Whether project has attached IFC model(s) or graph elements")
+    total_models: int = Field(default=0, ge=0, description="Total number of IFC models attached to the project")
+    is_graph_ready: bool = Field(default=False, description="Whether knowledge graph has ingested building elements for this project")
+    total_elements: int = Field(default=0, ge=0, description="Total number of building element nodes in knowledge graph")
+    total_storeys: int = Field(default=0, ge=0, description="Total number of building storeys in model")
+    total_spaces: int = Field(default=0, ge=0, description="Total number of architectural spaces in model")
     ifc_classes: list[dict[str, Any]] = Field(default_factory=list)
     storeys: list[dict[str, Any]] = Field(default_factory=list)
     documents: list[dict[str, Any]] = Field(default_factory=list)

@@ -305,6 +305,8 @@ export interface GraphRagContextSummary {
   project_code?: string;
   status?: string;
   has_ifc_model: boolean;
+  total_models: number;
+  is_graph_ready: boolean;
   total_elements: number;
   total_storeys?: number;
   total_spaces?: number;

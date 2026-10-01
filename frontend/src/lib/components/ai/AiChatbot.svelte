@@ -291,10 +291,12 @@
             {/if}
           </h2>
           <p class="text-[11px] text-fg-muted font-mono">
-            {#if contextSummary?.has_ifc_model}
-              {contextSummary.total_elements} IFC nodes connected
+            {#if contextSummary?.is_graph_ready}
+              {contextSummary.total_elements} IFC nodes connected{#if (contextSummary.total_models || 0) > 1} ({contextSummary.total_models} models){/if}
+            {:else if contextSummary?.has_ifc_model}
+              {contextSummary.total_models || 1} model{(contextSummary.total_models || 1) === 1 ? '' : 's'} attached • indexing graph
             {:else}
-              Model graph connecting
+              Model graph ready
             {/if}
             • {contextSummary?.documents.length || 0} document trees
           </p>

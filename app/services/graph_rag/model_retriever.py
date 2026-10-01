@@ -186,16 +186,17 @@ class ModelGraphRetriever:
                 except Exception as exc:
                     logger.debug("Notice querying project metadata: %s", exc)
 
-            models_count = 0
-            try:
-                models_count = len(self.models_service.list_models(project_id) or [])
-            except Exception:
-                pass
+            total_models = 0
+            if self.models_service:
+                try:
+                    total_models = len(self.models_service.list_models(project_id) or [])
+                except Exception:
+                    pass
 
-            docs_count = 0
+            total_docs = 0
             if self.projects_service:
                 try:
-                    docs_count = len(self.projects_service.get_client_documents_by_project(project_id) or [])
+                    total_docs = len(self.projects_service.get_client_documents_by_project(project_id) or [])
                 except Exception:
                     pass
 
@@ -215,8 +216,8 @@ class ModelGraphRetriever:
             else:
                 text_lines.append(f"- **Project ID**: {project_id}")
 
-            text_lines.append(f"- **Attached Models**: {models_count} IFC file(s)")
-            text_lines.append(f"- **Attached Documents**: {docs_count} specification document(s)")
+            text_lines.append(f"- **Attached Models**: {total_models} IFC file(s)")
+            text_lines.append(f"- **Attached Documents**: {total_docs} specification document(s)")
 
             citation = GraphRagCitation(
                 id=f"proj_meta_{project_id}",
