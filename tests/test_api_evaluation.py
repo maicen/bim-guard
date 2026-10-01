@@ -1,7 +1,7 @@
 """Tests for /api/evaluation endpoints.
 
-Uses an isolated in-process SQLite table (via PersistenceService's
-get_isolated_sqlite_db, the same test-isolation seam RuleService uses) for
+Uses an isolated in-process table (via PersistenceService's
+get_isolated_db, the same test-isolation seam RuleService uses) for
 evaluation_findings, and a fake ArchAnalysisService so capture doesn't need a
 real IFC model or the live Supabase project -- see EvaluationService's own
 docstring for why capture_results() recomputes server-side rather than
@@ -73,9 +73,9 @@ def _rule_compliance_fixture() -> list[dict]:
 
 
 @pytest.fixture
-def evaluation_service(tmp_path):
-    """Wire a real EvaluationService onto an isolated SQLite table + fake analysis service."""
-    db = PersistenceService.get_isolated_sqlite_db(str(tmp_path / "evaluation_findings.db"))
+def evaluation_service():
+    """Wire a real EvaluationService onto an isolated table + fake analysis service."""
+    db = PersistenceService.get_isolated_db()
     repo = PersistenceService.get_table(
         "evaluation_findings",
         {

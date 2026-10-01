@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from app.services.db_adapters import DatabaseAdapter, SQLiteTableAdapter, SupabaseTableAdapter
+from app.services.db_adapters import DatabaseAdapter, InMemoryTableAdapter, SupabaseTableAdapter
 from app.services.document_access_service import DocumentAccessService
 from app.services.ruleset_access_service import RulesetAccessService
 
@@ -158,12 +158,12 @@ def test_document_access_service_batches_queries():
         service.set_project_bindings(200, [999], organization_id=1)
 
 
-def test_sqlite_table_adapter_batch_operations():
-    import fastlite
-    db = fastlite.database(":memory:")
-    table = db.t.test_items
-    table.create(dict(id=int, name=str), pk="id")
-    adapter = SQLiteTableAdapter(table)
+def test_in_memory_table_adapter_batch_operations():
+    adapter = InMemoryTableAdapter(
+        table_or_name="test_items",
+        schema=dict(id=int, name=str),
+        pk="id",
+    )
 
     # insert_many
     items = [{"id": i, "name": f"item-{i}"} for i in range(1, 11)]

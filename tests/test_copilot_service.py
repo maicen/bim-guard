@@ -22,10 +22,11 @@ class DummyTable:
         pk_val = str(row[self.pk])
         self._data[pk_val] = dict(row)
 
-    def update(self, row: dict):
-        pk_val = str(row[self.pk])
+    def update(self, *args, updates: dict | None = None, pk_values: str | None = None, **kwargs):
+        target_updates = dict(updates if updates is not None else (args[0] if args else {}))
+        pk_val = str(pk_values if pk_values is not None else target_updates.get(self.pk))
         if pk_val in self._data:
-            self._data[pk_val].update(row)
+            self._data[pk_val].update(target_updates)
 
     def delete(self, pk_val: str):
         self._data.pop(str(pk_val), None)
@@ -114,3 +115,78 @@ def test_copilot_service_crud_flow():
     assert deleted is True
     assert svc.get_conversation(detail.id, 101) is None
     assert len(svc.list_conversations(101)) == 0
+
+
+def test_copilot_service_with_in_memory_table_adapter():
+    """Test CopilotService end-to-end with real InMemoryTableAdapter to prevent signature drift."""
+    from app.services.persistence import PersistenceService
+
+    db = PersistenceService.get_isolated_db()
+    conv_table = PersistenceService.get_table(
+        "chat_conversations",
+        {
+            "id": str,
+            "project_id": int,
+            "user_id": str,
+            "title": str,
+            "scope": str,
+            "document_id": int,
+            "element_class": str,
+            "is_pinned": bool,
+            "created_at": str,
+            "updated_at": str,
+        },
+        pk="id",
+        db=db,
+    )
+    msg_table = PersistenceService.get_table(
+        "chat_messages",
+        {
+            "id": str,
+            "conversation_id": str,
+            "role": str,
+            "content": str,
+            "citations": str,
+            "reasoning_steps": str,
+            "tool_calls": str,
+            "cypher_queries": str,
+            "timestamp": str,
+            "created_at": str,
+        },
+        pk="id",
+        db=db,
+    )
+
+    svc = CopilotService(conversations_repo=conv_table, messages_repo=msg_table)
+
+    # Create
+    detail = svc.create_conversation(
+        project_id=5006,
+        payload=ChatConversationCreatePayload(project_id=5006, title="New Conversation", scope="hybrid"),
+        user_id="user-123",
+    )
+    assert detail.id is not None
+
+    # Save messages
+    msg1 = ChatMessagePayload(id="m1", role="user", content="Hello")
+    msg2 = ChatMessagePayload(id="m2", role="assistant", content="Hi there")
+    svc.save_messages(conversation_id=detail.id, project_id=5006, messages=[msg1, msg2])
+
+    # Rename conversation
+    updated = svc.update_conversation(
+        conversation_id=detail.id,
+        project_id=5006,
+        payload=ChatConversationUpdatePayload(title="Renamed Topic", is_pinned=True),
+    )
+    assert updated is not None
+    assert updated.title == "Renamed Topic"
+    assert updated.is_pinned is True
+
+    # Check detail
+    fetched = svc.get_conversation(conversation_id=detail.id, project_id=5006)
+    assert fetched is not None
+    assert len(fetched.messages) == 2
+
+    # Delete
+    assert svc.delete_conversation(conversation_id=detail.id, project_id=5006) is True
+

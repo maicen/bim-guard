@@ -106,7 +106,14 @@ class DatabaseAdapter(abc.ABC):
         return [self.insert(payload) for payload in payloads]
 
     @abc.abstractmethod
-    def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
+    def update(
+        self,
+        updates_or_row: dict[str, Any] | None = None,
+        pk: Any = None,
+        *,
+        updates: dict[str, Any] | None = None,
+        pk_values: Any = None,
+    ) -> None:
         """Update row by primary key."""
 
     @abc.abstractmethod
@@ -150,81 +157,111 @@ class DatabaseAdapter(abc.ABC):
         return self.insert(report_data)
 
 
-class SQLiteTableAdapter(DatabaseAdapter):
-    """Expose a thin compatibility layer around a fastlite table object.
+class InMemoryTableAdapter(DatabaseAdapter):
+    """Expose an in-memory table implementing the DatabaseAdapter interface.
 
-    Used only for the isolated SQLite connections PersistenceService hands to
-    tests/the eval harness (see get_isolated_sqlite_db) — Supabase remains the
-    sole runtime backend for the live app.
+    Used for isolated test seams and offline harnesses — Supabase (PostgreSQL)
+    remains the sole runtime database backend for the live app.
     """
 
-    def __init__(self, table: Any):
-        """Store underlying fastlite table reference."""
-        self._table = table
+    def __init__(
+        self,
+        table_or_name: Any = "memory_table",
+        schema: dict[str, Any] | None = None,
+        *,
+        pk: str = "id",
+        table_name: str | None = None,
+    ) -> None:
+        raw_name = table_name if table_name is not None else table_or_name
+        self._table_name = getattr(raw_name, "name", str(raw_name))
+        self._columns_dict: dict[str, Any] = dict(schema or {})
+        self._pk = pk
+        self._rows: list[dict[str, Any]] = []
+
+    def _format_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Ensure all declared schema columns are present on returned rows (defaulting to None)."""
+        formatted = {col: None for col in self._columns_dict}
+        formatted.update(row)
+        return formatted
 
     @property
     def columns_dict(self) -> dict[str, Any]:
-        """Return table columns map."""
-        return self._table.columns_dict
+        """Return declared columns map."""
+        return self._columns_dict
 
     @property
     def rows(self) -> Iterable[dict[str, Any]]:
-        """Return all table rows."""
-        return self._table.rows
+        """Return all rows."""
+        return [self._format_row(r) for r in self._rows]
+
+    @property
+    def pks(self) -> list[str]:
+        """Return primary keys list."""
+        return [self._pk]
 
     def create(self, schema: dict[str, Any], *, pk: str, if_not_exists: bool = True) -> None:
-        """Create table if missing."""
-        self._table.create(schema, pk=pk, if_not_exists=if_not_exists)
+        """Create or update table schema."""
+        self._columns_dict.update(schema)
+        self._pk = pk
 
     def add_column(self, column_name: str, column_type: Any) -> None:
-        """Add table column."""
-        self._table.add_column(column_name, column_type)
+        """Add column to schema."""
+        self._columns_dict[column_name] = column_type
 
     def get(self, pk_value: Any) -> dict[str, Any] | None:
         """Get one row by primary key."""
-        try:
-            return self._table.get(pk_value)
-        except Exception:
-            return None
-
+        target = str(pk_value)
+        for r in self._rows:
+            if str(r.get(self._pk)) == target:
+                return self._format_row(r)
+        return None
 
     def insert(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Insert one row."""
-        return self._table.insert(payload)
+        row = dict(payload)
+        if self._pk not in row or row[self._pk] is None:
+            max_id = max(
+                (int(r[self._pk]) for r in self._rows if str(r.get(self._pk, "")).isdigit()),
+                default=0,
+            )
+            row[self._pk] = max_id + 1
+        self._rows.append(row)
+        return self._format_row(row)
 
     def insert_many(self, payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Insert multiple rows in a batch."""
-        if not payloads:
-            return []
-        try:
-            self._table.insert_all(payloads)
-            return payloads
-        except Exception:
-            return [self.insert(payload) for payload in payloads]
+        return [self.insert(p) for p in payloads]
 
-    def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
+    def update(
+        self,
+        updates_or_row: dict[str, Any] | None = None,
+        pk: Any = None,
+        *,
+        updates: dict[str, Any] | None = None,
+        pk_values: Any = None,
+    ) -> None:
         """Update one row by primary key."""
-        self._table.update(updates=updates, pk_values=pk_values)
+        target_updates = dict(updates if updates is not None else (updates_or_row or {}))
+        target_pk = pk_values if pk_values is not None else pk
+        if target_pk is None and self._pk in target_updates:
+            target_pk = target_updates[self._pk]
+        target_payload = {k: v for k, v in target_updates.items() if k != self._pk}
+        target_str = str(target_pk) if target_pk is not None else None
+        for row in self._rows:
+            if str(row.get(self._pk)) == target_str:
+                row.update(target_payload)
 
     def delete(self, pk_value: Any) -> None:
         """Delete one row by primary key."""
-        try:
-            self._table.delete(pk_value)
-        except Exception:
-            pass
+        target_str = str(pk_value)
+        self._rows = [r for r in self._rows if str(r.get(self._pk)) != target_str]
 
     def delete_many(self, pk_values: list[Any]) -> None:
-        """Delete multiple rows by primary key in a single batch query."""
+        """Delete multiple rows by primary key in a single batch."""
         if not pk_values:
             return
-        pk_col = self._table.pks[0] if getattr(self._table, "pks", None) else "id"
-        placeholders = ", ".join(["?"] * len(pk_values))
-        try:
-            self._table.delete_where(f"{pk_col} in ({placeholders})", pk_values)
-        except Exception:
-            for pk in pk_values:
-                self.delete(pk)
-
+        target_strs = {str(pk) for pk in pk_values}
+        self._rows = [r for r in self._rows if str(r.get(self._pk)) not in target_strs]
 
     def rows_where(
         self,
@@ -232,8 +269,42 @@ class SQLiteTableAdapter(DatabaseAdapter):
         params: list[Any] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Filter rows using fastlite's native rows_where."""
-        return list(self._table.rows_where(where_sql, params or [], limit=limit))
+        """Filter rows matching predicate."""
+        expr = parse_where(where_sql, params)
+        matching: list[dict[str, Any]] = []
+        for raw_row in self._rows:
+            row = self._format_row(raw_row)
+            val = row.get(expr.field)
+            if expr.operator == "is_null" and val is None:
+                matching.append(dict(row))
+            elif expr.operator == "eq" and (val == expr.value or str(val) == str(expr.value)):
+                matching.append(dict(row))
+            elif expr.operator == "like" and str(expr.value).lower().replace("%", "") in str(val or "").lower():
+                matching.append(dict(row))
+        return matching[:limit] if limit is not None else matching
+
+
+class InMemoryDatabase:
+    """In-memory database holding isolated InMemoryTableAdapters by name."""
+
+    def __init__(self) -> None:
+        self._tables: dict[str, InMemoryTableAdapter] = {}
+
+    def __getitem__(self, table_name: str) -> InMemoryTableAdapter:
+        if table_name not in self._tables:
+            self._tables[table_name] = InMemoryTableAdapter(table_name=table_name)
+        return self._tables[table_name]
+
+    @property
+    def t(self) -> InMemoryDatabase:
+        return self
+
+    def __getattr__(self, name: str) -> InMemoryTableAdapter:
+        return self[name]
+
+
+# Backward-compatibility alias
+SQLiteTableAdapter = InMemoryTableAdapter
 
 
 _SHARED_MEMORY_TABLES: dict[str, list[dict[str, Any]]] = {}
@@ -415,23 +486,37 @@ class SupabaseTableAdapter(DatabaseAdapter):
                 return [self.insert(payload) for payload in payloads]
             raise
 
-    def update(self, *, updates: dict[str, Any], pk_values: Any) -> None:
+    def update(
+        self,
+        updates_or_row: dict[str, Any] | None = None,
+        pk: Any = None,
+        *,
+        updates: dict[str, Any] | None = None,
+        pk_values: Any = None,
+    ) -> None:
         """Update one row by primary key."""
+        target_updates = dict(updates if updates is not None else (updates_or_row or {}))
+        target_pk = pk_values if pk_values is not None else pk
+        if target_pk is None and self._pk in target_updates:
+            target_pk = target_updates[self._pk]
+
+        target_payload = {k: v for k, v in target_updates.items() if k != self._pk}
+
         if self._use_memory_fallback:
             for row in self._memory_rows:
-                if row.get(self._pk) == pk_values or str(row.get(self._pk)) == str(pk_values):
-                    row.update(updates)
+                if row.get(self._pk) == target_pk or str(row.get(self._pk)) == str(target_pk):
+                    row.update(target_payload)
             return
 
         try:
             execute_with_retry(
-                lambda: self._client.table(self._table_name).update(updates).eq(self._pk, pk_values)
+                lambda: self._client.table(self._table_name).update(target_payload).eq(self._pk, target_pk)
             )
             self._invalidate_cache()
         except APIError as exc:
             if self._is_missing_table_error(exc):
                 self._degrade_to_memory("update", exc)
-                self.update(updates=updates, pk_values=pk_values)
+                self.update(updates=target_payload, pk_values=target_pk)
                 return
             raise
 

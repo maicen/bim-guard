@@ -144,8 +144,16 @@ class CopilotService:
             )
 
         # Sort pinned first, then by updated_at descending
-        summaries.sort(key=lambda s: (not s.is_pinned, s.updated_at), reverse=False)
-        summaries.sort(key=lambda s: (0 if s.is_pinned else 1, -(datetime.fromisoformat(s.updated_at.replace("Z", "+00:00")).timestamp() if "T" in s.updated_at else 0)))
+        def _sort_key(s: ChatConversationSummary) -> tuple[int, float]:
+            ts = 0.0
+            if s.updated_at:
+                try:
+                    ts = datetime.fromisoformat(s.updated_at.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    ts = 0.0
+            return (0 if s.is_pinned else 1, -ts)
+
+        summaries.sort(key=_sort_key)
         return summaries
 
     def create_conversation(
@@ -253,7 +261,7 @@ class CopilotService:
         if not row or int(row.get("project_id", 0)) != int(project_id):
             return None
 
-        updates: dict[str, Any] = {"id": str(conversation_id), "updated_at": _utc_now_iso()}
+        updates: dict[str, Any] = {"updated_at": _utc_now_iso()}
         if payload.title is not None:
             updates["title"] = payload.title.strip()
         if payload.is_pinned is not None:
@@ -265,7 +273,7 @@ class CopilotService:
         if payload.element_class is not None:
             updates["element_class"] = payload.element_class
 
-        self._conversations.update(updates)
+        self._conversations.update(updates=updates, pk_values=str(conversation_id))
         updated_row = self._conversations.get(str(conversation_id)) or row
         updated_row.update(updates)
 
@@ -276,13 +284,20 @@ class CopilotService:
             (last_content[:120] + "...") if last_content and len(last_content) > 120 else last_content
         )
 
+        doc_id = updated_row.get("document_id")
+        if doc_id is not None:
+            try:
+                doc_id = int(doc_id)
+            except (ValueError, TypeError):
+                doc_id = None
+
         return ChatConversationSummary(
             id=str(conversation_id),
             project_id=int(updated_row["project_id"]),
             user_id=str(updated_row["user_id"]) if updated_row.get("user_id") else None,
             title=str(updated_row.get("title") or "New Conversation"),
             scope=str(updated_row.get("scope") or "hybrid"),
-            document_id=updated_row.get("document_id"),
+            document_id=doc_id,
             element_class=updated_row.get("element_class"),
             is_pinned=bool(updated_row.get("is_pinned", False)),
             message_count=len(msg_rows),
@@ -340,15 +355,15 @@ class CopilotService:
             }
             existing = self._messages.get(str(msg.id))
             if existing:
-                self._messages.update(row_dict)
+                self._messages.update(updates=row_dict, pk_values=str(msg.id))
             else:
                 self._messages.insert(row_dict)
 
         # Touch conversation updated_at
-        self._conversations.update({
-            "id": str(conversation_id),
-            "updated_at": now,
-        })
+        self._conversations.update(
+            updates={"updated_at": now},
+            pk_values=str(conversation_id),
+        )
 
 
 DEFAULT_COPILOT_SERVICE = CopilotService()

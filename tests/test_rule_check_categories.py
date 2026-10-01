@@ -49,8 +49,8 @@ def _category_service() -> RuleCheckCategoryService:
     )
 
 
-def _rule_service(tmp_path) -> RuleService:
-    db = PersistenceService.get_isolated_sqlite_db(str(tmp_path / "rules.db"))
+def _rule_service(tmp_path=None) -> RuleService:
+    db = PersistenceService.get_isolated_db()
     return RuleService(check_categories=_category_service(), documents_service=object(), db=db)
 
 

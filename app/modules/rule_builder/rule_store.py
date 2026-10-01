@@ -13,7 +13,7 @@ Field-name mapping (CLI → web):
     desc   → description
     target → target_ifc_class
 
-Pass a db_path to get a fully isolated, throwaway SQLite database instead of
+Pass a db_path to get a fully isolated, throwaway in-memory database instead of
 the shared app database — see RuleStore.__init__.
 """
 
@@ -91,16 +91,15 @@ class RuleStore:
     def __init__(self, db_path=None):
         """Connect to the shared app database, or an isolated one.
 
-        db_path: when given, this store is fully isolated — it opens (or
-        creates) a throwaway SQLite database at that path instead of the
-        shared app database, so tests (and the eval harness) can never read
-        or write live data. Omit for normal use (web app / CLI pipeline),
-        which intentionally shares the app's configured database so
+        db_path: when given, this store is fully isolated — it opens an
+        isolated in-memory database instead of the shared app database, so
+        tests (and the eval harness) can never read or write live data.
+        Omit for normal use (web app / CLI pipeline), which intentionally shares the app's configured database so
         CLI-extracted rules show up in the web UI.
         """
         self._isolated = db_path is not None
         if self._isolated:
-            self._db = PersistenceService.get_isolated_sqlite_db(db_path)
+            self._db = PersistenceService.get_isolated_db(db_path)
             self._svc = RuleService(db=self._db)
         else:
             self._db = None

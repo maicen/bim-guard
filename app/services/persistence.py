@@ -5,10 +5,14 @@ from pathlib import Path
 from typing import Any, override
 
 import httpx
-from fastlite import database
 
 from app.environment import load_env_file
-from app.services.db_adapters import SQLiteTableAdapter, SupabaseTableAdapter
+from app.services.db_adapters import (
+    DatabaseAdapter,
+    InMemoryDatabase,
+    InMemoryTableAdapter,
+    SupabaseTableAdapter,
+)
 from supabase import ClientOptions, create_client
 
 load_env_file()
@@ -228,7 +232,14 @@ class PersistenceService:
         Supabase data.
         """
         if db is not None:
-            table = SQLiteTableAdapter(db[table_name])
+            table = db[table_name] if hasattr(db, "__getitem__") else db
+            if isinstance(table, DatabaseAdapter):
+                table.create(schema, pk=pk, if_not_exists=True)
+                for column_name, column_type in (required_columns or {}).items():
+                    if column_name not in table.columns_dict:
+                        table.add_column(column_name, column_type)
+                return table
+            table = InMemoryTableAdapter(table)
             table.create(schema, pk=pk, if_not_exists=True)
             for column_name, column_type in (required_columns or {}).items():
                 if column_name not in table.columns_dict:
@@ -242,16 +253,17 @@ class PersistenceService:
         return table
 
     @staticmethod
-    def get_isolated_sqlite_db(path: str):
-        """Return a brand-new, independent SQLite connection at *path*.
+    def get_isolated_db(path: str | None = None) -> InMemoryDatabase:
+        """Return a brand-new, independent in-memory database for testing.
 
-        Unlike get_db(), this never touches the shared singleton — the
-        connection it returns is structurally incapable of reaching the live
-        Supabase app database. Callers own its lifecycle (close it themselves)
-        since it isn't cached here.
+        Structurally incapable of reaching live Supabase/PostgreSQL data.
         """
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        return database(str(path))
+        return InMemoryDatabase()
+
+    @staticmethod
+    def get_isolated_sqlite_db(path: str | None = None) -> InMemoryDatabase:
+        """Provide compatibility alias returning get_isolated_db()."""
+        return PersistenceService.get_isolated_db(path)
 
     @classmethod
     def uploads_dir(cls, *parts: str) -> Path:

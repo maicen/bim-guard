@@ -63,7 +63,7 @@ This document describes how the BIMGUARD AI application is architected across it
 │ - ARCH-SPATIAL-001 Daylight  ││   (projects, rules, audit)  │
 │ - CODE-SHACL (Shacl engine)  ││ - Supabase Storage          │
 │ - GRAPH-TOPOLOGY-001         ││   (models, reports, BCF)    │
-│   (orphan-element graph)     ││ - SQLite / Fastlite Cache   │
+│   (orphan-element graph)     ││ - In-Memory Test Adapter    │
 │ - Pipeline I/O Orchestrator   ││                             │
 └──────────────────────────────┘└─────────────────────────────┘
 ```

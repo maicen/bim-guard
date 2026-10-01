@@ -143,7 +143,7 @@ class RuleService:
         """Initialize the rules table with required schema columns and dependency injection.
 
         db: optional isolated connection (from
-        PersistenceService.get_isolated_sqlite_db()) — when given, this
+        PersistenceService.get_isolated_db()) — when given, this
         RuleService reads/writes only that connection, never the shared app
         database. Used for test isolation.
         """
