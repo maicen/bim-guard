@@ -652,6 +652,20 @@ class DocumentService:
         for path_key in ("file_path", "doclang_storage_path", "doclang_archive_path"):
             stored_ref = document.get(path_key)
             if stored_ref:
+                # Deduplication check: do not delete the physical file if it's referenced elsewhere
+                other_uses = [
+                    doc for doc in self._documents.rows_where(f"{path_key} = ?", [stored_ref])
+                    if doc.get("id") != document_id
+                ]
+                if other_uses:
+                    logger.info(
+                        "Skipped physical cleanup for %s=%s (still used by %d other document(s))",
+                        path_key,
+                        stored_ref,
+                        len(other_uses),
+                    )
+                    continue
+
                 try:
                     self._storage.delete(stored_ref)
                 except Exception:
