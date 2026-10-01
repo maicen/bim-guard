@@ -87,10 +87,10 @@ The AI subsystem operates on the periphery of the deterministic compliance engin
 
 ---
 
-## Priority 4: Graph Database Integration (Kùzu & Neo4j)
+## Priority 4: Graph Database Integration (Neo4j)
 
 - [ ] **Wire `GraphService` into `LlamaIndexRuleGenerator` for GraphRAG**:
-  - Connect the embedded `KuzuDatabaseProvider` (`app/services/kuzu_provider.py`) into the document extraction pipeline, mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
+  - Connect `Neo4jDatabaseProvider` into the document extraction pipeline, mapping hierarchical building codes (Section → Clause) to the IFC ontology (Building → Storey → Space) to eliminate LLM hallucinations.
 - [ ] **Execute Complex Topological Rules via Native Cypher**:
   - Implement a Proof of Concept evaluating multi-element spatial relationships via native Cypher queries (e.g., `MATCH (p:IfcSpace)-[:ADJACENT_TO]->(c:IfcSpace) WHERE ...`) rather than ad-hoc Python loops.
 
@@ -189,4 +189,4 @@ Key milestones completed in previous development cycles:
 * **Digital Inspector Agent**: LangGraph state machine with 9 specialized tools for model querying, geometry extraction, compliance verification, and ISO 19650 CDE transitions.
 * **Enterprise RBAC**: Multi-tenant organizations, groups, superadmin ruleset/project/document grant matrices, and Google OAuth integration.
 * **DocLang Multimodal Pipeline**: Chunked storage offload, `.dclx` archive streaming, and multimodal image extraction.
-* **Embedded Graph Database**: `GraphDatabaseProvider` and `KuzuDatabaseProvider` integrated via application container.
+* **Graph Database**: `GraphDatabaseProvider` and `Neo4jDatabaseProvider` integrated via application container.

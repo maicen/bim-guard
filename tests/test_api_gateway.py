@@ -21,7 +21,7 @@ def test_api_health():
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "bim-guard-api"
-    assert data["graph_backend"] in ("neo4j", "kuzu", "none")
+    assert data["graph_backend"] in ("neo4j", "none")
 
 
 def test_api_openapi_json():

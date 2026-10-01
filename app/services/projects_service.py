@@ -556,7 +556,7 @@ class ProjectsService:
     def delete_project(self, project_id: int):
         """Delete a project row by primary key.
 
-        Also cascades into the graph database (Neo4j/Kùzu) and RDF
+        Also cascades into the graph database (Neo4j) and RDF
         triplestore, if configured: IFC element nodes/triples are ingested
         with a project_id tag (see app.modules.ifc_reader.ifc_graph and
         app.services.graph_triplestore_service), and were previously left

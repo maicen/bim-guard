@@ -33,7 +33,6 @@ from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
 from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.ifc_pipeline_service import IFCPipelineService
-from app.services.kuzu_provider import KuzuDatabaseProvider
 from app.services.llm_call_log_service import LLMCallLogService
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 from app.services.llm_task_assignment_service import LLMTaskAssignmentService
@@ -813,17 +812,12 @@ def build_default_container() -> ApplicationContainer:
                     logger.debug("Neo4j GraphRAG index setup note: %s", index_err)
                 logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)
             else:
-                logger.warning("Neo4j at %s is unreachable; falling back to Kùzu", neo4j_uri)
+                logger.warning("Neo4j at %s is unreachable", neo4j_uri)
         except Exception as e:
             logger.warning("Could not initialize Neo4jDatabaseProvider: %s", e)
 
     if graph_service is None:
-        try:
-            kuzu_provider = KuzuDatabaseProvider(db_path=".kuzu_db")
-            graph_service = GraphService(provider=kuzu_provider)
-        except Exception as e:
-            logger.warning("Could not initialize KuzuDatabaseProvider: %s", e)
-            graph_service = GraphService()
+        graph_service = GraphService()
 
     try:
         graph_triplestore_service = GraphTriplestoreService(store_path=".oxigraph_db")

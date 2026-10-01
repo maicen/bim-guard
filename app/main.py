@@ -518,7 +518,6 @@ app.include_router(api_scim.router, prefix="/api/scim/v2", tags=["SCIM"])
 def health_check() -> HealthCheckResponse:
     """Return API gateway operational status, including which graph backend is live."""
     from app.bootstrap import get_container
-    from app.services.kuzu_provider import KuzuDatabaseProvider
     from app.services.neo4j_provider import Neo4jDatabaseProvider
 
     graph_backend = "none"
@@ -526,8 +525,6 @@ def health_check() -> HealthCheckResponse:
         provider = get_container().graph_service.provider
         if isinstance(provider, Neo4jDatabaseProvider):
             graph_backend = "neo4j"
-        elif isinstance(provider, KuzuDatabaseProvider):
-            graph_backend = "kuzu"
     except Exception:
         pass
 

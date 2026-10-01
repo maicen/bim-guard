@@ -82,12 +82,10 @@ best-effort removes stored files alongside the document row.
 
 Project deletion now reaches:
 
-- **Graph data** (Neo4j/Kuzu): IFC element nodes are ingested with a `project_id` property
+- **Graph data** (Neo4j): IFC element nodes are ingested with a `project_id` property
   (`app/modules/ifc_reader/ifc_graph.py`). `GraphService.delete_project_data(project_id)`
   removes them — `Neo4jDatabaseProvider.delete_by_project` runs a single label-agnostic
-  `MATCH (n {project_id: ...}) DETACH DELETE n`; `KuzuDatabaseProvider.delete_by_project`
-  iterates the strictly-typed node-table catalog and deletes from only the tables that
-  actually carry a `project_id` column, leaving global reference data (`Rule`, `IfcClass`)
+  `MATCH (n {project_id: ...}) DETACH DELETE n`, leaving global reference data (`Rule`, `IfcClass`)
   untouched.
 - **RDF triplestore**: each project's triples live in their own named graph
   (`https://bimguard.io/graphs/{project_id}`) in `GraphTriplestoreService`.

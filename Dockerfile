@@ -18,7 +18,7 @@ COPY frontend/package.json frontend/package-lock.json* ./
 # drift (picomatch via tailwind vs vite) that npm's strict ci check rejects
 # even right after a clean `npm install` — a lockfile quirk, not a Docker issue.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --no-audit --no-fund
+    npm install --no-audit --no-fund --prefer-offline
 
 # Copy frontend source files
 COPY frontend/ ./
@@ -50,10 +50,12 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies into /app/.venv without project installation.
 # --frozen refuses to resolve/update the lockfile; cache mount keeps the
-# uv download cache out of the image layers entirely. No bytecode
-# precompilation, since PYTHONDONTWRITEBYTECODE=1 at runtime never uses it.
+# uv download cache out of the image layers entirely.
+# Purge __pycache__ and *.pyc bytecode from site-packages to shed ~100MB before copying to runtime.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project --no-dev --no-editable \
+    && find /app/.venv -type d -name "__pycache__" -prune -exec rm -rf {} + \
+    && find /app/.venv -type f -name "*.pyc" -delete
 
 
 # ── Stage 3: Production Runtime ───────────────────────────────────────────────
@@ -61,31 +63,19 @@ FROM python:3.12-slim-bookworm AS runtime
 
 # System dependencies:
 # - libgomp1: required by IfcOpenShell OpenCASCADE native bindings
-# Non-root user is created before the app payload is copied in, so ownership
-# is set by COPY --chown at copy time instead of a later `chown -R` layer —
-# a chown after the fact would copy-on-write the entire ~1GB venv again.
+# Pre-create non-root user, playwright directory, and persistent runtime directories
+# so ownership is established upfront, eliminating duplicate copy-on-write layers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 bimguard
+    && useradd -m -u 1000 bimguard \
+    && mkdir -p /opt/ms-playwright /app/data/cache/supabase-storage /app/data/agent-sessions /app/data/logs \
+    && chown -R bimguard:bimguard /opt/ms-playwright /app
 
 WORKDIR /app
 
 # Copy virtualenv from backend builder
 COPY --from=backend-builder --chown=bimguard:bimguard /app/.venv /app/.venv
-
-# Copy compiled Svelte 5 SPA from frontend builder
-COPY --from=frontend-builder --chown=bimguard:bimguard /frontend/dist ./frontend/dist
-
-# Copy application source & assets
-COPY --chown=bimguard:bimguard main.py ./
-COPY --chown=bimguard:bimguard app/ ./app/
-COPY --chown=bimguard:bimguard static/ ./static/
-COPY --chown=bimguard:bimguard data/ ./data/
-
-# Create runtime directories for Supabase Storage cache, agent sessions, and logs
-RUN mkdir -p data/cache/supabase-storage data/agent-sessions data/logs \
-    && chown -R bimguard:bimguard data/
 
 # Runtime environment settings
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -97,12 +87,24 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 # Chromium for the PDF compliance report (app/services/report_rendering.py).
-# --with-deps installs Chromium's own apt packages (libnss3, libatk, etc.)
-# alongside the browser binary, so it must run as root, before USER bimguard
-# below; PLAYWRIGHT_BROWSERS_PATH above points the download somewhere the
-# app user can still read after the chown.
-RUN playwright install --with-deps chromium \
+# Install only Chromium headless shell and its system dependencies.
+# Placed BEFORE application code copy so this heavy layer is 100% cached across
+# application source code updates, cutting rebuild times from minutes to seconds.
+# Purging /var/lib/apt/lists and /var/cache/apt immediately after install saves ~80MB.
+RUN playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
     && chown -R bimguard:bimguard /opt/ms-playwright
+
+# Copy compiled Svelte 5 SPA from frontend builder
+COPY --from=frontend-builder --chown=bimguard:bimguard /frontend/dist ./frontend/dist
+
+# Copy static assets and data (without running subsequent chown -R to avoid duplicate layers)
+COPY --chown=bimguard:bimguard static/ ./static/
+COPY --chown=bimguard:bimguard data/ ./data/
+
+# Copy application source (placed last so code edits only invalidate the top-most layers)
+COPY --chown=bimguard:bimguard app/ ./app/
+COPY --chown=bimguard:bimguard main.py ./
 
 EXPOSE 8000
 
@@ -114,3 +116,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Production command: 4 worker processes
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+

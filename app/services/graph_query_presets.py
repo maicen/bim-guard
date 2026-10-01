@@ -1,7 +1,7 @@
 """Parameterized, server-scoped Cypher presets for the GraphRAG query console.
 
-The property graph `GraphService`/`ingest_ifc_to_graph()` populate (Neo4j or
-Kùzu) has no per-project partitioning the way `GraphTriplestoreService` has
+The property graph `GraphService`/`ingest_ifc_to_graph()` populates (Neo4j)
+has no per-project partitioning the way `GraphTriplestoreService` has
 for the triplestore (`named_graphs` scoping) -- every provider just stamps a
 `project_id` property onto each node. Free-form Cypher would therefore leak
 every project's nodes to whoever ran it (`MATCH (n) RETURN n` has no
@@ -10,12 +10,6 @@ the query console reaches the property graph: a small library of preset
 queries, each parameterized by `project_id`, which the caller always injects
 server-side (see `app.api.graph_routes.run_graph_query_preset`) -- it is
 never a value the request body can supply.
-
-Every preset here is written in Cypher syntax portable across both
-providers this repo supports; notably it avoids Neo4j's `type(rel)` /
-Kùzu's `label(rel)` relationship-type functions, which are NOT
-interchangeable between the two dialects (verified against embedded Kùzu),
-rather than special-casing the query text per provider.
 """
 
 from __future__ import annotations

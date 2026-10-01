@@ -169,8 +169,8 @@ class HealthCheckResponse(BaseModel):
         "none",
         description=(
             "Which GraphDatabaseProvider is actually backing graph_service: "
-            "'neo4j', 'kuzu', or 'none' if neither initialized. Informational "
-            "only -- a broken graph backend does not fail this health check, "
+            "'neo4j' or 'none' if not initialized. Informational only -- "
+            "a broken graph backend does not fail this health check, "
             "since compliance/rules/documents work independently of it."
         ),
     )

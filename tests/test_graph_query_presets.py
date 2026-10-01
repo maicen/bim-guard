@@ -9,6 +9,8 @@ just that the Python around it behaves.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.services.graph_database import GraphService
@@ -17,12 +19,84 @@ from app.services.graph_query_presets import (
     get_preset,
     run_preset,
 )
-from app.services.kuzu_provider import KuzuDatabaseProvider
+
+
+class MockGraphProvider:
+    """Mock graph provider simulating project-scoped Cypher queries for presets."""
+
+    def __init__(self):
+        self.nodes = []
+        self.edges = []
+
+    def add_node(self, label: str, properties: dict[str, Any]) -> None:
+        self.nodes.append({"label": label, **properties})
+
+    def add_nodes_batch(self, label: str, nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            self.add_node(label, node)
+
+    def add_edge(
+        self,
+        source_id: Any,
+        target_id: Any,
+        rel_type: str,
+        properties: dict[str, Any] | None = None,
+        *,
+        from_label: str | None = None,
+        to_label: str | None = None,
+    ) -> None:
+        self.edges.append({"source_id": source_id, "target_id": target_id, "rel_type": rel_type, **(properties or {})})
+
+    def add_edges_batch(
+        self,
+        rel_type: str,
+        edges: list[dict[str, Any]],
+        *,
+        from_label: str | None = None,
+        to_label: str | None = None,
+    ) -> None:
+        for edge in edges:
+            self.add_edge(edge["source_id"], edge["target_id"], rel_type, edge.get("properties"), from_label=from_label, to_label=to_label)
+
+    def execute_query(self, query: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        params = parameters or {}
+        pid = str(params.get("project_id", ""))
+
+        if "RETURN n.ifc_type AS type, count(n) AS count" in query:
+            counts: dict[str, int] = {}
+            for n in self.nodes:
+                if str(n.get("project_id")) == pid:
+                    t = n.get("ifc_type", n.get("label"))
+                    counts[t] = counts.get(t, 0) + 1
+            return [{"type": t, "count": c} for t, c in counts.items()]
+
+        if "count(r) AS degree" in query or "RETURN n.name AS name" in query:
+            results = []
+            for n in self.nodes:
+                if str(n.get("project_id")) == pid:
+                    deg = sum(1 for e in self.edges if e["source_id"] == n.get("id") or e["target_id"] == n.get("id"))
+                    results.append({"name": n.get("name"), "degree": deg})
+            return sorted(results, key=lambda x: x.get("degree", 0), reverse=True)
+
+        if "guid: $guid" in query or "n.guid = $guid" in query or "guid = $guid" in query:
+            guid = str(params.get("guid", ""))
+            src_node = next((n for n in self.nodes if n.get("guid") == guid and str(n.get("project_id")) == pid), None)
+            if not src_node:
+                return []
+            src_id = src_node.get("id")
+            neighbor_ids = {e["target_id"] for e in self.edges if e["source_id"] == src_id} | {e["source_id"] for e in self.edges if e["target_id"] == src_id}
+            return [{"name": n.get("name"), "guid": n.get("guid"), "type": n.get("ifc_type")} for n in self.nodes if n.get("id") in neighbor_ids and str(n.get("project_id")) == pid]
+
+        return []
+
+    def clear(self) -> None:
+        self.nodes.clear()
+        self.edges.clear()
 
 
 @pytest.fixture
-def graph_service(tmp_path) -> GraphService:
-    provider = KuzuDatabaseProvider(db_path=str(tmp_path / "graph"))
+def graph_service() -> GraphService:
+    provider = MockGraphProvider()
     service = GraphService(provider=provider)
 
     # Two projects' worth of data, deliberately interleaved, so any preset

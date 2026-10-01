@@ -1,7 +1,7 @@
 """Document Graph Service for Graph RAG and Architectural Knowledge Graphs.
 
 Projects hierarchical document Table of Contents (TOC) trees and their semantic
-relationships into Neo4j / Kùzu graph databases via GraphService:
+relationships into Neo4j graph database via GraphService:
   - Document & DocumentSection nodes
   - PARENT_OF & NEXT_SIBLING structural edges
   - CITES & REFERENCES cross-citation edges

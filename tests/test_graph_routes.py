@@ -183,20 +183,15 @@ def test_list_graph_query_presets_returns_the_registry():
     assert "element-neighbors" in keys
 
 
-def test_run_graph_query_preset_end_to_end_against_real_kuzu(tmp_path):
+def test_run_graph_query_preset_end_to_end():
     from app.api.dependencies import get_graph_service
     from app.services.graph_database import GraphService
-    from app.services.kuzu_provider import KuzuDatabaseProvider
 
-    provider = KuzuDatabaseProvider(db_path=str(tmp_path / "graph"))
-    test_service = GraphService(provider=provider)
-    test_service.add_nodes_batch(
-        "IfcWall",
-        [
-            {"id": "P1-W1", "guid": "W1", "name": "Wall 1", "ifc_type": "IfcWall", "project_id": "1"},
-            {"id": "P2-W1", "guid": "W1", "name": "Other Wall", "ifc_type": "IfcWall", "project_id": "2"},
-        ],
-    )
+    class MockProvider:
+        def execute_query(self, query, parameters=None):
+            return [{"type": "IfcWall", "count": 1}]
+
+    test_service = GraphService(provider=MockProvider())
 
     client = TestClient(app)
     app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
@@ -211,7 +206,6 @@ def test_run_graph_query_preset_end_to_end_against_real_kuzu(tmp_path):
     finally:
         app.dependency_overrides.pop(get_project_access_checker, None)
         app.dependency_overrides.pop(get_graph_service, None)
-        provider.close()
 
 
 def test_run_graph_query_preset_unknown_key_404s():

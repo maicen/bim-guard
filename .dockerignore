@@ -34,6 +34,9 @@ frontend/.vite/
 # Runtime data (mounted via volumes at runtime, not baked into image)
 data/cache/
 data/uploads/
+data/migration/
+data/*.ifc
+data/*.bcf
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
@@ -41,11 +44,20 @@ data/agent-sessions/
 data/logs/
 data/bimguard_issue_history.json
 
-# Documentation and test fixtures not needed in production image
+# Documentation, test fixtures, and scripts not needed in production image
 docs/
+scripts/
+supabase/
+docker/
 IFC-Sample-Test-Files/
 tests/
 app/modules/tests/
+
+# Local databases and agents
+.kuzu_db/
+.oxigraph_db/
+.agents/
+.copilot/
 
 # Misc
 *.md

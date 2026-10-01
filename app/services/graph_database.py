@@ -2,7 +2,7 @@
 
 This module defines the abstract interface for graph database operations
 to support GraphRAG (Rules Extraction) and topological rule evaluation.
-Concrete implementations (e.g., KùzuDB, Neo4j, FalkorDB) can be injected
+Concrete implementations (e.g., Neo4j) can be injected
 without changing domain logic.
 """
 
@@ -36,9 +36,9 @@ class GraphDatabaseProvider(Protocol):
     ) -> None:
         """Add an edge between two nodes.
 
-        from_label/to_label identify each endpoint's node type -- required by
-        providers (e.g. Kùzu) whose graph is strictly typed; a provider that
-        doesn't need them may ignore both.
+        from_label/to_label identify each endpoint's node type when needed
+        by strictly typed graph backends; providers that don't need them
+        may ignore both.
         """
         ...
 
@@ -158,10 +158,8 @@ class GraphService:
     def link_rule_to_ifc(self, rule_id: str, ifc_class: str) -> None:
         """Link an extracted rule to its target IFC class.
 
-        Ensures both endpoint nodes exist first: add_edge needs to know each
-        endpoint's node-table label to build a MATCH against Kuzu's strictly
-        typed graph, and a rule/IFC class pair reaching this helper may never
-        have been added as nodes on their own.
+        Ensures both endpoint nodes exist first, so add_edge can create
+        the APPLIES_TO relationship cleanly.
         """
         if not self.provider:
             return

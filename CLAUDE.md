@@ -166,7 +166,7 @@ To keep feedback cycles fast without running all 150+ tests every time, use thes
    - `api`: FastAPI route handlers, dependencies, and contract validation.
    - `engine`: Architectural compliance engines (egress, spatial, stair, door, etc.).
    - `rules`: Rule extraction, catalog, draft workflow, and semantic alignment.
-   - `graph`: Neo4j, Kuzu, RDF triplestore, and OpenCDE integrations.
+   - `graph`: Neo4j, RDF triplestore, and OpenCDE integrations.
    - `export`: BCF, IDS, and analysis report export pipelines.
 4. **Name / Keyword filtering (`-k`)**: E.g. `uv run pytest -k "document and not export"`.
 5. **Re-run failures first**: Use `uv run pytest --lf` to quickly iterate on failing tests until they pass.
