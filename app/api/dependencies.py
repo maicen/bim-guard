@@ -153,7 +153,7 @@ def get_graph_rag_service() -> GraphRagService:
     return GraphRagService(
         graph_service=get_container().graph_service,
         models_service=get_container().models_service,
-        rules_service=get_container().rules_service,
+        rule_service=get_container().rules_service,
         projects_service=get_container().projects_service,
     )
 

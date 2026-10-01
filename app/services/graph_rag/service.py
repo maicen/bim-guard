@@ -32,12 +32,13 @@ class GraphRagService:
         graph_service: GraphService,
         embedding_service: Optional[EmbeddingService] = None,
         rule_service: Optional[RuleService] = None,
+        rules_service: Optional[RuleService] = None,
         models_service: Optional[ModelsService] = None,
         projects_service: Optional[Any] = None,
     ):
         self.graph_service = graph_service
         self.embedding_service = embedding_service or EmbeddingService()
-        self.rule_service = rule_service or RuleService()
+        self.rule_service = rule_service or rules_service or RuleService()
         self.models_service = models_service or ModelsService()
         self.projects_service = projects_service
 
