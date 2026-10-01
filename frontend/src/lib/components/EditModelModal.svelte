@@ -1,5 +1,6 @@
 <script lang="ts">
   import { run } from "svelte/legacy";
+  import { onDestroy } from "svelte";
   import { Pencil, UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import Alert from "./Alert.svelte";
@@ -33,6 +34,11 @@
   let isSaving = $state(false);
   let errorMessage = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
+  let uploadAbortController: AbortController | null = null;
+
+  onDestroy(() => {
+    uploadAbortController?.abort();
+  });
 
   // Re-seed the form fields whenever a different file is opened for editing.
   run(() => {
@@ -75,10 +81,11 @@
     isSaving = true;
     errorMessage = "";
     errorLog = [];
+    uploadAbortController = new AbortController();
     try {
       let updated: Model;
       if (replacement) {
-        updated = await modelsApi.replace(projectId, file.id, replacement);
+        updated = await modelsApi.replace(projectId, file.id, replacement, uploadAbortController.signal);
       }
       updated = await modelsApi.update(projectId, file.id, {
         file_name: fileName.trim(),
@@ -94,9 +101,11 @@
       });
       onSaved(updated);
     } catch (err: any) {
+      if (uploadAbortController?.signal.aborted) return;
       errorMessage = err?.message || "Failed to save model.";
       errorLog = [toErrorLogEntry(err, file?.file_name || `model #${file?.id}`)];
     } finally {
+      uploadAbortController = null;
       isSaving = false;
     }
   }

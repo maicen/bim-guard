@@ -9,10 +9,7 @@
   import { DOCUMENT_TYPES } from "../types";
   import type { DocumentItem, ParsingEngineInstance } from "../types";
   import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
-  import { formatFileSize } from "../fileLimits";
-
-  /** Mirrors MAX_DOCUMENT_UPLOAD_BYTES in app/document_upload_validation.py */
-  const MAX_DOC_BYTES = 100 * 1024 * 1024; // 100 MB
+  import { formatFileSize, MAX_DOCUMENT_UPLOAD_BYTES, describeOversizedFiles } from "../fileLimits";
 
   interface Props {
     isOpen: boolean;
@@ -74,8 +71,12 @@
     const dt = e.dataTransfer;
     if (!dt?.files?.length) return;
     const picked = dt.files[0];
-    if (picked.size > MAX_DOC_BYTES) {
-      uploadError = `"${picked.name}" is ${formatFileSize(picked.size)}, which exceeds the 100 MB document upload limit. Try splitting the document into smaller sections or use a page range.`;
+    if (picked.size > MAX_DOCUMENT_UPLOAD_BYTES) {
+      uploadError = describeOversizedFiles(
+        [picked],
+        MAX_DOCUMENT_UPLOAD_BYTES,
+        "Try splitting the document into smaller sections or use a page range."
+      );
       uploadErrorLog = [];
       return;
     }
@@ -215,8 +216,12 @@
             if (target.files && target.files[0]) {
               const picked = target.files[0];
               target.value = "";
-              if (picked.size > MAX_DOC_BYTES) {
-                uploadError = `"${picked.name}" is ${formatFileSize(picked.size)}, which exceeds the 100 MB document upload limit. Try splitting the document into smaller sections or use a page range.`;
+              if (picked.size > MAX_DOCUMENT_UPLOAD_BYTES) {
+                uploadError = describeOversizedFiles(
+                  [picked],
+                  MAX_DOCUMENT_UPLOAD_BYTES,
+                  "Try splitting the document into smaller sections or use a page range."
+                );
                 uploadErrorLog = [];
                 return;
               }
