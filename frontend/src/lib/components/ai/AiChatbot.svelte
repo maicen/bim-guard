@@ -55,14 +55,21 @@
   let isStreaming = $state(false);
   let stopStreamFn = $state<(() => void) | null>(null);
 
-  // Sync messages with store if persistent
+  let currentLoadedConvId = $state<string | null>(null);
+
+  // Sync messages with store if persistent, only when conversation changes
   $effect(() => {
     if (persistent) {
-      messages = copilotStore.activeMessages;
-      if (copilotStore.activeSummary) {
-        scope = copilotStore.activeSummary.scope;
-        selectedDocId = copilotStore.activeSummary.document_id || null;
-        selectedElementClass = copilotStore.activeSummary.element_class || null;
+      const activeId = copilotStore.activeConversationId;
+      if (activeId !== currentLoadedConvId) {
+        currentLoadedConvId = activeId;
+        messages = [...copilotStore.activeMessages];
+        const summary = untrack(() => copilotStore.activeSummary);
+        if (summary) {
+          scope = summary.scope;
+          selectedDocId = summary.document_id || null;
+          selectedElementClass = summary.element_class || null;
+        }
       }
     }
   });
@@ -110,11 +117,14 @@
     if (!queryText.trim() || isStreaming) return;
 
     if (persistent && !copilotStore.activeConversationId) {
-      await copilotStore.startNewConversation(projectId, {
+      const created = await copilotStore.startNewConversation(projectId, {
         scope,
         documentId: selectedDocId,
         elementClass: selectedElementClass,
       });
+      if (created) {
+        currentLoadedConvId = created.id;
+      }
     }
 
     const userMessageId = `user_${Date.now()}`;

@@ -24,20 +24,26 @@ _current: ContextVar[dict[str, Any]] = ContextVar("llm_call_context", default={}
 @contextmanager
 def llm_call_context(
     *,
-    context: str,
+    context: str = "unknown",
     organization_id: int | None = None,
     project_id: int | None = None,
     run_key: str | None = None,
     metadata: dict[str, Any] | None = None,
+    source: str | None = None,
+    **extra: Any,
 ) -> Iterator[None]:
     """Tag every LLM call made within this block for the logging callback."""
+    meta = dict(metadata or {})
+    if extra:
+        meta.update(extra)
+    tag_context = source or context
     token = _current.set(
         {
-            "context": context,
+            "context": tag_context,
             "organization_id": organization_id,
             "project_id": project_id,
             "run_key": run_key,
-            "metadata": metadata or {},
+            "metadata": meta,
         }
     )
     try:

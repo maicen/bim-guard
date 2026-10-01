@@ -283,6 +283,16 @@ export class CopilotStore {
   ) {
     if (!conversationId || messagesToSave.length === 0) return;
 
+    if (this.activeConversationId === conversationId) {
+      this.activeMessages = [...this.activeMessages, ...messagesToSave];
+      if (this.activeConversation) {
+        this.activeConversation.messages = [
+          ...(this.activeConversation.messages || []),
+          ...messagesToSave,
+        ];
+      }
+    }
+
     try {
       await copilotApi.saveMessages(conversationId, projectId, messagesToSave);
 

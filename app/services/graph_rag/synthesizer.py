@@ -54,7 +54,7 @@ class GraphRagSynthesizer:
             import litellm
 
             model_name = os.getenv("BIM_GUARD_LLM_MODEL", DEFAULT_LLM_MODEL)
-            with llm_call_context(source="graph_rag_service", task_type="synthesis"):
+            with llm_call_context(context="graph_rag_service", metadata={"task_type": "synthesis"}):
                 resp = await litellm.acompletion(
                     model=model_name,
                     messages=prompt_payload,
@@ -75,7 +75,7 @@ class GraphRagSynthesizer:
             import litellm
 
             model_name = os.getenv("BIM_GUARD_LLM_MODEL", DEFAULT_LLM_MODEL)
-            with llm_call_context(source="graph_rag_service", task_type="streaming_synthesis"):
+            with llm_call_context(context="graph_rag_service", metadata={"task_type": "streaming_synthesis"}):
                 response = await litellm.acompletion(
                     model=model_name,
                     messages=prompt_payload,

@@ -50,9 +50,17 @@
     loadProjects();
   });
 
+  let lastLoadedProjectId = $state<number | null>(null);
+  let lastLoadedThread = $state<string | null>(null);
+
   $effect(() => {
     if (targetProjectId) {
-      copilotStore.loadConversations(targetProjectId, threadParam);
+      const currentThread = threadParam || null;
+      if (lastLoadedProjectId !== targetProjectId || lastLoadedThread !== currentThread) {
+        lastLoadedProjectId = targetProjectId;
+        lastLoadedThread = currentThread;
+        copilotStore.loadConversations(targetProjectId, threadParam);
+      }
     }
   });
 
