@@ -106,6 +106,6 @@ else
     echo ""
     echo "    If dev.bim-guard.xyz is configured, it will be live shortly."
     echo ""
-    exec cloudflared tunnel --no-autoupdate run --token "${TUNNEL_TOKEN}" \
+    exec cloudflared tunnel --protocol http2 --no-autoupdate run --token "${TUNNEL_TOKEN}" \
         --url "http://localhost:${LOCAL_PORT}"
 fi

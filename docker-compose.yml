@@ -205,7 +205,7 @@ services:
     container_name: bim-guard-cloudflared
     profiles: ["tunnel"]
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --protocol http2 --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
     depends_on:
