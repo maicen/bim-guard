@@ -215,8 +215,14 @@ async def analyze_upload_ifc(
         ifc_file.filename, content, project_id=project_id, kind="ifc"
     )
     if not response.success:
+        # Distinguish user errors (bad file) from server errors (storage down).
+        # _validate runs before the storage call, so any size/extension/empty
+        # rejection is a 400; an I/O failure reaching this branch is a 502.
+        from app.modules.pipeline_io.file_upload import _validate
+
+        is_validation_error = bool(_validate(ifc_file.filename, content, kind="ifc"))
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST if is_validation_error else status.HTTP_502_BAD_GATEWAY,
             detail=response.error or "Upload failed.",
         )
 

@@ -36,6 +36,7 @@
   let uploadErrorLog: ErrorLogEntry[] = $state([]);
   let uploadErrorLogCopied = $state(false);
   let uploadAbortController: AbortController | null = null;
+  let isDragging = $state(false);
 
   onDestroy(() => {
     uploadAbortController?.abort();
@@ -61,8 +62,28 @@
   }
 
   function handleClose() {
+    if (isUploading) return; // guard: don't close while upload is in flight
     resetState();
     onClose();
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    isDragging = false;
+    if (isUploading) return;
+    const dt = e.dataTransfer;
+    if (!dt?.files?.length) return;
+    const picked = dt.files[0];
+    if (picked.size > MAX_DOC_BYTES) {
+      uploadError = `"${picked.name}" is ${formatFileSize(picked.size)}, which exceeds the 100 MB document upload limit. Try splitting the document into smaller sections or use a page range.`;
+      uploadErrorLog = [];
+      return;
+    }
+    uploadFile = picked;
+    rawText = "";
+    docTitle = "";
+    uploadError = "";
+    uploadErrorLog = [];
   }
 
   function getPastedFilename(): string {
@@ -169,11 +190,17 @@
 
     <!-- Option 1: File dropzone -->
     <div
-      class="rounded-xl border-2 border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-accent"
+      class="rounded-xl border-2 border-dashed {isDragging ? 'border-accent bg-accent/10' : 'border-border-interactive bg-surface-canvas/40'} p-6 text-center transition-colors hover:border-accent"
+      role="region"
+      aria-label="File drop zone"
+      ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+      ondragleave={() => { isDragging = false; }}
+      ondrop={handleDrop}
     >
       <FileText class="mx-auto mb-2 h-8 w-8 text-fg-muted" />
       <p class="mb-3 text-xs text-fg-muted">
-        Upload PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, TXT, an image
+        Drag &amp; drop a file here, or click to browse.
+        PDF, Word, Excel, PowerPoint, HTML, AsciiDoc, Markdown, CSV, TXT, images
         (PNG/JPEG/TIFF/BMP/WEBP), or pre-converted DocLang files (.dclg, .dclx, .doclang)
       </p>
       <label

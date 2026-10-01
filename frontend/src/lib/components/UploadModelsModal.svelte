@@ -23,7 +23,11 @@
   let primaryIndex = $state(0);
   let isSubmitting = $state(false);
   let errorMessage = $state("");
+  let compressionWarning = $state("");
   let statusMessage = $state("");
+  let isDragging = $state(false);
+
+  let totalSelectedMB = $derived(selectedFiles.reduce((s, f) => s + f.size, 0) / (1024 * 1024));
   // Cancels the in-flight upload/attach-status poll if the component
   // unmounts mid-upload (navigating away) -- the modal's own Close button
   // already refuses to close while isSubmitting, but a route change
@@ -40,6 +44,7 @@
     roles = [];
     primaryIndex = 0;
     errorMessage = "";
+    compressionWarning = "";
   }
 
   let isCompressing = $state(false);
@@ -49,7 +54,12 @@
     const input = e.target as HTMLInputElement;
     const rawFiles = Array.from(input.files || []).filter((f) => /\.(ifc|ifczip|zip)$/i.test(f.name));
     input.value = "";
+    processFiles(rawFiles);
+  }
+
+  async function processFiles(rawFiles: File[]) {
     if (!rawFiles.length) return;
+    compressionWarning = "";
 
     let processedCandidates: File[] = [];
     if (rawFiles.some((f) => /\.ifc$/i.test(f.name))) {
@@ -63,7 +73,7 @@
         );
         processedCandidates = compressedFiles;
       } catch (err) {
-        console.warn("Client compression fallback:", err);
+        compressionWarning = "Client-side compression failed — uploading original .ifc files instead. They must be under the 50 MB limit.";
         processedCandidates = rawFiles;
       } finally {
         isCompressing = false;
@@ -77,6 +87,20 @@
     selectedFiles = [...selectedFiles, ...accepted];
     roles = [...roles, ...accepted.map(() => "context")];
     errorMessage = oversized.length ? describeOversizedFiles(oversized) : "";
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    isDragging = false;
+    if (isSubmitting || isCompressing) return;
+    const dt = e.dataTransfer;
+    if (!dt?.files?.length) return;
+    const rawFiles = Array.from(dt.files).filter((f) => /\.(ifc|ifczip|zip)$/i.test(f.name));
+    if (!rawFiles.length) {
+      errorMessage = "Only .ifc, .ifczip, or .zip files are accepted.";
+      return;
+    }
+    processFiles(rawFiles);
   }
 
   function removeFile(index: number) {
@@ -129,10 +153,13 @@
 >
   <div class="space-y-4">
     <label
-      class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border-interactive bg-surface-canvas/40 p-6 text-center transition-colors hover:border-border-interactive"
+      class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed {isDragging ? 'border-accent bg-accent/10' : 'border-border-interactive bg-surface-canvas/40'} p-6 text-center transition-colors hover:border-accent"
+      ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+      ondragleave={() => { isDragging = false; }}
+      ondrop={handleDrop}
     >
       <UploadCloud class="h-5 w-5 text-fg-muted" />
-      <span class="text-xs font-medium text-fg-secondary">Click to choose .ifc or .ifcZIP files</span>
+      <span class="text-xs font-medium text-fg-secondary">Drag &amp; drop or click to choose .ifc / .ifcZIP files</span>
       <input type="file" accept=".ifc,.ifczip,.zip" multiple class="hidden" onchange={handleFileInput} />
     </label>
 
@@ -140,6 +167,12 @@
       <div class="flex items-center justify-center gap-2 py-2 text-xs text-accent">
         <Loader2 class="h-4 w-4 animate-spin" />
         <span>{compressionStatus || "Compressing IFC model to .ifcZIP..."}</span>
+      </div>
+    {/if}
+
+    {#if compressionWarning}
+      <div class="rounded-lg border border-caution-border bg-caution-bg px-3 py-2 text-xs text-caution">
+        {compressionWarning}
       </div>
     {/if}
 
@@ -173,9 +206,14 @@
             </div>
           {/each}
         </RadioGroupRoot>
-        <p class="text-micro text-fg-muted">
-          Select the radio button to mark which file is the primary model.
-        </p>
+        <div class="flex items-center justify-between">
+          <p class="text-micro text-fg-muted">
+            Select the radio button to mark which file is the primary model.
+          </p>
+          <p class="text-micro {totalSelectedMB > 50 ? 'text-critical font-medium' : 'text-fg-muted'}">
+            Total: {totalSelectedMB.toFixed(1)} MB / 50 MB limit
+          </p>
+        </div>
       </div>
     {/if}
 

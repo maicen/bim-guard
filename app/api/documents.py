@@ -574,21 +574,38 @@ async def upload_document(
             "DocLang extraction for '%s' exceeded 60s inline limit; storing file with DocLang deferred to avoid Cloudflare HTTP 524 timeout.",
             clean_filename,
         )
-        row, _created = await run_in_threadpool(
-            service.ingest_uploaded_bytes,
-            clean_filename,
-            content,
-            doc_type=doc_type,
-            project_code=project_code,
-            originator=resolved_originator,
-            suitability_code=suitability_code,
-            revision_code=revision_code,
-            parser=clean_parser,
-            instance=resolved_instance,
-            generate_doclang=False,
-            start_page=start_page,
-            end_page=end_page,
-        )
+        try:
+            row, _created = await asyncio.wait_for(
+                run_in_threadpool(
+                    service.ingest_uploaded_bytes,
+                    clean_filename,
+                    content,
+                    doc_type=doc_type,
+                    project_code=project_code,
+                    originator=resolved_originator,
+                    suitability_code=suitability_code,
+                    revision_code=revision_code,
+                    parser=clean_parser,
+                    instance=resolved_instance,
+                    generate_doclang=False,
+                    start_page=start_page,
+                    end_page=end_page,
+                ),
+                timeout=30.0,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "Document storage fallback also timed out for '%s'; returning 504.",
+                clean_filename,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail=(
+                    f"'{clean_filename}' could not be stored within the time limit. "
+                    "This may indicate slow storage connectivity. Try again, or reduce the file size "
+                    "by uploading a page range."
+                ),
+            )
     except NoParsingEngineConfiguredError as exc:
         if exc.had_instance:
             # An engine *was* resolved but it failed (e.g. the self-hosted

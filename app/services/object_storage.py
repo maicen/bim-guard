@@ -56,9 +56,24 @@ class ObjectStorage:
                 file=content,
                 file_options={"upsert": "true"},
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("Storage upload failed bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
-            raise
+            # Translate raw SDK / network errors into a concise message.  The
+            # original exception is chained so tracebacks are not lost, but the
+            # string that surfaces to the caller (and ultimately the user) never
+            # leaks internal bucket names, paths, or SDK implementation details.
+            msg = str(exc)
+            if "payload too large" in msg.lower() or "entity too large" in msg.lower():
+                friendly = f"The file is too large for the storage backend ({len(content) // (1024 * 1024)} MB). Check the bucket's file_size_limit in Supabase Storage settings."
+            elif "not found" in msg.lower() or "bucket" in msg.lower():
+                friendly = "Storage bucket not found or inaccessible. Contact your administrator."
+            elif "unauthorized" in msg.lower() or "jwt" in msg.lower() or "403" in msg:
+                friendly = "Storage authentication failed. The server's Supabase credentials may be expired or missing."
+            elif "connect" in msg.lower() or "timeout" in msg.lower() or "network" in msg.lower():
+                friendly = "Could not reach the storage service. Check network connectivity between the app server and Supabase."
+            else:
+                friendly = f"The file could not be stored. Storage error: {msg}"
+            raise OSError(friendly) from exc
         logger.info("Storage upload complete bucket=%s key=%s bytes=%d", self._bucket, object_key, len(content))
         return f"sb://{self._bucket}/{object_key}"
 
