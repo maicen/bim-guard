@@ -300,10 +300,18 @@ export interface GraphRagQueryResponse {
 /** Available document and IFC model entities available for Graph-RAG in a project. */
 export interface GraphRagContextSummary {
   project_id: number;
+  project_name?: string;
+  client_name?: string;
+  project_code?: string;
+  status?: string;
   has_ifc_model: boolean;
   total_elements: number;
+  total_storeys?: number;
+  total_spaces?: number;
   ifc_classes: Array<{ class_name: string; count: number }>;
-  documents: Array<{ id: number; title: string; section_count: number }>;
+  storeys?: Array<{ guid: string; name: string; element_count: number }>;
+  documents: Array<{ id: number; title: string; section_count: number; document_type?: string; cde_state?: string }>;
   rulesets: string[];
+  models?: Array<{ id?: number; file_name: string; role?: string; is_primary?: boolean; cde_state?: string; discipline?: string; uploaded_at?: string; revision_code?: string }>;
 }
 

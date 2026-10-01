@@ -1,10 +1,11 @@
 <!--
   AiBubble — chat bubble with role avatar and markdown formatting.
   Inspired by shadcn.io/ai/bubble & June 2026 Bubble component:
-  Supports user & assistant roles, timestamps, badges, and inline citation pills.
+  Supports user & assistant roles, timestamps, badges, markdown rendering, and inline citation pills.
 -->
 <script lang="ts">
   import { User, Sparkles, Copy, Check } from "lucide-svelte";
+  import { marked } from "marked";
   import AiInlineCitation from "./AiInlineCitation.svelte";
   import type { GraphRagCitation } from "../../types";
 
@@ -26,8 +27,21 @@
 
   let isUser = $derived(role === "user");
 
-  // Format content: handle code blocks and extract citations
-  // Simple clean markdown-safe rendering
+  function renderMarkdown(md: string): string {
+    if (!md) return "";
+    try {
+      // Style inline citation markers [Doc: ...] and [IFC: ...] with crisp badge styling
+      const processed = md.replace(
+        /\[(Doc|IFC):\s*([^\]]+)\]/g,
+        '<span class="inline-citation-tag" data-type="$1">[$1: $2]</span>'
+      );
+      return marked.parse(processed, { gfm: true, breaks: true }) as string;
+    } catch {
+      return md;
+    }
+  }
+
+  // Format content: handle code blocks and render markdown for text parts
   let formattedBlocks = $derived.by(() => {
     if (!content) return [];
     // Split by code blocks ```
@@ -37,9 +51,9 @@
         const lines = part.slice(3, -3).trim().split("\n");
         const lang = lines[0].trim();
         const code = lines.slice(lang ? 1 : 0).join("\n");
-        return { isCode: true, lang, code };
+        return { isCode: true, lang, code, html: "" };
       }
-      return { isCode: false, text: part };
+      return { isCode: false, text: part, html: renderMarkdown(part) };
     });
   });
 
@@ -107,9 +121,13 @@
               {block.code}
             </pre>
           </div>
-        {:else}
+        {:else if isUser}
           <div class="space-y-2 whitespace-pre-wrap">
             {block.text}
+          </div>
+        {:else}
+          <div class="prose-copilot text-fg-primary text-sm leading-relaxed space-y-2">
+            {@html block.html}
           </div>
         {/if}
       {/each}
@@ -128,3 +146,113 @@
     </div>
   </div>
 </div>
+
+<style>
+  :global(.prose-copilot h1) {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 0.75rem;
+    margin-bottom: 0.35rem;
+    color: var(--color-fg-primary);
+  }
+  :global(.prose-copilot h2) {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-top: 0.65rem;
+    margin-bottom: 0.3rem;
+    color: var(--color-fg-primary);
+  }
+  :global(.prose-copilot h3) {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
+    color: var(--color-fg-primary);
+  }
+  :global(.prose-copilot p) {
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.6;
+    color: var(--color-fg-secondary);
+  }
+  :global(.prose-copilot strong) {
+    font-weight: 600;
+    color: var(--color-fg-primary);
+  }
+  :global(.prose-copilot ul) {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+    color: var(--color-fg-secondary);
+  }
+  :global(.prose-copilot ol) {
+    list-style-type: decimal;
+    padding-left: 1.25rem;
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+    color: var(--color-fg-secondary);
+  }
+  :global(.prose-copilot li) {
+    margin-top: 0.2rem;
+    margin-bottom: 0.2rem;
+    line-height: 1.5;
+  }
+  :global(.prose-copilot table) {
+    width: 100%;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 0.375rem;
+    overflow: hidden;
+  }
+  :global(.prose-copilot th) {
+    background-color: var(--color-surface-hover);
+    padding: 0.4rem 0.6rem;
+    font-weight: 600;
+    text-align: left;
+    color: var(--color-fg-primary);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  :global(.prose-copilot td) {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
+    color: var(--color-fg-secondary);
+  }
+  :global(.prose-copilot blockquote) {
+    border-left: 3px solid var(--color-accent);
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+    font-style: italic;
+    color: var(--color-fg-muted);
+  }
+  :global(.prose-copilot code:not(pre code)) {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8em;
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-accent);
+  }
+  :global(.prose-copilot hr) {
+    margin: 0.75rem 0;
+    border: 0;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  :global(.inline-citation-tag) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-family: var(--font-mono, monospace);
+    background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+    margin: 0 0.15rem;
+  }
+</style>

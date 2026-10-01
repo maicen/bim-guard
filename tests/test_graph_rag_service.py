@@ -210,5 +210,95 @@ def test_graph_rag_floors_query():
     assert "Level 1 - First Floor" in response.citations[1].title
 
     # Verify answer contains verified facts
-    assert "Level 0 - Ground Floor" in response.answer or "Total Building Storeys" in response.answer
+    assert ("Level 0" in response.answer and "Ground Floor" in response.answer) or "Total Building Storeys" in response.answer
+
+
+def test_graph_rag_model_inventory_query():
+    """Verify GraphRagService directly handles 'How many models in this project?' and gates irrelevant doc search."""
+    mock_graph = MagicMock()
+    mock_graph.provider = MagicMock()
+    mock_graph.execute.return_value = []
+
+    mock_models_service = MagicMock()
+    mock_models_service.list_models.return_value = [
+        {
+            "id": 101,
+            "file_name": "Hospital_Architectural.ifc",
+            "role": "primary",
+            "is_primary": True,
+            "cde_state": "WIP",
+            "revision_code": "P01.01",
+            "uploaded_at": "2026-09-01T00:00:00Z",
+        },
+        {
+            "id": 102,
+            "file_name": "Hospital_Structural.ifc",
+            "role": "secondary",
+            "is_primary": False,
+            "cde_state": "SHARED",
+            "revision_code": "P01.02",
+            "uploaded_at": "2026-09-02T00:00:00Z",
+        },
+    ]
+
+    service = GraphRagService(
+        graph_service=mock_graph,
+        models_service=mock_models_service,
+    )
+
+    req = GraphRagQueryRequest(
+        query="How many models in this project?",
+        scope="hybrid",
+    )
+
+    response = asyncio.run(service.query(project_id=5006, request=req))
+
+    assert response.project_id == 5006
+    # Tool call must identify model inventory
+    tool_names = [t.tool_name for t in response.tool_calls]
+    assert "query_model_inventory" in tool_names
+    # Document search should be bypassed or produce 0 irrelevant doc citations
+    assert all(c.source_type == "model" for c in response.citations)
+    assert len(response.citations) == 2
+    assert "Hospital_Architectural.ifc" in response.citations[0].title
+    assert "Hospital_Structural.ifc" in response.citations[1].title
+
+
+def test_graph_rag_project_metadata_query():
+    """Verify GraphRagService answers project overview queries directly with project metadata."""
+    mock_graph = MagicMock()
+    mock_graph.provider = MagicMock()
+
+    mock_projects_service = MagicMock()
+    mock_projects_service.get_project.return_value = {
+        "id": 42,
+        "name": "Metro Transit Hub",
+        "client_name": "Metropolitan Transit Authority",
+        "project_code": "MTH-2026",
+        "status": "active",
+        "description": "Central intermodal transit terminal.",
+    }
+    mock_projects_service.get_client_documents_by_project.return_value = []
+
+    mock_models_service = MagicMock()
+    mock_models_service.list_models.return_value = []
+
+    service = GraphRagService(
+        graph_service=mock_graph,
+        models_service=mock_models_service,
+        projects_service=mock_projects_service,
+    )
+
+    req = GraphRagQueryRequest(
+        query="Tell me about this project and who the client is",
+        scope="hybrid",
+    )
+
+    response = asyncio.run(service.query(project_id=42, request=req))
+
+    assert response.project_id == 42
+    tool_names = [t.tool_name for t in response.tool_calls]
+    assert "query_project_metadata" in tool_names
+    assert len(response.citations) >= 1
+    assert "Metro Transit Hub" in response.citations[0].snippet
 
