@@ -83,7 +83,7 @@
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
         <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
+          <div class="rounded-xl border border-accent/20 bg-accent/10 p-2 text-accent">
             <Sparkles class="h-5 w-5" />
           </div>
           <div>
@@ -135,7 +135,7 @@
               type="button"
               disabled={isRunning || !project.ifc_file_path}
               onclick={handleRunEnhancement}
-              class="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-xs shadow-purple-600/20 transition-all hover:scale-[1.02] hover:bg-purple-500 disabled:opacity-50 disabled:hover:scale-100"
+              class="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-white shadow-xs shadow-accent/20 transition-all hover:scale-[1.02] hover:bg-accent-hover disabled:opacity-50 disabled:hover:scale-100"
             >
               <Sparkles class="h-4 w-4 {isRunning ? 'animate-spin' : ''}" />
               <span
@@ -192,7 +192,7 @@
                     {#each history as row (row.id)}
                       <tr class="transition-colors hover:bg-surface-hover">
                         <td class="px-4 py-3 font-mono text-fg-muted">v{row.source_version}</td>
-                        <td class="px-4 py-3 font-mono font-semibold text-purple-300"
+                        <td class="px-4 py-3 font-mono font-semibold text-accent"
                           >v{row.version}</td
                         >
                         <td class="px-4 py-3">
@@ -223,7 +223,7 @@
                             {#if row.output_reference}
                               <a
                                 href={withAuthToken(`/api/projects/${project.id}/enhancements/${row.id}/download`)}
-                                class="inline-flex items-center gap-1 rounded-lg border border-purple-800/40 bg-purple-950/40 px-3 py-1 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-900/60"
+                                class="inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
                                 title="Download enhanced IFC"
                               >
                                 <Download class="h-3 w-3" />

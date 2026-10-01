@@ -983,9 +983,9 @@
         </Tabs.Trigger>
         <Tabs.Trigger
           value="Arch"
-          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+          class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-xs text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
         >
-          <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+          <span class="h-2 w-2 rounded-full bg-accent"></span>
           <span>Arch</span>
           <span class="ml-0.5 text-micro opacity-75">({archCount})</span>
         </Tabs.Trigger>
@@ -1013,7 +1013,7 @@
                 onclick={toggleFolderSelectionMode}
                 class="rounded-md p-1 transition-colors {isFolderSelectionMode ||
                 selectedFolderRulesetIds.length > 0
-                  ? 'bg-blue-500/10 text-blue-400'
+                  ? 'bg-accent/10 text-accent'
                   : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'}"
                 title={isFolderSelectionMode
                   ? "Exit folder select mode"
@@ -1026,7 +1026,7 @@
           <button
             type="button"
             onclick={openCreateFolderModal}
-            class="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-overlay px-2 py-1 text-caption font-semibold text-fg-secondary transition-colors hover:bg-blue-600 hover:text-white"
+            class="inline-flex items-center gap-1 rounded-lg border border-border-default bg-surface-overlay px-2 py-1 text-caption font-semibold text-fg-secondary transition-colors hover:bg-accent hover:text-white"
             title="Create New Ruleset Folder"
           >
             <Plus class="h-3.5 w-3.5" />
@@ -1037,7 +1037,7 @@
         <!-- Folder Bulk Action Bar when folders are selected -->
         {#if selectedFolderRulesetIds.length > 0}
           <div
-            class="flex items-center justify-between gap-1 rounded-xl border border-blue-800 bg-blue-950/90 p-2 text-xs text-blue-200 shadow-md duration-150 animate-in fade-in"
+            class="flex items-center justify-between gap-1 rounded-xl border border-accent/50 bg-surface-selected p-2 text-xs text-fg-primary shadow-md duration-150 animate-in fade-in"
           >
             <div class="flex items-center gap-1 truncate text-caption font-medium">
               <span class="font-bold text-fg-primary">{selectedFolderRulesetIds.length}</span>
@@ -1047,7 +1047,7 @@
               <button
                 type="button"
                 onclick={openBulkEditFoldersModal}
-                class="rounded-md bg-blue-600/40 px-2 py-1 text-micro font-medium text-white transition-colors hover:bg-blue-600"
+                class="rounded-md bg-accent/40 px-2 py-1 text-micro font-medium text-white transition-colors hover:bg-accent"
                 title="Bulk edit selected folders"
               >
                 Edit
@@ -1063,7 +1063,7 @@
               <button
                 type="button"
                 onclick={() => (selectedFolderRulesetIds = [])}
-                class="rounded-md p-1 text-blue-300 hover:bg-blue-900/60 hover:text-fg-primary"
+                class="rounded-md p-1 text-accent hover:bg-accent/20 hover:text-fg-primary"
                 title="Clear selection"
               >
                 <X class="h-3.5 w-3.5" />
@@ -1132,7 +1132,7 @@
                     class="rounded px-1.5 py-0.5 font-mono text-nano font-medium {selectedFolderId ===
                     folder.ruleset_id
                       ? 'bg-white/20 text-white'
-                      : 'bg-blue-500/20 text-blue-300'}"
+                      : 'bg-accent/20 text-accent'}"
                   >
                     {folder.category || 'Arch'}
                   </span>

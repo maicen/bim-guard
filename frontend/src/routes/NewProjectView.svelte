@@ -31,6 +31,7 @@
   import { compressIfcFiles } from "../lib/compressIfc";
   import Alert from "../lib/components/Alert.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
+  import { Select } from "../lib/components/ui";
 
   interface Props {
     onCancel: () => void;
@@ -78,6 +79,10 @@
   // step-1 detail.
   let classificationStandard = $state("");
   let classificationStandards: BSDDDictionaryItem[] = $state([]);
+  let classificationStandardOptions = $derived([
+    { value: "", label: "Not set" },
+    ...classificationStandards.map((std) => ({ value: std.code, label: std.name }))
+  ]);
   // A project can carry several discipline models -- an architectural model, a
   // structural one, the site context -- and exactly one of them is primary: the
   // model an analysis run starts from, and the one projects.ifc_file_path keeps
@@ -174,6 +179,17 @@
       (s) => !s.applicable_to?.length || s.applicable_to.includes(analysisType),
     ),
   );
+
+  let ifcRoleOptions = $derived(
+    IFC_FILE_ROLES.map((role) => ({ value: role, label: role }))
+  );
+  let analysisTypeOptions = $derived([
+    { value: "Arch", label: "Arch — Doors, Egress, Daylight, Stairs" }
+  ]);
+  let buildingCodeOptions = $derived([
+    { value: "", label: "Not specified" },
+    ...buildingCodesForJurisdiction.map((c) => ({ value: c.id, label: c.name }))
+  ]);
 
   const STEPS = [
     { num: 1, title: "Details" },
@@ -700,19 +716,18 @@
                     {/if}
                   </button>
 
-                  <select
-                    aria-label="Role for {file.name}"
+                  <Select
+                    options={ifcRoleOptions}
                     value={ifcRoles[idx]}
-                    onchange={(event) => {
-                      const select = event.currentTarget;
-                      if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
+                    onValueChange={(val) => {
+                      if (!setIfcRole(idx, val)) {
+                        // force a re-render to revert the selection if setIfcRole rejected it
+                        ifcRoles = [...ifcRoles];
+                      }
                     }}
-                    class="shrink-0 rounded-lg border border-border-default bg-surface-card px-2 py-1 text-caption text-fg-primary focus:border-accent focus:outline-hidden"
-                  >
-                    {#each IFC_FILE_ROLES as roleOption (roleOption)}
-                      <option value={roleOption}>{roleOption}</option>
-                    {/each}
-                  </select>
+                    ariaLabel="Role for {file.name}"
+                    triggerClass="shrink-0 max-w-[130px]"
+                  />
 
                   <button
                     type="button"
@@ -739,13 +754,11 @@
             >
               Primary Analysis Domain
             </label>
-            <select
-              id="wizard-type"
+            <Select
+              options={analysisTypeOptions}
               bind:value={analysisType}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
-            </select>
+              ariaLabel="Primary Analysis Domain"
+            />
             <p class="mt-1 text-caption text-fg-muted">
               Determines which analysis page opens once the project is created.
             </p>
@@ -768,16 +781,11 @@
                 engines will apply the ISO / IFC international standards.
               </div>
             {:else}
-              <select
-                id="wizard-building-code"
+              <Select
+                options={buildingCodeOptions}
                 bind:value={buildingCode}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                <option value="">Not specified</option>
-                {#each buildingCodesForJurisdiction as code (code.id)}
-                  <option value={code.id}>{code.name}</option>
-                {/each}
-              </select>
+                ariaLabel="Building Code"
+              />
               {#if selectedBuildingCode}
                 <p class="mt-1 text-caption text-fg-muted">
                   {selectedBuildingCode.description}
@@ -816,16 +824,11 @@
             >
               Classification Standard
             </label>
-            <select
-              id="wizard-classification-standard"
+            <Select
+              options={classificationStandardOptions}
               bind:value={classificationStandard}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="">Not set</option>
-              {#each classificationStandards as std (std.uri)}
-                <option value={std.code}>{std.name}</option>
-              {/each}
-            </select>
+              ariaLabel="Classification Standard"
+            />
             <p class="mt-1 text-caption text-fg-muted">
               Resolved against buildingSMART's Data Dictionary (bSDD); powers element and property
               autocomplete in the rule builder.

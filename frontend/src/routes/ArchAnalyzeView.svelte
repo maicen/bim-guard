@@ -847,7 +847,7 @@
       class="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-card/60 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex items-center gap-3">
-        <div class="shrink-0 rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
+        <div class="shrink-0 rounded-xl border border-accent/20 bg-accent/10 p-2 text-accent">
           <Sparkles class="h-4 w-4" />
         </div>
         <div>
@@ -867,10 +867,10 @@
   {:else if selectedProject && hasIfcFile && hasEnhancedModel === false && !isCheckingEnhancement}
     <!-- Optional enhancement recommendation banner -->
     <div
-      class="flex flex-col gap-3 rounded-2xl border border-purple-500/20 bg-purple-950/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex items-start gap-3">
-        <div class="shrink-0 rounded-xl border border-purple-500/20 bg-purple-500/10 p-2 text-purple-400">
+        <div class="shrink-0 rounded-xl border border-accent/20 bg-accent/10 p-2 text-accent">
           <Sparkles class="h-4 w-4" />
         </div>
         <div class="min-w-0 flex-1">
@@ -883,7 +883,7 @@
       <button
         type="button"
         onclick={() => (showEnhancementsModal = true)}
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-600/20 px-4 py-2 text-xs font-semibold text-purple-300 transition-all hover:bg-purple-600/30 hover:text-white"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent/30 hover:text-fg-primary"
       >
         <Sparkles class="h-3.5 w-3.5" />
         Enhance Model
@@ -1009,7 +1009,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each Object.entries(buildingSummary.element_counts).sort( ([a], [b]) => (ELEM_LABELS[a] || a).localeCompare(ELEM_LABELS[b] || b) ) as [k, v] (k)}
                     <span
-                      class="inline-block rounded-md border border-blue-800/60 bg-blue-950/60 px-2.5 py-1 text-xs font-medium text-blue-300"
+                      class="inline-block rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
                     >
                       {ELEM_LABELS[k] || k}: {v}
                     </span>
@@ -1271,7 +1271,7 @@
         <!-- Plumbing fixture counts (inventory only) -->
         {@const fc = buildingSummary?.fixture_counts || {}}
         {@const pBadge = Object.keys(fc).length
-          ? { label: "Inventory only", cls: "bg-blue-950/80 text-blue-300 border-blue-800" }
+          ? { label: "Inventory only", cls: "bg-accent/20 text-accent border-accent/40" }
           : {
               label: "N/A — no fixtures found",
               cls: "bg-surface-overlay text-fg-muted border-border-interactive",

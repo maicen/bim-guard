@@ -38,7 +38,7 @@
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import Tooltip from "../lib/components/Tooltip.svelte";
   import Alert from "../lib/components/Alert.svelte";
-  import { RadioGroupRoot, RadioGroupItem } from "../lib/components/ui";
+  import { RadioGroupRoot, RadioGroupItem, Select } from "../lib/components/ui";
   import { createTableState } from "../lib/tableState.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
@@ -110,6 +110,23 @@
     }
   }
 
+  let sourceOptions = $derived([
+    { value: "supabase", label: "Supabase Database (Main Registry)" },
+    ...(repos.length > 0
+      ? repos.map((repo) => ({
+          value: `repo:${repo.id}`,
+          label: `${repo.owner}/${repo.name} (${repo.branch})`,
+        }))
+      : []),
+  ]);
+
+  let repoCategoryOptions = $derived([
+    { value: "all", label: "All Category Folders" },
+    ...(activeRepoStructure?.categories || []).map((cat) => ({
+      value: cat,
+      label: cat,
+    })),
+  ]);
   async function loadSelectedRepoStructure(repoId: number, force = false) {
     isRepoLoading = true;
     loadError = "";
@@ -404,22 +421,13 @@
             >
           </div>
 
-          <select
+          <Select
+            options={sourceOptions}
             bind:value={selectedSource}
-            onchange={handleSourceChange}
-            class="max-w-[240px] truncate rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-primary focus:border-blue-500 focus:outline-hidden"
-          >
-            <option value="supabase">Supabase Database (Main Registry)</option>
-            {#if repos.length > 0}
-              <optgroup label="GitHub Repositories">
-                {#each repos as repo (repo.id)}
-                  <option value={`repo:${repo.id}`}>
-                    {repo.owner}/{repo.name} ({repo.branch})
-                  </option>
-                {/each}
-              </optgroup>
-            {/if}
-          </select>
+            onValueChange={handleSourceChange}
+            triggerClass="max-w-[240px]"
+          />
+
 
           <button
             type="button"
@@ -427,7 +435,7 @@
             class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
             title="Manage GitHub Repositories (Add, Edit, Delete)"
           >
-            <Plus class="h-3.5 w-3.5 text-blue-400" />
+            <Plus class="h-3.5 w-3.5 text-accent" />
             <span>Manage Repos</span>
           </button>
 
@@ -438,7 +446,7 @@
               class="rounded-xl border border-border-default bg-surface-canvas p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
               title="Refresh attached models"
             >
-              <RotateCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-blue-400' : ''}" />
+              <RotateCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-accent' : ''}" />
             </button>
           {:else if selectedSource.startsWith("repo:")}
             <button
@@ -778,15 +786,10 @@
 
           {#if activeRepoStructure.categories.length > 0}
             <div class="flex w-full items-center gap-2 md:w-auto">
-              <select
+              <Select
+                options={repoCategoryOptions}
                 bind:value={repoCategoryFilter}
-                class="rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
-              >
-                <option value="all">All Category Folders</option>
-                {#each activeRepoStructure.categories as cat (cat)}
-                  <option value={cat}>{cat}</option>
-                {/each}
-              </select>
+              />
             </div>
           {/if}
         </div>
