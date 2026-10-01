@@ -43,19 +43,30 @@ def test_ask_admin_message_when_no_organization_context():
 
 
 class _FakeInstances:
+    def __init__(self, exc: Exception = None):
+        self._exc = exc
+
     def get_default(self, organization_id):
+        if self._exc:
+            raise self._exc
+        return {"name": "docling-local", "kind": "docling-local", "api_url": "http://localhost:5001"}
+
+    def get_instance(self, name, organization_id):
+        if self._exc:
+            raise self._exc
         return {"name": "docling-local", "kind": "docling-local", "api_url": "http://localhost:5001"}
 
 
-class _RaisingDocumentService:
-    def __init__(self, exc: Exception):
-        self._exc = exc
-
-    def register_pre_uploaded_document(self, *args, **kwargs):
-        raise self._exc
+class _FakeDocumentService:
+    def register_pending_document(self, *args, **kwargs):
+        return {"id": 123}, True
+    
+    def process_pending_document_background(self, *args, **kwargs):
+        pass
 
 
 def _upload_with(exc: Exception) -> HTTPException:
+    from fastapi import BackgroundTasks
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
             confirm_document_upload(
@@ -70,8 +81,9 @@ def _upload_with(exc: Exception) -> HTTPException:
                     generate_doclang=True,
                     organization_id=None,
                 ),
-                service=_RaisingDocumentService(exc),
-                instances_service=_FakeInstances(),
+                background_tasks=BackgroundTasks(),
+                service=_FakeDocumentService(),
+                instances_service=_FakeInstances(exc),
                 document_access=object(),
                 memberships=object(),
                 profiles=object(),
@@ -229,84 +241,6 @@ def test_extract_drafts_route_grants_the_requesting_org_its_new_batch_ruleset():
     ruleset_access.add_org_grant.assert_called_once_with(1, "EXTRACTED-20260921-000000")
 
 
-class _TimingOutDocumentService:
-    """Simulates a slow inline DocLang extraction that times out and falls back to deferred storage."""
-
-    def __init__(self):
-        self.calls = []
-
-    def register_pre_uploaded_document(self, filename, storage_reference, **kwargs):
-        self.calls.append(kwargs)
-        return {
-            "id": 123,
-            "filename": filename,
-            "doc_type": kwargs.get("doc_type", "Specification"),
-            "file_path": f"uploads/{filename}",
-            "upload_date": "2026-09-26T00:00:00Z",
-            "text": "",
-            "char_count": 0,
-            "doclang_xml": "",
-            "project_code": "",
-            "suitability_code": "S0",
-            "revision_code": "P01.01",
-            "cde_state": "WIP",
-        }, True
-
-    def get_document_text(self, doc):
-        return ""
-
-    def get_doclang_content(self, doc):
-        return ""
-
-
-def test_upload_falls_back_to_deferred_doclang_on_timeout(monkeypatch):
-    """When inline DocLang generation times out, confirm_document_upload stores the file with DocLang deferred."""
-    service = _TimingOutDocumentService()
-
-    real_wait_for = asyncio.wait_for
-    first = True
-
-    async def fake_wait_for(fut, timeout):
-        nonlocal first
-        if first:
-            first = False
-            task = asyncio.ensure_future(fut)
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
-            raise asyncio.TimeoutError()
-        return await real_wait_for(fut, timeout)
-
-    monkeypatch.setattr(asyncio, "wait_for", fake_wait_for)
-
-    resp = asyncio.run(
-        confirm_document_upload(
-            payload=DocumentConfirmRequest(
-                file_name="spec.pdf",
-                storage_reference="some_ref",
-                doc_type="Specification",
-                project_code="",
-                suitability_code="S0",
-                revision_code="P01.01",
-                parser="auto",
-                generate_doclang=True,
-                organization_id=None,
-            ),
-            service=service,
-            instances_service=_FakeInstances(),
-            document_access=object(),
-            memberships=object(),
-            profiles=object(),
-            permissions=_FakePermissions(allowed=True),
-            current_user=None,
-        )
-    )
-    assert resp.id == 123
-    assert resp.doclang_xml == ""
-    assert len(service.calls) == 1
-    assert service.calls[0]["generate_doclang"] is False
 
 
 def test_generate_doclang_returns_504_on_timeout(monkeypatch):

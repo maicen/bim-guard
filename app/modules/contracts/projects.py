@@ -285,13 +285,15 @@ class UploadUrlRequest(BaseModel):
     file_name: str = Field(..., min_length=1, description="Name of the file being uploaded")
     content_type: Optional[str] = Field(default=None, description="MIME type of the file")
     size_bytes: Optional[int] = Field(default=None, description="Size of the file in bytes")
+    md5_hash: Optional[str] = Field(default=None, description="MD5 hash of the file for deduplication")
 
 class UploadUrlResponse(BaseModel):
     """The presigned URL and storage reference for direct client upload."""
     
-    signed_url: str = Field(..., description="Short-lived HTTP PUT url for direct storage upload")
+    signed_url: Optional[str] = Field(default=None, description="Short-lived HTTP PUT url for direct storage upload. Null if already exists.")
     storage_reference: str = Field(..., description="Persistent reference (sb://...) to supply in the confirm call")
     token: Optional[str] = Field(default="", description="Token if required for headers")
+    already_exists: bool = Field(default=False, description="True if a file with the given hash already exists in storage")
 
 class ModelConfirmRequest(BaseModel):
     """Payload to confirm a direct-to-cloud model upload and trigger background attachment."""

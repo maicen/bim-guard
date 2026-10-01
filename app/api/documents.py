@@ -434,21 +434,31 @@ def _no_parsing_engine_detail(
 def get_document_upload_url(
     payload: UploadUrlRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> UploadUrlResponse:
     """Generate a direct-to-cloud upload URL for a document."""
+    
+    if payload.md5_hash:
+        existing_doc = service.find_by_md5(payload.md5_hash)
+        if existing_doc and existing_doc.get("storage_reference"):
+            # Deduplication: file already exists in DB
+            return UploadUrlResponse(
+                signed_url=None,
+                storage_reference=existing_doc["storage_reference"],
+                token="",
+                already_exists=True
+            )
+
     from app.services.object_storage import ObjectStorage
     storage = ObjectStorage()
     
     try:
-        # We can store documents in the 'documents' namespace or default.
-        # Previously we stored them with just UUID + extension. We'll let ObjectStorage handle it.
-        # In ObjectStorage.upload(), it defaults to 'docs'. We passed 'ifc' for models.
-        # ObjectStorage doesn't enforce namespaces strictly, but we'll use 'docs'.
         res = storage.create_presigned_upload_url(payload.file_name, "docs")
         return UploadUrlResponse(
             signed_url=res["signed_url"],
             storage_reference=res["storage_reference"],
-            token=res["token"]
+            token=res["token"],
+            already_exists=False
         )
     except Exception as exc:
         raise HTTPException(
@@ -456,9 +466,12 @@ def get_document_upload_url(
             detail=f"Failed to generate upload URL: {exc}"
         )
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+
 @router.post("/confirm", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Confirm document upload")
 async def confirm_document_upload(
     payload: DocumentConfirmRequest,
+    background_tasks: BackgroundTasks,
     service: Annotated[DocumentService, Depends(get_documents_service)],
     instances_service: Annotated[ParsingEngineInstancesService, Depends(get_parsing_engine_instances_service)],
     document_access: Annotated[DocumentAccessService, Depends(get_document_access_service)],
@@ -481,70 +494,36 @@ async def confirm_document_upload(
         elif user_orgs:
             target_org_id = next(iter(user_orgs))
 
-    resolved_instance = _resolve_parsing_instance(payload.engine_instance, target_org_id, instances_service) if payload.generate_doclang else None
-
-    # ISO 19650 Originator: default to the target organization's own code
-    # when the caller didn't specify one explicitly, same as project
-    # creation -- see app/api/projects.py create_project.
-    resolved_originator = payload.originator or ""
-    if not resolved_originator and target_org_id is not None and memberships is not None:
-        org = memberships.get_organization(target_org_id)
-        resolved_originator = (org or {}).get("org_code", "") or ""
-
-
-    # 1. Fetch file from temporary storage to run extraction/validation and re-upload properly.
-    # For a robust implementation, the service accepts the reference.
+    # 1. Register the document as Processing immediately
     try:
-        row, _created = await asyncio.wait_for(
-            run_in_threadpool(
-                service.register_pre_uploaded_document,
+        resolved_instance = _resolve_parsing_instance(payload.engine_instance, target_org_id, instances_service) if payload.generate_doclang else None
+
+        row, _created = service.register_pending_document(
+            filename=payload.file_name,
+            storage_reference=payload.storage_reference,
+            md5_hash=payload.md5_hash,
+            doc_type=payload.doc_type,
+            project_code=payload.project_code,
+            originator=resolved_originator,
+            suitability_code=payload.suitability_code,
+            revision_code=payload.revision_code,
+        )
+        
+        # 2. Enqueue the extraction if doclang generation is requested or it's a new file
+        if _created or (payload.generate_doclang and not row.get("doclang_xml")):
+            background_tasks.add_task(
+                service.process_pending_document_background,
+                document_id=row["id"],
                 filename=payload.file_name,
                 storage_reference=payload.storage_reference,
-                doc_type=payload.doc_type,
-                project_code=payload.project_code,
-                originator=resolved_originator,
-                suitability_code=payload.suitability_code,
-                revision_code=payload.revision_code,
                 parser=payload.parser,
                 instance=resolved_instance if payload.generate_doclang else None,
-                generate_doclang=payload.generate_doclang,
-            ),
-            timeout=60.0,
+            )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
         )
-    except asyncio.TimeoutError:
-        logger.warning(
-            "DocLang extraction for '%s' exceeded 60s inline limit; storing file with DocLang deferred to avoid Cloudflare HTTP 524 timeout.",
-            payload.file_name,
-        )
-        try:
-            row, _created = await asyncio.wait_for(
-                run_in_threadpool(
-                    service.register_pre_uploaded_document,
-                    filename=payload.file_name,
-                    storage_reference=payload.storage_reference,
-                    doc_type=payload.doc_type,
-                    project_code=payload.project_code,
-                    originator=resolved_originator,
-                    suitability_code=payload.suitability_code,
-                    revision_code=payload.revision_code,
-                    parser=payload.parser,
-                    instance=None,
-                    generate_doclang=False,
-                ),
-                timeout=30.0,
-            )
-        except asyncio.TimeoutError:
-            logger.error(
-                "Document storage fallback also timed out for '%s'; returning 504.",
-                payload.file_name,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail=(
-                    f"'{payload.file_name}' could not be stored within the time limit. "
-                    "This may indicate slow storage connectivity. Try again."
-                ),
-            )
     except NoParsingEngineConfiguredError as exc:
         if exc.had_instance:
             # An engine *was* resolved but it failed (e.g. the self-hosted

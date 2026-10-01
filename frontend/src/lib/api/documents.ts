@@ -85,50 +85,65 @@ export const documentsApi = {
   ): Promise<DocumentDetail> {
     const effectiveOrg = isoOptions?.organization_id !== undefined ? isoOptions.organization_id : getActiveOrgId();
 
+    const { computeMd5 } = await import("../hashFile");
+    const md5_hash = await computeMd5(file);
+
     // 1. Get presigned URL
     const urlRes = await apiFetch(`${API_BASE}/documents/upload-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_name: file.name, size_bytes: file.size, content_type: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ file_name: file.name, size_bytes: file.size, content_type: file.type || "application/octet-stream", md5_hash }),
       signal,
     });
-    const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
+    const { signed_url, storage_reference, token, already_exists } = await handleResponse<any>(urlRes);
 
-    // 2. Direct upload to Supabase via XHR for progress
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", signed_url);
-      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    // 2. Direct upload to Supabase via TUS for resumable upload
+    if (!already_exists) {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const tus = await import("tus-js-client");
       
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && isoOptions?.onUploadProgress) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          isoOptions.onUploadProgress(percent);
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Storage upload failed: ${xhr.statusText}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error("Storage network error"));
-      
-      if (signal) {
-        signal.addEventListener("abort", () => {
-          xhr.abort();
-          reject(new DOMException("Aborted", "AbortError"));
+      await new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable/sign`,
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            'x-signature': token,
+          },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            bucketName: "docs",
+            objectName: storage_reference.replace("sb://docs/", ""),
+            contentType: file.type || "application/octet-stream",
+          },
+          chunkSize: 6 * 1024 * 1024, // 6MB
+          onError: (err) => reject(new Error(`Storage upload failed: ${err.message}`)),
+          onProgress: (bytesUploaded, bytesTotal) => {
+            if (isoOptions?.onUploadProgress) {
+              isoOptions.onUploadProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+            }
+          },
+          onSuccess: () => resolve(),
         });
-      }
-      xhr.send(file);
-    });
+
+        if (signal) {
+          signal.addEventListener("abort", () => {
+            upload.abort(true);
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }
+        upload.start();
+      });
+    }
 
     // 3. Confirm upload
     const payload: Record<string, any> = {
       storage_reference,
       file_name: file.name,
       doc_type: docType,
+      md5_hash,
     };
     if (effectiveOrg) payload.organization_id = effectiveOrg;
     if (isoOptions?.project_code) payload.project_code = isoOptions.project_code;

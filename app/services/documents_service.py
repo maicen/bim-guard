@@ -665,6 +665,95 @@ class DocumentService:
 
         self.delete_document(document_id)
 
+    def register_pending_document(
+        self,
+        filename: str,
+        storage_reference: str,
+        md5_hash: str | None,
+        *,
+        doc_type: str = "Specification",
+        project_code: str = "",
+        originator: str = "",
+        suitability_code: str = "S0",
+        revision_code: str = "P01.01",
+    ) -> tuple[dict, bool]:
+        """Register a document that was uploaded to storage, marking it as Processing."""
+        from app.modules.document_parsing.iso_validator import ISO19650Validator
+
+        if not md5_hash:
+            local_path = self._storage.materialize_local_path(storage_reference)
+            if not local_path or not local_path.exists():
+                raise ValueError(f"Uploaded file not found at {storage_reference}")
+            from app.document_upload_validation import md5_file
+            md5_hash = md5_file(local_path)
+
+        existing = self.find_by_md5(md5_hash)
+        if existing:
+            return existing, False
+
+        clean_doc_type = (doc_type or "").strip() or "Specification"
+
+        val = ISO19650Validator.validate_filename(filename)
+        if val.is_valid:
+            project_code = project_code or val.fields.get("project_code", "")
+            originator = originator or val.fields.get("originator", "")
+            suitability_code = (
+                suitability_code
+                if suitability_code != "S0"
+                else val.fields.get("suitability_code", "S0")
+            )
+            revision_code = (
+                revision_code
+                if revision_code != "P01.01"
+                else val.fields.get("revision_code", "P01.01")
+            )
+
+        created = self.create_document(
+            md5_hash=md5_hash,
+            filename=filename,
+            file_path=storage_reference,
+            doc_type=clean_doc_type,
+            project_code=project_code,
+            originator=originator,
+            suitability_code=suitability_code,
+            revision_code=revision_code,
+            cde_state="Processing",
+        )
+        return created, True
+
+    def process_pending_document_background(
+        self,
+        document_id: int,
+        filename: str,
+        storage_reference: str,
+        parser: str = "auto",
+        instance: dict | None = None,
+    ) -> None:
+        """Run document extraction in the background and update the document."""
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            local_path = self._storage.materialize_local_path(storage_reference)
+            if not local_path or not local_path.exists():
+                logger.error(f"Uploaded file not found at {storage_reference}")
+                self.update_document(document_id, filename, cde_state="Failed")
+                return
+
+            _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
+                filename, local_path.read_bytes(), parser=parser, instance=instance, return_doclang=True
+            )
+            
+            self.update_document(
+                document_id,
+                filename=filename,
+                cde_state="WIP",
+                doclang_xml=doclang_xml,
+                element_bboxes=element_bboxes
+            )
+        except Exception:
+            logger.exception("Background document processing failed for %s", filename)
+            self.update_document(document_id, filename, cde_state="Failed")
+
     def register_pre_uploaded_document(
         self,
         filename: str,

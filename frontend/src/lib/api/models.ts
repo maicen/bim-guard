@@ -91,34 +91,43 @@ export const modelsApi = {
     });
     const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
 
-    // 2. Direct upload to Supabase via XHR for progress
+    // 2. Direct upload to Supabase via TUS for resumable upload
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const tus = await import("tus-js-client");
+    
     await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", signed_url);
-      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && onProgress) {
-          const percent = Math.round((e.loaded / file.size) * 100);
-          onProgress(percent);
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Storage upload failed: ${xhr.statusText}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error("Storage network error"));
-      
+      const upload = new tus.Upload(file, {
+        endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable/sign`,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          'x-signature': token,
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: "ifc",
+          objectName: storage_reference.replace("sb://ifc/", ""),
+          contentType: file.type || "application/octet-stream",
+        },
+        chunkSize: 6 * 1024 * 1024, // 6MB
+        onError: (err) => reject(new Error(`Storage upload failed: ${err.message}`)),
+        onProgress: (bytesUploaded, bytesTotal) => {
+          if (onProgress) {
+            onProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+          }
+        },
+        onSuccess: () => resolve(),
+      });
+
       if (signal) {
         signal.addEventListener("abort", () => {
-          xhr.abort();
+          upload.abort(true);
           reject(new DOMException("Aborted", "AbortError"));
         });
       }
-      xhr.send(file);
+      upload.start();
     });
 
     // 3. Confirm replace with backend
@@ -165,36 +174,47 @@ export const modelsApi = {
       });
       const { signed_url, storage_reference, token } = await handleResponse<any>(urlRes);
 
-      // 2. Direct upload to Supabase via XHR for progress
+      // 2. Direct upload to Supabase via TUS for resumable upload
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const tus = await import("tus-js-client");
+      
       await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", signed_url);
-        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        
-        const currentUploadedBeforeThisFile = uploadedBytes;
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable && options?.onUploadProgress) {
-            const overallPercent = Math.round(((currentUploadedBeforeThisFile + e.loaded) / totalBytes) * 100);
-            options.onUploadProgress(overallPercent);
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
+        const upload = new tus.Upload(file, {
+          endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable/sign`,
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            'x-signature': token,
+          },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            bucketName: "ifc",
+            objectName: storage_reference.replace("sb://ifc/", ""),
+            contentType: file.type || "application/octet-stream",
+          },
+          chunkSize: 6 * 1024 * 1024, // 6MB
+          onError: (err) => reject(new Error(`Storage upload failed: ${err.message}`)),
+          onProgress: (bytesUploaded, bytesTotal) => {
+            if (options?.onUploadProgress) {
+              const overallPercent = Math.round(((uploadedBytes + bytesUploaded) / totalBytes) * 100);
+              options.onUploadProgress(overallPercent);
+            }
+          },
+          onSuccess: () => {
             uploadedBytes += file.size;
             resolve();
-          } else {
-            reject(new Error(`Storage upload failed: ${xhr.statusText}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Storage network error"));
-        
+          },
+        });
+
         if (options?.signal) {
           options.signal.addEventListener("abort", () => {
-            xhr.abort();
+            upload.abort(true);
             reject(new DOMException("Aborted", "AbortError"));
           });
         }
-        xhr.send(file);
+        upload.start();
       });
 
       // 3. Confirm upload with backend

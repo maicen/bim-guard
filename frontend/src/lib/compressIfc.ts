@@ -1,4 +1,3 @@
-import { zip, type AsyncZippable } from "fflate";
 
 /**
  * Compress an IFC File into a .ifcZIP File in the browser using fflate.
@@ -14,25 +13,35 @@ export async function compressIfcFile(file: File): Promise<File> {
   const arrayBuffer = await file.arrayBuffer();
   const u8data = new Uint8Array(arrayBuffer);
 
-  const innerName = file.name;
-  const zipName = file.name.replace(/\.ifc$/i, "") + ".ifczip";
-
-  const zippable: AsyncZippable = {
-    [innerName]: [u8data, { level: 6 }],
-  };
-
   return new Promise<File>((resolve, reject) => {
-    zip(zippable, (err, data) => {
-      if (err) {
-        return reject(err);
+    // Instantiate worker
+    const worker = new Worker(new URL('./compressWorker.ts', import.meta.url), { type: 'module' });
+    
+    worker.onmessage = (e) => {
+      const { success, data, zipName, originalType, error } = e.data;
+      if (success) {
+        const blob = new Blob([data], { type: "application/zip" });
+        const compressedFile = new File([blob], zipName, {
+          type: "application/zip",
+          lastModified: Date.now(),
+        });
+        resolve(compressedFile);
+      } else {
+        reject(new Error(error));
       }
-      const blob = new Blob([data.buffer], { type: "application/zip" });
-      const compressedFile = new File([blob], zipName, {
-        type: "application/zip",
-        lastModified: Date.now(),
-      });
-      resolve(compressedFile);
-    });
+      worker.terminate();
+    };
+
+    worker.onerror = (err) => {
+      reject(err);
+      worker.terminate();
+    };
+
+    // Transfer the ArrayBuffer to the worker
+    worker.postMessage(
+      { fileName: file.name, u8data, fileType: file.type },
+      [u8data.buffer]
+    );
   });
 }
 
