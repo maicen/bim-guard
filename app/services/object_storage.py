@@ -234,6 +234,6 @@ class ObjectStorage:
                 "Supabase Storage requires SUPABASE_URL and a server-side API key"
             )
 
-        options = ClientOptions(httpx_client=httpx.Client(timeout=30.0))
+        options = ClientOptions(httpx_client=httpx.Client(timeout=120.0))
         self._client = create_client(url, key, options=options)
         return self._client

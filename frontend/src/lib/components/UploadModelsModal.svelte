@@ -158,6 +158,7 @@
                 <RadioGroupItem value={String(i)} aria-label="Set as primary model" />
               </Tooltip>
               <span class="min-w-0 flex-1 truncate text-xs text-fg-secondary">{file.name}</span>
+              <span class="shrink-0 text-caption text-fg-muted">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
               <div class="w-32 shrink-0">
                 <Select options={roleOptions} bind:value={roles[i]} />
               </div>

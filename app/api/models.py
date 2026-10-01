@@ -573,11 +573,19 @@ async def replace_model(
     ``projects.ifc_file_path`` is repointed at the new object.
 
     Raises:
-        HTTPException: 400 if the upload is not an ``.ifc`` file; 404 if the
-            project does not exist or holds no such model.
+        HTTPException: 400 if the upload is not an ``.ifc`` file, exceeds the
+            size limit, or is otherwise invalid; 404 if the project does not
+            exist or holds no such model.
     """
+    from app.modules.pipeline_io.file_upload import _validate
+
     [name] = _validated_ifc_names([file])
     content = await file.read()
+
+    rejection = _validate(name, content, kind="ifc")
+    if rejection:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=rejection)
+
     row = service.replace_model(project_id, model_id, content=content, file_name=name)
     if row is None:
         raise _not_found(project_id, model_id)

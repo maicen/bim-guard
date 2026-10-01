@@ -81,12 +81,13 @@ export const modelsApi = {
   },
 
   /** Replace an attached model's stored IFC file with a new upload, in place. */
-  async replace(projectId: number, modelId: number, file: File): Promise<Model> {
+  async replace(projectId: number, modelId: number, file: File, signal?: AbortSignal): Promise<Model> {
     const form = new FormData();
     form.append("file", file);
     const res = await apiFetch(`${API_BASE}/models/${modelId}/replace?project_id=${projectId}`, {
       method: "POST",
       body: form,
+      signal,
     });
     return handleResponse<Model>(res);
   },
