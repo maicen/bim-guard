@@ -150,6 +150,7 @@ export const documentsApi = {
       engine_instance?: string;
       start_page?: number;
       end_page?: number;
+      signal?: AbortSignal;
     },
   ): Promise<DocumentDetail> {
     const res = await apiFetch(`${API_BASE}/documents/${id}/generate-doclang`, {
@@ -161,6 +162,7 @@ export const documentsApi = {
         start_page: options?.start_page,
         end_page: options?.end_page,
       }),
+      signal: options?.signal,
     });
     const updated = await handleResponse<DocumentDetail>(res);
     _documentsStore.addOrUpdate({

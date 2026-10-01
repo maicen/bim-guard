@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { Sparkles, FileText, Settings2, CheckCircle2, AlertTriangle } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Alert from "./Alert.svelte";
   import { Select, Switch } from "./ui";
   import { documentsApi } from "../api";
   import type { ApiError } from "../api";
   import { authState } from "../auth.svelte";
   import type { DocumentItem, DocumentDetail, ParsingEngineInstance } from "../types";
-  import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
     isOpen: boolean;
@@ -31,9 +33,13 @@
   let isConverting = $state(false);
   let convertError = $state("");
   let convertErrorLog: ErrorLogEntry[] = $state([]);
-  let convertErrorLogCopied = $state(false);
   let noParsingEngineConfigured = $state(false);
   let parsingEngineFailed = $state(false);
+  let convertAbortController: AbortController | null = null;
+
+  onDestroy(() => {
+    convertAbortController?.abort();
+  });
 
   let isPdf = $derived(docItem ? /\.pdf$/i.test(docItem.filename) : false);
 
@@ -79,6 +85,7 @@
   }
 
   function handleClose() {
+    if (isConverting) return;
     resetState();
     onClose();
   }
@@ -94,16 +101,19 @@
     parsingEngineFailed = false;
 
     try {
+      convertAbortController = new AbortController();
       const usePageRange = isPdf && limitPages && !pageRangeError;
       const updated = await documentsApi.generateDoclang(docItem.id, {
         parser: "auto",
         engine_instance: selectedEngine || undefined,
         start_page: usePageRange ? parseInt(startPage, 10) : undefined,
         end_page: usePageRange ? parseInt(endPage, 10) : undefined,
+        signal: convertAbortController.signal,
       });
       resetState();
       onConverted(updated);
     } catch (err: any) {
+      if (convertAbortController?.signal.aborted) return;
       const apiErr = err as ApiError;
       convertError = apiErr.isNetworkError
         ? "Couldn't reach the BIM-Guard server. Make sure the backend is running, then try again."
@@ -112,6 +122,7 @@
       parsingEngineFailed = apiErr.status === 502;
       convertErrorLog = [toErrorLogEntry(err, docItem.filename)];
     } finally {
+      convertAbortController = null;
       isConverting = false;
     }
   }
@@ -125,35 +136,17 @@
 >
   <div class="space-y-4">
     {#if convertError}
-      <div class="space-y-2 rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical">
-        <p class="font-medium">{convertError}</p>
+      <Alert type="error" message={convertError} errors={convertErrorLog} logTitle="DocLang Conversion Error Log">
         {#if noParsingEngineConfigured && canManageParsing}
           <a
             href={`#/external-providers?tab=parsing${authState.activeOrganizationId ? `&org=${authState.activeOrganizationId}` : ""}`}
-            class="inline-flex items-center gap-1.5 font-semibold text-accent underline hover:text-accent-hover"
+            class="mt-1 inline-flex items-center gap-1.5 font-semibold text-accent underline hover:text-accent-hover"
           >
             <Settings2 class="h-3.5 w-3.5" />
             Configure a parsing engine
           </a>
         {/if}
-        {#if convertErrorLog.length > 0}
-          <button
-            type="button"
-            onclick={async () => {
-              const ok = await copyToClipboard(
-                buildIssueLog("DocLang Conversion Error Log", {}, convertErrorLog),
-              );
-              if (ok) {
-                convertErrorLogCopied = true;
-                setTimeout(() => (convertErrorLogCopied = false), 2000);
-              }
-            }}
-            class="rounded-lg border border-critical-border px-2.5 py-1 text-caption font-semibold text-critical transition-colors hover:bg-surface-hover"
-          >
-            {convertErrorLogCopied ? "Copied!" : "Copy issue log"}
-          </button>
-        {/if}
-      </div>
+      </Alert>
     {/if}
 
     {#if docItem}

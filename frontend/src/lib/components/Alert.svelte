@@ -11,18 +11,17 @@
     errors = null,
     logTitle = "Error Log",
     logContext = {},
+    children,
   }: {
     type?: "error" | "warning" | "success" | "info";
     title?: string | null;
     message?: string;
     dismissible?: boolean;
     onDismiss?: (() => void) | null;
-    /** Raw failures backing a copiable technical-details panel (see errorLog.ts's toErrorLogEntry). */
     errors?: ErrorLogEntry[] | null;
-    /** Heading for the copied issue log text. */
     logTitle?: string;
-    /** Extra key/value lines (screen, action, document id, ...) included in the copied issue log. */
     logContext?: Record<string, string | number | undefined>;
+    children?: import('svelte').Snippet;
   } = $props();
 
   let visible = $state(true);
@@ -70,7 +69,7 @@
   let Icon = $derived(conf.icon);
 </script>
 
-{#if visible && message}
+{#if visible && (message || children)}
   <div class="space-y-2">
     <div
       role="alert"
@@ -84,9 +83,16 @@
               {title}
             </div>
           {/if}
-          <div class="text-fg-secondary">
-            {message}
-          </div>
+          {#if message}
+            <div class="text-fg-secondary">
+              {message}
+            </div>
+          {/if}
+          {#if children}
+            <div class="text-fg-secondary">
+              {@render children()}
+            </div>
+          {/if}
         </div>
       </div>
 

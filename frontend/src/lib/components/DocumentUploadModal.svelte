@@ -2,13 +2,14 @@
   import { onDestroy } from "svelte";
   import { FileText, CheckCircle2, X } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Alert from "./Alert.svelte";
   import { Select } from "./ui";
   import { documentsApi } from "../api";
   import type { ApiError } from "../api";
   import { authState } from "../auth.svelte";
   import { DOCUMENT_TYPES } from "../types";
   import type { DocumentItem, ParsingEngineInstance } from "../types";
-  import { buildIssueLog, copyToClipboard, toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
+  import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
   import { formatFileSize, MAX_DOCUMENT_UPLOAD_BYTES, describeOversizedFiles } from "../fileLimits";
 
   interface Props {
@@ -31,7 +32,6 @@
   let isUploading = $state(false);
   let uploadError = $state("");
   let uploadErrorLog: ErrorLogEntry[] = $state([]);
-  let uploadErrorLogCopied = $state(false);
   let uploadAbortController: AbortController | null = null;
   let isDragging = $state(false);
 
@@ -152,26 +152,7 @@
 >
   <div class="space-y-4">
     {#if uploadError}
-      <div class="space-y-2 rounded-xl border border-critical-border bg-critical-bg p-3 text-xs text-critical">
-        <p class="font-medium">{uploadError}</p>
-        {#if uploadErrorLog.length > 0}
-          <button
-            type="button"
-            onclick={async () => {
-              const ok = await copyToClipboard(
-                buildIssueLog("Document Upload Error Log", {}, uploadErrorLog),
-              );
-              if (ok) {
-                uploadErrorLogCopied = true;
-                setTimeout(() => (uploadErrorLogCopied = false), 2000);
-              }
-            }}
-            class="rounded-lg border border-critical-border px-2.5 py-1 text-caption font-semibold text-critical transition-colors hover:bg-surface-hover"
-          >
-            {uploadErrorLogCopied ? "Copied!" : "Copy issue log"}
-          </button>
-        {/if}
-      </div>
+      <Alert type="error" message={uploadError} errors={uploadErrorLog} logTitle="Document Upload Error Log" />
     {/if}
 
     <div class="space-y-1.5">
