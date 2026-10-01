@@ -10,7 +10,7 @@ import type {
   ModelUploadResponse,
 } from "../types";
 import { withAuthToken } from "../authToken";
-import { API_BASE, apiFetch, handleResponse } from "./client";
+import { API_BASE, apiFetch, handleResponse, storageUploadTarget } from "./client";
 
 export const modelsApi = {
   async list(projectId: number): Promise<Model[]> {
@@ -107,8 +107,7 @@ export const modelsApi = {
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,
         metadata: {
-          bucketName: "ifc",
-          objectName: storage_reference.replace("sb://ifc/", ""),
+          ...storageUploadTarget(storage_reference),
           contentType: file.type || "application/octet-stream",
         },
         chunkSize: 6 * 1024 * 1024, // 6MB
@@ -190,8 +189,7 @@ export const modelsApi = {
           uploadDataDuringCreation: true,
           removeFingerprintOnSuccess: true,
           metadata: {
-            bucketName: "ifc",
-            objectName: storage_reference.replace("sb://ifc/", ""),
+            ...storageUploadTarget(storage_reference),
             contentType: file.type || "application/octet-stream",
           },
           chunkSize: 6 * 1024 * 1024, // 6MB

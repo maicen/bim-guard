@@ -147,6 +147,17 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   return res;
 }
 
+/**
+ * Split an `sb://<bucket>/<key>` storage reference from an `/upload-url`
+ * endpoint into the tus metadata Supabase Storage expects. The bucket comes
+ * from the server's configured bucket, never a hardcoded name.
+ */
+export function storageUploadTarget(storageReference: string): { bucketName: string; objectName: string } {
+  const match = /^sb:\/\/([^/]+)\/(.+)$/.exec(storageReference);
+  if (!match) throw new Error(`Unexpected storage reference: ${storageReference}`);
+  return { bucketName: match[1], objectName: match[2] };
+}
+
 /** True when a rejection is an aborted fetch rather than a real failure. */
 export function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";

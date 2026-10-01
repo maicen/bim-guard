@@ -19,7 +19,7 @@ import {
   type Unsubscribe,
 } from "../cache";
 import { getActiveOrgId, withAuthToken } from "../authToken";
-import { API_BASE, apiFetch, handleResponse } from "./client";
+import { API_BASE, apiFetch, handleResponse, storageUploadTarget } from "./client";
 
 const _documentsStore = new EntityCacheStore<DocumentItem, number>((d) => d.id, 60_000, 60_000);
 const _documentDetailStore = new SWRStore<number, DocumentDetail>(new InMemoryCache(), 60_000);
@@ -114,8 +114,7 @@ export const documentsApi = {
           uploadDataDuringCreation: true,
           removeFingerprintOnSuccess: true,
           metadata: {
-            bucketName: "docs",
-            objectName: storage_reference.replace("sb://docs/", ""),
+            ...storageUploadTarget(storage_reference),
             contentType: file.type || "application/octet-stream",
           },
           chunkSize: 6 * 1024 * 1024, // 6MB
