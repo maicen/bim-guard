@@ -5,7 +5,7 @@
   import ThemeToggle from "./ThemeToggle.svelte";
   import GlobalPipelineStatus from "./GlobalPipelineStatus.svelte";
   import IntegrationsMenu from "./IntegrationsMenu.svelte";
-  import UserMenu from "./UserMenu.svelte";
+  import DocumentationMenu from "./DocumentationMenu.svelte";
   import { SidebarTrigger, Separator } from "./ui";
   import {
     Breadcrumb,
@@ -60,6 +60,8 @@
     "ifc-export-setting": { section: "Resources", title: "IFC Export Setting for Architectural Model" },
     "user-manual": { section: "Resources", title: "User Workflow Manual" },
     "modeling-manual": { section: "Resources", title: "3D Modeling Reference" },
+    "bsdd-wiki": { section: "Resources", title: "bSDD Wiki" },
+    "design-system": { section: "Resources", title: "Design System Catalog" },
     settings: { section: "System", title: "Application Settings" },
     admin: { section: "Admin", title: "Organization Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
@@ -81,7 +83,7 @@
 </script>
 
 <header
-  class="apple-blur sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border-default bg-surface-canvas/60 px-4 md:px-6"
+  class="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border-subtle bg-surface-canvas/80 backdrop-blur-md px-4 md:px-6"
 >
   <div class="flex min-w-0 items-center gap-2">
     <SidebarTrigger
@@ -136,6 +138,8 @@
   <div class="flex shrink-0 items-center gap-2.5">
     <GlobalPipelineStatus onOpen={onOpenPipeline} />
 
+    <DocumentationMenu {activeView} />
+
     <IntegrationsMenu {activeView} />
 
     {#if authState.isSuperadmin || authState.activeOrganization?.role === 'owner' || authState.activeOrganization?.role === 'admin'}
@@ -157,7 +161,5 @@
 
     <!-- Theme Toggle Button -->
     <ThemeToggle />
-
-    <UserMenu />
   </div>
 </header>
