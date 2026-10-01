@@ -23,9 +23,13 @@ services:
     restart: unless-stopped
     ports:
       - "${KONG_HTTP_PORT:-54321}:8000/tcp"
+    entrypoint:
+      - "bash"
+      - "-c"
+      - "perl -pe 's/\\$$\\(([A-Z0-9_]+)\\)/$$ENV{$$1}/g' /var/lib/kong/kong.yml.template > /tmp/kong.yml && exec /docker-entrypoint.sh kong docker-start"
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.yml
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,post-function
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
@@ -43,7 +47,7 @@ services:
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-admin}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-admin}
     volumes:
-      - ./volumes/api/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./volumes/api/kong.yml:/var/lib/kong/kong.yml.template:ro
     depends_on:
       db:
         condition: service_healthy
