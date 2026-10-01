@@ -1,6 +1,21 @@
 # Contributing to BIM-Guard
 
-## Setup
+## Environment Setup (First-Time)
+
+Before running anything, copy the example environment file and fill in real values:
+
+```bash
+cp example.env .env
+# Then open .env and replace every "..." placeholder with a real value.
+# Ask the repo owner for the shared Supabase keys, JWT_SECRET, and OpenRouter key.
+```
+
+> **Security note**: Credentials were accidentally committed in commit `175b987` (Sept 28 2026)
+> and have since been **rotated**. If you cloned the repo before those credentials were rotated,
+> discard any `.env` you copied from that commit and request fresh values from the repo owner.
+> The secrets in git history are dead; do not use them.
+
+## Running the Stack
 
 ```bash
 # Install backend dependencies

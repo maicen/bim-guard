@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 
-BASE_DIR = Path("/Users/sam/coding/bim-guard")
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "migration"
 
 def sql_quote(val):
@@ -87,10 +87,17 @@ def main():
     out_file.write_text(sql)
     print(f"Generated SQL written to {out_file} ({len(sql)} bytes).")
 
+    pg_password = os.environ.get("POSTGRES_PASSWORD")
+    if not pg_password:
+        raise RuntimeError(
+            "POSTGRES_PASSWORD is not set. "
+            "Export it from docker/supabase/.env or your .env file before running this script."
+        )
+
     print("Executing in supabase-db container as supabase_admin...")
     env = os.environ.copy()
     proc = subprocess.run(
-        ["docker", "exec", "-e", "PGPASSWORD=-7vpWPBTJa3MOL88N4vOBdSZJaOy5s8a", "-i", "supabase-db", "psql", "-U", "supabase_admin", "-d", "postgres"],
+        ["docker", "exec", "-e", f"PGPASSWORD={pg_password}", "-i", "supabase-db", "psql", "-U", "supabase_admin", "-d", "postgres"],
         input=sql,
         text=True,
         capture_output=True

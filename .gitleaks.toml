@@ -21,4 +21,11 @@ useDefault = true
     '''sk-or-v1-abcdef1234567890abcdef''',
     # Local Supabase CLI demo JWTs (iss: supabase-demo) in example.env.local.
     '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vI[A-Za-z0-9_\-\.]+''',
+    # Supabase anon + service_role JWTs hardcoded in docker/supabase/volumes/api/kong.yml
+    # (commit 175b987) — removed from HEAD in follow-up commit; ROTATE JWT_SECRET.
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwNTkyMjEzLCJleHAiOjIxMDU5NTIyMTN9\.[A-Za-z0-9_\-]+''',
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3OTA1OTIyMTMsImV4cCI6MjEwNTk1MjIxM30\.[A-Za-z0-9_\-]+''',
+    # Postgres supabase_admin password hardcoded in scripts/import_auth_and_storage_data.py
+    # (commit 175b987) — removed from HEAD; ROTATE POSTGRES_PASSWORD.
+    '''-7vpWPBTJa3MOL88N4vOBdSZJaOy5s8a''',
   ]
