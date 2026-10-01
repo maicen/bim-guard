@@ -82,16 +82,61 @@ Auth is Google OAuth only. For local dev, sign in without the OAuth click-throug
 
 `.claude/launch.json`, `.antigravity/launch.json`, and `.vscode/launch.json` register the same two dev servers for editor/agent preview and debugging. They are generated — never hand-edit them. Update `scripts/generate_launch_configs.py` (the source of truth) and rerun `uv run python scripts/generate_launch_configs.py` if the run commands, host, or ports change.
 
-### Jules environment setup
+### Jules CLI delegation & automation
 
-Jules (jules.google) has no repo config file for environment setup — it's configured in the Jules dashboard under the repo's **Configuration → Initial Setup** box, then validated with "Run and Snapshot". Use this script:
+Jules (Google's asynchronous coding agent via `@google/jules` CLI and [jules.google](https://jules.google)) is fully integrated for this repository (`maicen/bim-guard`). Local agents (Antigravity, Claude Code) and developers should actively delegate asynchronous, background, and parallel exploration tasks to Jules.
 
-```bash
-uv sync
-cd frontend && npm install && cd ..
-```
+1. **Jules Environment Setup (Dashboard)**:
+   Jules runs remotely against GitHub. Configure the initial environment in the Jules dashboard under **Configuration → Initial Setup**, then click **Run and Snapshot**:
+   ```bash
+   uv sync
+   cd frontend && npm install && cd ..
+   ```
+   *Validation check (optional before snapshot)*:
+   ```bash
+   uv run ruff check . && uv run pytest tests/ -m 'not slow'
+   ```
 
-Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'` before snapshotting to validate the environment.
+2. **CLI Commands (`@google/jules`)**:
+   - **Interactive TUI**: Launch `jules` to monitor ongoing sessions, review diffs, or chat.
+   - **Dispatch single task**:
+     ```bash
+     jules new "Add unit tests for IfcSpatialEngine in tests/test_arch_spatial.py"
+     ```
+   - **Parallel exploration (multi-candidate design spikes)**:
+     ```bash
+     jules new --parallel 2 "Propose alternative implementations for rule extraction error recovery"
+     ```
+   - **Task from markdown specification or pipe**:
+     ```bash
+     cat docs/task_spec.md | jules new
+     ```
+   - **List remote sessions**:
+     ```bash
+     jules remote list --session
+     ```
+   - **Pull and apply results to local repo**:
+     ```bash
+     jules remote pull --session <SESSION_ID> --apply
+     # or teleport directly into the working directory
+     jules teleport <SESSION_ID>
+     ```
+
+3. **When to Delegate to Jules**:
+   - **Candidate tasks for Jules delegation**:
+     - Boilerplate or comprehensive unit/integration test coverage generation (`tests/`).
+     - Parallel implementation spikes (comparing 2–3 algorithmic or refactoring approaches).
+     - Standalone script authoring (`scripts/`) and document parsing benchmarks.
+     - Tedious documentation updates, type-syncing, or lint fixes across multiple files.
+   - **Tasks to keep with the local IDE agent**:
+     - Core architectural migrations, live database schema migrations (`supabase/migrations/`), production Docker tunnel deployments, and sensitive credential modifications.
+
+4. **Mandatory Post-Jules Review & Quality Gate**:
+   Never merge or commit changes from Jules blindly. After pulling or teleporting a session:
+   - **Diff Review**: Inspect with `git diff` to verify compliance with repository standards.
+   - **Backend Verification**: Run `uv run ruff check <modified_files>` and `uv run python scripts/test_relevant.py` (or `uv run pytest tests/ -m 'not slow'`).
+   - **Frontend Verification**: If frontend code was modified, run `cd frontend && npm run build`.
+   - **Commit Hygiene**: Ensure commit messages adhere to the multi-paragraph format and **strictly contain no AI attribution trailers** (`Co-Authored-By`, `🤖 Generated with...`).
 
 ## Repo structure
 
@@ -138,6 +183,7 @@ Optionally append `uv run ruff check .` and `uv run pytest tests/ -m 'not slow'`
 - **Database-Driven Rules**: Never hardcode engineering cutoffs, scoring weights, or rule classifications in Python engines. Rules must be read dynamically from the database via `RuleService`.
 - **Real-Time Streaming**: Use Server-Sent Events (`/api/events/{project_id}`) for pipeline progress; avoid polling loops.
 - **Default validation rule**: Skip slow tests by default; only run them when the task is explicitly about slow pipeline/engine behavior or when there is no reliable fast-path validation. Routine verification should use `uv run pytest tests/ -m 'not slow'`.
+- **Jules Delegation & Automation**: Jules (`@google/jules` CLI / jules.google) is active and authorized for `maicen/bim-guard`. Delegate asynchronous, heavy, or multi-variant tasks (e.g. test expansion, parallel algorithm spikes, standalone scripts) to Jules using `jules new` or `jules new --parallel <N>`. Review, test, and sanitize all imported patches with local test suites and strict commit attribution hygiene before pushing.
 - **Root Directory Protection**: NEVER create or place new files (code, tests, reports, data, JSON manifests, scratch files) in the repository root. Always use the appropriate subdirectories (`app/`, `frontend/`, `tests/`, `scripts/`, `docs/`, `data/`, `supabase/migrations/`).
 - **Quality & Docs**: For public modules, classes, and functions, add or update PEP 257 docstrings.
 - **Universal Data Table UX Standards**: All data tables across the platform (Projects, Documents, Reports & BCF Topics/Deliverables, Rules Catalog, Extracted Rules Review, Audit Findings/Issues, Revit Sync, etc.) MUST provide rich, interactive, and user-friendly features following modern UX best practices:
