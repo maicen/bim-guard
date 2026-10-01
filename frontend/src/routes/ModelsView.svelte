@@ -429,38 +429,41 @@
           />
 
 
-          <button
-            type="button"
-            onclick={() => (isRepoManagerOpen = true)}
-            class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
-            title="Manage GitHub Repositories (Add, Edit, Delete)"
-          >
-            <Plus class="h-3.5 w-3.5 text-accent" />
-            <span>Manage Repos</span>
-          </button>
+          <Tooltip text="Manage GitHub Repositories (Add, Edit, Delete)">
+            <button
+              type="button"
+              onclick={() => (isRepoManagerOpen = true)}
+              class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
+            >
+              <Plus class="h-3.5 w-3.5 text-accent" />
+              <span>Manage Repos</span>
+            </button>
+          </Tooltip>
 
           {#if selectedSource === "supabase"}
-            <button
-              type="button"
-              onclick={() => initialProjectId && loadFiles(initialProjectId)}
-              class="rounded-xl border border-border-default bg-surface-canvas p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-              title="Refresh attached models"
-            >
-              <RotateCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-accent' : ''}" />
-            </button>
+            <Tooltip text="Refresh attached models">
+              <button
+                type="button"
+                onclick={() => initialProjectId && loadFiles(initialProjectId)}
+                class="rounded-xl border border-border-default bg-surface-canvas p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+              >
+                <RotateCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-accent' : ''}" />
+              </button>
+            </Tooltip>
           {:else if selectedSource.startsWith("repo:")}
-            <button
-              type="button"
-              onclick={() => {
-                const repoId = parseInt(selectedSource.split(":")[1], 10);
-                loadSelectedRepoStructure(repoId, true);
-              }}
-              class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
-              title="Re-sync GitHub repository models & manifest"
-            >
-              <RotateCw class="h-3.5 w-3.5 {isRepoLoading ? 'animate-spin text-blue-400' : ''}" />
-              <span>Sync Repo</span>
-            </button>
+            <Tooltip text="Re-sync GitHub repository models & manifest">
+              <button
+                type="button"
+                onclick={() => {
+                  const repoId = parseInt(selectedSource.split(":")[1], 10);
+                  loadSelectedRepoStructure(repoId, true);
+                }}
+                class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
+              >
+                <RotateCw class="h-3.5 w-3.5 {isRepoLoading ? 'animate-spin text-blue-400' : ''}" />
+                <span>Sync Repo</span>
+              </button>
+            </Tooltip>
           {/if}
         </div>
       </div>
@@ -638,63 +641,70 @@
                   <td class="px-4 py-3 text-right text-fg-muted">
                     {file.element_count ?? "—"}
                   </td>
-                  <td class="px-4 py-3 text-fg-muted" title={JSON.stringify(file.discipline_summary ?? {})}>
-                    {disciplineSummaryLabel(file)}
+                  <td class="px-4 py-3 text-fg-muted">
+                    <Tooltip text={JSON.stringify(file.discipline_summary ?? {})}>
+                      {disciplineSummaryLabel(file)}
+                    </Tooltip>
                   </td>
                   <td class="px-4 py-3 text-fg-muted">
                     {file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : "—"}
                   </td>
                   <td class="px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onclick={() => initialProjectId && onSelectProjectForViewer(initialProjectId)}
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                        title="Open in 3D Viewer"
-                      >
-                        <ScanEye class="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip text="Open in 3D Viewer">
+                        <button
+                          type="button"
+                          onclick={() => initialProjectId && onSelectProjectForViewer(initialProjectId)}
+                          class="inline-flex items-center gap-1.5 rounded-lg bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                        >
+                          <ScanEye class="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
 
                       {#if file.id != null}
-                        <button
-                          type="button"
-                          onclick={() => handleSetPrimary(file)}
-                          disabled={file.is_primary || pendingActionId === file.id}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-amber-950/30 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
-                          title={file.is_primary ? "Already primary" : "Set as primary model"}
-                        >
-                          <Star class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text={file.is_primary ? "Already primary" : "Set as primary model"}>
+                          <button
+                            type="button"
+                            onclick={() => handleSetPrimary(file)}
+                            disabled={file.is_primary || pendingActionId === file.id}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-amber-950/30 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Star class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
 
-                        <button
-                          type="button"
-                          onclick={() => handleRefreshMetadata(file)}
-                          disabled={refreshingId === file.id}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
-                          title="Refresh IFC metadata (schema, storeys, elements, discipline)"
-                        >
-                          <RefreshCw
-                            class="h-3.5 w-3.5 {refreshingId === file.id ? 'animate-spin' : ''}"
-                          />
-                        </button>
+                        <Tooltip text="Refresh IFC metadata (schema, storeys, elements, discipline)">
+                          <button
+                            type="button"
+                            onclick={() => handleRefreshMetadata(file)}
+                            disabled={refreshingId === file.id}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <RefreshCw
+                              class="h-3.5 w-3.5 {refreshingId === file.id ? 'animate-spin' : ''}"
+                            />
+                          </button>
+                        </Tooltip>
 
-                        <button
-                          type="button"
-                          onclick={() => openEditModal(file)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                          title="Edit model (name, ISO 19650 fields, replace file)"
-                        >
-                          <Pencil class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Edit model (name, ISO 19650 fields, replace file)">
+                          <button
+                            type="button"
+                            onclick={() => openEditModal(file)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                          >
+                            <Pencil class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
 
-                        <button
-                          type="button"
-                          onclick={() => promptDelete(file)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
-                          title="Delete model"
-                        >
-                          <Trash2 class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Delete model">
+                          <button
+                            type="button"
+                            onclick={() => promptDelete(file)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                          >
+                            <Trash2 class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
                       {/if}
                     </div>
                   </td>
@@ -886,15 +896,16 @@
                           {/if}
                         </td>
                         <td class="whitespace-nowrap px-4 py-3 text-right">
-                          <a
-                            href={item.download_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                            title="Direct download raw IFC"
-                          >
-                            <Download class="h-3.5 w-3.5" />
-                          </a>
+                          <Tooltip text="Direct download raw IFC">
+                            <a
+                              href={item.download_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="inline-flex rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                            >
+                              <Download class="h-3.5 w-3.5" />
+                            </a>
+                          </Tooltip>
                         </td>
                       </tr>
                     {/each}

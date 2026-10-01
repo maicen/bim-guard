@@ -46,7 +46,7 @@
     getDomainBadgeClasses,
   } from "../lib/analysisDomain";
   import { Select } from "../lib/components/ui";
-
+  import Tooltip from "../lib/components/Tooltip.svelte";
   interface Props {
     onSelectProjectForAudit: (projectId: number, analysisType?: string | null) => void;
     onSelectProjectForViewer: (projectId: number) => void;
@@ -386,15 +386,16 @@
             triggerClass="max-w-[240px]"
           />
 
-          <button
-            type="button"
-            onclick={() => (isRepoManagerOpen = true)}
-            class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
-            title="Manage GitHub Repositories (Add, Edit, Delete)"
-          >
-            <Plus class="h-3.5 w-3.5 text-accent" />
-            <span>Manage Repos</span>
-          </button>
+          <Tooltip text="Manage GitHub Repositories (Add, Edit, Delete)">
+            <button
+              type="button"
+              onclick={() => (isRepoManagerOpen = true)}
+              class="flex items-center gap-1.5 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
+            >
+              <Plus class="h-3.5 w-3.5 text-accent" />
+              <span>Manage Repos</span>
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -539,14 +540,15 @@
                   </td>
                   <td class="px-4 py-3 font-semibold text-fg-primary">
                     <div class="flex flex-col items-start">
-                      <button
-                        type="button"
-                        onclick={() => onSelectProjectForDashboard(project.id)}
-                        class="text-left text-sm text-fg-primary transition-colors hover:text-accent hover:underline"
-                        title="Open project"
-                      >
-                        {project.name}
-                      </button>
+                      <Tooltip text="Open project" align="start">
+                        <button
+                          type="button"
+                          onclick={() => onSelectProjectForDashboard(project.id)}
+                          class="text-left text-sm text-fg-primary transition-colors hover:text-accent hover:underline"
+                        >
+                          {project.name}
+                        </button>
+                      </Tooltip>
                       {#if project.description}
                         <span class="max-w-sm truncate text-caption font-normal text-fg-muted">
                           {project.description}
@@ -570,10 +572,9 @@
                     {#if project.ifc_file_path}
                       <div class="flex items-center gap-1.5 font-medium text-emerald-400">
                         <CheckCircle2 class="h-4 w-4 text-emerald-400" />
-                        <span
-                          class="max-w-[120px] truncate text-caption"
-                          title={project.ifc_file_path}>Attached</span
-                        >
+                        <Tooltip text={project.ifc_file_path}>
+                          <span class="max-w-[120px] truncate text-caption">Attached</span>
+                        </Tooltip>
                       </div>
                     {:else}
                       <div class="flex items-center gap-1.5 text-fg-muted">
@@ -597,33 +598,36 @@
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onclick={() => openDetails(project)}
-                        class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                        title="View project details"
-                      >
-                        <Eye class="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip text="View project details">
+                        <button
+                          type="button"
+                          onclick={() => openDetails(project)}
+                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                        >
+                          <Eye class="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
 
                       {#if project.ifc_file_path}
-                        <button
-                          type="button"
-                          onclick={() => onSelectProjectForViewer(project.id)}
-                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                          title="Open in 3D Viewer"
-                        >
-                          <ScanEye class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Open in 3D Viewer">
+                          <button
+                            type="button"
+                            onclick={() => onSelectProjectForViewer(project.id)}
+                            class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                          >
+                            <ScanEye class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
 
-                        <button
-                          type="button"
-                          onclick={() => openEnhancements(project)}
-                          class="rounded-lg border border-purple-800/40 bg-purple-950/40 p-1.5 text-purple-300 transition-colors hover:bg-purple-900/60"
-                          title="Model Quality Improvements (Lineage)"
-                        >
-                          <Sparkles class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Model Quality Improvements (Lineage)">
+                          <button
+                            type="button"
+                            onclick={() => openEnhancements(project)}
+                            class="rounded-lg border border-purple-800/40 bg-purple-950/40 p-1.5 text-purple-300 transition-colors hover:bg-purple-900/60"
+                          >
+                            <Sparkles class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
                       {/if}
 
                       <button
@@ -635,42 +639,46 @@
                       </button>
 
                       {#if canManageRuleAssignments}
-                        <button
-                          type="button"
-                          onclick={() => (rulesetBindingsTarget = project)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
-                          title="Rule Assignments"
-                        >
-                          <ListChecks class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Rule Assignments">
+                          <button
+                            type="button"
+                            onclick={() => (rulesetBindingsTarget = project)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
+                          >
+                            <ListChecks class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
 
-                        <button
-                          type="button"
-                          onclick={() => (documentBindingsTarget = project)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
-                          title="Document Assignments"
-                        >
-                          <BookOpen class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="Document Assignments">
+                          <button
+                            type="button"
+                            onclick={() => (documentBindingsTarget = project)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-success-bg/40 hover:text-success"
+                          >
+                            <BookOpen class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
                       {/if}
 
-                      <button
-                        type="button"
-                        onclick={() => openEdit(project)}
-                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
-                        title="Edit project"
-                      >
-                        <Pencil class="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip text="Edit project">
+                        <button
+                          type="button"
+                          onclick={() => openEdit(project)}
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
+                        >
+                          <Pencil class="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
 
-                      <button
-                        type="button"
-                        onclick={() => promptDelete(project.id, project.name)}
-                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
-                        title="Delete project"
-                      >
-                        <Trash2 class="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip text="Delete project">
+                        <button
+                          type="button"
+                          onclick={() => promptDelete(project.id, project.name)}
+                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                        >
+                          <Trash2 class="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>

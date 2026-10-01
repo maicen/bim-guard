@@ -1,5 +1,6 @@
 <script lang="ts">
   import Checkbox from "./ui/Checkbox.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   let {
     checked = $bindable(false),
@@ -28,12 +29,14 @@
   }
 </script>
 
-<span {title} class="inline-flex items-center">
-  <Checkbox
-    bind:checked
-    bind:indeterminate
-    {disabled}
-    {ariaLabel}
-    onCheckedChange={() => onchange?.(new Event("change"))}
-  />
-</span>
+<Tooltip text={title} disabled={!title}>
+  <span class="inline-flex items-center">
+    <Checkbox
+      bind:checked
+      bind:indeterminate
+      {disabled}
+      {ariaLabel}
+      onCheckedChange={() => onchange?.(new Event("change"))}
+    />
+  </span>
+</Tooltip>

@@ -49,6 +49,7 @@
   import IsoGovernanceBadges from "../lib/components/IsoGovernanceBadges.svelte";
   import SeverityBadge from "../lib/components/SeverityBadge.svelte";
   import { Select, type SelectOption } from "../lib/components/ui";
+  import Tooltip from "../lib/components/Tooltip.svelte";
   import Alert from "../lib/components/Alert.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
@@ -752,30 +753,33 @@
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-right">
                       <div class="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onclick={() => openTopicDetails(topic)}
-                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
-                          title="View topic discussion & viewpoints"
-                        >
-                          <Eye class="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onclick={() => openTopicEdit(topic)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
-                          title="Edit topic"
-                        >
-                          <Pencil class="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onclick={() => promptDeleteTopic(topic)}
-                          class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-critical-bg/40 hover:text-critical"
-                          title="Delete topic"
-                        >
-                          <Trash2 class="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip text="View topic discussion & viewpoints">
+                          <button
+                            type="button"
+                            onclick={() => openTopicDetails(topic)}
+                            class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                          >
+                            <Eye class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip text="Edit topic">
+                          <button
+                            type="button"
+                            onclick={() => openTopicEdit(topic)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-accent"
+                          >
+                            <Pencil class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip text="Delete topic">
+                          <button
+                            type="button"
+                            onclick={() => promptDeleteTopic(topic)}
+                            class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-critical-bg/40 hover:text-critical"
+                          >
+                            <Trash2 class="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
                       </div>
                     </td>
                   </tr>
