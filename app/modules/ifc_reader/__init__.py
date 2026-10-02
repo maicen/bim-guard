@@ -262,12 +262,32 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
 }
 
 
-#: Generic allowance (mm) for the leaf thickness and door-stop projection
-#: lost from a door's active-leaf width when it's swung to 90 degrees --
-#: used by ``_door_clear_opening_width`` to approximate the accessible
-#: clear/net passage width from OverallWidth. A fixed constant, not a
-#: measured swing simulation -- see that method's docstring.
-DEFAULT_DOOR_STOP_DEDUCTION_MM: float = 45.0
+#: Clear (net passage) dimensions of a door or window, by normalised rule
+#: property name. They depend on the frame, leaf and stop, which Revit exports
+#: empty (IfcDoorLiningProperties / IfcWindowLiningProperties carry no
+#: dimensions), so they are read only from a value the model actually
+#: provides -- never estimated from the overall size or the element's
+#: bounding box. Each maps to the other authored names accepted for it.
+_FRAME_DEPENDENT_PROPERTIES: dict[str, tuple[str, ...]] = {
+    "clearwidth": ("DoorClearOpeningWidth", "ClearOpeningWidth"),
+    "doorclearopeningwidth": ("ClearWidth",),
+    "clearopeningwidth": ("ClearWidth",),
+    "clearopeningheight": (),
+    "clearopeningarea": (),
+}
+
+
+def _frame_dependent_missing_reason(el) -> str:
+    """Why a door/window clear dimension could not be read, for the result row."""
+    kind = "door" if el.is_a("IfcDoor") else "window"
+    lining_cls = "IfcDoorLiningProperties" if kind == "door" else "IfcWindowLiningProperties"
+    return (
+        f"Clear opening is not in the model: the {kind}'s frame width is missing "
+        f"({lining_cls} was exported without dimensions), so it cannot be worked out "
+        f"from the {kind}'s overall size. Add the clear dimension as a property on the "
+        f"{kind} (e.g. through the BIM Guard property-mapping file)."
+    )
+
 
 # ── Length measure IFC types ──────────────────────────────────────────────────
 # Values with these NominalValue types are in model length units and must be
@@ -1188,118 +1208,16 @@ class IFCReader:
         )
 
     def _door_clear_opening_width(self, el) -> tuple[float | None, dict]:
-        """Accessible clear (net passage) opening width for a door leaf, mm.
+        """Return a door's clear opening width in mm, as authored in the model.
 
-        ``OverallWidth`` is the FRAME width, not what a wheelchair/stroller
-        can actually pass through: on a multi-leaf door only the ACTIVE leaf
-        counts, and every leaf loses some width to its own thickness/stop
-        when swung open. Computed as::
-
-            clear_width = overall_width * active_leaf_fraction - stop_deduction_mm
-
-        ``active_leaf_fraction`` comes from ``PanelWidth`` (an
-        ``IfcNormalisedRatioMeasure``, 0-1) on ``Pset_DoorPanelProperties``
-        when a model declares it. Most models do not, so this falls back to
-        an even split across ``NumberOfPanels`` when that's authored (>=2),
-        or 1.0 for an apparent single-leaf door -- both are documented
-        approximations, not a measurement, and are flagged as such in the
-        returned detail's ``warnings``. ``DEFAULT_DOOR_STOP_DEDUCTION_MM``
-        (a fixed generic allowance for the leaf thickness/door-stop lost
-        when swung to 90 degrees) is likewise an approximation, not a
-        simulated swing.
-
-        Returns (None, {}) only when OverallWidth itself cannot be resolved
-        at all (no Pset value and no geometry) -- there is nothing to
-        approximate from in that case.
+        Only a stated value counts (see ``_FRAME_DEPENDENT_PROPERTIES``):
+        returns ``(None, detail)`` with a ``missing_reason`` otherwise. Shared
+        with the SHACL graph enrichment so both paths agree on the value.
         """
-        detail: dict = {"unit": "mm", "warnings": []}
-        try:
-            psets = ifcopenshell.util.element.get_psets(el, psets_only=False)
-        except Exception:
-            psets = {}
-
-        # OverallWidth is a direct IfcDoor/IfcDoorType ATTRIBUTE in the
-        # schema, never a Pset_DoorCommon property -- checked first, the
-        # same way every other direct-attribute length value is read
-        # elsewhere in this cascade (Pass 3/4). The Pset scan below is a
-        # fallback only for the rare exporter that also duplicates it there.
-        overall_width = None
-        scale = getattr(self.geometry_extractor, "_unit_scale", 1.0) or 1.0
-        raw_attr = getattr(el, "OverallWidth", None)
-        if raw_attr is None and _IFCOPENSHELL_AVAILABLE:
-            try:
-                door_type = ifcopenshell.util.element.get_type(el)
-            except Exception:
-                door_type = None
-            raw_attr = getattr(door_type, "OverallWidth", None) if door_type else None
-        if raw_attr is not None:
-            try:
-                overall_width = float(raw_attr) * scale
-            except (TypeError, ValueError):
-                overall_width = None
-
-        if overall_width is None:
-            for ps in psets.values():
-                if isinstance(ps, dict) and ps.get("OverallWidth") is not None:
-                    try:
-                        overall_width = float(ps["OverallWidth"]) * scale
-                    except (TypeError, ValueError):
-                        overall_width = None
-                    break
-        if overall_width is None and self.geometry_extractor:
-            overall_width = self.geometry_extractor.get_width_mm(el)
-            if overall_width is not None:
-                detail["warnings"].append(
-                    "OverallWidth not authored; using bounding-box width instead"
-                )
-
-        if overall_width is None:
-            return None, {}
-
-        panel_fraction = None
-        for ps in psets.values():
-            if isinstance(ps, dict) and ps.get("PanelWidth") is not None:
-                try:
-                    candidate = float(ps["PanelWidth"])
-                except (TypeError, ValueError):
-                    candidate = None
-                if candidate is not None and 0.0 < candidate <= 1.0:
-                    panel_fraction = candidate
-                break
-
-        if panel_fraction is not None:
-            detail["active_leaf_fraction_source"] = "Pset_DoorPanelProperties.PanelWidth"
-        else:
-            num_panels = None
-            for ps in psets.values():
-                if isinstance(ps, dict) and ps.get("NumberOfPanels") is not None:
-                    try:
-                        num_panels = int(float(ps["NumberOfPanels"]))
-                    except (TypeError, ValueError):
-                        num_panels = None
-                    break
-            if num_panels and num_panels >= 2:
-                panel_fraction = 1.0 / num_panels
-                detail["warnings"].append(
-                    f"PanelWidth not declared; assumed an evenly split "
-                    f"{num_panels}-leaf door -- verify the actual active-leaf "
-                    "width before relying on this for an accessibility check"
-                )
-            else:
-                panel_fraction = 1.0
-                detail["active_leaf_fraction_source"] = "single leaf (NumberOfPanels not > 1)"
-
-        active_leaf_width_mm = overall_width * panel_fraction
-        clear_width_mm = max(0.0, round(active_leaf_width_mm - DEFAULT_DOOR_STOP_DEDUCTION_MM, 1))
-        detail["overall_width_mm"] = round(overall_width, 1)
-        detail["active_leaf_fraction"] = round(panel_fraction, 3)
-        detail["active_leaf_width_mm"] = round(active_leaf_width_mm, 1)
-        detail["stop_deduction_mm"] = DEFAULT_DOOR_STOP_DEDUCTION_MM
-        detail["warnings"].append(
-            "clear opening width assumes a fixed door-stop/thickness "
-            "deduction, not a measured swing-through opening"
+        value, _found, detail = self._resolve_element_property(
+            el, "DoorClearOpeningWidth", unit_scale_mm=self._get_length_unit_scale_mm()
         )
-        return clear_width_mm, detail
+        return value, detail
 
     # ── Reusable single-property resolution cascade ──────────────────────────
 
@@ -1351,6 +1269,12 @@ class IFCReader:
         # rule written with underscores rather than PascalCase would pay for
         # the traversal and then fail to read it.
         prop_key_name = prop_lower_name.replace("_", "").replace(" ", "").replace("-", "")
+        # A door/window clear dimension is read only where the model states
+        # it: its own aliases replace the generic ones, and the geometry pass
+        # is skipped (a bounding box measures the frame, not the clear gap).
+        frame_dependent = prop_key_name in _FRAME_DEPENDENT_PROPERTIES and (
+            el.is_a("IfcDoor") or el.is_a("IfcWindow")
+        )
         if prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
             storey_name = spatial.get("storey_name")
             if storey_name:
@@ -1427,22 +1351,6 @@ class IFCReader:
             value, detail = self._stair_derived_value(prop_key_name, stair)
             if value is not None:
                 return value, "geometry:stair", detail
-        elif prop_key_name == "doorclearopeningwidth" and el.is_a() in (
-            "IfcDoor", "IfcDoorStandardCase",
-        ):
-            # OverallWidth is the FRAME width, not the accessible passage
-            # width: a multi-leaf door's OTHER leaf doesn't count, and every
-            # leaf loses some width to its own thickness/stop when swung
-            # open. Neither of those is a Pset key on its own, so no amount
-            # of Pset searching below could derive this -- see
-            # _door_clear_opening_width's docstring for the approximation.
-            #
-            # Falls through when it produced nothing, so a model that
-            # authors "DoorClearOpeningWidth" as a real Pset property still
-            # gets it from Pass 1 below.
-            value, detail = self._door_clear_opening_width(el)
-            if value is not None:
-                return value, "geometry:door_clear_opening", detail
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
@@ -1523,7 +1431,12 @@ class IFCReader:
             except Exception:
                 pass
 
-            for alias in _PROPERTY_ALIASES.get(prop_name, []):
+            aliases = (
+                _FRAME_DEPENDENT_PROPERTIES[prop_key_name]
+                if frame_dependent
+                else _PROPERTY_ALIASES.get(prop_name, [])
+            )
+            for alias in aliases:
                 v, ps = self._lookup_in_psets(psets_simple, alias)
                 if v is not None:
                     actual_value, found_pset = v, f"alias:{ps}"
@@ -1570,7 +1483,7 @@ class IFCReader:
 
         # ── Pass 7: bounding-box geometry (Tier 1) ───────────────
         # Only runs when all Pset/attribute passes returned nothing.
-        if actual_value is None and self.geometry_extractor:
+        if actual_value is None and self.geometry_extractor and not frame_dependent:
             try:
                 floor_z = spatial.get("storey_elevation")
                 # storey_elevation from IFC is in model units; convert to mm
@@ -1611,6 +1524,9 @@ class IFCReader:
                 if (measure_type in _LENGTH_MEASURE_TYPES
                         or prop_lower in _LENGTH_DIRECT_ATTRS):
                     actual_value = round(actual_value * unit_scale_mm, 4)
+
+        if actual_value is None and frame_dependent:
+            rich_detail = {**rich_detail, "missing_reason": _frame_dependent_missing_reason(el)}
 
         return actual_value, found_pset, rich_detail
 
@@ -2044,6 +1960,8 @@ class IFCReader:
                         "name": getattr(el, "Name", None) or f"{target}_{el.id()}",
                         "actual_value": actual_value,
                         "found_pset": found_pset,
+                        # Why actual_value is None, when the resolver knows.
+                        "missing_reason": rich_detail.get("missing_reason"),
                         "found": actual_value is not None,
                         # Property-referencing bounds resolved for this element
                         "resolved_value_min": resolved_value_min,

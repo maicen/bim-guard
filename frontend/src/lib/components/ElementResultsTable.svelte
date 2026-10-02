@@ -181,6 +181,9 @@
             <td class="px-3 py-2 text-xs text-fg-muted">{requiredText}</td>
             <td class="px-3 py-2 text-xs {statusClass(el)}">
               {statusLabel(el)}
+              {#if el.status === "MISSING" && el.reason && el.reason !== "property not found"}
+                <span class="mt-0.5 block max-w-xs font-normal text-fg-muted">{el.reason}</span>
+              {/if}
               {#if el.status === "FAIL" && el.guid && onViewIn3d}
                 <button
                   type="button"

@@ -263,7 +263,11 @@ class ComplianceComparator:
                     pass_count += 1
                     all_elements.append(self._entry(el, actual, "PASS", "", scope_notes))
                 else:
-                    reason = "property missing" if wanted else "property should not exist"
+                    reason = (
+                        (el.get("missing_reason") or "property missing")
+                        if wanted
+                        else "property should not exist"
+                    )
                     fail_count += 1
                     failures.append(self._failure(el, actual, reason, scope_notes))
                     all_elements.append(self._entry(el, actual, "FAIL", reason, scope_notes))
@@ -316,7 +320,9 @@ class ComplianceComparator:
                     "storey": el.get("storey") or "—",
                     "space": el.get("space") or "—",
                 })
-                all_elements.append(self._entry(el, actual, "MISSING", "property not found", scope_notes))
+                all_elements.append(
+                    self._entry(el, actual, "MISSING", el.get("missing_reason") or "property not found", scope_notes)
+                )
                 continue
 
             # Property-referencing bounds (value_min_property / value_max_property)

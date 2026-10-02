@@ -29,7 +29,7 @@ def enrich_bot_graph_with_engine_outputs(
     Two literals are wired today:
 
     - `bimguard:calculatedClearWidth` (mm) on every `IfcDoor`, via the same
-      `M2Reader._door_clear_opening_width()` cascade the procedural
+      `M2Reader._door_clear_opening_width()` lookup (authored values only) the procedural
       comparator uses for the `doorClearOpeningWidth` rule property, so a
       SHACL shape and a procedural rule agree on the value.
     - `bimguard:travelDistanceM` on every space with a resolved egress
