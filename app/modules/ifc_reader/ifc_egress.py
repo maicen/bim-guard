@@ -183,6 +183,27 @@ class IFCEgressGraph:
         geo = self.geometry_extractor if _GEOMETRY_AVAILABLE else None
         space_centroids: dict[str, tuple | None] = {}
 
+        door_to_spaces = adj.get_door_to_spaces()
+        door_elements: dict[str, object | None] = {}
+        for door_guid in door_to_spaces:
+            try:
+                door_elements[door_guid] = adj.ifc_file.by_guid(door_guid)
+            except Exception:
+                door_elements[door_guid] = None
+
+        # Tessellate every space and door in one multi-threaded pass before
+        # the loops below ask for their centroids. Asked one at a time,
+        # get_centroid_or_none falls back to a sequential create_shape per
+        # element -- ~0.2s each, which made this build ~50s of a ~57s model
+        # load on a 290-space/door model. prefetch_centroids computes the same
+        # vertex-mean centroid, so results are unchanged; anything it cannot
+        # tessellate still takes the sequential path.
+        if geo is not None:
+            geo.prefetch_centroids(
+                [data["space"] for data in adj._space_data.values()]
+                + [el for el in door_elements.values() if el is not None]
+            )
+
         # ── Step 1: add one node per IfcSpace ─────────────────────────────────
         from .ifc_spatial import _get_storey_name  # reuse existing helper
 
@@ -209,14 +230,10 @@ class IFCEgressGraph:
 
         # ── Step 2: door → spaces map (shared with garage-separation and the
         # new SpaceConnection check) + detect exterior doors + door centroids ──
-        door_to_spaces = adj.get_door_to_spaces()
         exterior_door_guids: set[str] = set()
         door_centroids: dict[str, tuple | None] = {}
         for door_guid in door_to_spaces:
-            try:
-                door_el = adj.ifc_file.by_guid(door_guid)
-            except Exception:
-                door_el = None
+            door_el = door_elements.get(door_guid)
             if door_el is not None and _is_exterior_door(door_el):
                 exterior_door_guids.add(door_guid)
             door_centroids[door_guid] = geo.get_centroid_or_none(door_el) if geo and door_el else None

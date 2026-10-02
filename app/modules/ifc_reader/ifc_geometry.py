@@ -237,10 +237,11 @@ class IFCGeometryExtractor:
         self._shape_cache: dict[int, object] = {}  # STEP #id → shape
         # STEP #id → centroid (mm), filled in bulk by prefetch_centroids.
         self._centroid_cache: dict[int, tuple[float, float, float]] = {}
+        # Element ids prefetch_centroids has already handed to the iterator.
+        self._prefetch_attempted: set[int] = set()
         # Triangle meshes and their KD-trees, keyed the same way and for the
-        # same reason. XM-001 sweeps every dissimilar-material pair in a
-        # network, so an element is queried once per candidate partner;
-        # rebuilding its tree each time turns an O(n) extraction into O(n^2)
+        # same reason. A pairwise proximity check queries an element once per
+        # candidate partner; rebuilding its tree each time turns an O(n) extraction into O(n^2)
         # tessellations. The mesh caches the FACES alongside the vertices
         # because calculate_shortest_distance's narrow phase measures to
         # triangles, not to the vertex cloud alone.
@@ -399,10 +400,21 @@ class IFCGeometryExtractor:
                 eid = el.id()
             except Exception:
                 continue
-            if eid not in self._centroid_cache and eid not in self._shape_cache:
+            if (
+                eid not in self._centroid_cache
+                and eid not in self._shape_cache
+                and eid not in self._prefetch_attempted
+            ):
                 todo.append(el)
         if len(todo) < 16:
             return 0
+        # Remember what was tried: the iterator yields nothing for elements
+        # without a body representation, so they never reach _centroid_cache.
+        # Without this, every rule targeting their class (it is called once per
+        # rule) re-ran a full iterator pass over them -- ~2.4s of wasted
+        # tessellation for 125 rules. They still fall back to the sequential
+        # path on first use.
+        self._prefetch_attempted.update(el.id() for el in todo)
         try:
             import os
 
@@ -859,7 +871,7 @@ class IFCGeometryExtractor:
         Accuracy note: the narrow phase searches only the triangles incident
         on the broad phase's closest vertex pair, which is exact whenever the
         true closest surface point lies on one of them — the case for the
-        contact and near-contact geometry XM-001 asks about. It remains an
+        contact and near-contact geometry proximity checks ask about. It remains an
         upper bound in the general case (a long sliver face whose nearest
         point sits far from every vertex of the closest pair), so the result
         is sound for "are these two elements touching or near-touching?" and

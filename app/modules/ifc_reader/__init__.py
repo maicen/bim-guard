@@ -482,6 +482,9 @@ class IFCReader:
         self.egress_graph: "IFCEgressGraph | None" = None
         self._stair_engine: "IFCStairEngine | None" = None
         self._stair_engine_built = False
+        # Per-run memo of per-element lookups; see _memo(). None outside
+        # extract_for_compliance, so no other caller ever sees cached data.
+        self._element_memo: dict[tuple[str, int], object] | None = None
         if self.file_path:
             self.load_ifc_file()
 
@@ -1221,6 +1224,53 @@ class IFCReader:
 
     # ── Reusable single-property resolution cascade ──────────────────────────
 
+    # ── Per-run element memo ──────────────────────────────────────────────────
+    #
+    # WHY: extract_for_compliance evaluates every rule against every element of
+    # its target class, so one door is read once per door rule (dozens of
+    # times). The lookups below -- psets, rich property metadata, direct
+    # attributes, type, spatial location, materials -- depend only on the
+    # element, never on the rule, yet were recomputed on every visit;
+    # ifcopenshell's get_psets alone was ~30s of a 25s-wall-clock extraction
+    # on a 14 MB model. Memoising them per element makes the cost proportional
+    # to elements, not rules x elements.
+    #
+    # The memo lives only for one extract_for_compliance call (the model is
+    # not modified during a run) and is dropped afterwards, so readers used
+    # for anything else never see cached values. Cached values are shared:
+    # treat them as read-only and copy before mutating. A lookup that raises
+    # is not cached, so callers' existing try/except fallbacks behave as before.
+
+    def _memo(self, kind: str, el, compute):
+        """Return ``compute(el)``, memoised per element for the current run."""
+        memo = getattr(self, "_element_memo", None)  # tests may skip __init__
+        if memo is None:
+            return compute(el)
+        key = (kind, el.id())
+        if key in memo:
+            return memo[key]
+        value = compute(el)
+        memo[key] = value
+        return value
+
+    def _psets(self, el) -> dict:
+        """``get_psets(el, psets_only=False)`` (Psets + Qtos), memoised per run."""
+        return self._memo(
+            "psets", el, lambda e: ifcopenshell.util.element.get_psets(e, psets_only=False)
+        )
+
+    def _type_of(self, el):
+        """``get_type(el)``, memoised per run (may be None)."""
+        return self._memo("type", el, ifcopenshell.util.element.get_type)
+
+    def _rich_properties(self, el) -> dict:
+        """:meth:`extract_rich_properties`, memoised per run."""
+        return self._memo("rich", el, self.extract_rich_properties)
+
+    def _direct_attributes(self, el) -> dict:
+        """:meth:`get_direct_attributes`, memoised per run."""
+        return self._memo("direct", el, self.get_direct_attributes)
+
     def _resolve_element_property(
         self,
         el,
@@ -1354,7 +1404,7 @@ class IFCReader:
 
         # ── Pass 1: instance Psets + Qto sets (fast path) ─────────
         try:
-            psets_simple = ifcopenshell.util.element.get_psets(el, psets_only=False)
+            psets_simple = self._psets(el)
         except Exception:
             psets_simple = {}
 
@@ -1372,18 +1422,20 @@ class IFCReader:
         # ── Pass 2: rich property metadata (type/unit/bounds) ─────
         if found_pset:
             try:
-                rich_all = self.extract_rich_properties(el)
+                rich_all = self._rich_properties(el)
                 pset_key = found_pset.split(":")[-1]  # strip "type:" prefix if any
                 rich_prop = rich_all.get(pset_key, {}).get(prop_name, {})
                 if rich_prop:
-                    rich_detail = rich_prop
+                    # Copied: rich_all is memoised and shared by every rule
+                    # that reads this element.
+                    rich_detail = dict(rich_prop)
             except Exception:
                 pass
 
         # ── Pass 3: direct IFC schema attributes ──────────────────
         if actual_value is None:
             try:
-                direct = self.get_direct_attributes(el)
+                direct = self._direct_attributes(el)
                 v = direct.get(prop_name)
                 if v is not None:
                     actual_value = v
@@ -1396,17 +1448,15 @@ class IFCReader:
         # live on the IfcDoorType / IfcWindowType, not the instance.
         if actual_value is None:
             try:
-                el_type = ifcopenshell.util.element.get_type(el)
+                el_type = self._type_of(el)
                 if el_type:
-                    type_psets = ifcopenshell.util.element.get_psets(
-                        el_type, psets_only=False
-                    )
+                    type_psets = self._psets(el_type)
                     v, ps = self._lookup_in_psets(type_psets, prop_name)
                     if v is not None:
                         actual_value = v
                         found_pset = f"type:{ps}"
                     if actual_value is None:
-                        type_direct = self.get_direct_attributes(el_type)
+                        type_direct = self._direct_attributes(el_type)
                         v = type_direct.get(prop_name)
                         if v is not None:
                             actual_value = v
@@ -1423,11 +1473,9 @@ class IFCReader:
             el_type_for_alias = None
             type_psets_for_alias = None
             try:
-                el_type_for_alias = ifcopenshell.util.element.get_type(el)
+                el_type_for_alias = self._type_of(el)
                 if el_type_for_alias:
-                    type_psets_for_alias = ifcopenshell.util.element.get_psets(
-                        el_type_for_alias, psets_only=False
-                    )
+                    type_psets_for_alias = self._psets(el_type_for_alias)
             except Exception:
                 pass
 
@@ -1442,7 +1490,7 @@ class IFCReader:
                     actual_value, found_pset = v, f"alias:{ps}"
                     break
                 try:
-                    direct = self.get_direct_attributes(el)
+                    direct = self._direct_attributes(el)
                     v = direct.get(alias)
                     if v is not None:
                         actual_value = v
@@ -1457,7 +1505,7 @@ class IFCReader:
                         break
                 if el_type_for_alias:
                     try:
-                        type_direct = self.get_direct_attributes(el_type_for_alias)
+                        type_direct = self._direct_attributes(el_type_for_alias)
                         v = type_direct.get(alias)
                         if v is not None:
                             actual_value = v
@@ -1473,7 +1521,7 @@ class IFCReader:
                 actual_value, found_pset = v, f"fallback:{ps}"
             if actual_value is None:
                 try:
-                    direct = self.get_direct_attributes(el)
+                    direct = self._direct_attributes(el)
                     v = direct.get(fallback_prop)
                     if v is not None:
                         actual_value = v
@@ -1533,6 +1581,17 @@ class IFCReader:
     # ── Compliance extraction (all fallbacks) ─────────────────────────────────
 
     def extract_for_compliance(self, rules: list[dict]) -> list[dict]:
+        """Run :meth:`_extract_for_compliance` with the per-run element memo active.
+
+        See the "Per-run element memo" note above :meth:`_memo`.
+        """
+        self._element_memo = {}
+        try:
+            return self._extract_for_compliance(rules)
+        finally:
+            self._element_memo = None
+
+    def _extract_for_compliance(self, rules: list[dict]) -> list[dict]:
         """
         For each rule, find matching IFC elements and extract the property value.
 
@@ -1637,9 +1696,8 @@ class IFCReader:
             # A waiver definition states the condition under which another rule
             # is excused. It makes no claim about the model on its own, so
             # evaluating it standalone would report a verdict on a requirement
-            # that does not exist -- which is exactly what PC-001.03/.04/.05
-            # did, surfacing as MISSING_DATA and NOT_APPLICABLE rows beside the
-            # requirement they belong to. It still stays in rules_by_reference
+            # that does not exist, surfacing as MISSING_DATA and
+            # NOT_APPLICABLE rows beside the requirement it belongs to. It still stays in rules_by_reference
             # above, so the rules that cite it can resolve its predicate.
             if self._is_waiver_only(operator):
                 logger.info(
@@ -1774,11 +1832,11 @@ class IFCReader:
                 # Pass 7 geometry, and both feed the Pass 0 relationship shortcut
                 # for "Storey"/"Material" rules.
                 try:
-                    spatial = self.get_spatial_location(el)
+                    spatial = self._memo("spatial", el, self.get_spatial_location)
                 except Exception:
                     spatial = {}
                 try:
-                    mat_info = self.get_material_info(el)
+                    mat_info = self._memo("material", el, self.get_material_info)
                 except Exception:
                     mat_info = {}
                 door_space = door_space_lookup.get(getattr(el, "GlobalId", None))
@@ -1893,9 +1951,8 @@ class IFCReader:
                     )
 
                 # Scope/waiver predicate inputs, through the same cascade. The
-                # loop body is skipped entirely for the rules that declare no
-                # predicates, which is every rule but BIMGUARD-PC-001's, so
-                # extraction cost is unchanged for them.
+                # loop body is skipped entirely for rules that declare no
+                # predicates, so extraction cost is unchanged for them.
                 scope_values: dict = {}
                 for scope_prop in scope_property_names:
                     try:
@@ -1917,7 +1974,7 @@ class IFCReader:
                 _t = _t2
                 # ── Type context ────────────────────────────────
                 try:
-                    type_inf = self.get_type_info(el)
+                    type_inf = self._memo("type_info", el, self.get_type_info)
                 except Exception:
                     type_inf = {}
                 _t2 = _tick()
@@ -1992,8 +2049,8 @@ class IFCReader:
                         "space": spatial.get("space_name"),
                         "element_type": type_inf.get("type_name"),
                         # Gap 3: material
-                        "materials": mat_info.get("materials", []),
-                        "material_layers": mat_info.get("layers", []),
+                        "materials": list(mat_info.get("materials", [])),
+                        "material_layers": list(mat_info.get("layers", [])),
                         # Properties needed only by this rule's scope/waiver
                         # predicates, resolved through the same cascade as the
                         # main property. Empty for rules that declare neither.
