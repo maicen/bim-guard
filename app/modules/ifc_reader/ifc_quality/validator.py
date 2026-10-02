@@ -25,22 +25,35 @@ except ImportError:
     _IFC_AVAILABLE = False
 
 
+# Classes get_psets reads properties/quantities from (ifcopenshell.util.element).
+_PSET_OWNER_BASES = (
+    "IfcObjectDefinition",
+    "IfcMaterialDefinition",
+    "IfcMaterial",  # IFC2X3, where it is not an IfcMaterialDefinition
+    "IfcProfileDef",
+)
+
+
 class IFCValidator:
     """Validate and score an IFC file for compliance-checking readiness."""
 
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, ifc_file=None):
+        """``ifc_file`` is an already-open model for *filepath*; passing it
+        skips a second parse of the file (several seconds on large models)."""
         self.filepath = filepath
-        self.ifc = None
+        self.ifc = ifc_file
         self.results: dict = {}
+        self._scan_cache: dict | None = None
 
     def validate(self) -> Dict:
         if not _IFC_AVAILABLE:
             return {"valid": False, "error": "ifcopenshell not installed"}
 
-        try:
-            self.ifc = ifcopenshell.open(self.filepath)
-        except Exception as exc:
-            return {"valid": False, "error": str(exc), "filepath": self.filepath}
+        if self.ifc is None:
+            try:
+                self.ifc = ifcopenshell.open(self.filepath)
+            except Exception as exc:
+                return {"valid": False, "error": str(exc), "filepath": self.filepath}
 
         self._check_metadata()
         self._check_elements()
@@ -59,19 +72,53 @@ class IFCValidator:
             "file_size_kb": Path(self.filepath).stat().st_size / 1024,
         }
 
-    def _check_elements(self):
-        element_types: dict = {}
+    def _scan(self) -> dict:
+        """Group the model by concrete type once, so per-entity Python work is
+        limited to the classes that can matter.
+
+        A multi-million-entity model is mostly geometry (points, polylines,
+        placements) that has no Name, no GlobalId and no property sets. Those
+        are only counted; the relevant entities are visited in id order, which
+        is the order a plain walk of the model yields them in.
+        """
+        if self._scan_cache is not None:
+            return self._scan_cache
+        by_type: dict = {}
+        relevant: list = []
         total = 0
-        for el in self._iter_entities():
-            t = el.is_a()
-            element_types[t] = element_types.get(t, 0) + 1
-            total += 1
-        self.results["elements"] = {"total": total, "by_type": element_types}
+        try:
+            type_names = self.ifc.wrapped_data.types()
+            for name in type_names:
+                entities = self.ifc.by_type(name, include_subtypes=False)
+                if not entities:
+                    continue
+                by_type[name] = len(entities)
+                total += len(entities)
+                probe = entities[0]
+                if (
+                    hasattr(probe, "Name")
+                    or hasattr(probe, "GlobalId")
+                    or any(probe.is_a(t) for t in _PSET_OWNER_BASES)
+                ):
+                    relevant.extend(entities)
+        except Exception:
+            by_type, relevant, total = {}, [], 0
+            for el in self._iter_entities():
+                by_type[el.is_a()] = by_type.get(el.is_a(), 0) + 1
+                total += 1
+            relevant = list(self._iter_entities())
+        relevant.sort(key=lambda e: e.id())
+        self._scan_cache = {"by_type": by_type, "relevant": relevant, "total": total}
+        return self._scan_cache
+
+    def _check_elements(self):
+        scan = self._scan()
+        self.results["elements"] = {"total": scan["total"], "by_type": scan["by_type"]}
 
     def _check_labeling(self):
         named = unnamed = 0
         samples: list = []
-        for el in self._iter_entities():
+        for el in self._scan()["relevant"]:
             if hasattr(el, "Name"):
                 if el.Name and str(el.Name).strip():
                     named += 1
@@ -92,8 +139,7 @@ class IFCValidator:
     def _check_guids(self):
         with_guid = 0
         samples: list = []
-        entities = self._iter_entities()
-        for el in entities:
+        for el in self._scan()["relevant"]:
             if hasattr(el, "GlobalId") and el.GlobalId:
                 with_guid += 1
                 if len(samples) < 3:
@@ -104,7 +150,7 @@ class IFCValidator:
                             "name": getattr(el, "Name", "N/A"),
                         }
                     )
-        total = len(entities)
+        total = self._scan()["total"]
         score = (with_guid / total * 100) if total else 0
         self.results["guids"] = {
             "with_guid": with_guid,
@@ -114,10 +160,18 @@ class IFCValidator:
         }
 
     def _check_properties(self):
-        with_props = without_props = 0
+        scan = self._scan()
+        with_props = 0
+        # Every entity outside `relevant` has no property sets by construction.
+        without_props = scan["total"] - len(scan["relevant"])
         all_psets: set = set()
         samples: list = []
-        for el in self._iter_entities():
+        for el in scan["relevant"]:
+            # Only these classes can own property/quantity sets; for the rest
+            # get_psets returns nothing.
+            if not any(el.is_a(t) for t in _PSET_OWNER_BASES):
+                without_props += 1
+                continue
             try:
                 psets = get_psets(el, psets_only=False)
                 if psets:
@@ -148,12 +202,12 @@ class IFCValidator:
         }
 
     def _iter_entities(self) -> list:
-        """Return IFC entities in a version-safe way across IfcOpenShell releases."""
+        """Every entity, in a version-safe way across IfcOpenShell releases
+        (fallback path only; ``_scan`` is the normal route)."""
         try:
             return list(self.ifc)
         except Exception:
             pass
-
         try:
             return list(self.ifc.by_type("IfcRoot"))
         except Exception:

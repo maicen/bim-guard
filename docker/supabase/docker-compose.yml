@@ -34,6 +34,9 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,post-function
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Keep typical JSON/upload bodies in memory instead of spilling to a
+      # temp file (the "request body is buffered to a temporary file" warnings).
+      KONG_NGINX_PROXY_CLIENT_BODY_BUFFER_SIZE: 8m
       # Public traffic arrives via cloudflared over https:443. Trust its
       # X-Forwarded-Proto from the Docker network and report 443 rather than
       # Kong's own 8000, so services that build absolute URLs (Storage's tus

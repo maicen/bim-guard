@@ -53,7 +53,7 @@ COPY pyproject.toml uv.lock ./
 # uv download cache out of the image layers entirely.
 # Purge __pycache__ and *.pyc bytecode from site-packages to shed ~100MB before copying to runtime.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev --no-editable \
+    uv sync --frozen --no-install-project --no-dev --no-editable --group triplestore \
     && find /app/.venv -type d -name "__pycache__" -prune -exec rm -rf {} + \
     && find /app/.venv -type f -name "*.pyc" -delete
 

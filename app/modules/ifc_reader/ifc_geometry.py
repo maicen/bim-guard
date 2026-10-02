@@ -235,6 +235,8 @@ class IFCGeometryExtractor:
         # Keyed on the STEP entity instance id, never on id(element): see
         # _get_shape for why the Python object address is not an identity.
         self._shape_cache: dict[int, object] = {}  # STEP #id → shape
+        # STEP #id → centroid (mm), filled in bulk by prefetch_centroids.
+        self._centroid_cache: dict[int, tuple[float, float, float]] = {}
         # Triangle meshes and their KD-trees, keyed the same way and for the
         # same reason. XM-001 sweeps every dissimilar-material pair in a
         # network, so an element is queried once per candidate partner;
@@ -377,6 +379,56 @@ class IFCGeometryExtractor:
         shape = self._create_shape(element)
         self._shape_cache[eid] = shape
         return shape
+
+    def prefetch_centroids(self, elements, num_threads: int | None = None) -> int:
+        """Compute many centroids at once, tessellating on multiple threads.
+
+        ``create_shape`` is one element at a time on one core (~13 ms per wall);
+        the iterator spreads the same work across cores. The iterator owns the
+        memory behind each shape it yields and invalidates it on the next step,
+        so the centroid is taken inside the loop and only that is kept (shapes
+        cannot go in ``_shape_cache``). Elements the iterator does not return
+        are left alone and fall back to the sequential path on first use.
+        Returns the number of centroids cached.
+        """
+        if self._settings is None or self.model is None or not _NP_AVAILABLE:
+            return 0
+        todo = []
+        for el in elements:
+            try:
+                eid = el.id()
+            except Exception:
+                continue
+            if eid not in self._centroid_cache and eid not in self._shape_cache:
+                todo.append(el)
+        if len(todo) < 16:
+            return 0
+        try:
+            import os
+
+            threads = num_threads or max(1, (os.cpu_count() or 1))
+            iterator = ifcopenshell.geom.iterator(
+                self._settings, self.model, threads, include=todo
+            )
+            cached = 0
+            if iterator.initialize():
+                while True:
+                    shape = iterator.get()
+                    verts = _ifcos_shape.get_vertices(shape.geometry) * self._mesher_scale
+                    if len(verts):
+                        cx, cy, cz = verts.mean(axis=0)
+                        self._centroid_cache[shape.id] = (
+                            round(float(cx), 4),
+                            round(float(cy), 4),
+                            round(float(cz), 4),
+                        )
+                        cached += 1
+                    if not iterator.next():
+                        break
+            return cached
+        except Exception as exc:
+            logger.debug(f"prefetch_centroids failed, falling back to sequential: {exc}")
+            return 0
 
     def _create_shape(self, element):
         """Tessellate *element*, returning None if ifcopenshell cannot."""
@@ -629,6 +681,12 @@ class IFCGeometryExtractor:
         fall back to a non-geometric estimate instead of computing a
         meaningless distance from/to the origin).
         """
+        try:
+            cached = self._centroid_cache.get(element.id())
+        except Exception:
+            cached = None
+        if cached is not None:
+            return cached
         if self._get_shape(element) is None:
             return None
         return self.get_centroid(element)

@@ -119,7 +119,7 @@ def ingest_compliance_verdicts(
         MERGE (v)-[:TRIGGERED_BY]->(r)
         MERGE (v)-[:GENERATED_FINDING]->(i)
         WITH v, item
-        MATCH (e {guid: item.element_id, project_id: $project_id})
+        MATCH (e:IfcProduct {guid: item.element_id, project_id: $project_id})
         MERGE (v)-[:EVALUATED_ELEMENT]->(e)
         """
         link_items = [

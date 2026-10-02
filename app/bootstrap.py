@@ -808,6 +808,10 @@ def build_default_container() -> ApplicationContainer:
                     neo4j_provider.ensure_index("IfcBuildingStorey", "project_id")
                     neo4j_provider.ensure_index("IfcSpace", "id")
                     neo4j_provider.ensure_index("IfcSpace", "project_id")
+                    # Compliance lineage ingest MATCHes these by id on every run.
+                    neo4j_provider.ensure_index("ComplianceVerdict", "id")
+                    neo4j_provider.ensure_index("Rule", "id")
+                    neo4j_provider.ensure_index("Issue", "id")
                 except Exception as index_err:
                     logger.debug("Neo4j GraphRAG index setup note: %s", index_err)
                 logger.info("Initialized GraphService with Neo4jDatabaseProvider (%s)", neo4j_uri)

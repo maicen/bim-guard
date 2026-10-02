@@ -402,9 +402,27 @@ class IFCReader:
         self.spatial_adjacency: "IFCSpatialAdjacency | None" = None
         self.room_linker: "ElementRoomLinker | None" = None
         self.egress_graph: "IFCEgressGraph | None" = None
-        self.stair_engine: "IFCStairEngine | None" = None
+        self._stair_engine: "IFCStairEngine | None" = None
+        self._stair_engine_built = False
         if self.file_path:
             self.load_ifc_file()
+
+    @property
+    def stair_engine(self) -> "IFCStairEngine | None":
+        """Stair geometry analysis, built on first use.
+
+        It meshes every flight, landing and railing in the model (~13s on a
+        large one), and only rules that read a stair-derived property need it.
+        """
+        if not self._stair_engine_built:
+            self._stair_engine_built = True
+            if _STAIR_AVAILABLE and self.geometry_extractor is not None and self.ifc_file is not None:
+                t0 = time.monotonic()
+                self._stair_engine = IFCStairEngine(
+                    self.ifc_file, self.geometry_extractor
+                ).build()
+                logger.info("IFC stage=stair-engine elapsed=%.2fs", time.monotonic() - t0)
+        return self._stair_engine
 
     # ── Core load / schema helpers ────────────────────────────────────────────
 
@@ -419,8 +437,27 @@ class IFCReader:
         self.quality_warnings: list[str] = []
         self.quality_improvements: list[str] = []
 
+        timings: dict[str, float] = {}
+
+        def _timed(stage, fn):
+            t0 = time.monotonic()
+            try:
+                return fn()
+            finally:
+                timings[stage] = time.monotonic() - t0
+                logger.info(
+                    "IFC load stage=%s elapsed=%.2fs", stage, timings[stage]
+                )
+
+        if self.ifc_file is None:
+            self.ifc_file = _timed(
+                "ifcopenshell-open", lambda: ifcopenshell.open(str(load_path))
+            )
         if _QUALITY_TOOLS_AVAILABLE:
-            results = IFCValidator(str(load_path)).validate()
+            results = _timed(
+                "quality-validate",
+                lambda: IFCValidator(str(load_path), ifc_file=self.ifc_file).validate(),
+            )
             self.quality_report = results
             score = results.get("overall", {}).get("score", 100)
 
@@ -435,30 +472,40 @@ class IFCReader:
                     "Consider running the IFC improver for better results."
                 )
 
-        if self.ifc_file is None:
-            self.ifc_file = ifcopenshell.open(str(load_path))
         if _GEOMETRY_AVAILABLE:
-            self.geometry_extractor = IFCGeometryExtractor(self.ifc_file)
+            self.geometry_extractor = _timed(
+                "geometry-extractor", lambda: IFCGeometryExtractor(self.ifc_file)
+            )
         if _SPATIAL_AVAILABLE:
-            self.spatial_adjacency = IFCSpatialAdjacency(self.ifc_file).build()
+            self.spatial_adjacency = _timed(
+                "spatial-adjacency",
+                lambda: IFCSpatialAdjacency(self.ifc_file).build(),
+            )
         if _ROOMS_AVAILABLE and self.spatial_adjacency is not None:
-            self.room_linker = ElementRoomLinker(
-                self.spatial_adjacency,
-                self.ifc_file,
-                geometry_extractor=self.geometry_extractor,
+            self.room_linker = _timed(
+                "room-linker",
+                lambda: ElementRoomLinker(
+                    self.spatial_adjacency,
+                    self.ifc_file,
+                    geometry_extractor=self.geometry_extractor,
+                ),
             )
             # Room names are left exactly as the model's author wrote them; a
             # name that looks like a misspelling is reported, with a suggested
             # fix, instead of being quietly reinterpreted.
             self.quality_warnings.extend(self.room_linker.rooms.warning_messages())
         if _EGRESS_AVAILABLE and self.spatial_adjacency is not None:
-            self.egress_graph = IFCEgressGraph(
-                self.spatial_adjacency, geometry_extractor=self.geometry_extractor
-            ).build()
-        if _STAIR_AVAILABLE and self.geometry_extractor is not None:
-            self.stair_engine = IFCStairEngine(
-                self.ifc_file, self.geometry_extractor
-            ).build()
+            self.egress_graph = _timed(
+                "egress-graph",
+                lambda: IFCEgressGraph(
+                    self.spatial_adjacency, geometry_extractor=self.geometry_extractor
+                ).build(),
+            )
+        logger.info(
+            "IFC load complete total=%.2fs stages=%s",
+            sum(timings.values()),
+            {k: round(v, 2) for k, v in timings.items()},
+        )
         return self.ifc_file
 
     def get_all_elements(self, ifc_type: str = "IfcBuildingElement") -> list:
@@ -1629,9 +1676,9 @@ class IFCReader:
                 _interference_index = build_interference_index(self.ifc_file)
 
 
-            needs_stair = _STAIR_AVAILABLE and self.stair_engine is not None and self._needs_stair_context(
+            needs_stair = _STAIR_AVAILABLE and self._needs_stair_context(
                 prop_name, scope_predicate, resolved_exceptions
-            )
+            ) and self.stair_engine is not None
 
             needs_room = self.room_linker is not None and self._needs_room_context(
                 prop_name, scope_predicate, resolved_exceptions
@@ -1727,8 +1774,18 @@ class IFCReader:
             if location_filter in ("interior", "exterior") and _SPATIAL_AVAILABLE:
                 elements = [el for el in elements if _element_matches_location(el, location_filter)]
 
+            # Centroids (BCF camera targets) tessellate every element; do it
+            # for the whole class on all cores rather than one at a time.
+            if self.geometry_extractor is not None:
+                self.geometry_extractor.prefetch_centroids(
+                    [el for el in elements if el.id() not in _position_cache]
+                )
+
             element_results = []
+            _sub: dict[str, float] = {}
+            _tick = time.monotonic
             for el in elements:
+                _t = _tick()
                 # Spatial + material context fetched early — floor_z needed for
                 # Pass 7 geometry, and both feed the Pass 0 relationship shortcut
                 # for "Storey"/"Material" rules.
@@ -1741,6 +1798,9 @@ class IFCReader:
                 except Exception:
                     mat_info = {}
                 door_space = door_space_lookup.get(getattr(el, "GlobalId", None))
+                _t2 = _tick()
+                _sub["spatial+material"] = _sub.get("spatial+material", 0.0) + (_t2 - _t)
+                _t = _t2
 
                 # Host / opening traversal: what this element passes through
                 # and how much gap surrounds it. Resolved before the property
@@ -1803,6 +1863,9 @@ class IFCReader:
                             room = {}
                         _room_cache[room_key] = room
 
+                _t2 = _tick()
+                _sub["penetration+stair+room"] = _sub.get("penetration+stair+room", 0.0) + (_t2 - _t)
+                _t = _t2
                 actual_value, found_pset, rich_detail = self._resolve_element_property(
                     el,
                     prop_name,
@@ -1865,11 +1928,17 @@ class IFCReader:
                     scope_values[scope_prop] = scope_value
 
 
+                _t2 = _tick()
+                _sub["property-resolve"] = _sub.get("property-resolve", 0.0) + (_t2 - _t)
+                _t = _t2
                 # ── Type context ────────────────────────────────
                 try:
                     type_inf = self.get_type_info(el)
                 except Exception:
                     type_inf = {}
+                _t2 = _tick()
+                _sub["type-info"] = _sub.get("type-info", 0.0) + (_t2 - _t)
+                _t = _t2
 
                 # World-space centroid (mm) — resolved once per unique
                 # element via _position_cache above, not once per rule. Only
@@ -1888,6 +1957,8 @@ class IFCReader:
                         except Exception:
                             position_mm = None
                     _position_cache[eid] = position_mm
+                _t2 = _tick()
+                _sub["centroid"] = _sub.get("centroid", 0.0) + (_t2 - _t)
 
                 # A class-fallback caveat leads the list: whether the element
                 # is the kind of thing this rule targets at all outranks any
@@ -2044,6 +2115,14 @@ class IFCReader:
                 dict(source_counts),
                 time.monotonic() - rule_started_at,
             )
+            if time.monotonic() - rule_started_at > 2.0:
+                logger.info(
+                    "Rule extraction slow rule=%d/%d reference=%s breakdown=%s",
+                    rule_index,
+                    total_rules,
+                    rule.get("reference") or rule.get("id") or "unknown",
+                    {k: round(v, 2) for k, v in _sub.items()},
+                )
 
         return results
 

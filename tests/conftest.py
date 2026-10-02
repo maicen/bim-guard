@@ -58,6 +58,24 @@ TEST_USER = CurrentUser(
 )
 
 
+# TEST_USER is not a row in auth.users, so the real membership insert that
+# ensure_default_membership performs on first sign-in always fails the
+# memberships_user_id_fkey constraint against a live Supabase. Skip the write
+# for this one fake user; every other user still takes the real path.
+from app.services.membership_service import MembershipService  # noqa: E402
+
+_real_ensure_default_membership = MembershipService.ensure_default_membership
+
+
+def _ensure_default_membership_skip_test_user(self, user_id: str):
+    if user_id == TEST_USER.id:
+        return []
+    return _real_ensure_default_membership(self, user_id)
+
+
+MembershipService.ensure_default_membership = _ensure_default_membership_skip_test_user
+
+
 def _override_get_current_user() -> CurrentUser:
     return TEST_USER
 
