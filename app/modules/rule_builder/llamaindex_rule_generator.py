@@ -19,7 +19,7 @@ Keeping prompts as Python (not external text files) preserves format-string
 escaping semantics and lets the schema/prompt contract be reviewed together.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.logging_config import get_logger
 from app.modules.contracts import (
@@ -105,6 +105,21 @@ class _LLMRuleCandidate(BaseModel):
             "none were listed or none fits."
         ),
     )
+
+    @field_validator("applies_when_materials", mode="before")
+    @classmethod
+    def _coerce_materials(cls, value):
+        """Models often write "" / null for "none" (like every other string field here) or a bare string.
+
+        One strict list field must not discard every rule in the reply:
+        the whole result is validated at once, so a single "" here used to
+        drop all of a clause's rules.
+        """
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return []
+        if isinstance(value, str):
+            return [value]
+        return value
 
 
 class _LLMRuleExtractionResult(BaseModel):
