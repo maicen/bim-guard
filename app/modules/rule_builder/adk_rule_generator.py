@@ -9,25 +9,46 @@ import json
 from typing import Optional
 
 from google.adk.agents import LlmAgent, LoopAgent, SequentialAgent
+from google.adk.events import Event
+from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import InMemoryRunner
 from google.adk.tools import ToolContext
-from google.adk.events import Event
 from google.genai.types import Content, Part
 
 from app.logging_config import get_logger
+from app.modules.config import DEFAULT_LLM_MODEL
 from app.modules.contracts import (
     DeonticStatement,
     DocumentNodeContract,
     RuleExtractionDraft,
 )
+from app.modules.llm_providers.key_resolver import resolve_api_key
 from app.modules.rule_builder._extraction_prompts import (
     RULE_PROMPT,
     SYSTEM_PROMPT,
     format_check_category_context,
+    format_kg_context,
 )
 from app.services.clause_grounding_index import ClauseGroundingIndex
 
 logger = get_logger(__name__)
+
+
+def _build_adk_model(model: str | None, *, organization_id: int | None):
+    """Resolve the model argument for an ADK LlmAgent, mirroring build_llm's provider/key logic.
+
+    A bare Gemini model name routes to ADK's native Gemini integration; any
+    other provider (e.g. "openrouter/...") needs the LiteLlm wrapper plus the
+    org/env-resolved API key -- ADK's LlmAgent has no provider-routing of its
+    own the way LlamaIndex's LiteLLM binding does.
+    """
+    resolved_model = model or DEFAULT_LLM_MODEL
+    if "/" not in resolved_model:
+        return resolved_model
+    provider = resolved_model.split("/", 1)[0]
+    api_key = resolve_api_key(provider, organization_id)
+    return LiteLlm(model=resolved_model, api_key=api_key)
+
 
 def exit_loop(tool_context: ToolContext) -> dict:
     """Call this function ONLY when the rules are perfect and no further changes are needed."""
@@ -49,30 +70,28 @@ class AdkRuleGenerator:
         check_categories: list[dict] | None = None,
     ) -> list[RuleExtractionDraft]:
         from app.modules.rule_builder.llamaindex_rule_generator import (
-            _LLMRuleExtractionResult,
             _candidate_to_draft,
-            _format_kg_context,
+            _LLMRuleExtractionResult,
         )
-        
-        model_name = model or "gemini-2.5-flash"
-        
+
+        adk_model = _build_adk_model(model, organization_id=organization_id)
+
         # 1. Prepare formatting context
-        kg_context = ""
+        clause_id = node.metadata.clause_id if node.metadata else None
         class_candidates = []
         if clause_grounding:
-            grounding_matches = await clause_grounding.search_candidates(
-                clause_text=node.text,
-                organization_id=organization_id,
+            class_candidates = clause_grounding.class_candidates_for(clause_id)
+            kg_context = format_kg_context(
+                class_candidates=class_candidates,
+                property_hints=clause_grounding.property_hints_for(clause_id),
+                dependencies=clause_grounding.dependencies_for(clause_id),
             )
-            kg_context = _format_kg_context(
-                class_candidates=grounding_matches.class_candidates,
-                property_candidates=grounding_matches.property_candidates,
-            )
-            class_candidates = grounding_matches.class_candidates
+        else:
+            kg_context = ""
 
         cat_context = format_check_category_context(
             categories=check_categories or [],
-            section_heading=node.metadata.section_heading,
+            section_heading=node.metadata.parent_section if node.metadata else None,
         )
 
         formatted_rule_prompt = RULE_PROMPT.format(
@@ -84,7 +103,7 @@ class AdkRuleGenerator:
         # 2. Define the ADK Agents
         initial_writer = LlmAgent(
             name="InitialRuleWriter",
-            model=model_name,
+            model=adk_model,
             instruction=SYSTEM_PROMPT + "\n\n" + formatted_rule_prompt,
             output_schema=_LLMRuleExtractionResult,
             output_key="current_rules",
@@ -92,7 +111,7 @@ class AdkRuleGenerator:
 
         critic = LlmAgent(
             name="RuleCritic",
-            model=model_name,
+            model=adk_model,
             instruction=f"""
 You are a strict compliance rule critic. Review the extracted rules against the original text.
 
@@ -116,7 +135,7 @@ If there are issues, list them clearly so the refiner can fix them. Do NOT outpu
 
         refiner = LlmAgent(
             name="RuleRefiner",
-            model=model_name,
+            model=adk_model,
             instruction=f"""
 You are a compliance rule refiner. You must refine the current rules based on the critic's feedback.
 
@@ -164,15 +183,15 @@ Otherwise, apply the requested fixes to the Current Rules and output the correct
         msg = Content(role="user", parts=[Part(text="Start extraction")])
         
         final_rules_obj = None
-        
-        # Execute the workflow stream
-        try:
-            async for event in runner.run_async(user_id="system", session_id=session_id, new_message=msg):
-                if hasattr(event, "state") and "current_rules" in event.state:
-                    final_rules_obj = event.state["current_rules"]
-        except Exception as e:
-            logger.error("ADK workflow failed: %s", e)
-            return []
+
+        # Execute the workflow stream. A genuine failure (bad API key, model
+        # unavailable, ...) propagates instead of being swallowed into an
+        # empty list here -- RuleExtractionService.extract_rule_drafts
+        # counts these per-node exceptions to tell "the model failed on
+        # every clause" apart from "the model legitimately found nothing".
+        async for event in runner.run_async(user_id="system", session_id=session_id, new_message=msg):
+            if hasattr(event, "state") and "current_rules" in event.state:
+                final_rules_obj = event.state["current_rules"]
 
         if not final_rules_obj:
             return []
