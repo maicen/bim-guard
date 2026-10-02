@@ -24,6 +24,12 @@ def test_copilot_api_endpoints():
         claims={"role": "authenticated"},
     )
 
+    # conftest.py installs app-wide overrides for these same dependencies, so put
+    # back what was there rather than popping it: popping silently removed the
+    # global authentication for every later test on the same xdist worker.
+    overridden = (get_project_access_checker, get_current_user, get_copilot_service)
+    saved = {dep: app.dependency_overrides[dep] for dep in overridden if dep in app.dependency_overrides}
+
     app.dependency_overrides[get_project_access_checker] = lambda: lambda pid: None
     app.dependency_overrides[get_current_user] = lambda: fake_user
     app.dependency_overrides[get_copilot_service] = lambda: test_svc
@@ -106,6 +112,6 @@ def test_copilot_api_endpoints():
         assert get_after.status_code == 404
 
     finally:
-        app.dependency_overrides.pop(get_project_access_checker, None)
-        app.dependency_overrides.pop(get_current_user, None)
-        app.dependency_overrides.pop(get_copilot_service, None)
+        for dep in overridden:
+            app.dependency_overrides.pop(dep, None)
+        app.dependency_overrides.update(saved)

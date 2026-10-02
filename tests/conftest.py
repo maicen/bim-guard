@@ -273,6 +273,38 @@ def pytest_sessionfinish(session, exitstatus):
 
 
 @pytest.fixture(autouse=True)
+def purge_created_storage_objects(monkeypatch, request):
+    """Delete every storage object a test saves, whether or not the test passes.
+
+    ObjectStorage.save_upload writes to the live Supabase bucket, and the
+    tests that exercise document/doclang/upload flows through a real
+    ObjectStorage left their files behind (the rows were cleaned up, the
+    objects were not). Saves are recorded per test and deleted at teardown, so
+    parallel xdist workers never touch each other's objects.
+    """
+    from app.services.object_storage import ObjectStorage
+
+    created: list[str] = []
+    real_save = ObjectStorage.save_upload
+
+    def save_upload(self, *args, **kwargs):
+        reference = real_save(self, *args, **kwargs)
+        created.append(reference)
+        return reference
+
+    monkeypatch.setattr(ObjectStorage, "save_upload", save_upload)
+    yield
+    if not created:
+        return
+    storage = ObjectStorage()
+    for reference in created:
+        try:
+            storage.delete(reference)
+        except Exception:  # cleanup must never fail the test
+            pass
+
+
+@pytest.fixture(autouse=True)
 def offline_embeddings(monkeypatch):
     """Keep tests off the real embedding provider.
 
