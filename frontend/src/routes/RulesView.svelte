@@ -957,7 +957,7 @@
         <Camera class="h-3.5 w-3.5" />
         <span>Snapshots</span>
         {#if snapshots.length > 0}
-          <span class="ml-0.5 text-micro opacity-75">({snapshots.length})</span>
+          <span class="ml-0.5 text-micro">({snapshots.length})</span>
         {/if}
       </Tabs.Trigger>
     </Tabs.List>
@@ -988,7 +988,7 @@
         >
           <span class="h-2 w-2 rounded-full bg-accent"></span>
           <span>Arch</span>
-          <span class="ml-0.5 text-micro opacity-75">({archCount})</span>
+          <span class="ml-0.5 text-micro">({archCount})</span>
         </Tabs.Trigger>
       </Tabs.List>
     </Tabs.Root>
@@ -1085,7 +1085,7 @@
               <FolderOpen class="h-3.5 w-3.5" />
               <span>All Rules</span>
             </div>
-            <span class="text-micro opacity-75">{rules.length}</span>
+            <span class="text-micro">{rules.length}</span>
           </button>
 
           {#each filteredFolders as folder (folder)}
@@ -1123,7 +1123,7 @@
                 <Folder class="h-3.5 w-3.5 shrink-0" />
                 <span class="flex min-w-0 flex-col">
                   <span class="truncate">{folder.display_name}</span>
-                  <span class="truncate text-nano font-normal opacity-60">{folder.ruleset_id}</span>
+                  <span class="truncate text-nano font-normal text-fg-muted">{folder.ruleset_id}</span>
                 </span>
               </button>
 

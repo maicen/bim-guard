@@ -416,7 +416,9 @@ code, kbd, samp, pre {
    and is declared after `@tailwind utilities`, so it wins without !important. */
 /* Accent used as text on the dark canvas needs a lighter tint than the button
    fill (white-on-#0071e3 stays AA, #0071e3-on-#020617 does not). */
-html.dark .text-accent {
+html.dark .text-accent,
+html.dark .data-\[state\=active\]\:text-accent[data-state="active"],
+html.dark .data-\[state\=on\]\:text-accent[data-state="on"] {
   color: rgb(var(--accent-text-rgb));
 }
 

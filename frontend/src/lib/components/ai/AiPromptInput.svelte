@@ -132,6 +132,6 @@
       <Sparkles class="w-3 h-3 text-accent" />
       <span>Grounded in Neo4j Knowledge Graph & LiteLLM</span>
     </div>
-    <span>Press <kbd class="px-1 py-0.2 rounded border border-border-subtle bg-surface-hover font-mono text-[10px]">Enter</kbd> to send, <kbd class="px-1 py-0.2 rounded border border-border-subtle font-mono text-[10px]">Shift+Enter</kbd> for newline</span>
+    <span>Press <kbd class="px-1 py-0.2 rounded border border-border-subtle bg-surface-hover text-fg-secondary font-mono text-[10px]">Enter</kbd> to send, <kbd class="px-1 py-0.2 rounded border border-border-subtle font-mono text-[10px]">Shift+Enter</kbd> for newline</span>
   </div>
 </div>
