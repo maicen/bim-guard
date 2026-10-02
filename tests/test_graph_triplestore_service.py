@@ -1,8 +1,12 @@
 """Tests for the GraphTriplestoreService and its pyoxigraph wrapper."""
 
+import pytest
 import rdflib
 
 from app.services.graph_triplestore_service import GraphTriplestoreService
+
+# pyoxigraph is the optional `triplestore` dependency group (uv sync --group triplestore).
+pytest.importorskip("pyoxigraph")
 
 
 def test_triplestore_service_load_and_query():

@@ -1,5 +1,6 @@
 """Tests for the SPARQL endpoint."""
 
+import pytest
 import rdflib
 from fastapi.testclient import TestClient
 
@@ -7,6 +8,9 @@ from app.bootstrap import get_container
 from app.main import app
 
 client = TestClient(app)
+
+# pyoxigraph is the optional `triplestore` dependency group (uv sync --group triplestore).
+pytest.importorskip("pyoxigraph")
 
 def test_sparql_route_query(monkeypatch):
     """Test the POST /api/sparql/{project_id} route."""

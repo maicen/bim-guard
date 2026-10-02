@@ -67,13 +67,49 @@ from app.services.membership_service import MembershipService  # noqa: E402
 _real_ensure_default_membership = MembershipService.ensure_default_membership
 
 
+# The fake user is nonetheless treated as an owner of the default organization
+# (id 1, the home of every grandfathered project): the org-scoped project and
+# listing tests need a user who can create in, and see, that organization.
+_TEST_USER_MEMBERSHIPS = [
+    {"organization_id": 1, "user_id": TEST_USER.id, "role": "owner"},
+]
+
+
 def _ensure_default_membership_skip_test_user(self, user_id: str):
     if user_id == TEST_USER.id:
-        return []
+        return [dict(row) for row in _TEST_USER_MEMBERSHIPS]
     return _real_ensure_default_membership(self, user_id)
 
 
 MembershipService.ensure_default_membership = _ensure_default_membership_skip_test_user
+
+_real_role_for_user = MembershipService.role_for_user
+
+
+def _role_for_user_test_user(self, organization_id: int, user_id: str):
+    if user_id == TEST_USER.id:
+        return next(
+            (m["role"] for m in _TEST_USER_MEMBERSHIPS if m["organization_id"] == organization_id),
+            None,
+        )
+    return _real_role_for_user(self, organization_id, user_id)
+
+
+MembershipService.role_for_user = _role_for_user_test_user
+
+_real_membership_row = MembershipService._membership_row
+
+
+def _membership_row_test_user(self, organization_id: int, user_id: str):
+    if user_id == TEST_USER.id:
+        return next(
+            (dict(m) for m in _TEST_USER_MEMBERSHIPS if m["organization_id"] == organization_id),
+            None,
+        )
+    return _real_membership_row(self, organization_id, user_id)
+
+
+MembershipService._membership_row = _membership_row_test_user
 
 
 def _override_get_current_user() -> CurrentUser:
@@ -201,18 +237,9 @@ try:
 except ImportError:
     pass
 
-# Membership auto-provisioning lands a first-time signer as a plain 'member',
-# which the group-based RBAC layer (MembershipService.member_can_access_project)
-# now restricts to nothing without a group grant. Tests need TEST_USER to act
-# like an org owner — full access to whatever it creates — so promote it here,
-# once, rather than in every test file that touches a project.
-from app.bootstrap import get_container  # noqa: E402
-
-_test_user_memberships = get_container().membership_service.ensure_default_membership(TEST_USER.id)
-if _test_user_memberships:
-    get_container().membership_service.update_role(
-        _test_user_memberships[0]["organization_id"], TEST_USER.id, "owner"
-    )
+# TEST_USER acts as an org owner (full access to whatever it creates) via the
+# synthetic membership stubbed in above -- there is no real membership row to
+# promote, since the fake user is not in auth.users.
 
 
 @pytest.fixture(autouse=True)
