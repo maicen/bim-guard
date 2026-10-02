@@ -1,10 +1,12 @@
 """Rule persistence service for CRUD, lookup, and ruleset import operations."""
 
 import json
+import threading
 from typing import Any
 
 from postgrest.exceptions import APIError
 
+from app.services.db_adapters import SupabaseTableAdapter
 from app.services.documents_service import DocumentService
 from app.services.persistence import PersistenceService
 from app.services.rule_check_category_service import RuleCheckCategoryService
@@ -181,7 +183,7 @@ class RuleService:
             )
         )
         self._folders_enabled = True
-        self._sync_folders_from_rules()
+        self._sync_folders_once()
 
     @staticmethod
     def normalize_ruleset_id(value: str | None) -> str:
@@ -274,6 +276,35 @@ class RuleService:
             if not self._disable_folders_if_missing(exc):
                 raise
 
+
+    # Supabase clients whose folders have already been backfilled in this
+    # process (by id of the shared client).
+    _folders_synced_clients: set[int] = set()
+    _folders_sync_lock = threading.Lock()
+
+    def _sync_folders_once(self) -> None:
+        """Run :meth:`_sync_folders_from_rules` once per process for Supabase.
+
+        WHY: the backfill reads the entire ``rules`` and ``rule_folders``
+        tables. It ran in every ``RuleService.__init__``, and services are
+        built per request and several times inside each analysis run
+        (spatial/egress checks construct their own), so every one of those
+        paid two full-table reads. Rules created through this service already
+        get their folder via ``_ensure_folder``; the backfill only exists for
+        rows written by other means (seeds, migrations), so once per process
+        is enough. Test fakes and in-memory tables, which are fresh per test,
+        keep syncing on every construction as before.
+        """
+        client = getattr(self._rules, "_client", None)
+        if not isinstance(self._rules, SupabaseTableAdapter) or client is None:
+            self._sync_folders_from_rules()
+            return
+        key = id(client)
+        with RuleService._folders_sync_lock:
+            if key in RuleService._folders_synced_clients:
+                return
+            self._sync_folders_from_rules()
+            RuleService._folders_synced_clients.add(key)
 
     def _sync_folders_from_rules(self) -> None:
         """Backfill folder rows from existing rule records during startup."""
