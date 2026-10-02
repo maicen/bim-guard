@@ -92,6 +92,64 @@ try:
 except ImportError:
     _PENETRATIONS_AVAILABLE = False
 
+#: Rule property names (lower-cased, separators stripped) answered from the
+#: opening an element fills, mapped to which side of that relationship they
+#: read. Kept in step with ``_RELATIONSHIP_LOOKUPS`` in ``rule_reliability``.
+_OPENING_RELATIONSHIP_PROPERTIES: dict[str, str] = {
+    "openingglobalid": "opening_global_id",
+    "openingelement": "opening_global_id",
+    "ifcopeningelement": "opening_global_id",
+    "fillsvoids": "opening_global_id",
+    "fillsopening": "opening_global_id",
+    "openingifcclass": "opening_ifc_class",
+    "hostglobalid": "host_global_id",
+    "hostelement": "host_global_id",
+    "hostifcclass": "host_ifc_class",
+}
+
+
+def _opening_relationship_value(el, field: str) -> tuple[object, dict]:
+    """Read ``field`` off the openings ``el`` fills (IfcRelFillsElement).
+
+    The host is the element each opening voids (IfcRelVoidsElement), usually
+    a wall. Several openings or hosts join with ", ". Returns ``(None, {})``
+    when the element fills no opening.
+    """
+    openings = []
+    try:
+        for rel in getattr(el, "FillsVoids", None) or []:
+            opening = getattr(rel, "RelatingOpeningElement", None)
+            if opening is not None:
+                openings.append(opening)
+    except Exception as exc:  # noqa: BLE001 - a malformed relationship must not fail the rule run
+        logger.debug("Opening lookup failed for %s: %s", el, exc)
+        return None, {}
+    if not openings:
+        return None, {}
+
+    hosts = []
+    for opening in openings:
+        for rel in getattr(opening, "VoidsElements", None) or []:
+            host = getattr(rel, "RelatingBuildingElement", None)
+            if host is not None:
+                hosts.append(host)
+
+    values = {
+        "opening_global_id": [o.GlobalId for o in openings],
+        "opening_ifc_class": [o.is_a() for o in openings],
+        "host_global_id": [h.GlobalId for h in hosts],
+        "host_ifc_class": [h.is_a() for h in hosts],
+    }[field]
+    if not values:
+        return None, {}
+    detail = {
+        "relationship": "IfcRelFillsElement",
+        "opening_global_ids": [o.GlobalId for o in openings],
+        "host_global_ids": [h.GlobalId for h in hosts],
+    }
+    return ", ".join(dict.fromkeys(values)), detail
+
+
 try:
     from .ifc_stair import IFCStairEngine, stair_context
     _STAIR_AVAILABLE = True
@@ -1300,6 +1358,15 @@ class IFCReader:
             materials = (material_info or {}).get("materials") or []
             if materials:
                 return ", ".join(materials), "material:relationship", rich_detail
+        elif prop_key_name in _OPENING_RELATIONSHIP_PROPERTIES:
+            # Whether a window/door sits in an opening, and in which wall, is
+            # an IfcRelFillsElement -> IfcRelVoidsElement relationship, never a
+            # Pset key. Falls through when the element fills no opening, so a
+            # model that authors one of these names as a real property still
+            # has it read by Pass 1.
+            value, detail = _opening_relationship_value(el, _OPENING_RELATIONSHIP_PROPERTIES[prop_key_name])
+            if value is not None:
+                return value, "relationship:fills_opening", detail
         elif prop_lower_name in ("connectedspaces", "spaceconnection", "connectedspacenames", "doorconnectedspaces"):
             names = (door_space_connection or {}).get("connected_space_names") or []
             if names:

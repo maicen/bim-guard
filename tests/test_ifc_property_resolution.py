@@ -138,3 +138,40 @@ class TestRequiredHeadroomTypo:
 
         assert rich["measure_type"] == "IfcReal"  # not a length-measure type
         assert value == pytest.approx(1950.0)
+
+
+class TestOpeningRelationship:
+    """A window's opening and host wall are relationships, never Pset keys."""
+
+    def _window_in_wall(self):
+        f = _metre_model()
+        wall = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWall")
+        opening = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcOpeningElement")
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+        ifcopenshell.api.run("feature.add_feature", f, feature=opening, element=wall)
+        ifcopenshell.api.run("feature.add_filling", f, opening=opening, element=window)
+        return f, wall, opening, window
+
+    @pytest.mark.parametrize("prop_name", ["OpeningElement", "IfcOpeningElement", "OpeningGlobalId", "FillsVoids"])
+    def test_window_filling_an_opening_reports_it(self, prop_name):
+        f, _wall, opening, window = self._window_in_wall()
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, prop_name)
+
+        assert value == opening.GlobalId
+        assert found_pset == "relationship:fills_opening"
+
+    def test_host_names_the_voided_wall(self):
+        f, wall, _opening, window = self._window_in_wall()
+        m2 = _empty_reader(f)
+
+        assert m2._resolve_element_property(window, "HostIfcClass")[0] == "IfcWall"
+        assert m2._resolve_element_property(window, "HostGlobalId")[0] == wall.GlobalId
+
+    def test_window_filling_no_opening_stays_missing(self):
+        f = _metre_model()
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+
+        value, _found_pset, _ = _empty_reader(f)._resolve_element_property(window, "OpeningElement")
+
+        assert value is None

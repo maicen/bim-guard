@@ -114,6 +114,11 @@ _RELATIONSHIP_LOOKUPS: dict[str, str] = {
     "hostifcclass": "IfcRelVoidsElement (the wall/slab the opening this element fills belongs to)",
     "openingglobalid": "IfcRelFillsElement (the opening this element fills)",
     "openingifcclass": "IfcRelFillsElement (the opening this element fills)",
+    "openingelement": "IfcRelFillsElement (the opening this element fills)",
+    "ifcopeningelement": "IfcRelFillsElement (the opening this element fills)",
+    "fillsvoids": "IfcRelFillsElement (the opening this element fills)",
+    "fillsopening": "IfcRelFillsElement (the opening this element fills)",
+    "hostelement": "IfcRelVoidsElement (the wall/slab the opening this element fills belongs to)",
     "typeglobalid": "IfcRelDefinesByType (the element's type object)",
     "placementmatrix": "IfcLocalPlacement (the element's own placement)",
 }
