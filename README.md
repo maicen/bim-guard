@@ -161,6 +161,14 @@ ANTHROPIC_API_KEY=...
 OLLAMA_API_BASE=http://localhost:11434
 ```
 
+`OLLAMA_API_BASE` is optional and only needed to use a self-hosted Ollama server — if
+you don't have Ollama installed, leave it unset. The default above is correct when
+running the backend directly on your machine (`uv run uvicorn`) alongside a locally
+installed Ollama. Running via `docker compose up` instead, leave it unset: the
+container already defaults to `http://host.docker.internal:11434`, which reaches
+Ollama on whichever machine is running the Docker stack (your laptop in dev, the
+production host in prod) — see `example.env` for details.
+
 Pin the default app model with `BIM_GUARD_LLM_MODEL`; it defaults to
 `openrouter/auto`.
 

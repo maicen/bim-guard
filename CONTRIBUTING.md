@@ -1,37 +1,74 @@
 # Contributing to BIM-Guard
 
-## Environment Setup (First-Time)
+Thanks for your interest in contributing! This guide covers everything needed to get
+a working local setup and submit a change — no internal credentials required.
 
-Before running anything, copy the example environment file and fill in real values:
+## Choose a setup path
+
+| | Docker Compose (recommended to start) | Native (`uv` + `npm`) |
+|---|---|---|
+| Needs | Docker only | Python 3.12+ / `uv`, Node.js / `npm` |
+| External accounts | None | None (local Supabase/Neo4j optional) |
+| Best for | Trying the app, full-stack changes | Fast iteration, hot reload |
+
+### Option A — Docker Compose
+
+Don't have Docker installed? See [Installing Docker](docs/manual/infrastructure/docker-installation.md)
+for step-by-step instructions on macOS, Windows, and Linux first.
 
 ```bash
 cp example.env .env
-# Then open .env and replace every "..." placeholder with a real value.
-# Ask the repo owner for the shared Supabase keys, JWT_SECRET, and OpenRouter key.
+cp frontend/.env.example frontend/.env
+cp docker/supabase/.env.example docker/supabase/.env
+
+docker compose up --build
 ```
 
-> **Security note**: Credentials were accidentally committed in commit `175b987` (Sept 28 2026)
-> and have since been **rotated**. If you cloned the repo before those credentials were rotated,
-> discard any `.env` you copied from that commit and request fresh values from the repo owner.
-> The secrets in git history are dead; do not use them.
-
-## Running the Stack
+Once the containers are healthy, apply the database schema (the self-hosted Supabase
+stack starts with an empty database):
 
 ```bash
-# Install backend dependencies
-uv sync
+uv run python scripts/migrate_production.py --apply
+```
 
+Visit [http://localhost:8000](http://localhost:8000) and use the **"Sign in as dev test
+user"** button on the login screen — no Google OAuth setup required.
+
+### Option B — Native (uv + npm)
+
+```bash
+uv sync
 # Optional: ML pipeline extras (docling, spaCy, LLM providers)
 uv sync --group ml-pipeline
 
-# Backend dev server (auto-reloads on file changes)
-uv run uvicorn main:app --reload
+cp example.env .env
+# Fill in Supabase credentials — point at a local `supabase start` stack (see
+# example.env for the "Disposable CLI Stack" option) or the Docker Compose stack
+# from Option A running alongside this.
 
-# Frontend dependencies and dev server
-cd frontend && npm install && npm run dev
+cd frontend
+cp .env.example .env   # fill in VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+npm install
+cd ..
+
+uv run uvicorn main:app --reload   # backend: http://127.0.0.1:8000
+cd frontend && npm run dev          # frontend: http://localhost:5173
 ```
 
 Or launch both together: `./run_server.sh` (macOS/Linux) or `run_server.bat` (Windows).
+
+See [Environment Setup](docs/manual/infrastructure/environment-setup.md) for the full
+walkthrough, including the local-LLM-via-Ollama option.
+
+> **Internal team members**: if you have access to the shared credentials vault
+> (hosted Supabase project, OpenRouter key, etc.), see the "Dev-Only Hosted Supabase"
+> section in `example.env` instead of running a local database. This isn't available
+> to external contributors — use Option A or B above.
+>
+> **Security note**: credentials were accidentally committed in commit `175b987`
+> (Sept 28 2026) and have since been **rotated**. If you cloned the repo before those
+> credentials were rotated, discard any `.env` you copied from that commit and request
+> fresh values from the repo owner — the secrets in git history are dead, do not use them.
 
 ## Automated Tests
 
@@ -40,9 +77,9 @@ uv run ruff check .
 uv run pytest tests/ -v
 ```
 
-The test suite is grouped by pytest markers (`slow`, `llm`, `integration`) and
-runs in parallel by default (`pytest-xdist`, `-n auto -m 'not slow'`). Plain
-`pytest` already excludes slow tests.
+The test suite is grouped by pytest markers (`slow`, `llm`, `integration`) and runs in
+parallel by default (`pytest-xdist`, `-n auto -m 'not slow'`). Plain `pytest` already
+excludes slow tests.
 
 ```bash
 uv run pytest -m slow       # only the slow tests (full engine/pipeline runs)
@@ -60,7 +97,7 @@ cd frontend && npm run build
 
 Run through these after any non-trivial UI or API change:
 
-- [ ] `uv run uvicorn main:app --reload` starts without errors
+- [ ] `uv run uvicorn main:app --reload` (or `docker compose up`) starts without errors
 - [ ] `cd frontend && npm run dev` starts without errors; `http://localhost:5173` loads
 - [ ] Create a project, upload an IFC model, and confirm it appears in Projects
 - [ ] Upload a document and confirm it appears in Documents
@@ -86,3 +123,20 @@ See [docs/CONVENTIONS.md](docs/CONVENTIONS.md) for the full style guide. Key rul
 All Python dependencies must be declared in `pyproject.toml` (including optional
 dependency groups) and managed via `uv`. Do **not** add or maintain a separate
 `requirements.txt`. All frontend dependencies must be declared in `frontend/package.json`.
+
+## Submitting changes
+
+1. Commit with a clear, human-readable message (no AI-attribution trailers — see
+   `CLAUDE.md`).
+2. Push and open a pull request describing the change and how you verified it (tests
+   run, manual checklist items exercised).
+3. CI runs lint, backend tests, and a frontend build on every PR.
+
+## Where to go next
+
+- **Something broken in setup?** Check the Troubleshooting section at the bottom of
+  [Installing Docker](docs/manual/infrastructure/docker-installation.md), or open an issue.
+- **Architecture questions**: see `CLAUDE.md` and `AGENTS.md` for how the codebase is
+  organized and the rules coding agents (and contributors) follow in this repo.
+- **Product/user documentation**: `docs/manual/` (built with MkDocs — `mkdocs serve` to
+  preview locally).

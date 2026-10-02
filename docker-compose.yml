@@ -19,6 +19,12 @@ services:
     container_name: bim-guard-app
     ports:
       - "${PORT:-8000}:8000"
+    # Resolves host.docker.internal to the Docker host's gateway IP. Docker
+    # Desktop and OrbStack already provide this on macOS/Windows; this line
+    # makes it resolve on plain Linux Docker Engine too, so a host-installed
+    # Ollama server (see OLLAMA_API_BASE below) is reachable on every platform.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # ── Supabase Configuration (Required for database & file storage) ────────
       # Points at the team's hosted Supabase project by default. For local
@@ -51,7 +57,11 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
+      # Defaults to the container's host machine (via host.docker.internal,
+      # see extra_hosts above) so a locally-installed Ollama server on the
+      # production/dev host is reachable from inside the container. Override
+      # if Ollama runs elsewhere (another host, a hosted Ollama endpoint).
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
 
       # Document Parsing — Docling (self-hosted by default)
       - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}

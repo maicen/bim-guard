@@ -45,6 +45,7 @@ nav:
       - Project Settings: projects/project-settings.md
   - Infrastructure Setup:
       - Environment Setup: infrastructure/environment-setup.md
+      - Installing Docker: infrastructure/docker-installation.md
       - Deployment: infrastructure/deployment.md
   - Documents:
       - Uploading Documents: documents/uploading-documents.md
