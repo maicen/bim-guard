@@ -20,7 +20,7 @@ from fastapi import (
     status,
 )
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.api.dependencies import (
     get_audit_log_service,
@@ -1438,6 +1438,7 @@ async def extract_rule_drafts(
     ),
     x_org_id: Optional[str] = Header(None, alias="X-Organization-Id"),
     body: Optional[RuleDraftExtractionRequest] = None,
+    accept: Annotated[Optional[str], Header()] = None,
 ) -> RuleExtractionDraftListResponse:
     """Ingest a document and generate LlamaIndex rule drafts awaiting review.
 
@@ -1450,6 +1451,17 @@ async def extract_rule_drafts(
     `body.text`, when given, scopes extraction to a caller-chosen subset of
     the document (e.g. sections picked in the UI) rather than its full
     DocLang-derived text.
+
+    A whole building code can take several minutes, well past the
+    Cloudflare Tunnel's ~100s timeout (HTTP 524) for a response that sends
+    nothing until it is done. A caller sending ``Accept: text/event-stream``
+    gets the run as Server-Sent Events instead: ``progress`` events
+    (`RuleExtractionProgressResponse`) every few seconds, then exactly one
+    ``result`` (`RuleExtractionDraftListResponse`) or ``error``
+    (`RuleExtractionProgressResponse` with ``status="failed"``). The stream
+    rides the request's own connection, so unlike polling
+    `GET .../extract-progress` it works when the server runs several
+    workers. Any other caller gets the plain JSON response as before.
     """
     access_checker(document_id, for_mutation=True)
     doc = service.get_document(document_id)
@@ -1470,7 +1482,8 @@ async def extract_rule_drafts(
         document_id, doc, organization_id, x_org_id, current_user, memberships, document_access, profiles
     )
     extraction_service = RuleExtractionService()
-    try:
+
+    async def run_extraction() -> RuleExtractionDraftListResponse:
         # A whole-document run splits on the DocLang structure (the clauses the
         # Smart TOC shows); a picked-sections run only has the joined text.
         drafts = await extraction_service.extract_rule_drafts(
@@ -1481,19 +1494,100 @@ async def extract_rule_drafts(
             doclang_xml=None if scoped_text else service.get_doclang_content(doc),
             element_bboxes=None if scoped_text else service.get_element_bboxes(doc),
         )
+        # Each run mints a fresh EXTRACTED-<timestamp> ruleset, the same way
+        # create_rule_folder mints a new folder. Reviewing and promoting its drafts
+        # is grant-checked (see RulesetAccessChecker), so without this the org that
+        # just ran the extraction gets a 403 on every accept/promote.
+        if llm_org_id is not None:
+            for batch_ruleset_id in {d.proposed_rule.ruleset_id for d in drafts if d.proposed_rule.ruleset_id}:
+                ruleset_access.add_org_grant(llm_org_id, batch_ruleset_id)
+        return RuleExtractionDraftListResponse(drafts=drafts)
+
+    if accept and "text/event-stream" in accept:
+        return StreamingResponse(
+            _stream_rule_extraction(document_id, run_extraction()),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    try:
+        return await run_extraction()
     except RuleGenerationFailedError as exc:
         # The model rejected every clause (bad/missing key, no credit, ...): report the
         # provider's own reason, not an empty "success".
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    # Each run mints a fresh EXTRACTED-<timestamp> ruleset, the same way
-    # create_rule_folder mints a new folder. Reviewing and promoting its drafts
-    # is grant-checked (see RulesetAccessChecker), so without this the org that
-    # just ran the extraction gets a 403 on every accept/promote.
-    if llm_org_id is not None:
-        for batch_ruleset_id in {d.proposed_rule.ruleset_id for d in drafts if d.proposed_rule.ruleset_id}:
-            ruleset_access.add_org_grant(llm_org_id, batch_ruleset_id)
-    return RuleExtractionDraftListResponse(drafts=drafts)
+
+#: Seconds between ``progress`` events on an extraction stream -- each one is
+#: also what keeps the Cloudflare Tunnel from timing the connection out.
+_EXTRACTION_STREAM_INTERVAL_SECONDS = 3.0
+
+#: Extraction runs whose stream's client went away. Held so the event loop
+#: doesn't garbage-collect them mid-run: the drafts still get saved, the same
+#: as when a tab closed on the old blocking request.
+_detached_extractions: set[asyncio.Task] = set()
+
+
+def _sse(event: str, payload: RuleExtractionProgressResponse | RuleExtractionDraftListResponse) -> str:
+    return f"event: {event}\ndata: {payload.model_dump_json()}\n\n"
+
+
+async def _stream_rule_extraction(document_id: int, extraction):
+    """Run ``extraction`` as a task, emitting SSE progress until it finishes.
+
+    The task is never cancelled by a disconnecting client: if this generator
+    is torn down mid-run, the task is parked in ``_detached_extractions`` and
+    finishes (and persists its drafts) on its own.
+    """
+    from app.services import extraction_progress
+
+    # The service only starts tracking once ingestion has counted the
+    # clause-nodes; reset now so ingestion doesn't report the last run's counts.
+    extraction_progress.start(document_id, total=0)
+    task = asyncio.ensure_future(extraction)
+    finished = False
+    try:
+        while not task.done():
+            await asyncio.wait({task}, timeout=_EXTRACTION_STREAM_INTERVAL_SECONDS)
+            if task.done():
+                break
+            progress = extraction_progress.snapshot(document_id)
+            yield _sse(
+                "progress",
+                RuleExtractionProgressResponse(
+                    document_id=document_id,
+                    total=progress.total if progress else 0,
+                    completed=progress.completed if progress else 0,
+                    status="running",
+                ),
+            )
+        finished = True
+        try:
+            result = task.result()
+        except Exception as exc:  # noqa: BLE001 - reported to the client as the stream's error event
+            if not isinstance(exc, RuleGenerationFailedError):
+                logger.exception("Rule-draft extraction failed document_id=%d", document_id)
+            extraction_progress.fail(document_id, str(exc))
+            yield _sse(
+                "error",
+                RuleExtractionProgressResponse(document_id=document_id, status="failed", error=str(exc)),
+            )
+            return
+        yield _sse("result", result)
+    finally:
+        if not finished and not task.done():
+            _detached_extractions.add(task)
+            task.add_done_callback(_on_detached_extraction_done)
+
+
+def _on_detached_extraction_done(task: asyncio.Task) -> None:
+    _detached_extractions.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        logger.warning("Detached rule-draft extraction failed: %s", task.exception())
 
 
 @router.get(

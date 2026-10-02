@@ -82,7 +82,7 @@ export async function handleResponse<T>(res: Response): Promise<T> {
     }
     if (res.status === 524 && errorDetail.startsWith("HTTP 524")) {
       errorDetail =
-        "Network proxy timeout (HTTP 524). The server took longer than 100 seconds to respond — this usually occurs when converting large documents (such as building codes) to DocLang. Turn off “Convert to DocLang now” to upload immediately, or use “Limit to a page range”.";
+        "Network proxy timeout (HTTP 524). The server took longer than 100 seconds to respond, so the proxy stopped waiting. The server may still finish the work — refresh in a minute to check before retrying.";
     } else if (res.status === 504 && errorDetail.startsWith("HTTP 504")) {
       errorDetail = "Gateway timeout (HTTP 504). The server took too long to process the request.";
     }

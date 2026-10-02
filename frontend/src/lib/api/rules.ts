@@ -420,6 +420,7 @@ export const ruleExtractionApi = {
     model?: string,
     text?: string,
     organizationId?: number | null,
+    onProgress?: (progress: RuleExtractionProgressResponse) => void,
   ): Promise<RuleExtractionDraftListResponse> {
     // Documents carry no organization, so the server can't tell whose LLM
     // provider key to use unless we say which organization is active.
@@ -428,12 +429,50 @@ export const ruleExtractionApi = {
     if (model) params.set("model", model);
     if (effectiveOrg) params.set("organization_id", String(effectiveOrg));
     const query = params.toString() ? `?${params.toString()}` : "";
+    // A whole building code runs for minutes. Asking for an event stream gets
+    // progress events every few seconds, which both drive the progress bar
+    // and keep the Cloudflare Tunnel from cutting the request off at 100s
+    // (HTTP 524) — see extract_rule_drafts in app/api/documents.py.
     const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-drafts${query}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
       body: JSON.stringify(text ? { text } : {}),
     });
-    return handleResponse<RuleExtractionDraftListResponse>(res);
+    if (!res.ok || !res.body || !res.headers.get("content-type")?.includes("text/event-stream")) {
+      return handleResponse<RuleExtractionDraftListResponse>(res);
+    }
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let boundary: number;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        let event = "message";
+        let data = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) event = line.slice(7);
+          else if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        if (!data) continue;
+        if (event === "progress") {
+          onProgress?.(JSON.parse(data) as RuleExtractionProgressResponse);
+        } else if (event === "error") {
+          const failure = JSON.parse(data) as RuleExtractionProgressResponse;
+          throw new Error(failure.error || "Rule extraction failed.");
+        } else if (event === "result") {
+          await reader.cancel();
+          return JSON.parse(data) as RuleExtractionDraftListResponse;
+        }
+      }
+    }
+    throw new Error(
+      "The connection to the server closed before rule extraction finished. Any drafts it produced are saved — reselect the document to load them.",
+    );
   },
 
   async listDrafts(documentId: number): Promise<RuleExtractionDraftListResponse> {
@@ -504,12 +543,6 @@ export const ruleExtractionApi = {
       body: JSON.stringify({ element_id: elementId }),
     });
     return handleResponse<RuleExtractionDraft>(res);
-  },
-
-  /** Poll progress of an in-flight or recent document rule-draft extraction. */
-  async getExtractionProgress(documentId: number): Promise<RuleExtractionProgressResponse> {
-    const res = await apiFetch(`${API_BASE}/documents/${documentId}/rules/extract-progress`);
-    return handleResponse<RuleExtractionProgressResponse>(res);
   },
 
   async bulkCreate(rules: any[]): Promise<any> {

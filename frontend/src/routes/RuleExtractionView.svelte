@@ -696,25 +696,6 @@
     extractionWarnings = [];
     table.requestedPage = 1;
 
-    // Large documents run many clause-nodes through the LLM concurrently on
-    // the backend (extraction_progress) — poll it while the request is in
-    // flight so the button shows real progress instead of a static spinner.
-    let pollInterval: ReturnType<typeof setInterval> | undefined;
-    if (selectedDocId) {
-      const docId = selectedDocId;
-      pollInterval = setInterval(async () => {
-        try {
-          const progress = await ruleExtractionApi.getExtractionProgress(docId);
-          if (progress.status !== "unknown") {
-            extractionProgress = { completed: progress.completed, total: progress.total };
-          }
-        } catch {
-          // Transient polling error — the main extraction request is the
-          // source of truth; just skip this tick.
-        }
-      }, 1200);
-    }
-
     try {
       // A selected document runs through the persisted draft-review
       // lifecycle (rule_extraction_drafts) instead of the ephemeral
@@ -734,7 +715,19 @@
               .join("\n\n")
           : undefined;
 
-      const res = await ruleExtractionApi.extractDrafts(selectedDocId, selectedModel, scopedText);
+      // Large documents run many clause-nodes through the LLM concurrently on
+      // the backend; its streamed progress drives the button's progress bar.
+      const res = await ruleExtractionApi.extractDrafts(
+        selectedDocId,
+        selectedModel,
+        scopedText,
+        undefined,
+        (progress) => {
+          if (progress.total > 0) {
+            extractionProgress = { completed: progress.completed, total: progress.total };
+          }
+        },
+      );
       draftRules = [...res.drafts, ...draftRules];
       draftTable.clearSelection();
       if (res.drafts.length === 0) {
@@ -744,7 +737,6 @@
     } catch (err: any) {
       error = err.message || "Rule extraction failed.";
     } finally {
-      if (pollInterval) clearInterval(pollInterval);
       isExtracting = false;
       extractionProgress = null;
     }

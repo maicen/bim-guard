@@ -356,3 +356,81 @@ def test_generate_doclang_rejects_invalid_page_range():
     assert "Both start_page and end_page" in exc_info2.value.detail
 
 
+
+
+def _stream_extraction(extract_rule_drafts_impl):
+    """Call the extract-drafts route as an SSE client and collect its events."""
+    import asyncio
+    import json
+    from unittest.mock import MagicMock, patch
+
+    from app.api import documents
+    from app.api.documents import extract_rule_drafts
+
+    service = MagicMock()
+    service.get_document.return_value = {"id": 500}
+    service.get_document_text.return_value = "The door shall be 900 mm wide."
+    memberships = MagicMock()
+    memberships.org_ids_for_user.return_value = {1}
+    profiles = MagicMock()
+    profiles.is_superadmin.return_value = False
+
+    async def run():
+        response = await extract_rule_drafts(
+            500,
+            service=service,
+            access_checker=lambda *a, **k: None,
+            current_user=SimpleNamespace(id="user-1"),
+            memberships=memberships,
+            document_access=MagicMock(),
+            profiles=profiles,
+            ruleset_access=MagicMock(),
+            model="m",
+            organization_id=1,
+            x_org_id=None,
+            body=None,
+            accept="text/event-stream",
+        )
+        assert response.media_type == "text/event-stream"
+        return [chunk async for chunk in response.body_iterator]
+
+    with (
+        patch("app.api.documents.RuleExtractionService") as extraction,
+        patch.object(documents, "_EXTRACTION_STREAM_INTERVAL_SECONDS", 0.01),
+    ):
+        extraction.return_value.extract_rule_drafts = extract_rule_drafts_impl
+        chunks = asyncio.run(run())
+
+    events = []
+    for chunk in chunks:
+        event_line, data_line = chunk.strip().split("\n")
+        events.append((event_line.removeprefix("event: "), json.loads(data_line.removeprefix("data: "))))
+    return events
+
+
+def test_extract_drafts_stream_sends_progress_then_the_result():
+    """A long run keeps the connection alive with progress events instead of hitting the proxy's 524."""
+    import asyncio
+
+    async def slow_extraction(*args, **kwargs):
+        await asyncio.sleep(0.05)
+        return []
+
+    events = _stream_extraction(slow_extraction)
+
+    assert events[0][0] == "progress"
+    assert events[0][1]["status"] == "running"
+    assert events[-1] == ("result", {"drafts": []})
+
+
+def test_extract_drafts_stream_reports_a_total_model_failure_as_an_error_event():
+    from app.services.rule_extraction_service import RuleGenerationFailedError
+
+    async def failing(*args, **kwargs):
+        raise RuleGenerationFailedError("The AI model failed on all 2 clauses. Reason: 401")
+
+    events = _stream_extraction(failing)
+
+    assert events[-1][0] == "error"
+    assert events[-1][1]["status"] == "failed"
+    assert "failed on all 2 clauses" in events[-1][1]["error"]
