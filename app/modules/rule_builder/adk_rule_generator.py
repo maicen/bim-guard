@@ -84,7 +84,31 @@ def exit_loop(tool_context: ToolContext) -> dict:
     """Call this function ONLY when the rules are perfect and no further changes are needed."""
     logger.info("Rule refinement complete; exiting loop.")
     tool_context.actions.escalate = True
+    # Without this the refiner makes one more LLM call to summarize the tool
+    # result, and that prose reply lands in its output_key ("current_rules"),
+    # overwriting the accepted rules JSON -- every clause then parsed to [].
+    tool_context.actions.skip_summarization = True
     return {}
+
+
+def _latest_rules_result(events: list, authors: set[str], result_cls: type) -> Any | None:
+    """Return the most recent rules JSON one of ``authors`` produced, parsed.
+
+    Read from the session's event history rather than the ``current_rules``
+    state key: the refiner shares that key, so any prose reply it gives
+    instead of JSON (e.g. acknowledging "Rules are perfect." without calling
+    ``exit_loop``) would otherwise discard the rules written before it.
+    """
+    for event in reversed(events):
+        if event.author not in authors or not event.content or not event.content.parts:
+            continue
+        text = "".join(part.text for part in event.content.parts if part.text and not part.thought)
+        if "{" not in text:
+            continue
+        result = _parse_llm_rules_json(text, result_cls)
+        if result is not None:
+            return result
+    return None
 
 
 class AdkRuleGenerator:
@@ -237,21 +261,13 @@ schema exactly (the same one the initial extraction used):
         session = await runner.session_service.get_session(
             app_name=runner.app_name, user_id="system", session_id=session_id
         )
-        final_rules_obj = session.state.get("current_rules") if session else None
-
-        if not final_rules_obj:
-            return []
-
-        if isinstance(final_rules_obj, str):
-            final_rules_obj = _parse_llm_rules_json(final_rules_obj, _LLMRuleExtractionResult)
-        elif isinstance(final_rules_obj, dict):
-            try:
-                final_rules_obj = _LLMRuleExtractionResult.model_validate(final_rules_obj)
-            except Exception:
-                final_rules_obj = None
-
-        if not isinstance(final_rules_obj, _LLMRuleExtractionResult):
-            logger.warning("Final output was not a valid _LLMRuleExtractionResult")
+        final_rules_obj = _latest_rules_result(
+            session.events if session else [],
+            {initial_writer.name, refiner.name},
+            _LLMRuleExtractionResult,
+        )
+        if final_rules_obj is None:
+            logger.warning("No valid rules JSON produced for node_id=%s", node.node_id)
             return []
 
         # 4. Map back to drafts
