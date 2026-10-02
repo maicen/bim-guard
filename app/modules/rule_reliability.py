@@ -272,7 +272,7 @@ def assess_property(property_set: Optional[str], property_name: Optional[str]) -
         return None
     bsdd_defined = (name in _bsdd_property_names()) if _bsdd_property_names() else None
 
-    if name == "ifcclass":
+    if name in ("ifcclass", "ifcentity"):  # kept in step with ifc_reader's Pass 0
         return Assessment("high", "ifc_class", _REASONS["ifc_class"], bsdd_defined)
     if name in _RELATIONSHIP_LOOKUPS:
         reason = f"Read from an explicit stored IFC relationship: {_RELATIONSHIP_LOOKUPS[name]}."

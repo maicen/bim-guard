@@ -1380,7 +1380,15 @@ class IFCReader:
         frame_dependent = prop_key_name in _FRAME_DEPENDENT_PROPERTIES and (
             el.is_a("IfcDoor") or el.is_a("IfcWindow")
         )
-        if prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
+        if prop_key_name in ("ifcclass", "ifcentity"):
+            # The element's own entity class (IfcDoor, IfcWindow, ...). It is
+            # what the element *is*, not a Pset key or a get_info() attribute
+            # (get_direct_attributes drops "type"), so without this every
+            # "must resolve to IfcDoor" rule reported every element missing.
+            # Answered first, ahead of authored data: no Pset value can change
+            # an element's runtime class.
+            return el.is_a(), "attribute:ifc_class", rich_detail
+        elif prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
             storey_name = spatial.get("storey_name")
             if storey_name:
                 return storey_name, "spatial:storey", rich_detail

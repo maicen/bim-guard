@@ -313,3 +313,39 @@ class TestTypeAssignment:
         value, _, _ = _empty_reader(f)._resolve_element_property(window, "DoorType")
 
         assert value is None
+
+
+class TestIfcClass:
+    """"Runtime IFC class must resolve to IfcDoor" reads the entity class itself.
+
+    ``ifc_class`` is neither a Pset key nor a get_info() attribute, so it used
+    to resolve to nothing and every element was reported missing.
+    """
+
+    @pytest.mark.parametrize("prop_name", ["ifc_class", "IfcClass", "IFC Class", "ifc_entity"])
+    def test_ifc_class_is_the_elements_entity_class(self, prop_name):
+        f = _metre_model()
+        door = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(door, prop_name)
+
+        assert value == "IfcDoor"
+        assert found_pset == "attribute:ifc_class"
+
+    def test_a_door_exported_as_a_proxy_reports_the_proxy_class(self):
+        """So a "must resolve to IfcDoor" rule fails it rather than passing it."""
+        f = _metre_model()
+        proxy = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuildingElementProxy", name="Door")
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(proxy, "ifc_class")
+
+        assert value == "IfcBuildingElementProxy"
+
+    def test_an_authored_property_cannot_override_the_runtime_class(self):
+        f = _metre_model()
+        proxy = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuildingElementProxy")
+        _add_pset_property(f, proxy, "Custom", "ifc_class", f.createIfcLabel("IfcDoor"))
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(proxy, "ifc_class")
+
+        assert value == "IfcBuildingElementProxy"
