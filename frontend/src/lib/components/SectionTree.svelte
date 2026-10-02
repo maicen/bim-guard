@@ -13,6 +13,7 @@
   } from "lucide-svelte";
   import type { SectionTreeNode } from "../types";
   import SectionTreeRow from "./SectionTreeRow.svelte";
+  import Select from "./ui/Select.svelte";
 
   let {
     nodes,
@@ -191,15 +192,12 @@
         {#if availableChapters.length > 0}
           <div class="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface-canvas px-1.5 py-0.5">
             <span class="text-fg-muted text-[10px]">Chapter:</span>
-            <select
+            <Select
               bind:value={selectedChapter}
-              class="bg-transparent text-micro text-fg-primary focus:outline-hidden cursor-pointer"
-            >
-              <option value="all">All</option>
-              {#each availableChapters as ch}
-                <option value={ch.id}>{ch.label.slice(0, 32)}</option>
-              {/each}
-            </select>
+              options={[{ value: "all", label: "All" }, ...availableChapters.map((ch) => ({ value: ch.id, label: ch.label.slice(0, 32) }))]}
+              ariaLabel="Filter by chapter"
+              triggerClass="h-6 w-auto min-w-24 rounded-md border-0 bg-transparent px-1 py-0 text-micro shadow-none"
+            />
           </div>
         {/if}
       </div>

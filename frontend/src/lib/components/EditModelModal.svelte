@@ -4,6 +4,7 @@
   import { Pencil, UploadCloud, X as XIcon } from "lucide-svelte";
   import Modal from "./Modal.svelte";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { modelsApi } from "../api";
   import { IFC_FILE_ROLES, type Model } from "../types";
   import { MAX_IFC_UPLOAD_BYTES, describeOversizedFiles } from "../fileLimits";
@@ -146,15 +147,11 @@
         </div>
         <div class="space-y-1.5">
           <label for="model-role" class="block text-xs font-semibold text-fg-secondary"> Role </label>
-          <select
-            id="model-role"
+          <Select
             bind:value={role}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            {#each IFC_FILE_ROLES as r (r)}
-              <option value={r}>{r}</option>
-            {/each}
-          </select>
+            options={IFC_FILE_ROLES.map((r) => ({ value: r, label: r }))}
+            ariaLabel="Model role"
+          />
         </div>
       </div>
 

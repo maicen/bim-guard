@@ -11,6 +11,7 @@
   import Modal from "../lib/components/Modal.svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import Button from "../lib/components/ui/Button.svelte";
+  import Select from "../lib/components/ui/Select.svelte";
   import { organizationsApi, projectsApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -107,6 +108,13 @@
   // Bulk / row role changes
   let bulkRoleModalOpen = $state(false);
   let removeTarget: OrganizationMember | null = $state(null);
+
+  const ROLE_OPTIONS = [
+    { value: "owner", label: "Owner" },
+    { value: "admin", label: "Admin" },
+    { value: "member", label: "Member" },
+  ];
+  const ROLE_OPTIONS_INVITE = [ROLE_OPTIONS[2], ROLE_OPTIONS[1], ROLE_OPTIONS[0]];
 
   async function setRole(userId: string, role: OrganizationMember["role"]) {
     if (!activeOrg) return;
@@ -438,31 +446,24 @@
                     </div>
                   </td>
                   <td class="px-4 py-3">
-                    <select
+                    <Select
                       value={member.role}
-                      onchange={(e) =>
-                        setRole(member.user_id, (e.target as HTMLSelectElement).value as OrganizationMember["role"])}
-                      class="rounded-lg border border-border-interactive bg-surface-canvas px-2 py-1 text-xs capitalize text-fg-secondary focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                    </select>
+                      options={ROLE_OPTIONS}
+                      ariaLabel="Role for {member.email || member.user_id}"
+                      class="w-auto"
+                      triggerClass="h-auto rounded-lg border-border-interactive bg-surface-canvas px-2 py-1 text-fg-secondary"
+                      onValueChange={(v) => setRole(member.user_id, v as OrganizationMember["role"])}
+                    />
                   </td>
                   <td class="px-4 py-3">
-                    <select
-                      value={member.group_id ?? ""}
-                      onchange={(e) => {
-                        const v = (e.target as HTMLSelectElement).value;
-                        setMemberGroup(member.user_id, v ? Number(v) : null);
-                      }}
-                      class="rounded-lg border border-border-interactive bg-surface-canvas px-2 py-1 text-xs text-fg-secondary focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Ungrouped</option>
-                      {#each groups as group (group.id)}
-                        <option value={group.id}>{group.name}</option>
-                      {/each}
-                    </select>
+                    <Select
+                      value={member.group_id == null ? "" : String(member.group_id)}
+                      options={[{ value: "", label: "Ungrouped" }, ...groups.map((group) => ({ value: String(group.id), label: group.name }))]}
+                      ariaLabel="Group for {member.email || member.user_id}"
+                      class="w-auto"
+                      triggerClass="h-auto rounded-lg border-border-interactive bg-surface-canvas px-2 py-1 text-fg-secondary"
+                      onValueChange={(v) => setMemberGroup(member.user_id, v ? Number(v) : null)}
+                    />
                   </td>
                   <td class="px-4 py-3 text-right">
                     <button
@@ -671,15 +672,12 @@
     </div>
     <div>
       <label for="invite-role" class="mb-1 block font-semibold text-fg-secondary">Role</label>
-      <select
-        id="invite-role"
+      <Select
         bind:value={inviteRole}
-        class="w-full rounded-lg border border-border-interactive bg-surface-canvas px-3 py-2 capitalize text-fg-primary focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-      >
-        <option value="member">Member</option>
-        <option value="admin">Admin</option>
-        <option value="owner">Owner</option>
-      </select>
+        options={ROLE_OPTIONS_INVITE}
+        ariaLabel="Invite role"
+        triggerClass="h-auto rounded-lg border-border-interactive bg-surface-canvas px-3 py-2 text-sm"
+      />
     </div>
     <div class="flex justify-end gap-2 pt-1">
       <button

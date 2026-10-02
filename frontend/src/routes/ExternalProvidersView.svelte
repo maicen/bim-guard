@@ -15,6 +15,7 @@
     XCircle,
   } from "lucide-svelte";
   import { router } from "svelte-spa-router";
+  import Select from "../lib/components/ui/Select.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
   import TabStrip from "../lib/components/TabStrip.svelte";
@@ -23,7 +24,12 @@
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
   import TaskAssignmentModal from "../lib/components/TaskAssignmentModal.svelte";
   import Alert from "../lib/components/Alert.svelte";
-  import { parsingEnginesApi, orgParsingEnginesApi, llmProvidersApi, settingsApi } from "../lib/api";
+  import {
+    parsingEnginesApi,
+    orgParsingEnginesApi,
+    llmProvidersApi,
+    settingsApi,
+  } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { formatModelMeta } from "../lib/utils/formatModelMeta";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
@@ -59,7 +65,7 @@
   // Action.MANAGE_PARSING_ENGINES permission lookup once a frontend helper
   // for the permission matrix exists.
   let canManageOrgParsing = $derived(
-    authState.isSuperadmin || activeOrg?.role === "owner" || activeOrg?.role === "admin"
+    authState.isSuperadmin || activeOrg?.role === "owner" || activeOrg?.role === "admin",
   );
 
   const TABS = [
@@ -192,7 +198,10 @@
   async function handleTestEngine(engine: ParsingEngineInstance) {
     testingEngineId = engine.id;
     try {
-      engineTestResults = { ...engineTestResults, [engine.id]: await parsingEnginesApi.test(engine.id) };
+      engineTestResults = {
+        ...engineTestResults,
+        [engine.id]: await parsingEnginesApi.test(engine.id),
+      };
     } catch (err: any) {
       engineTestResults = {
         ...engineTestResults,
@@ -683,24 +692,29 @@
       icon={Building2}
     />
   {:else}
-    <TabStrip tabs={TABS} active={activeTab} onSelect={(id) => (activeTab = id as "parsing" | "llm")} />
+    <TabStrip
+      tabs={TABS}
+      active={activeTab}
+      onSelect={(id) => (activeTab = id as "parsing" | "llm")}
+    />
 
     {#if activeTab === "env"}
-      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+      <div class="border-border-default bg-surface-card/60 space-y-4 rounded-2xl border p-6">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-fg-primary">Environment Variables</h2>
-          <p class="text-xs text-fg-muted">
+          <h2 class="text-fg-primary text-base font-bold tracking-tight">Environment Variables</h2>
+          <p class="text-fg-muted text-xs">
             Every environment variable this deployment reads, and whether it's currently set in this
-            process — names and presence only, values are never sent to the browser. Most are fallbacks
-            used only when no matching DB-configured provider instance exists (see the tabs above).
+            process — names and presence only, values are never sent to the browser. Most are
+            fallbacks used only when no matching DB-configured provider instance exists (see the
+            tabs above).
           </p>
         </div>
 
         {#if !authState.isSuperadmin}
           <div
-            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
+            class="border-border-default bg-surface-canvas/60 text-fg-muted flex items-center gap-2 rounded-xl border p-3 text-xs"
           >
-            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
+            <ShieldAlert class="text-fg-muted h-4 w-4 shrink-0" />
             <span>Only a platform superadmin can view environment variable status.</span>
           </div>
         {:else}
@@ -714,7 +728,7 @@
           {/if}
 
           {#if envLoading}
-            <div class="p-8 text-center text-xs text-fg-muted">Loading environment status...</div>
+            <div class="text-fg-muted p-8 text-center text-xs">Loading environment status...</div>
           {:else if envVars.length > 0}
             {#if envMissingRequired.length > 0}
               <div
@@ -722,7 +736,9 @@
               >
                 <ShieldAlert class="h-4 w-4 shrink-0 text-amber-400" />
                 <span
-                  >{envMissingRequired.length} required variable{envMissingRequired.length === 1 ? "" : "s"}
+                  >{envMissingRequired.length} required variable{envMissingRequired.length === 1
+                    ? ""
+                    : "s"}
                   missing: {envMissingRequired.map((v) => v.name).join(", ")}</span
                 >
               </div>
@@ -731,36 +747,40 @@
             <div class="space-y-5">
               {#each envCategories as [category, items] (category)}
                 <div>
-                  <h3 class="mb-2 text-caption font-semibold uppercase tracking-wide text-fg-muted">
+                  <h3 class="text-caption text-fg-muted mb-2 font-semibold tracking-wide uppercase">
                     {category}
                   </h3>
-                  <div class="divide-y divide-border-subtle rounded-xl border border-border-default bg-surface-canvas/60">
+                  <div
+                    class="divide-border-subtle border-border-default bg-surface-canvas/60 divide-y rounded-xl border"
+                  >
                     {#each items as item (item.name)}
                       <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
                         <div class="min-w-0">
                           <div class="flex items-center gap-1.5">
-                            <span class="font-mono text-xs font-semibold text-fg-secondary">{item.name}</span>
+                            <span class="text-fg-secondary font-mono text-xs font-semibold"
+                              >{item.name}</span
+                            >
                             {#if item.required}
                               <span
-                                class="rounded-full border border-border-interactive px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-fg-muted"
+                                class="border-border-interactive text-micro text-fg-muted rounded-full border px-1.5 py-0.5 font-semibold tracking-wide uppercase"
                                 >Required</span
                               >
                             {/if}
                           </div>
                           {#if item.description}
-                            <p class="mt-0.5 text-caption text-fg-muted">{item.description}</p>
+                            <p class="text-caption text-fg-muted mt-0.5">{item.description}</p>
                           {/if}
                         </div>
                         {#if item.is_set}
                           <span
-                            class="flex shrink-0 items-center gap-1 rounded-full border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 text-micro font-semibold text-emerald-300"
+                            class="text-micro flex shrink-0 items-center gap-1 rounded-full border border-emerald-800/60 bg-emerald-950/60 px-2 py-0.5 font-semibold text-emerald-300"
                           >
                             <CheckCircle2 class="h-3 w-3" />
                             Set
                           </span>
                         {:else}
                           <span
-                            class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-semibold {item.required
+                            class="text-micro flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 font-semibold {item.required
                               ? 'border-rose-800/60 bg-rose-950/60 text-rose-300'
                               : 'border-border-interactive bg-surface-card text-fg-muted'}"
                           >
@@ -778,12 +798,14 @@
         {/if}
       </div>
     {:else if activeTab === "parsing"}
-      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+      <div class="border-border-default bg-surface-card/60 space-y-4 rounded-2xl border p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">Document Parsing Engines</h2>
-            <p class="text-xs text-fg-muted">
-              Scoped to <span class="font-semibold text-fg-secondary">{activeOrg.name}</span> — used in
+            <h2 class="text-fg-primary text-base font-bold tracking-tight">
+              Document Parsing Engines
+            </h2>
+            <p class="text-fg-muted text-xs">
+              Scoped to <span class="text-fg-secondary font-semibold">{activeOrg.name}</span> — used in
               preference to the platform default below when configured. Local self-hosted containers,
               hosted accounts, or a mix.
             </p>
@@ -795,7 +817,7 @@
                 showAddOrgEngineForm = !showAddOrgEngineForm;
                 if (showAddOrgEngineForm) resetOrgEngineForm();
               }}
-              class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
+              class="bg-accent hover:bg-accent-hover flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all"
             >
               <Plus class="h-4 w-4" />
               <span>Add Instance</span>
@@ -805,10 +827,13 @@
 
         {#if !canManageOrgParsing}
           <div
-            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
+            class="border-border-default bg-surface-canvas/60 text-fg-muted flex items-center gap-2 rounded-xl border p-3 text-xs"
           >
-            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
-            <span>Read-only — ask an organization owner or admin to add, edit, or remove parsing engines.</span>
+            <ShieldAlert class="text-fg-muted h-4 w-4 shrink-0" />
+            <span
+              >Read-only — ask an organization owner or admin to add, edit, or remove parsing
+              engines.</span
+            >
           </div>
         {/if}
 
@@ -837,19 +862,20 @@
             {#snippet extraFields(kindInfo)}
               {#if (kindInfo as ParsingEngineKind | null)?.supports_strategy}
                 <div>
-                  <label for="org-engine-strategy" class="mb-1 block text-caption font-semibold text-fg-muted"
-                    >Strategy</label
+                  <label
+                    for="org-engine-strategy"
+                    class="text-caption text-fg-muted mb-1 block font-semibold">Strategy</label
                   >
-                  <select
-                    id="org-engine-strategy"
+                  <Select
                     bind:value={newOrgEngineStrategy}
-                    class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-                  >
-                    <option value="auto">auto</option>
-                    <option value="fast">fast</option>
-                    <option value="hi_res">hi_res</option>
-                    <option value="ocr_only">ocr_only</option>
-                  </select>
+                    ariaLabel="Parsing strategy"
+                    options={[
+                      { value: "auto", label: "auto" },
+                      { value: "fast", label: "fast" },
+                      { value: "hi_res", label: "hi_res" },
+                      { value: "ocr_only", label: "ocr_only" },
+                    ]}
+                  />
                 </div>
               {/if}
             {/snippet}
@@ -857,11 +883,13 @@
         {/if}
 
         {#if orgEnginesLoading}
-          <div class="p-8 text-center text-xs text-fg-muted">Loading parsing engines...</div>
+          <div class="text-fg-muted p-8 text-center text-xs">Loading parsing engines...</div>
         {:else if orgEngines.length === 0}
-          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
-            No parsing engines configured for this organization — uploads use the platform default below,
-            if one is set, or fail with a clear error otherwise.
+          <div
+            class="border-border-default text-fg-muted rounded-xl border border-dashed p-8 text-center text-xs"
+          >
+            No parsing engines configured for this organization — uploads use the platform default
+            below, if one is set, or fail with a clear error otherwise.
           </div>
         {:else}
           <div class="space-y-2">
@@ -890,20 +918,20 @@
         {/if}
       </div>
 
-      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+      <div class="border-border-default bg-surface-card/60 space-y-4 rounded-2xl border p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">Platform Default</h2>
-            <p class="text-xs text-fg-muted">
-              Shared by every organization that hasn't configured its own instance above, managed by a
-              superadmin.
+            <h2 class="text-fg-primary text-base font-bold tracking-tight">Platform Default</h2>
+            <p class="text-fg-muted text-xs">
+              Shared by every organization that hasn't configured its own instance above, managed by
+              a superadmin.
             </p>
           </div>
           {#if authState.isSuperadmin}
             <button
               type="button"
               onclick={() => (showAddEngineForm = !showAddEngineForm)}
-              class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
+              class="bg-accent hover:bg-accent-hover flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all"
             >
               <Plus class="h-4 w-4" />
               <span>Add Instance</span>
@@ -913,10 +941,12 @@
 
         {#if !authState.isSuperadmin}
           <div
-            class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-xs text-fg-muted"
+            class="border-border-default bg-surface-canvas/60 text-fg-muted flex items-center gap-2 rounded-xl border p-3 text-xs"
           >
-            <ShieldAlert class="h-4 w-4 shrink-0 text-fg-muted" />
-            <span>Read-only — only a platform superadmin can add, edit, or remove the platform default.</span>
+            <ShieldAlert class="text-fg-muted h-4 w-4 shrink-0" />
+            <span
+              >Read-only — only a platform superadmin can add, edit, or remove the platform default.</span
+            >
           </div>
         {/if}
 
@@ -945,19 +975,20 @@
             {#snippet extraFields(kindInfo)}
               {#if (kindInfo as ParsingEngineKind | null)?.supports_strategy}
                 <div>
-                  <label for="engine-strategy" class="mb-1 block text-caption font-semibold text-fg-muted"
-                    >Strategy</label
+                  <label
+                    for="engine-strategy"
+                    class="text-caption text-fg-muted mb-1 block font-semibold">Strategy</label
                   >
-                  <select
-                    id="engine-strategy"
+                  <Select
                     bind:value={newEngineStrategy}
-                    class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-                  >
-                    <option value="auto">auto</option>
-                    <option value="fast">fast</option>
-                    <option value="hi_res">hi_res</option>
-                    <option value="ocr_only">ocr_only</option>
-                  </select>
+                    ariaLabel="Parsing strategy"
+                    options={[
+                      { value: "auto", label: "auto" },
+                      { value: "fast", label: "fast" },
+                      { value: "hi_res", label: "hi_res" },
+                      { value: "ocr_only", label: "ocr_only" },
+                    ]}
+                  />
                 </div>
               {/if}
             {/snippet}
@@ -965,11 +996,14 @@
         {/if}
 
         {#if enginesLoading}
-          <div class="p-8 text-center text-xs text-fg-muted">Loading parsing engines...</div>
+          <div class="text-fg-muted p-8 text-center text-xs">Loading parsing engines...</div>
         {:else if engines.length === 0}
-          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
-            No platform default configured — organizations with no org-scoped instance of their own will
-            fail to upload documents until one is added here, or they configure their own above.
+          <div
+            class="border-border-default text-fg-muted rounded-xl border border-dashed p-8 text-center text-xs"
+          >
+            No platform default configured — organizations with no org-scoped instance of their own
+            will fail to upload documents until one is added here, or they configure their own
+            above.
           </div>
         {:else}
           <div class="space-y-2">
@@ -998,14 +1032,14 @@
         {/if}
       </div>
     {:else if activeTab === "llm"}
-      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+      <div class="border-border-default bg-surface-card/60 space-y-4 rounded-2xl border p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">LLM Providers</h2>
-            <p class="text-xs text-fg-muted">
-              Scoped to <span class="font-semibold text-fg-secondary">{activeOrg.name}</span> — bring your
-              own API keys per organization. Curate which models each task may use below, under
-              Task Shortlists.
+            <h2 class="text-fg-primary text-base font-bold tracking-tight">LLM Providers</h2>
+            <p class="text-fg-muted text-xs">
+              Scoped to <span class="text-fg-secondary font-semibold">{activeOrg.name}</span> — bring
+              your own API keys per organization. Curate which models each task may use below, under Task
+              Shortlists.
             </p>
           </div>
           <button
@@ -1014,7 +1048,7 @@
               showAddLlmForm = !showAddLlmForm;
               if (showAddLlmForm) resetLlmForm();
             }}
-            class="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
+            class="bg-accent hover:bg-accent-hover flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-all"
           >
             <Plus class="h-4 w-4" />
             <span>Add Provider</span>
@@ -1022,7 +1056,12 @@
         </div>
 
         {#if llmError}
-          <Alert type="error" message={llmError} errors={llmErrorLog} logTitle="LLM Provider Error Log" />
+          <Alert
+            type="error"
+            message={llmError}
+            errors={llmErrorLog}
+            logTitle="LLM Provider Error Log"
+          />
         {/if}
 
         {#if showAddLlmForm}
@@ -1050,11 +1089,13 @@
         {/if}
 
         {#if llmLoading}
-          <div class="p-8 text-center text-xs text-fg-muted">Loading LLM providers...</div>
+          <div class="text-fg-muted p-8 text-center text-xs">Loading LLM providers...</div>
         {:else if llmInstances.length === 0}
-          <div class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted">
-            No LLM providers configured for this organization yet — add one above (e.g. OpenRouter or
-            OpenAI) so features like Rule Extraction can pick a real model.
+          <div
+            class="border-border-default text-fg-muted rounded-xl border border-dashed p-8 text-center text-xs"
+          >
+            No LLM providers configured for this organization yet — add one above (e.g. OpenRouter
+            or OpenAI) so features like Rule Extraction can pick a real model.
           </div>
         {:else}
           <div class="space-y-2">
@@ -1083,28 +1124,31 @@
                     type="button"
                     onclick={() => handleLoadModels(instance)}
                     disabled={loadingModelsId === instance.id}
-                    class="text-caption font-semibold text-accent hover:underline disabled:opacity-50"
+                    class="text-caption text-accent font-semibold hover:underline disabled:opacity-50"
                   >
                     {loadingModelsId === instance.id ? "Loading models…" : "Fetch available models"}
                   </button>
                   {#if modelsError[instance.id]}
-                    <p class="mt-1 text-caption text-rose-400">{modelsError[instance.id]}</p>
+                    <p class="text-caption mt-1 text-rose-400">{modelsError[instance.id]}</p>
                   {:else if modelsById[instance.id]}
                     <div class="mt-1.5 space-y-1">
                       <p class="text-caption text-fg-muted">
-                        {modelsById[instance.id].length} model{modelsById[instance.id].length === 1 ? "" : "s"} available
-                        (showing first 8):
+                        {modelsById[instance.id].length} model{modelsById[instance.id].length === 1
+                          ? ""
+                          : "s"} available (showing first 8):
                       </p>
                       <ul class="space-y-0.5">
                         {#each modelsById[instance.id].slice(0, 8) as model (model.id)}
-                          <li class="flex flex-wrap items-baseline gap-x-2 text-caption">
+                          <li class="text-caption flex flex-wrap items-baseline gap-x-2">
                             <span class="text-fg-secondary">{model.name}</span>
                             <span class="text-fg-muted">{formatModelMeta(model)}</span>
                           </li>
                         {/each}
                       </ul>
                       {#if modelsById[instance.id].length > 8}
-                        <p class="text-caption text-fg-muted">…and {modelsById[instance.id].length - 8} more.</p>
+                        <p class="text-caption text-fg-muted">
+                          …and {modelsById[instance.id].length - 8} more.
+                        </p>
                       {/if}
                     </div>
                   {/if}
@@ -1116,49 +1160,55 @@
       </div>
 
       <!-- Task Shortlists: which models each task may pick from -->
-      <div class="space-y-4 rounded-2xl border border-border-default bg-surface-card/60 p-6">
+      <div class="border-border-default bg-surface-card/60 space-y-4 rounded-2xl border p-6">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-fg-primary">Task Shortlists</h2>
-          <p class="text-xs text-fg-muted">
+          <h2 class="text-fg-primary text-base font-bold tracking-tight">Task Shortlists</h2>
+          <p class="text-fg-muted text-xs">
             Curate which models each task may use — capped to a deliberate shortlist chosen for
             capability, price, and context window, instead of a provider's whole catalogue.
           </p>
         </div>
 
         {#if tasksError}
-          <Alert type="error" message={tasksError} errors={tasksErrorLog} logTitle="Task Shortlists Error Log" />
+          <Alert
+            type="error"
+            message={tasksError}
+            errors={tasksErrorLog}
+            logTitle="Task Shortlists Error Log"
+          />
         {/if}
 
         {#if tasksLoading}
-          <div class="p-8 text-center text-xs text-fg-muted">Loading tasks...</div>
+          <div class="text-fg-muted p-8 text-center text-xs">Loading tasks...</div>
         {:else}
           <div class="space-y-2">
             {#each llmTasks as task (task.key)}
               {@const assigned = assignmentsForTask(task.key)}
-              <div class="rounded-xl border border-border-default bg-surface-canvas/80 p-3.5">
+              <div class="border-border-default bg-surface-canvas/80 rounded-xl border p-3.5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="space-y-0.5">
-                    <div class="text-sm font-semibold text-fg-primary">{task.label}</div>
+                    <div class="text-fg-primary text-sm font-semibold">{task.label}</div>
                     <p class="text-caption text-fg-muted">{task.description}</p>
                   </div>
                   <button
                     type="button"
                     onclick={() => (configuringTask = task)}
-                    class="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-caption font-semibold text-fg-secondary transition-colors hover:bg-surface-hover"
+                    class="border-border-interactive bg-surface-overlay text-caption text-fg-secondary hover:bg-surface-hover flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-semibold transition-colors"
                   >
                     <Settings2 class="h-3.5 w-3.5" />
                     Configure
                   </button>
                 </div>
                 {#if assigned.length === 0}
-                  <p class="mt-2 text-caption text-fg-muted">
-                    No shortlist yet — every enabled provider's full catalogue is offered for this task.
+                  <p class="text-caption text-fg-muted mt-2">
+                    No shortlist yet — every enabled provider's full catalogue is offered for this
+                    task.
                   </p>
                 {:else}
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     {#each assigned as a (a.model_id + a.provider_instance_id)}
                       <span
-                        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-micro font-medium {a.is_default
+                        class="text-micro inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium {a.is_default
                           ? 'border-amber-800/60 bg-amber-950/60 text-amber-300'
                           : 'border-border-interactive bg-surface-card text-fg-secondary'}"
                       >

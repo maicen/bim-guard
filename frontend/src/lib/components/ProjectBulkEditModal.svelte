@@ -5,6 +5,7 @@
   import { projectsApi } from "../api";
   import { PROJECT_TYPES } from "../types";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
@@ -122,16 +123,11 @@
             <label for="bulk-proj-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
-            <select
-              id="bulk-proj-status"
-              bind:value={status}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="no_change">-- Keep Current Status --</option>
-              <option value="Active">Active</option>
-              <option value="Draft">Draft</option>
-              <option value="Archived">Archived</option>
-            </select>
+            <Select
+ bind:value={status}
+ options={[{ value: "no_change", label: "-- Keep Current Status --" }, { value: "Active", label: "Active" }, { value: "Draft", label: "Draft" }, { value: "Archived", label: "Archived" }]}
+ ariaLabel="Project status"
+ />
           </div>
 
           <!-- Jurisdiction -->
@@ -139,17 +135,11 @@
             <label for="bulk-proj-country" class="block text-xs font-semibold text-fg-secondary">
               Jurisdiction
             </label>
-            <select
-              id="bulk-proj-country"
-              bind:value={country}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="no_change">-- Keep Current Jurisdiction --</option>
-              <option value="Canada">Canada (NBC)</option>
-              <option value="US">United States (IBC)</option>
-              <option value="UK">United Kingdom</option>
-              <option value="EU">European Union</option>
-            </select>
+            <Select
+ bind:value={country}
+ options={[{ value: "no_change", label: "-- Keep Current Jurisdiction --" }, { value: "Canada", label: "Canada (NBC)" }, { value: "US", label: "United States (IBC)" }, { value: "UK", label: "United Kingdom" }, { value: "EU", label: "European Union" }]}
+ ariaLabel="Jurisdiction"
+ />
           </div>
         </div>
 
@@ -158,14 +148,11 @@
           <label for="bulk-proj-domain" class="block text-xs font-semibold text-fg-secondary">
             Analysis Domain
           </label>
-          <select
-            id="bulk-proj-domain"
-            bind:value={analysisType}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="no_change">-- Keep Current Domain --</option>
-            <option value="Arch">Arch</option>
-          </select>
+          <Select
+ bind:value={analysisType}
+ options={[{ value: "no_change", label: "-- Keep Current Domain --" }, { value: "Arch", label: "Arch" }]}
+ ariaLabel="Analysis domain"
+ />
         </div>
 
         <!-- Project Type -->
@@ -173,16 +160,11 @@
           <label for="bulk-proj-type" class="block text-xs font-semibold text-fg-secondary">
             Project Type
           </label>
-          <select
-            id="bulk-proj-type"
-            bind:value={projectType}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="no_change">-- Keep Current Project Type --</option>
-            {#each PROJECT_TYPES as type (type)}
-              <option value={type}>{type}</option>
-            {/each}
-          </select>
+          <Select
+ bind:value={projectType}
+ options={[{ value: "no_change", label: "-- Keep Current Project Type --" }, ...PROJECT_TYPES.map((t) => ({ value: t, label: t }))]}
+ ariaLabel="Project type"
+ />
         </div>
       </div>
 

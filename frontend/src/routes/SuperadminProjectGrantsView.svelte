@@ -4,8 +4,6 @@
     Save,
     CheckCircle2,
     XCircle,
-    Building2,
-    Filter,
     Lock,
     Users,
     FolderGit2,
@@ -13,6 +11,7 @@
     Settings,
     Trash2,
   } from "lucide-svelte";
+  import Select from "../lib/components/ui/Select.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -48,6 +47,14 @@
   let searchQuery = $state("");
   let selectedOrgFilter = $state<number | "all">("all");
   let grantStatusFilter = $state<"all" | "granted" | "ungranted">("all");
+  let orgFilterOptions = $derived([
+    ...(isSuperadmin ? [{ value: "all", label: `All Organizations (${orgs.length})` }] : []),
+    ...orgs.map((o) => ({ value: String(o.id), label: o.name })),
+  ]);
+  let orgPickerOptions = $derived([
+    { value: "all", label: "All Organizations" },
+    ...orgs.map((o) => ({ value: String(o.id), label: o.name })),
+  ]);
   let sortField = $state<"name" | "id" | "country">("name");
   let sortAsc = $state(true);
   let pageIndex = $state(1);
@@ -191,7 +198,8 @@
 
   let hasActiveFilters = $derived(
     searchQuery.trim() !== "" ||
-      selectedOrgFilter !== (isSuperadmin ? "all" : (authState.activeOrganizationId || (orgs[0]?.id ?? "all"))) ||
+      selectedOrgFilter !==
+        (isSuperadmin ? "all" : authState.activeOrganizationId || (orgs[0]?.id ?? "all")) ||
       grantStatusFilter !== "all",
   );
 
@@ -208,15 +216,20 @@
 
       // Scope to caller's org if not superadmin
       if (!isSuperadmin && currentTargetOrg) {
-        const isOwner = p.organization_id === currentTargetOrg.id || (!p.organization_id && currentTargetOrg.id === 1);
+        const isOwner =
+          p.organization_id === currentTargetOrg.id ||
+          (!p.organization_id && currentTargetOrg.id === 1);
         const isGranted = crossOrgGrants[currentTargetOrg.id]?.has(p.id) ?? false;
         if (!isOwner && !isGranted) return false;
       }
 
       if (grantStatusFilter === "all") return true;
 
-      const checkOrgs = selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter);
-      const isGrantedAny = checkOrgs.some((o) => crossOrgGrants[o.id]?.has(p.id) || p.organization_id === o.id);
+      const checkOrgs =
+        selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter);
+      const isGrantedAny = checkOrgs.some(
+        (o) => crossOrgGrants[o.id]?.has(p.id) || p.organization_id === o.id,
+      );
 
       if (grantStatusFilter === "granted") return isGrantedAny;
       if (grantStatusFilter === "ungranted") return !isGrantedAny;
@@ -280,8 +293,7 @@
   }
 
   let allOnPageSelected = $derived(
-    paginatedProjects.length > 0 &&
-      paginatedProjects.every((p) => selectedProjectIds.has(p.id)),
+    paginatedProjects.length > 0 && paginatedProjects.every((p) => selectedProjectIds.has(p.id)),
   );
   let someOnPageSelected = $derived(
     paginatedProjects.some((p) => selectedProjectIds.has(p.id)) && !allOnPageSelected,
@@ -421,7 +433,7 @@
           type="button"
           onclick={saveAllDirty}
           disabled={isSavingAll}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all disabled:opacity-50"
         >
           <Save class="h-4 w-4" />
           <span>{isSavingAll ? "Saving…" : `Save All Changes (${dirty.size} pending)`}</span>
@@ -443,41 +455,33 @@
     {#snippet filters()}
       <!-- Organization Selector -->
       {#if orgs.length > 1 || isSuperadmin}
-        <div class="relative">
-          <select
-            bind:value={selectedOrgFilter}
-            onchange={() => {
-              if (selectedOrgFilter !== "all") {
-                loadGroupsForOrg(Number(selectedOrgFilter));
-              }
-            }}
-            aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
-          >
-            {#if isSuperadmin}
-              <option value="all">All Organizations ({orgs.length})</option>
-            {/if}
-            {#each orgs as org (org.id)}
-              <option value={org.id}>{org.name}</option>
-            {/each}
-          </select>
-          <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-        </div>
+        <Select
+          bind:value={
+            () => String(selectedOrgFilter),
+            (v) => (selectedOrgFilter = v === "all" ? "all" : Number(v))
+          }
+          ariaLabel="Filter by Organization"
+          options={orgFilterOptions}
+          class="w-auto min-w-48"
+          onValueChange={(v) => {
+            if (v !== "all") {
+              loadGroupsForOrg(Number(v));
+            }
+          }}
+        />
       {/if}
 
       <!-- Grant Status Filter -->
-      <div class="relative">
-        <select
-          bind:value={grantStatusFilter}
-          aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
-        >
-          <option value="all">All Access</option>
-          <option value="granted">Granted / Owned</option>
-          <option value="ungranted">Not Shared</option>
-        </select>
-        <Filter class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-      </div>
+      <Select
+        bind:value={grantStatusFilter}
+        ariaLabel="Filter by Grant Status"
+        options={[
+          { value: "all", label: "All Access" },
+          { value: "granted", label: "Granted / Owned" },
+          { value: "ungranted", label: "Not Shared" },
+        ]}
+        class="w-auto min-w-40"
+      />
     {/snippet}
   </DataTableHeader>
 
@@ -501,11 +505,13 @@
     />
   {:else}
     <!-- Data Table Container -->
-    <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40 shadow-xl">
+    <div
+      class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border shadow-xl"
+    >
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-border-default bg-surface-canvas/80">
+            <tr class="border-border-default bg-surface-canvas/80 border-b">
               <th class="w-12 px-4 py-3 text-center">
                 <TableCheckbox
                   checked={allOnPageSelected}
@@ -537,17 +543,23 @@
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
                   <th class="min-w-44 px-4 py-3 text-center">
-                    <div class="truncate font-semibold text-fg-primary" title={org.name}>
+                    <div class="text-fg-primary truncate font-semibold" title={org.name}>
                       {org.name}
                     </div>
                     <button
                       type="button"
                       disabled={!dirty.has(org.id) || savingOrgId === org.id}
                       onclick={() => saveOrg(org.id)}
-                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-medium text-fg-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+                      class="border-border-interactive bg-surface-overlay text-micro text-fg-secondary hover:bg-surface-hover mt-1 inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Save class="h-3 w-3" />
-                      <span>{savingOrgId === org.id ? "Saving…" : dirty.has(org.id) ? "Save" : "Saved"}</span>
+                      <span
+                        >{savingOrgId === org.id
+                          ? "Saving…"
+                          : dirty.has(org.id)
+                            ? "Save"
+                            : "Saved"}</span
+                      >
                     </button>
                   </th>
                 {/each}
@@ -562,13 +574,18 @@
               {/if}
             </tr>
           </thead>
-          <tbody class="divide-y divide-border-subtle">
+          <tbody class="divide-border-subtle divide-y">
             {#each paginatedProjects as project (project.id)}
               {@const isRowSelected = selectedProjectIds.has(project.id)}
               {@const assignedGroups = getAssignedGroupsForProject(project.id)}
-              {@const isOwner = currentTargetOrg ? (project.organization_id === currentTargetOrg.id || (!project.organization_id && currentTargetOrg.id === 1)) : false}
+              {@const isOwner = currentTargetOrg
+                ? project.organization_id === currentTargetOrg.id ||
+                  (!project.organization_id && currentTargetOrg.id === 1)
+                : false}
               <tr
-                class="transition-colors hover:bg-surface-hover {isRowSelected ? 'bg-surface-selected' : ''}"
+                class="hover:bg-surface-hover transition-colors {isRowSelected
+                  ? 'bg-surface-selected'
+                  : ''}"
               >
                 <td class="px-4 py-3 text-center">
                   <TableCheckbox
@@ -577,30 +594,35 @@
                     ariaLabel={`Select ${project.name}`}
                   />
                 </td>
-                <td class="px-4 py-3 font-medium text-fg-secondary">
-                  <div class="truncate font-semibold text-fg-primary" title={project.name}>
+                <td class="text-fg-secondary px-4 py-3 font-medium">
+                  <div class="text-fg-primary truncate font-semibold" title={project.name}>
                     {project.name}
                   </div>
                   <div class="text-micro text-fg-muted font-mono">
-                    #{project.id} &middot; {project.analysis_type ? formatAnalysisDomain(project.analysis_type) : "Arch"}
+                    #{project.id} &middot; {project.analysis_type
+                      ? formatAnalysisDomain(project.analysis_type)
+                      : "Arch"}
                   </div>
                 </td>
-                <td class="px-4 py-3 text-fg-muted">
+                <td class="text-fg-muted px-4 py-3">
                   {project.country || "—"}
                 </td>
 
                 <!-- Superadmin Multi-Org Sharing Matrix -->
                 {#if isSuperadmin && displayOrgs.length > 1}
                   {#each displayOrgs as org (org.id)}
-                    {@const isOrgOwner = project.organization_id === org.id || (!project.organization_id && org.id === 1)}
-                    {@const isGranted = isOrgOwner || (crossOrgGrants[org.id]?.has(project.id) ?? false)}
+                    {@const isOrgOwner =
+                      project.organization_id === org.id ||
+                      (!project.organization_id && org.id === 1)}
+                    {@const isGranted =
+                      isOrgOwner || (crossOrgGrants[org.id]?.has(project.id) ?? false)}
                     <td class="px-4 py-3 text-center">
                       {#if isOrgOwner}
                         <span
-                          class="inline-flex items-center gap-1 rounded-lg border border-info-border bg-info-bg px-2.5 py-1 text-micro font-semibold text-info"
+                          class="border-info-border bg-info-bg text-micro text-info inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-semibold"
                           title="Owning Organization (Primary owner)"
                         >
-                          <Lock class="h-3 w-3 text-info" />
+                          <Lock class="text-info h-3 w-3" />
                           <span>Owner</span>
                         </span>
                       {:else}
@@ -610,13 +632,17 @@
                           class="group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all {isGranted
                             ? 'border-success-border bg-success-bg text-success hover:bg-success-bg/80'
                             : 'border-border-interactive bg-surface-overlay text-fg-muted hover:border-border-interactive hover:text-fg-primary'}"
-                          title={isGranted ? `Revoke access from ${org.name}` : `Grant access to ${org.name}`}
+                          title={isGranted
+                            ? `Revoke access from ${org.name}`
+                            : `Grant access to ${org.name}`}
                         >
                           {#if isGranted}
-                            <CheckCircle2 class="h-3.5 w-3.5 text-success" />
+                            <CheckCircle2 class="text-success h-3.5 w-3.5" />
                             <span>Granted</span>
                           {:else}
-                            <XCircle class="h-3.5 w-3.5 text-fg-muted group-hover:text-fg-secondary" />
+                            <XCircle
+                              class="text-fg-muted group-hover:text-fg-secondary h-3.5 w-3.5"
+                            />
                             <span>No Access</span>
                           {/if}
                         </button>
@@ -627,13 +653,17 @@
                   <!-- Org Owner View: Ownership Badge -->
                   <td class="px-4 py-3">
                     {#if isOwner}
-                      <span class="inline-flex items-center gap-1 rounded-md border border-info-border bg-info-bg px-2 py-0.5 text-micro font-semibold text-info">
-                        <Lock class="h-3 w-3 text-info" />
+                      <span
+                        class="border-info-border bg-info-bg text-micro text-info inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold"
+                      >
+                        <Lock class="text-info h-3 w-3" />
                         <span>Owned</span>
                       </span>
                     {:else}
-                      <span class="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-semibold text-accent">
-                        <Share2 class="h-3 w-3 text-accent" />
+                      <span
+                        class="border-accent/30 bg-accent/10 text-micro text-accent inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold"
+                      >
+                        <Share2 class="text-accent h-3 w-3" />
                         <span>Shared</span>
                       </span>
                     {/if}
@@ -644,14 +674,18 @@
                     {#if assignedGroups.length > 0}
                       <div class="flex flex-wrap gap-1">
                         {#each assignedGroups as groupName}
-                          <span class="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">
-                            <Users class="h-3 w-3 text-accent" />
+                          <span
+                            class="border-accent/30 bg-accent/10 text-micro text-accent inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium"
+                          >
+                            <Users class="text-accent h-3 w-3" />
                             <span>{groupName}</span>
                           </span>
                         {/each}
                       </div>
                     {:else}
-                      <span class="text-micro text-fg-muted italic">All organization members (no group gating)</span>
+                      <span class="text-micro text-fg-muted italic"
+                        >All organization members (no group gating)</span
+                      >
                     {/if}
                   </td>
 
@@ -660,10 +694,10 @@
                     <button
                       type="button"
                       onclick={() => (managingProject = project)}
-                      class="inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1 text-micro font-semibold text-fg-secondary transition-colors hover:bg-surface-hover hover:text-white"
+                      class="border-border-interactive bg-surface-overlay text-micro text-fg-secondary hover:bg-surface-hover inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-semibold transition-colors hover:text-white"
                       title="Manage internal group access"
                     >
-                      <Settings class="h-3 w-3 text-fg-muted" />
+                      <Settings class="text-fg-muted h-3 w-3" />
                       <span>Groups</span>
                     </button>
                   </td>
@@ -673,7 +707,7 @@
                     <button
                       type="button"
                       onclick={() => (deletingProject = project)}
-                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                      class="text-fg-muted rounded-lg p-1.5 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
                       title="Delete project"
                     >
                       <Trash2 class="h-4 w-4" />
@@ -709,16 +743,16 @@
   >
     {#if isSuperadmin}
       <div class="flex items-center gap-2">
-        <select
-          bind:value={bulkTargetOrgId}
-          aria-label="Target Organization for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-border-interactive bg-surface-card py-1 pl-2.5 pr-6 text-xs text-fg-secondary focus:outline-hidden"
-        >
-          <option value="all">All Organizations</option>
-          {#each orgs as org (org.id)}
-            <option value={org.id}>{org.name}</option>
-          {/each}
-        </select>
+        <Select
+          bind:value={
+            () => String(bulkTargetOrgId),
+            (v) => (bulkTargetOrgId = v === "all" ? "all" : Number(v))
+          }
+          ariaLabel="Target Organization for Bulk Action"
+          options={orgPickerOptions}
+          class="w-auto min-w-44"
+          triggerClass="h-8"
+        />
         <button
           type="button"
           onclick={handleBulkGrant}
@@ -738,19 +772,20 @@
       <!-- Org Owner: Bulk Assign Group Access -->
       <div class="flex items-center gap-2">
         <span class="text-micro text-fg-secondary font-medium">Assign to Group:</span>
-        <select
-          bind:value={bulkTargetGroupId}
-          aria-label="Target Group for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-border-interactive bg-surface-card py-1 pl-2.5 pr-6 text-xs text-fg-secondary focus:outline-hidden"
-        >
-          {#each groups as grp (grp.id)}
-            <option value={grp.id}>{grp.name}</option>
-          {/each}
-        </select>
+        <Select
+          bind:value={
+            () => String(bulkTargetGroupId),
+            (v) => (bulkTargetGroupId = v === "all" ? "all" : Number(v))
+          }
+          ariaLabel="Target Group for Bulk Action"
+          options={groups.map((grp) => ({ value: String(grp.id), label: grp.name }))}
+          class="w-auto min-w-40"
+          triggerClass="h-8"
+        />
         <button
           type="button"
           onclick={handleBulkAssignGroup}
-          class="rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-accent-hover"
+          class="bg-accent hover:bg-accent-hover rounded-lg px-2.5 py-1 text-xs font-semibold text-white shadow-xs"
         >
           Assign Group
         </button>

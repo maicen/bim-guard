@@ -6,6 +6,7 @@
   import { CDE_STATE_CHOICES } from "../types";
   import Modal from "./Modal.svelte";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
@@ -27,6 +28,18 @@
   let topicStatus = $state("no_change");
   let priority = $state("no_change");
   let cdeState = $state("no_change");
+  const STATUS_OPTIONS = [
+    { value: "no_change", label: "-- Keep Current Status --" },
+    ...["Open", "In Progress", "Resolved", "Closed"].map((v) => ({ value: v, label: v })),
+  ];
+  const PRIORITY_OPTIONS = [
+    { value: "no_change", label: "-- Keep Current Priority --" },
+    ...["Critical", "High", "Normal", "Low"].map((v) => ({ value: v, label: v })),
+  ];
+  const CDE_OPTIONS = [
+    { value: "no_change", label: "-- Keep Current CDE State --" },
+    ...CDE_STATE_CHOICES.map((v) => ({ value: v as string, label: v as string })),
+  ];
   let isSaving = $state(false);
   let errorMessage = $state("");
   let errorLog: ErrorLogEntry[] = $state([]);
@@ -113,17 +126,11 @@
       <label for="bulk-bcf-status" class="block text-xs font-semibold text-fg-secondary">
         Topic Status
       </label>
-      <select
-        id="bulk-bcf-status"
+      <Select
         bind:value={topicStatus}
-        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
-      >
-        <option value="no_change">-- Keep Current Status --</option>
-        <option value="Open">Open</option>
-        <option value="In Progress">In Progress</option>
-        <option value="Resolved">Resolved</option>
-        <option value="Closed">Closed</option>
-      </select>
+        options={STATUS_OPTIONS}
+        ariaLabel="Topic status"
+      />
     </div>
 
     <!-- Priority -->
@@ -131,17 +138,11 @@
       <label for="bulk-bcf-priority" class="block text-xs font-semibold text-fg-secondary">
         Priority
       </label>
-      <select
-        id="bulk-bcf-priority"
+      <Select
         bind:value={priority}
-        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
-      >
-        <option value="no_change">-- Keep Current Priority --</option>
-        <option value="Critical">Critical</option>
-        <option value="High">High</option>
-        <option value="Normal">Normal</option>
-        <option value="Low">Low</option>
-      </select>
+        options={PRIORITY_OPTIONS}
+        ariaLabel="Priority"
+      />
     </div>
   </div>
 
@@ -150,16 +151,11 @@
     <label for="bulk-bcf-cde" class="block text-xs font-semibold text-fg-secondary">
       ISO 19650 CDE State
     </label>
-    <select
-      id="bulk-bcf-cde"
-      bind:value={cdeState}
-      class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
-    >
-      <option value="no_change">-- Keep Current CDE State --</option>
-      {#each CDE_STATE_CHOICES as state (state)}
-        <option value={state}>{state}</option>
-      {/each}
-    </select>
+    <Select
+        bind:value={cdeState}
+        options={CDE_OPTIONS}
+        ariaLabel="ISO 19650 CDE state"
+      />
   </div>
 
   {#snippet footer()}

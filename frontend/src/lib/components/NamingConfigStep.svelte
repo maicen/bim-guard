@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { Plus, X, Info } from "lucide-svelte";
   import { namingConfigApi } from "../api";
+  import Select from "./ui/Select.svelte";
   import type { NamingCatalog, NamingCode, NamingConfigPayload } from "../types";
 
   interface Props {
@@ -182,15 +183,7 @@
         <label for="naming-type" class="mb-1.5 block text-caption font-medium text-fg-muted">
           Information Type
         </label>
-        <select
-          id="naming-type"
-          bind:value={config.type_code}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each [...(catalog?.codes?.types ?? []), ...(config.type_codes ?? [])] as t (t)}
-            <option value={t.code}>{t.code} — {t.label}</option>
-          {/each}
-        </select>
+        <Select bind:value={config.type_code} options={[...(catalog?.codes?.types ?? []), ...(config.type_codes ?? [])].map((t) => ({ value: t.code, label: `${t.code} — ${t.label}` }))} ariaLabel="Information type" />
       </div>
       <div>
         <label
@@ -199,15 +192,7 @@
         >
           Suitability (CDE Status)
         </label>
-        <select
-          id="naming-suitability"
-          bind:value={config.suitability}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each selectableStatuses as s (s)}
-            <option value={s.code}>{s.code} — {s.label}</option>
-          {/each}
-        </select>
+        <Select bind:value={config.suitability} options={selectableStatuses.map((st) => ({ value: st.code, label: `${st.code} — ${st.label}` }))} ariaLabel="Suitability (CDE status)" />
       </div>
       <div>
         <label for="naming-revision" class="mb-1.5 block text-caption font-medium text-fg-muted">
@@ -228,29 +213,13 @@
         >
           Date Format
         </label>
-        <select
-          id="naming-date-format"
-          bind:value={config.date_format}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each catalog?.date_formats ?? ["YYMMDD"] as f (f)}
-            <option value={f}>{f}</option>
-          {/each}
-        </select>
+        <Select bind:value={config.date_format} options={(catalog?.date_formats ?? ["YYMMDD"]).map((f) => ({ value: f, label: f }))} ariaLabel="Date format" />
       </div>
       <div>
         <label for="naming-separator" class="mb-1.5 block text-caption font-medium text-fg-muted">
           Separator
         </label>
-        <select
-          id="naming-separator"
-          bind:value={config.separator}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each catalog?.separators ?? ["_"] as sep (sep)}
-            <option value={sep}>{sep}</option>
-          {/each}
-        </select>
+        <Select bind:value={config.separator} options={(catalog?.separators ?? ["_"]).map((sep) => ({ value: sep, label: sep }))} ariaLabel="Separator" />
       </div>
     </div>
 

@@ -3,6 +3,7 @@
   import { Tooltip as TooltipPrimitive } from "bits-ui";
   import Tooltip from "../Tooltip.svelte";
   import TabStrip from "../TabStrip.svelte";
+  import Select from "../ui/Select.svelte";
   import type { TabStripItem } from "../TabStrip.svelte";
   import {
     Box,
@@ -21,7 +22,6 @@
     FilePlus2,
     Download,
     MousePointer2,
-    ChevronDown,
     UploadCloud,
   } from "lucide-svelte";
   import type { Model } from "../../types";
@@ -171,14 +171,6 @@
     viewerAPI.isolate.toggle();
     refreshIsolate();
   }
-  function openPlan(event: Event) {
-    const id = (event.target as HTMLSelectElement).value;
-    if (id) viewerAPI.views.plan(id);
-  }
-  function openElevation(event: Event) {
-    const id = (event.target as HTMLSelectElement).value;
-    if (id) viewerAPI.views.elevation(id);
-  }
   function toggleSectionMode() {
     if (sectionModeActive) viewerAPI.views.exitSectionMode();
     else viewerAPI.views.enterSectionMode();
@@ -213,24 +205,18 @@
       {#if ifcFiles.length > 1}
         <Tooltip text="Switch which of this project's models the viewport renders">
           {#snippet trigger()}
-            <div class="relative">
-              <select
-                value={selectedFileId}
-                onchange={(e) => onSelectFile?.(Number((e.target as HTMLSelectElement).value))}
-                class="w-full max-w-[220px] appearance-none rounded-lg border border-border-default bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                {#each ifcFiles as file (file.id)}
-                  <option value={file.id}>
-                    {file.file_name || `Model #${file.id}`} — {file.role}{file.is_primary
-                      ? " (primary)"
-                      : ""}
-                  </option>
-                {/each}
-              </select>
-              <ChevronDown
-                class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
-              />
-            </div>
+            <div class="w-[220px] max-w-full">
+                <Select
+                  value={selectedFileId == null ? "" : String(selectedFileId)}
+                  options={ifcFiles.map((file) => ({
+                    value: String(file.id),
+                    label: `${file.file_name || `Model #${file.id}`} — ${file.role}${file.is_primary ? " (primary)" : ""}`,
+                  }))}
+                  ariaLabel="Active model"
+                  triggerClass="h-auto rounded-lg bg-surface-overlay py-1.5 pl-3 pr-2.5 font-medium"
+                  onValueChange={(v) => onSelectFile?.(Number(v))}
+                />
+              </div>
           {/snippet}
         </Tooltip>
       {:else if fileName}
@@ -374,11 +360,16 @@
         {#if plans.length > 1}
           <Tooltip text="Switch between the model's plan views">
             {#snippet trigger()}
-              <select class="rbn-select" onchange={openPlan}>
-                {#each plans as plan (plan.id)}
-                  <option value={plan.id} selected={activeViewId === plan.id}>{plan.label}</option>
-                {/each}
-              </select>
+              <div class="rbn-select-wrap">
+                <Select
+                  value={activeViewId ?? ""}
+                  options={plans.map((v) => ({ value: v.id, label: v.label }))}
+                  placeholder="Plan"
+                  ariaLabel="Plan view"
+                  triggerClass="h-auto rounded-lg px-1.5 py-1 text-[11px]"
+                  onValueChange={(id) => id && viewerAPI.views.plan(id)}
+                />
+              </div>
             {/snippet}
           </Tooltip>
         {/if}
@@ -392,13 +383,16 @@
         {#if elevations.length > 1}
           <Tooltip text="Switch between the model's elevation views">
             {#snippet trigger()}
-              <select class="rbn-select" onchange={openElevation}>
-                {#each elevations as elevation (elevation.id)}
-                  <option value={elevation.id} selected={activeViewId === elevation.id}
-                    >{elevation.label}</option
-                  >
-                {/each}
-              </select>
+              <div class="rbn-select-wrap">
+                <Select
+                  value={activeViewId ?? ""}
+                  options={elevations.map((v) => ({ value: v.id, label: v.label }))}
+                  placeholder="Elevation"
+                  ariaLabel="Elevation view"
+                  triggerClass="h-auto rounded-lg px-1.5 py-1 text-[11px]"
+                  onValueChange={(id) => id && viewerAPI.views.elevation(id)}
+                />
+              </div>
             {/snippet}
           </Tooltip>
         {/if}
@@ -536,13 +530,7 @@
     opacity: 0.35;
     cursor: not-allowed;
   }
-  .rbn-select {
-    background: var(--color-surface-card);
-    border: 1px solid var(--color-border-default);
-    border-radius: 8px;
-    color: var(--color-fg-primary);
-    font-size: 11px;
-    padding: 4px 6px;
-    max-width: 140px;
+  .rbn-select-wrap {
+    width: 140px;
   }
 </style>

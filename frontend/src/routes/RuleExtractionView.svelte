@@ -25,6 +25,7 @@
     AlertTriangle,
     RefreshCw,
   } from "lucide-svelte";
+  import Select from "../lib/components/ui/Select.svelte";
   import { documentsApi, ruleExtractionApi, llmProvidersApi, bsddApi } from "../lib/api";
   import { downloadBlob, downloadText } from "../lib/utils/download";
   import { authState } from "../lib/auth.svelte";
@@ -220,16 +221,14 @@
         document_id: selectedDocId,
         include_threshold_discrepancies: true,
       });
-      const conflictMap = new Map(
-        resp.drafts_with_conflicts.map((d) => [d.id, d.conflicts || []])
-      );
+      const conflictMap = new Map(resp.drafts_with_conflicts.map((d) => [d.id, d.conflicts || []]));
       draftRules = draftRules.map((d) => ({
         ...d,
         conflicts: conflictMap.get(d.id) || [],
       }));
       if (resp.total_conflicts_found > 0) {
         toasts.warning(
-          `Detected ${resp.total_conflicts_found} conflict(s) across ${resp.drafts_with_conflicts.length} rule draft(s).`
+          `Detected ${resp.total_conflicts_found} conflict(s) across ${resp.drafts_with_conflicts.length} rule draft(s).`,
         );
       } else {
         toasts.success("No cross-rule or cross-draft building code contradictions detected.");
@@ -345,7 +344,9 @@
     if (!editForm) return;
     const query = field === "target_ifc_class" ? editForm.target_ifc_class : editForm.property_name;
     if (!query?.trim()) {
-      toasts.warning(`Enter a ${field === "target_ifc_class" ? "class" : "property"} name to suggest from first.`);
+      toasts.warning(
+        `Enter a ${field === "target_ifc_class" ? "class" : "property"} name to suggest from first.`,
+      );
       return;
     }
     suggestingField = field;
@@ -402,13 +403,17 @@
   }
 
   /** Toast a promoted rule's ontology-alignment warnings/conflicts, if any -- promotion itself never blocks on these. */
-  function warnAboutAlignment(result: { alignment_issues?: unknown[]; conflicts?: unknown[] }, ruleId: string) {
+  function warnAboutAlignment(
+    result: { alignment_issues?: unknown[]; conflicts?: unknown[] },
+    ruleId: string,
+  ) {
     const issueCount = result.alignment_issues?.length ?? 0;
     const conflictCount = result.conflicts?.length ?? 0;
     if (issueCount === 0 && conflictCount === 0) return;
     const parts = [];
     if (issueCount > 0) parts.push(`${issueCount} ontology warning${issueCount === 1 ? "" : "s"}`);
-    if (conflictCount > 0) parts.push(`${conflictCount} conflicting rule${conflictCount === 1 ? "" : "s"}`);
+    if (conflictCount > 0)
+      parts.push(`${conflictCount} conflicting rule${conflictCount === 1 ? "" : "s"}`);
     toasts.warning(
       `"${ruleId}" was promoted with ${parts.join(" and ")} -- flagged for review.`,
       "Promoted with warnings",
@@ -872,51 +877,55 @@
 
   {#if successMessage}
     <div
-      class="flex items-center gap-2 rounded-xl border border-success-border/60 bg-success-bg/40 p-4 text-xs text-success"
+      class="border-success-border/60 bg-success-bg/40 text-success flex items-center gap-2 rounded-xl border p-4 text-xs"
     >
-      <CheckCircle2 class="h-4 w-4 shrink-0 text-success" />
+      <CheckCircle2 class="text-success h-4 w-4 shrink-0" />
       <span>{successMessage}</span>
     </div>
   {/if}
 
   <!-- Configuration & Input Section -->
-  <div class="space-y-6 rounded-2xl border border-border-default bg-surface-card/40 p-6">
+  <div class="border-border-default bg-surface-card/40 space-y-6 rounded-2xl border p-6">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <!-- Document Source Selector -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <label
             for="rule-doc-source"
-            class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
+            class="text-fg-muted block text-xs font-bold tracking-wider uppercase"
           >
             Source Specification Document
           </label>
           <button
             type="button"
             onclick={() => (isUploadModalOpen = true)}
-            class="inline-flex items-center gap-1 text-caption font-semibold text-accent hover:underline"
+            class="text-caption text-accent inline-flex items-center gap-1 font-semibold hover:underline"
           >
             <Plus class="h-3 w-3" />
             <span>Add / Upload Document</span>
           </button>
         </div>
-        <select
-          id="rule-doc-source"
-          bind:value={selectedDocId}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          <option value={null}>-- Select from Document Library --</option>
-          {#each documents as doc (doc.id)}
-            <option value={doc.id}>{doc.filename} ({doc.doc_type || "Spec"})</option>
-          {/each}
-        </select>
+        <Select
+          bind:value={
+            () => (selectedDocId === null ? "" : String(selectedDocId)),
+            (v) => (selectedDocId = v === "" ? null : Number(v))
+          }
+          ariaLabel="Source document"
+          options={[
+            { value: "", label: "-- Select from Document Library --" },
+            ...documents.map((doc) => ({
+              value: String(doc.id),
+              label: `${doc.filename} (${doc.doc_type || "Spec"})`,
+            })),
+          ]}
+        />
       </div>
 
       <!-- LLM Model Selector -->
       <div class="space-y-2">
         <label
           for="rule-ai-model"
-          class="block text-xs font-bold uppercase tracking-wider text-fg-muted"
+          class="text-fg-muted block text-xs font-bold tracking-wider uppercase"
         >
           Extraction Model / Parser
         </label>
@@ -924,7 +933,7 @@
           <p class="text-caption text-fg-muted">Loading available models…</p>
         {:else if llmModels.length === 0}
           <div
-            class="rounded-xl border border-critical-border bg-critical-bg px-3.5 py-2.5 text-xs text-critical"
+            class="border-critical-border bg-critical-bg text-critical rounded-xl border px-3.5 py-2.5 text-xs"
           >
             {llmModelsError || "No LLM provider configured for this organization."} Add one under
             <a href="#/external-providers" class="font-semibold underline hover:no-underline"
@@ -932,19 +941,18 @@
             >.
           </div>
         {:else}
-          <select
-            id="rule-ai-model"
+          <Select
             bind:value={selectedModel}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            {#each llmModels as model (model.id)}
-              <option value={model.id}>{model.name} — {formatModelMeta(model)}</option>
-            {/each}
-          </select>
+            ariaLabel="LLM model"
+            options={llmModels.map((model) => ({
+              value: model.id,
+              label: `${model.name} — ${formatModelMeta(model)}`,
+            }))}
+          />
           {#if !usingShortlist}
             <p class="text-caption text-fg-muted">
               Showing this provider's full catalogue — curate a shortlist under
-              <a href="#/external-providers" class="font-semibold text-accent hover:underline"
+              <a href="#/external-providers" class="text-accent font-semibold hover:underline"
                 >Admin → External Providers → LLM Providers</a
               > for a shorter, priced list here.
             </p>
@@ -954,27 +962,30 @@
     </div>
 
     {#if selectedDocId && isLoadingSections}
-      <p class="text-xs text-fg-muted">Detecting sections…</p>
+      <p class="text-fg-muted text-xs">Detecting sections…</p>
     {:else if selectedDocId && docSections.length > 0}
       <div
         role="group"
         aria-labelledby="rule-section-scope-label"
-        class="space-y-3 rounded-xl border border-border-default bg-surface-canvas/60 p-4 shadow-xs"
+        class="border-border-default bg-surface-canvas/60 space-y-3 rounded-xl border p-4 shadow-xs"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="space-y-0.5">
-            <span id="rule-section-scope-label" class="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+            <span
+              id="rule-section-scope-label"
+              class="text-fg-muted block text-xs font-bold tracking-wider uppercase"
+            >
               Document Outline & Extraction Scope
             </span>
             <p class="text-micro text-fg-muted">
               {docSections.length} clause{docSections.length === 1 ? "" : "s"} detected in Smart TOC.
               {#if selectedSectionKeys.size > 0}
-                <span class="font-semibold text-accent">({selectedSectionKeys.size} scoped)</span>
+                <span class="text-accent font-semibold">({selectedSectionKeys.size} scoped)</span>
               {:else}
                 <span>Leave all unselected to process the whole document.</span>
               {/if}
               {#if sectionsEnhanced}
-                <span class="ml-1 inline-flex items-center gap-1 text-accent font-medium">
+                <span class="text-accent ml-1 inline-flex items-center gap-1 font-medium">
                   <Sparkles class="h-3 w-3" /> AI-arranged
                 </span>
               {/if}
@@ -988,7 +999,7 @@
               type="button"
               disabled={isRegeneratingToc}
               onclick={handleRegenerateToc}
-              class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary disabled:opacity-50 transition-colors"
+              class="border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover hover:text-fg-primary inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50"
               title="Re-extract and rebuild Smart TOC from DocLang XML, replacing the persisted DB record"
             >
               <RefreshCw class="h-3 w-3 {isRegeneratingToc ? 'animate-spin' : ''}" />
@@ -1000,28 +1011,28 @@
               <button
                 type="button"
                 onclick={() => (isExportMenuOpen = !isExportMenuOpen)}
-                class="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors"
+                class="border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover hover:text-fg-primary inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
                 title="Export outline as JSON or CSV"
               >
                 <Download class="h-3 w-3" />
                 <span>Export</span>
-                <ChevronDown class="h-3 w-3 text-fg-muted" />
+                <ChevronDown class="text-fg-muted h-3 w-3" />
               </button>
               {#if isExportMenuOpen}
                 <div
-                  class="absolute right-0 top-full z-20 mt-1 w-32 rounded-lg border border-border-default bg-surface-overlay p-1 shadow-lg backdrop-blur-md"
+                  class="border-border-default bg-surface-overlay absolute top-full right-0 z-20 mt-1 w-32 rounded-lg border p-1 shadow-lg backdrop-blur-md"
                 >
                   <button
                     type="button"
                     onclick={() => handleExportToc("json")}
-                    class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-fg-primary text-left"
+                    class="text-fg-secondary hover:bg-surface-hover hover:text-fg-primary flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs"
                   >
                     Export JSON
                   </button>
                   <button
                     type="button"
                     onclick={() => handleExportToc("csv")}
-                    class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-fg-primary text-left"
+                    class="text-fg-secondary hover:bg-surface-hover hover:text-fg-primary flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs"
                   >
                     Export CSV
                   </button>
@@ -1031,7 +1042,9 @@
 
             <!-- Import Button -->
             <label
-              class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-default bg-surface-canvas px-2.5 py-1 text-xs font-medium text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors {isImportingToc ? 'opacity-50 pointer-events-none' : ''}"
+              class="border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover hover:text-fg-primary inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors {isImportingToc
+                ? 'pointer-events-none opacity-50'
+                : ''}"
               title="Import corrected TOC from JSON or CSV file"
             >
               <Upload class="h-3 w-3" />
@@ -1045,15 +1058,15 @@
               />
             </label>
 
-            <div class="h-3.5 w-px bg-border-default"></div>
+            <div class="bg-border-default h-3.5 w-px"></div>
 
             <!-- Selection controls -->
-            <div class="flex items-center gap-2 text-micro font-semibold">
+            <div class="text-micro flex items-center gap-2 font-semibold">
               {#if selectedSectionKeys.size > 0}
                 <button
                   type="button"
                   onclick={clearSectionSelection}
-                  class="rounded bg-accent/15 px-2 py-0.5 text-accent hover:underline"
+                  class="bg-accent/15 text-accent rounded px-2 py-0.5 hover:underline"
                 >
                   Clear ({selectedSectionKeys.size})
                 </button>
@@ -1071,7 +1084,9 @@
         </div>
 
         <!-- Section Tree Container: enlarged from max-h-64 to max-h-[30rem] -->
-        <div class="max-h-[30rem] overflow-y-auto pr-1 rounded-lg border border-border-subtle bg-surface-canvas/40 p-2">
+        <div
+          class="border-border-subtle bg-surface-canvas/40 max-h-[30rem] overflow-y-auto rounded-lg border p-2 pr-1"
+        >
           <SectionTree
             nodes={sectionTree}
             selected={selectedSectionKeys}
@@ -1091,13 +1106,16 @@
         </div>
       </div>
     {:else if selectedDocId}
-      <p class="text-xs text-fg-muted">
+      <p class="text-fg-muted text-xs">
         No sections were detected — extraction will run over the whole document.
       </p>
     {:else}
-      <div class="rounded-xl border border-dashed border-border-default bg-surface-canvas/30 p-6 text-center space-y-2">
-        <p class="text-xs font-medium text-fg-secondary">
-          No document selected — choose a specification from the library above to configure extraction scope.
+      <div
+        class="border-border-default bg-surface-canvas/30 space-y-2 rounded-xl border border-dashed p-6 text-center"
+      >
+        <p class="text-fg-secondary text-xs font-medium">
+          No document selected — choose a specification from the library above to configure
+          extraction scope.
         </p>
         <p class="text-caption text-fg-muted">
           Need to extract rules from text clauses? Add or paste them directly as a document.
@@ -1106,9 +1124,9 @@
           <button
             type="button"
             onclick={() => (isUploadModalOpen = true)}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs font-semibold text-fg-primary hover:bg-surface-hover hover:border-accent transition-colors"
+            class="border-border-interactive bg-surface-overlay text-fg-primary hover:bg-surface-hover hover:border-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
           >
-            <Plus class="h-3.5 w-3.5 text-accent" />
+            <Plus class="text-accent h-3.5 w-3.5" />
             <span>Add / Upload Specification</span>
           </button>
         </div>
@@ -1121,7 +1139,7 @@
         disabled={isExtracting || !selectedModel || !selectedDocId}
         aria-busy={isExtracting}
         onclick={handleExtract}
-        class="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] hover:bg-accent-hover {isExtracting
+        class="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-semibold text-white shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] {isExtracting
           ? 'disabled:cursor-progress'
           : 'disabled:opacity-50'}"
       >
@@ -1151,15 +1169,17 @@
   {#if selectedDocId && (isLoadingDrafts || draftRules.length > 0)}
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-bold tracking-tight text-fg-primary">
+        <h2 class="text-fg-primary text-lg font-bold tracking-tight">
           Draft Review ({draftRules.length} draft{draftRules.length === 1 ? "" : "s"})
           {#if draftRules[0]?.proposed_rule.ruleset_id}
-            <span class="ml-2 rounded-full border border-border-interactive bg-surface-card px-2.5 py-0.5 text-caption font-semibold text-fg-muted">
+            <span
+              class="border-border-interactive bg-surface-card text-caption text-fg-muted ml-2 rounded-full border px-2.5 py-0.5 font-semibold"
+            >
               ruleset {draftRules[0].proposed_rule.ruleset_id}
             </span>
           {/if}
         </h2>
-        <p class="text-xs text-fg-muted">
+        <p class="text-fg-muted text-xs">
           Accept or reject each candidate, then promote accepted drafts into the compliance rule
           library. Drafts persist across sessions.
         </p>
@@ -1190,27 +1210,29 @@
         <LoadingState message="Loading extraction drafts…" />
       {:else}
         <div
-          class="flex flex-col items-center gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 md:flex-row"
+          class="border-border-default/90 bg-surface-canvas/80 flex flex-col items-center gap-3 rounded-2xl border p-3.5 md:flex-row"
         >
           <div class="relative w-full flex-1">
-            <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
+            <Search class="text-fg-muted absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2" />
             <input
               type="text"
               bind:value={draftTable.search}
               placeholder="Search drafts by reference, description, property..."
-              class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-card text-fg-primary placeholder:text-fg-muted focus:border-accent w-full rounded-xl border py-2 pr-4 pl-10 text-xs focus:outline-hidden"
             />
           </div>
-          <select
+          <Select
             bind:value={draftTable.filters.status}
-            class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="pending_review">Pending Review</option>
-            <option value="accepted">Accepted</option>
-            <option value="edited">Edited</option>
-            <option value="rejected">Rejected</option>
-          </select>
+            ariaLabel="Filter by draft status"
+            options={[
+              { value: "ALL", label: "All Statuses" },
+              { value: "pending_review", label: "Pending Review" },
+              { value: "accepted", label: "Accepted" },
+              { value: "edited", label: "Edited" },
+              { value: "rejected", label: "Rejected" },
+            ]}
+            class="w-auto min-w-40"
+          />
           <Button
             variant="outline"
             size="sm"
@@ -1230,7 +1252,7 @@
             disabled={!selectedDocId || draftRules.length === 0}
             title="Scan for cross-rule and cross-draft building code contradictions"
           >
-            {#if !isCheckingConflicts}<AlertTriangle class="h-3.5 w-3.5 text-warning" />{/if}
+            {#if !isCheckingConflicts}<AlertTriangle class="text-warning h-3.5 w-3.5" />{/if}
             <span>Scan Conflicts</span>
           </Button>
         </div>
@@ -1274,11 +1296,11 @@
           {/snippet}
         </BulkActionBar>
 
-        <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
+        <div class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border">
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-fg-secondary">
+            <table class="text-fg-secondary w-full text-left text-xs">
               <thead
-                class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
               >
                 <tr>
                   <th class="w-10 px-3 py-3 text-center">
@@ -1299,12 +1321,16 @@
                   <th class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-border-subtle">
+              <tbody class="divide-border-subtle divide-y">
                 {#each draftTable.paginated as draft (draft.id)}
                   <tr
-                    class="transition-colors hover:bg-surface-hover {draftTable.isSelected(draft.id!)
+                    class="hover:bg-surface-hover transition-colors {draftTable.isSelected(
+                      draft.id!,
+                    )
                       ? 'bg-surface-selected'
-                      : ''} {draftTable.isPending(draft.id!) ? 'opacity-50 pointer-events-none' : ''}"
+                      : ''} {draftTable.isPending(draft.id!)
+                      ? 'pointer-events-none opacity-50'
+                      : ''}"
                   >
                     <td class="px-3 py-3 text-center">
                       <TableCheckbox
@@ -1315,7 +1341,7 @@
                     </td>
                     <td class="px-3 py-3">
                       <span
-                        class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider
+                        class="text-micro rounded-md border px-2 py-0.5 font-semibold tracking-wider uppercase
                           {draft.status === 'accepted' || draft.status === 'edited'
                           ? 'border-success-border bg-success-bg text-success'
                           : draft.status === 'rejected'
@@ -1325,18 +1351,22 @@
                         {draft.status.replace("_", " ")}
                       </span>
                     </td>
-                    <td class="px-3 py-3 font-mono font-bold text-fg-primary">
+                    <td class="text-fg-primary px-3 py-3 font-mono font-bold">
                       <div class="flex items-center gap-1.5">
                         <span>{draft.proposed_rule.rule_id}</span>
                         {#if draft.conflicts && draft.conflicts.length > 0}
                           <button
                             type="button"
                             onclick={() => (inspectingConflictDraft = draft)}
-                            class="inline-flex items-center gap-1 rounded-md border border-warning-border bg-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-warning transition-transform hover:scale-105"
+                            class="border-warning-border bg-warning-bg text-warning inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-transform hover:scale-105"
                             title={`${draft.conflicts.length} conflicting specification(s) detected. Click to inspect.`}
                           >
-                            <AlertTriangle class="size-3 text-warning" />
-                            <span>{draft.conflicts.length} conflict{draft.conflicts.length === 1 ? '' : 's'}</span>
+                            <AlertTriangle class="text-warning size-3" />
+                            <span
+                              >{draft.conflicts.length} conflict{draft.conflicts.length === 1
+                                ? ""
+                                : "s"}</span
+                            >
                           </button>
                         {/if}
                       </div>
@@ -1346,7 +1376,7 @@
                         <span class="truncate">{draft.proposed_rule.description}</span>
                         {#if draft.proposed_rule.applies_when && Object.keys(draft.proposed_rule.applies_when).length > 0}
                           <span
-                            class="shrink-0 rounded-md border border-amber-800 bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300"
+                            class="shrink-0 rounded-md border border-amber-800 bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-amber-300 uppercase"
                             title={`Scoped: ${JSON.stringify(draft.proposed_rule.applies_when)}`}
                           >
                             Conditional
@@ -1354,7 +1384,7 @@
                         {/if}
                       </div>
                     </td>
-                    <td class="px-3 py-3 font-mono text-fg-muted">
+                    <td class="text-fg-muted px-3 py-3 font-mono">
                       <div class="flex items-center gap-1.5">
                         <span
                           >{draft.proposed_rule.property_set || "—"} / {draft.proposed_rule
@@ -1362,7 +1392,7 @@
                         >
                         {#if draft.review_notes?.startsWith("bSDD grounding")}
                           <span
-                            class="rounded-md border border-success-border bg-success-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-success"
+                            class="border-success-border bg-success-bg text-success rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase"
                             title={draft.review_notes}
                           >
                             bSDD Grounded
@@ -1381,13 +1411,13 @@
                     <td class="px-3 py-3">
                       <ReliabilityBadge reliability={draft.reliability} />
                     </td>
-                    <td class="whitespace-nowrap px-3 py-3 text-right">
+                    <td class="px-3 py-3 text-right whitespace-nowrap">
                       <div class="flex items-center justify-end gap-1">
                         {#if draft.status === "pending_review"}
                           <button
                             type="button"
                             onclick={() => reviewDraftRow(draft, "accepted")}
-                            class="rounded-lg bg-surface-card p-1.5 text-success transition-colors hover:bg-success-bg/60"
+                            class="bg-surface-card text-success hover:bg-success-bg/60 rounded-lg p-1.5 transition-colors"
                             title="Accept draft"
                           >
                             <Check class="h-3.5 w-3.5" />
@@ -1395,7 +1425,7 @@
                           <button
                             type="button"
                             onclick={() => reviewDraftRow(draft, "rejected")}
-                            class="rounded-lg bg-surface-card p-1.5 text-critical transition-colors hover:bg-critical-bg/60"
+                            class="bg-surface-card text-critical hover:bg-critical-bg/60 rounded-lg p-1.5 transition-colors"
                             title="Reject draft"
                           >
                             <X class="h-3.5 w-3.5" />
@@ -1404,7 +1434,7 @@
                         <button
                           type="button"
                           onclick={() => viewDraftSource(draft)}
-                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                          class="bg-surface-overlay text-fg-secondary hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1.5 transition-colors"
                           title="View source in document"
                         >
                           <Eye class="h-3.5 w-3.5" />
@@ -1412,7 +1442,7 @@
                         <button
                           type="button"
                           onclick={() => openEditDraftModal(draft)}
-                          class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                          class="bg-surface-overlay text-fg-secondary hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1.5 transition-colors"
                           title="Edit draft"
                         >
                           <Pencil class="h-3.5 w-3.5" />
@@ -1455,10 +1485,10 @@
     <div class="space-y-4">
       <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 class="text-lg font-bold tracking-tight text-fg-primary">
+          <h2 class="text-fg-primary text-lg font-bold tracking-tight">
             Extracted Rules Review ({extractedRules.length} rules identified)
           </h2>
-          <p class="text-xs text-fg-muted">
+          <p class="text-fg-muted text-xs">
             Review, modify properties, filter, and select rules to persist to the library.
           </p>
           <ReliabilityLegend class="mt-2" />
@@ -1468,21 +1498,21 @@
           <div class="flex flex-col">
             <label
               for="extraction-ruleset"
-              class="mb-0.5 text-micro font-semibold uppercase tracking-wider text-fg-muted"
+              class="text-micro text-fg-muted mb-0.5 font-semibold tracking-wider uppercase"
               >Rule Folder</label
             >
             <input
               id="extraction-ruleset"
               type="text"
               bind:value={formRulesetId}
-              class="w-44 rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-44 rounded-xl border px-3 py-1.5 text-xs focus:outline-hidden"
             />
           </div>
 
           <button
             type="button"
             onclick={addManualDraftRule}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-all hover:bg-surface-hover"
+            class="bg-surface-overlay text-fg-primary hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all"
           >
             <Plus class="h-3.5 w-3.5" />
             <span>Add Rule</span>
@@ -1504,29 +1534,31 @@
 
       <!-- Filter Toolbar -->
       <div
-        class="flex flex-col items-center gap-3 rounded-2xl border border-border-default/90 bg-surface-canvas/80 p-3.5 md:flex-row"
+        class="border-border-default/90 bg-surface-canvas/80 flex flex-col items-center gap-3 rounded-2xl border p-3.5 md:flex-row"
       >
         <div class="relative w-full flex-1">
-          <Search class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" />
+          <Search class="text-fg-muted absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2" />
           <input
             type="text"
             bind:value={table.search}
             placeholder="Search draft rules by reference, description, property..."
-            class="w-full rounded-xl border border-border-default bg-surface-card py-2 pl-10 pr-4 text-xs text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
+            class="border-border-default bg-surface-card text-fg-primary placeholder:text-fg-muted focus:border-accent w-full rounded-xl border py-2 pr-4 pl-10 text-xs focus:outline-hidden"
           />
         </div>
 
         <div class="flex w-full items-center gap-2 md:w-auto">
-          <select
+          <Select
             bind:value={table.filters.severity}
-            class="rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="ALL">All Severities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+            ariaLabel="Filter by severity"
+            options={[
+              { value: "ALL", label: "All Severities" },
+              { value: "Critical", label: "Critical" },
+              { value: "High", label: "High" },
+              { value: "Medium", label: "Medium" },
+              { value: "Low", label: "Low" },
+            ]}
+            class="w-auto min-w-40"
+          />
         </div>
       </div>
 
@@ -1543,11 +1575,11 @@
       />
 
       <!-- Table Container -->
-      <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40">
+      <div class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-fg-secondary">
+          <table class="text-fg-secondary w-full text-left text-xs">
             <thead
-              class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
+              class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
             >
               <tr>
                 <th class="w-10 px-3 py-3 text-center">
@@ -1617,12 +1649,12 @@
                 <th class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-border-subtle">
+            <tbody class="divide-border-subtle divide-y">
               {#each table.paginated as rule (rule.rowId)}
                 <tr
-                  class="transition-colors hover:bg-surface-hover {table.isSelected(rule.rowId)
+                  class="hover:bg-surface-hover transition-colors {table.isSelected(rule.rowId)
                     ? 'bg-surface-selected'
-                    : ''} {table.isPending(rule.rowId) ? 'opacity-50 pointer-events-none' : ''}"
+                    : ''} {table.isPending(rule.rowId) ? 'pointer-events-none opacity-50' : ''}"
                 >
                   <td class="px-3 py-3 text-center">
                     <TableCheckbox
@@ -1631,35 +1663,35 @@
                       ariaLabel={`Select rule ${rule.rule_id}`}
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono font-bold text-fg-primary">
+                  <td class="text-fg-primary px-3 py-3 font-mono font-bold">
                     <input
                       type="text"
                       bind:value={rule.rule_id}
-                      class="w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold text-fg-primary hover:border-border-interactive focus:border-accent focus:outline-hidden"
+                      class="text-fg-primary hover:border-border-interactive focus:border-accent w-24 border-b border-transparent bg-transparent font-mono text-xs font-bold focus:outline-hidden"
                     />
                   </td>
                   <td class="px-3 py-3">
                     <input
                       type="text"
                       bind:value={rule.description}
-                      class="w-full min-w-[200px] border-b border-transparent bg-transparent text-xs text-fg-secondary hover:border-border-interactive focus:border-accent focus:outline-hidden"
+                      class="text-fg-secondary hover:border-border-interactive focus:border-accent w-full min-w-[200px] border-b border-transparent bg-transparent text-xs focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-fg-muted">
+                  <td class="text-fg-muted px-3 py-3 font-mono">
                     <input
                       type="text"
                       bind:value={rule.property_set}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-fg-muted hover:border-border-interactive focus:border-accent focus:outline-hidden"
+                      class="text-fg-muted hover:border-border-interactive focus:border-accent w-28 border-b border-transparent bg-transparent text-xs focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-fg-secondary">
+                  <td class="text-fg-secondary px-3 py-3 font-mono">
                     <input
                       type="text"
                       bind:value={rule.property_name}
-                      class="w-28 border-b border-transparent bg-transparent text-xs text-fg-secondary hover:border-border-interactive focus:border-accent focus:outline-hidden"
+                      class="text-fg-secondary hover:border-border-interactive focus:border-accent w-28 border-b border-transparent bg-transparent text-xs focus:outline-hidden"
                     />
                   </td>
-                  <td class="px-3 py-3 font-mono text-fg-muted">
+                  <td class="text-fg-muted px-3 py-3 font-mono">
                     {rule.operator || "=="}
                   </td>
                   <td class="px-3 py-3 font-mono text-cyan-300">
@@ -1667,15 +1699,18 @@
                       (rule.value_min ? `[${rule.value_min}..${rule.value_max}]` : "-")}
                   </td>
                   <td class="px-3 py-3">
-                    <select
+                    <Select
                       bind:value={rule.severity}
-                      class="rounded border border-border-default bg-surface-canvas px-2 py-0.5 text-micro font-semibold text-fg-primary focus:outline-hidden"
-                    >
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      ariaLabel="Severity"
+                      options={[
+                        { value: "Critical", label: "Critical" },
+                        { value: "High", label: "High" },
+                        { value: "Medium", label: "Medium" },
+                        { value: "Low", label: "Low" },
+                      ]}
+                      class="w-auto min-w-28"
+                      triggerClass="h-7"
+                    />
                   </td>
                   <td class="px-3 py-3">
                     <LiveReliability
@@ -1684,12 +1719,12 @@
                       initial={rule.reliability ?? null}
                     />
                   </td>
-                  <td class="whitespace-nowrap px-3 py-3 text-right">
+                  <td class="px-3 py-3 text-right whitespace-nowrap">
                     <div class="flex items-center justify-end gap-1">
                       <button
                         type="button"
                         onclick={() => (viewingDraftRule = rule)}
-                        class="rounded-lg bg-surface-overlay p-1.5 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                        class="bg-surface-overlay text-fg-secondary hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1.5 transition-colors"
                         title="Inspect draft details"
                       >
                         <Eye class="h-3.5 w-3.5" />
@@ -1697,7 +1732,7 @@
                       <button
                         type="button"
                         onclick={() => removeDraftRule(rule.rowId)}
-                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                        class="text-fg-muted rounded-lg p-1.5 transition-colors hover:bg-rose-950/30 hover:text-rose-400"
                         title="Remove draft rule"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
@@ -1741,7 +1776,7 @@
     <button
       type="button"
       onclick={() => (showReturnPrompt = false)}
-      class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover"
+      class="bg-accent hover:bg-accent-hover rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all"
     >
       Got it
     </button>
@@ -1752,19 +1787,21 @@
 {#if viewingDraftSource}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
     <div
-      class="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
+      class="border-border-default bg-surface-card flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
+      <div class="border-border-default flex items-center justify-between border-b px-6 py-4">
         <div>
-          <h2 class="text-base font-bold tracking-tight text-fg-primary">{viewingDraftSource.filename}</h2>
+          <h2 class="text-fg-primary text-base font-bold tracking-tight">
+            {viewingDraftSource.filename}
+          </h2>
           {#if viewingDraftSource.page_number}
-            <p class="mt-0.5 text-xs text-fg-muted">Page {viewingDraftSource.page_number}</p>
+            <p class="text-fg-muted mt-0.5 text-xs">Page {viewingDraftSource.page_number}</p>
           {/if}
         </div>
         <button
           type="button"
           onclick={() => (viewingDraftSource = null)}
-          class="rounded-lg p-1 text-fg-muted hover:bg-surface-hover hover:text-fg-primary"
+          class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1"
         >
           <X class="h-5 w-5" />
         </button>
@@ -1783,14 +1820,14 @@
 
 {#if draftSourceError}
   <div
-    class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-critical-border bg-critical-bg px-4 py-3 text-xs text-critical shadow-2xl backdrop-blur-md"
+    class="border-critical-border bg-critical-bg text-critical fixed right-6 bottom-6 z-50 max-w-sm rounded-xl border px-4 py-3 text-xs shadow-2xl backdrop-blur-md"
   >
     <div class="flex items-start justify-between gap-3">
       <span>{draftSourceError}</span>
       <button
         type="button"
         onclick={() => (draftSourceError = "")}
-        class="shrink-0 text-critical hover:text-fg-primary"
+        class="text-critical hover:text-fg-primary shrink-0"
         aria-label="Dismiss error"
       >
         <X class="h-3.5 w-3.5" />
@@ -1803,17 +1840,17 @@
 {#if editingDraft && editForm}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
+      class="border-border-default bg-surface-card w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-border-default pb-3">
+      <div class="border-border-default flex items-center justify-between border-b pb-3">
         <div class="flex items-center gap-2">
-          <Pencil class="h-4 w-4 text-accent" />
-          <h3 class="font-mono text-sm font-bold text-fg-primary">Edit Draft</h3>
+          <Pencil class="text-accent h-4 w-4" />
+          <h3 class="text-fg-primary font-mono text-sm font-bold">Edit Draft</h3>
         </div>
         <button
           type="button"
           onclick={closeEditDraftModal}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1 transition-colors"
         >
           <X class="h-4 w-4" />
         </button>
@@ -1832,28 +1869,28 @@
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
-          <label for="edit-draft-description" class="block font-semibold text-fg-secondary"
+          <label for="edit-draft-description" class="text-fg-secondary block font-semibold"
             >Description</label
           >
           <textarea
             id="edit-draft-description"
             bind:value={editForm.description}
             rows="2"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas p-3 text-fg-primary focus:border-accent focus:outline-hidden"
+            class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-full rounded-xl border p-3 focus:outline-hidden"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div class="space-y-1">
             <div class="flex items-center justify-between gap-2">
-              <label for="edit-draft-target" class="block font-semibold text-fg-secondary"
+              <label for="edit-draft-target" class="text-fg-secondary block font-semibold"
                 >Target IFC Class</label
               >
               <button
                 type="button"
                 onclick={() => suggestViaAI("target_ifc_class")}
                 disabled={suggestingField !== null}
-                class="text-[10px] font-semibold text-accent hover:underline disabled:opacity-50"
+                class="text-accent text-[10px] font-semibold hover:underline disabled:opacity-50"
                 title="Ask AI to suggest a bSDD class matching this name"
               >
                 {suggestingField === "target_ifc_class" ? "Suggesting…" : "Suggest via AI"}
@@ -1863,28 +1900,30 @@
               id="edit-draft-target"
               type="text"
               bind:value={editForm.target_ifc_class}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-full rounded-xl border px-3 py-2 font-mono focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-pset" class="block font-semibold text-fg-secondary"
+            <label for="edit-draft-pset" class="text-fg-secondary block font-semibold"
               >Property Set</label
             >
             <input
               id="edit-draft-pset"
               type="text"
               bind:value={editForm.property_set}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-full rounded-xl border px-3 py-2 font-mono focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
             <div class="flex items-center justify-between gap-2">
-              <label for="edit-draft-prop" class="block font-semibold text-fg-secondary">Property</label>
+              <label for="edit-draft-prop" class="text-fg-secondary block font-semibold"
+                >Property</label
+              >
               <button
                 type="button"
                 onclick={() => suggestViaAI("property_name")}
                 disabled={suggestingField !== null}
-                class="text-[10px] font-semibold text-accent hover:underline disabled:opacity-50"
+                class="text-accent text-[10px] font-semibold hover:underline disabled:opacity-50"
                 title="Ask AI to suggest a bSDD property matching this name"
               >
                 {suggestingField === "property_name" ? "Suggesting…" : "Suggest via AI"}
@@ -1894,67 +1933,67 @@
               id="edit-draft-prop"
               type="text"
               bind:value={editForm.property_name}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-full rounded-xl border px-3 py-2 font-mono focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-operator" class="block font-semibold text-fg-secondary"
+            <label for="edit-draft-operator" class="text-fg-secondary block font-semibold"
               >Operator</label
             >
-            <select
-              id="edit-draft-operator"
+            <Select
               bind:value={editForm.operator}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:outline-hidden"
-            >
-              <option value="==">== (Equals)</option>
-              <option value="!=">!= (Not equals)</option>
-              <option value=">">&gt; (Greater than)</option>
-              <option value=">=">&gt;= (Greater or equal)</option>
-              <option value="<">&lt; (Less than)</option>
-              <option value="<=">&lt;= (Less or equal)</option>
-              <option value="between">between</option>
-              <option value="exists">exists</option>
-            </select>
+              ariaLabel="Operator"
+              options={[
+                { value: "==", label: "== (Equals)" },
+                { value: "!=", label: "!= (Not equals)" },
+                { value: ">", label: "> (Greater than)" },
+                { value: ">=", label: ">= (Greater or equal)" },
+                { value: "<", label: "< (Less than)" },
+                { value: "<=", label: "<= (Less or equal)" },
+                { value: "between", label: "between" },
+                { value: "exists", label: "exists" },
+              ]}
+            />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-value" class="block font-semibold text-fg-secondary"
+            <label for="edit-draft-value" class="text-fg-secondary block font-semibold"
               >Check Value</label
             >
             <input
               id="edit-draft-value"
               type="text"
               bind:value={editForm.check_value}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 font-mono text-fg-primary focus:border-accent focus:outline-hidden"
+              class="border-border-default bg-surface-canvas text-fg-primary focus:border-accent w-full rounded-xl border px-3 py-2 font-mono focus:outline-hidden"
             />
           </div>
           <div class="space-y-1">
-            <label for="edit-draft-severity" class="block font-semibold text-fg-secondary"
+            <label for="edit-draft-severity" class="text-fg-secondary block font-semibold"
               >Severity</label
             >
-            <select
-              id="edit-draft-severity"
+            <Select
               bind:value={editForm.severity}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:outline-hidden"
-            >
-              <option value="mandatory">Mandatory</option>
-              <option value="recommended">Recommended</option>
-            </select>
+              ariaLabel="Severity"
+              options={[
+                { value: "mandatory", label: "Mandatory" },
+                { value: "recommended", label: "Recommended" },
+              ]}
+            />
           </div>
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-border-default pt-2">
+      <div class="border-border-default flex justify-end gap-2 border-t pt-2">
         <button
           type="button"
           onclick={closeEditDraftModal}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:text-fg-primary"
+          class="text-fg-muted hover:text-fg-primary rounded-xl px-4 py-2 text-xs font-semibold"
         >
           Cancel
         </button>
         <button
           type="button"
           onclick={saveEditedDraft}
-          class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
+          class="bg-accent hover:bg-accent-hover rounded-xl px-5 py-2 text-xs font-semibold text-white"
         >
           Save Edits
         </button>
@@ -1967,19 +2006,19 @@
 {#if viewingDraftRule}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
+      class="border-border-default bg-surface-card w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-border-default pb-3">
+      <div class="border-border-default flex items-center justify-between border-b pb-3">
         <div class="flex items-center gap-2">
-          <FileText class="h-4 w-4 text-accent" />
-          <h3 class="font-mono text-sm font-bold text-fg-primary">
+          <FileText class="text-accent h-4 w-4" />
+          <h3 class="text-fg-primary font-mono text-sm font-bold">
             {viewingDraftRule.rule_id || "Draft Rule"}
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (viewingDraftRule = null)}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1 transition-colors"
         >
           <X class="h-4 w-4" />
         </button>
@@ -1987,14 +2026,16 @@
 
       <div class="space-y-3 text-xs">
         <div>
-          <span class="mb-1 block font-semibold text-fg-muted">Description</span>
-          <div class="rounded-xl border border-border-default bg-surface-canvas/60 p-3 text-fg-secondary">
+          <span class="text-fg-muted mb-1 block font-semibold">Description</span>
+          <div
+            class="border-border-default bg-surface-canvas/60 text-fg-secondary rounded-xl border p-3"
+          >
             {viewingDraftRule.description || "No description"}
           </div>
         </div>
 
         <div
-          class="grid grid-cols-2 gap-2 rounded-xl border border-border-default bg-surface-canvas p-3 font-mono text-caption"
+          class="border-border-default bg-surface-canvas text-caption grid grid-cols-2 gap-2 rounded-xl border p-3 font-mono"
         >
           <div>
             <span class="text-fg-muted">Pset:</span>
@@ -2028,7 +2069,7 @@
         <button
           type="button"
           onclick={() => (viewingDraftRule = null)}
-          class="rounded-xl bg-surface-overlay px-4 py-2 text-xs font-semibold text-fg-primary transition-colors hover:bg-surface-hover"
+          class="bg-surface-overlay text-fg-primary hover:bg-surface-hover rounded-xl px-4 py-2 text-xs font-semibold transition-colors"
         >
           Close
         </button>
@@ -2041,19 +2082,19 @@
 {#if isDraftBulkEditModalOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
     <div
-      class="w-full max-w-md space-y-4 overflow-hidden rounded-2xl border border-border-default bg-surface-card p-6 shadow-2xl"
+      class="border-border-default bg-surface-card w-full max-w-md space-y-4 overflow-hidden rounded-2xl border p-6 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-border-default pb-3">
+      <div class="border-border-default flex items-center justify-between border-b pb-3">
         <div class="flex items-center gap-2">
           <SlidersHorizontal class="h-4 w-4 text-blue-400" />
-          <h3 class="text-sm font-bold text-fg-primary">
+          <h3 class="text-fg-primary text-sm font-bold">
             Bulk Edit Draft Rules ({table.selectedCount} selected)
           </h3>
         </div>
         <button
           type="button"
           onclick={() => (isDraftBulkEditModalOpen = false)}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1 transition-colors"
         >
           <X class="h-4 w-4" />
         </button>
@@ -2061,24 +2102,24 @@
 
       <div class="space-y-3 text-xs">
         <div class="space-y-1">
-          <label for="bulk-draft-severity" class="block font-semibold text-fg-secondary"
+          <label for="bulk-draft-severity" class="text-fg-secondary block font-semibold"
             >Severity</label
           >
-          <select
-            id="bulk-draft-severity"
+          <Select
             bind:value={bulkDraftSeverity}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="no_change">-- Keep Current Severity --</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+            ariaLabel="Bulk severity"
+            options={[
+              { value: "no_change", label: "-- Keep Current Severity --" },
+              { value: "Critical", label: "Critical" },
+              { value: "High", label: "High" },
+              { value: "Medium", label: "Medium" },
+              { value: "Low", label: "Low" },
+            ]}
+          />
         </div>
 
         <div class="space-y-1">
-          <label for="bulk-draft-pset" class="block font-semibold text-fg-secondary"
+          <label for="bulk-draft-pset" class="text-fg-secondary block font-semibold"
             >Property Set</label
           >
           <input
@@ -2086,42 +2127,42 @@
             type="text"
             bind:value={bulkDraftPset}
             placeholder="Leave empty to keep current"
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
+            class="border-border-default bg-surface-canvas text-fg-primary placeholder:text-fg-muted focus:border-accent w-full rounded-xl border px-3 py-2 focus:outline-hidden"
           />
         </div>
 
         <div class="space-y-1">
-          <label for="bulk-draft-op" class="block font-semibold text-fg-secondary">Operator</label>
-          <select
-            id="bulk-draft-op"
+          <label for="bulk-draft-op" class="text-fg-secondary block font-semibold">Operator</label>
+          <Select
             bind:value={bulkDraftOperator}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="no_change">-- Keep Current Operator --</option>
-            <option value="==">== (Equals)</option>
-            <option value="!=">!= (Not equals)</option>
-            <option value=">">&gt; (Greater than)</option>
-            <option value=">=">&gt;= (Greater or equal)</option>
-            <option value="<">&lt; (Less than)</option>
-            <option value="<=">&lt;= (Less or equal)</option>
-            <option value="contains">contains</option>
-            <option value="exists">exists</option>
-          </select>
+            ariaLabel="Bulk operator"
+            options={[
+              { value: "no_change", label: "-- Keep Current Operator --" },
+              { value: "==", label: "== (Equals)" },
+              { value: "!=", label: "!= (Not equals)" },
+              { value: ">", label: "> (Greater than)" },
+              { value: ">=", label: ">= (Greater or equal)" },
+              { value: "<", label: "< (Less than)" },
+              { value: "<=", label: "<= (Less or equal)" },
+              { value: "contains", label: "contains" },
+              { value: "exists", label: "exists" },
+            ]}
+          />
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-border-default pt-2">
+      <div class="border-border-default flex justify-end gap-2 border-t pt-2">
         <button
           type="button"
           onclick={() => (isDraftBulkEditModalOpen = false)}
-          class="rounded-xl px-4 py-2 text-xs font-semibold text-fg-muted hover:text-fg-primary"
+          class="text-fg-muted hover:text-fg-primary rounded-xl px-4 py-2 text-xs font-semibold"
         >
           Cancel
         </button>
         <button
           type="button"
           onclick={applyDraftBulkEdit}
-          class="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
+          class="bg-accent hover:bg-accent-hover rounded-xl px-5 py-2 text-xs font-semibold text-white"
         >
           Apply Changes
         </button>
@@ -2152,63 +2193,82 @@
     maxWidth="max-w-2xl"
     onClose={() => (inspectingConflictDraft = null)}
   >
-    <div class="space-y-4 text-xs text-fg-secondary">
+    <div class="text-fg-secondary space-y-4 text-xs">
       <!-- Candidate rule summary card -->
-      <div class="rounded-xl border border-border-default bg-surface-canvas p-3">
+      <div class="border-border-default bg-surface-canvas rounded-xl border p-3">
         <div class="flex items-center justify-between">
-          <span class="font-bold text-fg-primary">Candidate Extracted Rule</span>
-          <span class="font-mono text-micro text-fg-muted">Draft #{inspectingConflictDraft.id}</span>
+          <span class="text-fg-primary font-bold">Candidate Extracted Rule</span>
+          <span class="text-micro text-fg-muted font-mono">Draft #{inspectingConflictDraft.id}</span
+          >
         </div>
-        <div class="mt-2 grid grid-cols-2 gap-2 text-micro">
+        <div class="text-micro mt-2 grid grid-cols-2 gap-2">
           <div>
             <span class="text-fg-muted">Target Entity:</span>
-            <span class="font-mono font-semibold text-fg-primary ml-1">{inspectingConflictDraft.proposed_rule.target_ifc_class}</span>
+            <span class="text-fg-primary ml-1 font-mono font-semibold"
+              >{inspectingConflictDraft.proposed_rule.target_ifc_class}</span
+            >
           </div>
           <div>
             <span class="text-fg-muted">Property:</span>
-            <span class="font-mono text-fg-primary ml-1">{inspectingConflictDraft.proposed_rule.property_set || "—"} / {inspectingConflictDraft.proposed_rule.property_name}</span>
+            <span class="text-fg-primary ml-1 font-mono"
+              >{inspectingConflictDraft.proposed_rule.property_set || "—"} / {inspectingConflictDraft
+                .proposed_rule.property_name}</span
+            >
           </div>
           <div>
             <span class="text-fg-muted">Constraint:</span>
-            <span class="font-mono font-bold text-accent ml-1">
-              {inspectingConflictDraft.proposed_rule.operator} {inspectingConflictDraft.proposed_rule.check_value || `${inspectingConflictDraft.proposed_rule.value_min}..${inspectingConflictDraft.proposed_rule.value_max}`}
+            <span class="text-accent ml-1 font-mono font-bold">
+              {inspectingConflictDraft.proposed_rule.operator}
+              {inspectingConflictDraft.proposed_rule.check_value ||
+                `${inspectingConflictDraft.proposed_rule.value_min}..${inspectingConflictDraft.proposed_rule.value_max}`}
             </span>
           </div>
           <div>
             <span class="text-fg-muted">Standard / Section:</span>
-            <span class="text-fg-primary ml-1">{inspectingConflictDraft.clause?.parent_section || inspectingConflictDraft.proposed_rule.ruleset_id || "Unspecified"}</span>
+            <span class="text-fg-primary ml-1"
+              >{inspectingConflictDraft.clause?.parent_section ||
+                inspectingConflictDraft.proposed_rule.ruleset_id ||
+                "Unspecified"}</span
+            >
           </div>
         </div>
         {#if inspectingConflictDraft.proposed_rule.description}
-          <p class="mt-2 text-micro italic text-fg-muted">{inspectingConflictDraft.proposed_rule.description}</p>
+          <p class="text-micro text-fg-muted mt-2 italic">
+            {inspectingConflictDraft.proposed_rule.description}
+          </p>
         {/if}
       </div>
 
       <!-- Conflicts list -->
       <div class="space-y-3">
-        <h4 class="font-semibold text-fg-primary">Contradictory Specifications & Standards</h4>
+        <h4 class="text-fg-primary font-semibold">Contradictory Specifications & Standards</h4>
         {#each inspectingConflictDraft.conflicts || [] as conflict, idx (idx)}
-          <div class="rounded-xl border border-warning-border/80 bg-warning-bg/20 p-3.5 space-y-2">
+          <div class="border-warning-border/80 bg-warning-bg/20 space-y-2 rounded-xl border p-3.5">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-fg-primary flex items-center gap-1.5">
-                <AlertTriangle class="size-3.5 text-warning" />
+              <span class="text-fg-primary flex items-center gap-1.5 font-bold">
+                <AlertTriangle class="text-warning size-3.5" />
                 <span>Conflicting Standard: {conflict.conflicting_reference}</span>
               </span>
               <span
-                class="rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider
+                class="text-micro rounded-md border px-2 py-0.5 font-semibold tracking-wider uppercase
                   {conflict.severity === 'critical'
-                    ? 'border-critical-border bg-critical-bg text-critical'
-                    : 'border-warning-border bg-warning-bg text-warning'}"
+                  ? 'border-critical-border bg-critical-bg text-critical'
+                  : 'border-warning-border bg-warning-bg text-warning'}"
               >
-                {conflict.conflict_type === 'mutually_exclusive_range' ? 'Mutually Exclusive' : 'Threshold Discrepancy'}
+                {conflict.conflict_type === "mutually_exclusive_range"
+                  ? "Mutually Exclusive"
+                  : "Threshold Discrepancy"}
               </span>
             </div>
 
-            <p class="text-xs text-fg-secondary leading-relaxed">{conflict.message}</p>
+            <p class="text-fg-secondary text-xs leading-relaxed">{conflict.message}</p>
 
             {#if conflict.resolution_suggestion}
-              <div class="rounded-lg border border-border-default/60 bg-surface-card/60 p-2 text-micro text-fg-muted">
-                <strong class="text-fg-primary">Recommendation:</strong> {conflict.resolution_suggestion}
+              <div
+                class="border-border-default/60 bg-surface-card/60 text-micro text-fg-muted rounded-lg border p-2"
+              >
+                <strong class="text-fg-primary">Recommendation:</strong>
+                {conflict.resolution_suggestion}
               </div>
             {/if}
           </div>
@@ -2217,7 +2277,7 @@
     </div>
 
     {#snippet footer()}
-      <div class="flex items-center justify-between w-full">
+      <div class="flex w-full items-center justify-between">
         <Button
           variant="outline"
           size="sm"
@@ -2242,11 +2302,7 @@
           >
             Edit Candidate Rule
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onclick={() => (inspectingConflictDraft = null)}
-          >
+          <Button variant="primary" size="sm" onclick={() => (inspectingConflictDraft = null)}>
             Done
           </Button>
         </div>

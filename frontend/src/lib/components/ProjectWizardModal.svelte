@@ -52,6 +52,7 @@
   } from "../fileLimits";
   import { compressIfcFiles } from "../compressIfc";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
@@ -107,6 +108,8 @@
   const DEFAULT_ROLE = "context";
   let ifcFiles: File[] = $state([]);
   let ifcRoles: string[] = $state([]);
+  /** Bumped when a role change is rejected so the Select remounts at the true role. */
+  let ifcRoleResetTick = $state(0);
   let primaryIndex = $state(0);
   let isDraggingIfc = $state(false);
   let ifcNotice = $state("");
@@ -815,15 +818,12 @@
                     class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
                   />
                   {#if activeRepoStructure.categories.length > 0}
-                    <select
-                      bind:value={repoCategoryFilter}
-                      class="w-full shrink-0 rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden sm:w-auto"
-                    >
-                      <option value="all">All Category Folders</option>
-                      {#each activeRepoStructure.categories as cat (cat)}
-                        <option value={cat}>{cat}</option>
-                      {/each}
-                    </select>
+                    <Select
+ bind:value={repoCategoryFilter}
+ options={[{ value: "all", label: "All Category Folders" }, ...activeRepoStructure.categories.map((cat) => ({ value: cat, label: cat }))]}
+ ariaLabel="Filter by category folder"
+ class="w-full shrink-0 sm:w-auto"
+ />
                   {/if}
                 </div>
 
@@ -1013,19 +1013,18 @@
                         {/if}
                       </button>
 
-                      <select
-                        aria-label="Role for {file.name}"
-                        value={ifcRoles[idx]}
-                        onchange={(event) => {
-                          const select = event.currentTarget;
-                          if (!setIfcRole(idx, select.value)) select.value = ifcRoles[idx];
-                        }}
-                        class="shrink-0 rounded-lg border border-border-default bg-surface-card px-2 py-1 text-caption text-fg-primary focus:border-accent focus:outline-hidden"
-                      >
-                        {#each IFC_FILE_ROLES as roleOption (roleOption)}
-                          <option value={roleOption}>{roleOption}</option>
-                        {/each}
-                      </select>
+                      {#key ifcRoleResetTick}
+<Select
+ value={ifcRoles[idx]}
+ options={IFC_FILE_ROLES.map((roleOption) => ({ value: roleOption, label: roleOption }))}
+ ariaLabel="Role for {file.name}"
+ class="w-auto shrink-0"
+ triggerClass="h-auto px-2 py-1 text-caption"
+ onValueChange={(v) => {
+ if (!setIfcRole(idx, v)) ifcRoleResetTick += 1;
+ }}
+ />
+{/key}
 
                       <button
                         type="button"
@@ -1053,13 +1052,11 @@
               >
                 Primary Analysis Domain
               </label>
-              <select
-                id="wizard-type"
-                bind:value={analysisType}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                <option value="Arch">Arch — Doors, Egress, Daylight, Stairs</option>
-              </select>
+              <Select
+ bind:value={analysisType}
+ options={[{ value: "Arch", label: "Arch — Doors, Egress, Daylight, Stairs" }]}
+ ariaLabel="Analysis domain"
+ />
               <p class="mt-1 text-caption text-fg-muted">
                 Determines which analysis page opens once the project is created.
               </p>
@@ -1087,16 +1084,11 @@
                   engines will apply the ISO / IFC international standards.
                 </div>
               {:else}
-                <select
-                  id="wizard-building-code"
-                  bind:value={buildingCode}
-                  class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-                >
-                  <option value="">Not specified</option>
-                  {#each buildingCodesForJurisdiction as code (code.id)}
-                    <option value={code.id}>{code.name}</option>
-                  {/each}
-                </select>
+                <Select
+ bind:value={buildingCode}
+ options={[{ value: "", label: "Not specified" }, ...buildingCodesForJurisdiction.map((code) => ({ value: code.id, label: code.name }))]}
+ ariaLabel="Building code"
+ />
                 {#if selectedBuildingCode}
                   <p class="mt-1 text-caption text-fg-muted">
                     {selectedBuildingCode.description}
@@ -1132,16 +1124,11 @@
               <label for="wizard-classification-standard" class="block text-xs font-semibold text-fg-secondary uppercase tracking-wider mb-1.5">
                 Classification Standard
               </label>
-              <select
-                id="wizard-classification-standard"
-                bind:value={classificationStandard}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-              >
-                <option value="">Not set</option>
-                {#each classificationStandards as std (std.uri)}
-                  <option value={std.code}>{std.name}</option>
-                {/each}
-              </select>
+              <Select
+ bind:value={classificationStandard}
+ options={[{ value: "", label: "Not set" }, ...classificationStandards.map((std) => ({ value: std.code, label: std.name }))]}
+ ariaLabel="Classification standard"
+ />
               <p class="mt-1 text-caption text-fg-muted">
                 Resolved against buildingSMART's Data Dictionary (bSDD); powers element and property
                 autocomplete in the rule builder.

@@ -7,6 +7,7 @@
   import type { DocumentType } from "../types";
   import Modal from "./Modal.svelte";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
@@ -99,16 +100,11 @@
     <label for="bulk-doc-type" class="block text-xs font-semibold text-fg-secondary">
       Document Specification Type
     </label>
-    <select
-      id="bulk-doc-type"
-      bind:value={docType}
-      class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:ring-accent focus:outline-hidden"
-    >
-      <option value="no_change">-- Keep Current Type --</option>
-      {#each DOCUMENT_TYPES as type (type)}
-        <option value={type}>{type}</option>
-      {/each}
-    </select>
+    <Select
+ bind:value={docType}
+ options={[{ value: "no_change", label: "-- Keep Current Type --" }, ...DOCUMENT_TYPES.map((t) => ({ value: t, label: t }))]}
+ ariaLabel="Document type"
+ />
   </div>
 
   {#snippet footer()}

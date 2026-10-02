@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import { Loader2, PlugZap, CheckCircle2, AlertCircle, Info } from "lucide-svelte";
   import SecretInput from "./SecretInput.svelte";
+  import Select from "./ui/Select.svelte";
 
   interface KindOption {
     kind: string;
@@ -91,15 +92,7 @@
       <label for="provider-instance-kind" class="mb-1 block text-caption font-semibold text-fg-muted">
         Kind
       </label>
-      <select
-        id="provider-instance-kind"
-        bind:value={kind}
-        class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-      >
-        {#each kinds as kindOption (kindOption.kind)}
-          <option value={kindOption.kind}>{kindOption.display_name}</option>
-        {/each}
-      </select>
+      <Select bind:value={kind} options={kinds.map((k) => ({ value: k.kind, label: k.display_name }))} ariaLabel="Provider kind" />
       {#if selectedKindInfo?.description}
         <p class="mt-1 text-caption text-fg-muted">{selectedKindInfo.description}</p>
       {/if}

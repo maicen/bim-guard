@@ -1,17 +1,7 @@
 <script lang="ts">
-  import {
-    ShieldCheck,
-    Save,
-    CheckCircle2,
-    XCircle,
-    Building2,
-    Filter,
-    Eye,
-    Layers,
-    Info,
-    Trash2,
-  } from "lucide-svelte";
+  import { ShieldCheck, Save, CheckCircle2, XCircle, Eye, Info, Trash2 } from "lucide-svelte";
   import ConfirmModal from "../lib/components/ConfirmModal.svelte";
+  import Select from "../lib/components/ui/Select.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";
   import LoadingState from "../lib/components/LoadingState.svelte";
   import EmptyState from "../lib/components/EmptyState.svelte";
@@ -44,6 +34,14 @@
   let selectedOrgFilter = $state<number | "all">("all");
   let categoryFilter = $state<string>("all");
   let grantStatusFilter = $state<"all" | "granted" | "ungranted">("all");
+  let orgFilterOptions = $derived([
+    ...(isSuperadmin ? [{ value: "all", label: `All Organizations (${orgs.length})` }] : []),
+    ...orgs.map((o) => ({ value: String(o.id), label: o.name })),
+  ]);
+  let orgPickerOptions = $derived([
+    { value: "all", label: "All Organizations" },
+    ...orgs.map((o) => ({ value: String(o.id), label: o.name })),
+  ]);
   let sortField = $state<"name" | "id" | "category" | "count">("name");
   let sortAsc = $state(true);
   let pageIndex = $state(1);
@@ -123,7 +121,10 @@
       dirty.clear();
       selectedRulesetIds.clear();
 
-      if (authState.activeOrganizationId && orgs.some((o) => o.id === authState.activeOrganizationId)) {
+      if (
+        authState.activeOrganizationId &&
+        orgs.some((o) => o.id === authState.activeOrganizationId)
+      ) {
         selectedOrgFilter = authState.activeOrganizationId;
         bulkTargetOrgId = authState.activeOrganizationId;
       } else if (orgs.length > 0) {
@@ -151,7 +152,8 @@
 
   let hasActiveFilters = $derived(
     searchQuery.trim() !== "" ||
-      selectedOrgFilter !== (isSuperadmin ? "all" : (authState.activeOrganizationId || (orgs[0]?.id ?? "all"))) ||
+      selectedOrgFilter !==
+        (isSuperadmin ? "all" : authState.activeOrganizationId || (orgs[0]?.id ?? "all")) ||
       categoryFilter !== "all" ||
       grantStatusFilter !== "all",
   );
@@ -174,7 +176,8 @@
 
       if (grantStatusFilter === "all") return true;
 
-      const checkOrgs = selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter);
+      const checkOrgs =
+        selectedOrgFilter === "all" ? orgs : orgs.filter((o) => o.id === selectedOrgFilter);
       const isGrantedAny = checkOrgs.some((o) => grants[o.id]?.has(r.ruleset_id));
 
       if (grantStatusFilter === "granted") return isGrantedAny;
@@ -358,7 +361,7 @@
           type="button"
           onclick={saveAllDirty}
           disabled={isSavingAll}
-          class="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover disabled:opacity-50"
+          class="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all disabled:opacity-50"
         >
           <Save class="h-4 w-4" />
           <span>{isSavingAll ? "Saving…" : `Save All Changes (${dirty.size} pending)`}</span>
@@ -380,51 +383,39 @@
     {#snippet filters()}
       <!-- Organization Selector -->
       {#if orgs.length > 1 || isSuperadmin}
-        <div class="relative">
-          <select
-            bind:value={selectedOrgFilter}
-            aria-label="Filter by Organization"
-            class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
-          >
-            {#if isSuperadmin}
-              <option value="all">All Organizations ({orgs.length})</option>
-            {/if}
-            {#each orgs as org (org.id)}
-              <option value={org.id}>{org.name}</option>
-            {/each}
-          </select>
-          <Building2 class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-        </div>
+        <Select
+          bind:value={
+            () => String(selectedOrgFilter),
+            (v) => (selectedOrgFilter = v === "all" ? "all" : Number(v))
+          }
+          ariaLabel="Filter by Organization"
+          options={orgFilterOptions}
+          class="w-auto min-w-48"
+        />
       {/if}
 
       <!-- Category Filter -->
-      <div class="relative">
-        <select
-          bind:value={categoryFilter}
-          aria-label="Filter by Category"
-          class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
-        >
-          <option value="all">All Categories</option>
-          {#each categories as cat}
-            <option value={cat}>{cat}</option>
-          {/each}
-        </select>
-        <Layers class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-      </div>
+      <Select
+        bind:value={categoryFilter}
+        ariaLabel="Filter by Category"
+        options={[
+          { value: "all", label: "All Categories" },
+          ...categories.map((cat) => ({ value: cat, label: cat })),
+        ]}
+        class="w-auto min-w-40"
+      />
 
       <!-- Grant Status Filter -->
-      <div class="relative">
-        <select
-          bind:value={grantStatusFilter}
-          aria-label="Filter by Grant Status"
-          class="cursor-pointer appearance-none rounded-xl border border-border-interactive bg-surface-canvas py-2 pl-3 pr-8 text-xs font-medium text-fg-secondary focus:border-accent focus:ring-accent focus:outline-hidden"
-        >
-          <option value="all">All Statuses</option>
-          <option value="granted">Granted Only</option>
-          <option value="ungranted">Ungranted Only</option>
-        </select>
-        <Filter class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-      </div>
+      <Select
+        bind:value={grantStatusFilter}
+        ariaLabel="Filter by Grant Status"
+        options={[
+          { value: "all", label: "All Statuses" },
+          { value: "granted", label: "Granted Only" },
+          { value: "ungranted", label: "Ungranted Only" },
+        ]}
+        class="w-auto min-w-40"
+      />
     {/snippet}
   </DataTableHeader>
 
@@ -448,11 +439,13 @@
     />
   {:else}
     <!-- Rich Data Table Container -->
-    <div class="overflow-hidden rounded-2xl border border-border-default bg-surface-card/40 shadow-xl">
+    <div
+      class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border shadow-xl"
+    >
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-border-default bg-surface-canvas/80">
+            <tr class="border-border-default bg-surface-canvas/80 border-b">
               <!-- Master Checkbox Column -->
               <th class="w-12 px-4 py-3 text-center">
                 <TableCheckbox
@@ -512,17 +505,23 @@
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
                   <th class="min-w-44 px-4 py-3 text-center">
-                    <div class="truncate font-semibold text-fg-primary" title={org.name}>
+                    <div class="text-fg-primary truncate font-semibold" title={org.name}>
                       {org.name}
                     </div>
                     <button
                       type="button"
                       disabled={!dirty.has(org.id) || savingOrgId === org.id}
                       onclick={() => saveOrg(org.id)}
-                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-border-interactive bg-surface-overlay px-2 py-0.5 text-micro font-medium text-fg-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+                      class="border-border-interactive bg-surface-overlay text-micro text-fg-secondary hover:bg-surface-hover mt-1 inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Save class="h-3 w-3" />
-                      <span>{savingOrgId === org.id ? "Saving…" : dirty.has(org.id) ? "Save" : "Saved"}</span>
+                      <span
+                        >{savingOrgId === org.id
+                          ? "Saving…"
+                          : dirty.has(org.id)
+                            ? "Save"
+                            : "Saved"}</span
+                      >
                     </button>
                   </th>
                 {/each}
@@ -530,7 +529,7 @@
                 <!-- Single Org Access Status Column (Org Owner View or Single-Filtered Superadmin) -->
                 {@const targetOrg = displayOrgs[0] || orgs[0]}
                 <th class="min-w-48 px-4 py-3 text-center">
-                  <div class="font-semibold text-fg-primary">
+                  <div class="text-fg-primary font-semibold">
                     {targetOrg?.name || "Organization"} Access
                   </div>
                   {#if isSuperadmin && targetOrg && dirty.has(targetOrg.id)}
@@ -538,7 +537,7 @@
                       type="button"
                       disabled={savingOrgId === targetOrg.id}
                       onclick={() => saveOrg(targetOrg.id)}
-                      class="mt-1 inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/20 px-2.5 py-0.5 text-micro font-semibold text-accent transition-colors hover:bg-accent/30"
+                      class="border-accent/40 bg-accent/20 text-micro text-accent hover:bg-accent/30 mt-1 inline-flex items-center gap-1 rounded-lg border px-2.5 py-0.5 font-semibold transition-colors"
                     >
                       <Save class="h-3 w-3" />
                       <span>{savingOrgId === targetOrg.id ? "Saving…" : "Save Changes"}</span>
@@ -551,13 +550,17 @@
               <th class="w-20 px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-border-subtle">
+          <tbody class="divide-border-subtle divide-y">
             {#each paginatedRulesets as ruleset (ruleset.ruleset_id)}
               {@const isRowSelected = selectedRulesetIds.has(ruleset.ruleset_id)}
               {@const singleOrg = displayOrgs[0] || orgs[0]}
-              {@const isSingleOrgGranted = singleOrg ? (grants[singleOrg.id]?.has(ruleset.ruleset_id) ?? false) : false}
+              {@const isSingleOrgGranted = singleOrg
+                ? (grants[singleOrg.id]?.has(ruleset.ruleset_id) ?? false)
+                : false}
               <tr
-                class="transition-colors hover:bg-surface-hover {isRowSelected ? 'bg-surface-selected' : ''}"
+                class="hover:bg-surface-hover transition-colors {isRowSelected
+                  ? 'bg-surface-selected'
+                  : ''}"
               >
                 <!-- Row Checkbox -->
                 <td class="px-4 py-3 text-center">
@@ -569,33 +572,35 @@
                 </td>
 
                 <!-- Ruleset Name -->
-                <td class="px-4 py-3 font-medium text-fg-secondary">
-                  <div class="truncate font-semibold text-fg-primary" title={ruleset.display_name}>
+                <td class="text-fg-secondary px-4 py-3 font-medium">
+                  <div class="text-fg-primary truncate font-semibold" title={ruleset.display_name}>
                     {ruleset.display_name}
                   </div>
                   {#if ruleset.description}
-                    <div class="truncate text-micro text-fg-muted" title={ruleset.description}>
+                    <div class="text-micro text-fg-muted truncate" title={ruleset.description}>
                       {ruleset.description}
                     </div>
                   {/if}
                 </td>
 
                 <!-- Ruleset ID -->
-                <td class="px-4 py-3 font-mono text-micro text-fg-muted">
-                  <span class="rounded bg-surface-overlay px-1.5 py-0.5 text-fg-secondary">
+                <td class="text-micro text-fg-muted px-4 py-3 font-mono">
+                  <span class="bg-surface-overlay text-fg-secondary rounded px-1.5 py-0.5">
                     {ruleset.ruleset_id}
                   </span>
                 </td>
 
                 <!-- Category -->
                 <td class="px-4 py-3">
-                  <span class="rounded-lg border border-border-default bg-surface-card/60 px-2 py-0.5 text-micro font-medium text-fg-secondary">
+                  <span
+                    class="border-border-default bg-surface-card/60 text-micro text-fg-secondary rounded-lg border px-2 py-0.5 font-medium"
+                  >
                     {ruleset.category || "General"}
                   </span>
                 </td>
 
                 <!-- Rule Count -->
-                <td class="px-4 py-3 text-center font-mono text-micro text-fg-secondary">
+                <td class="text-micro text-fg-secondary px-4 py-3 text-center font-mono">
                   {ruleset.rules?.length || ruleset.count || 0}
                 </td>
 
@@ -616,7 +621,9 @@
                           <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
                           <span>Granted</span>
                         {:else}
-                          <XCircle class="h-3.5 w-3.5 text-fg-muted group-hover:text-fg-secondary" />
+                          <XCircle
+                            class="text-fg-muted group-hover:text-fg-secondary h-3.5 w-3.5"
+                          />
                           <span>No Access</span>
                         {/if}
                       </button>
@@ -638,7 +645,9 @@
                           <CheckCircle2 class="h-3.5 w-3.5 text-emerald-400" />
                           <span>Granted</span>
                         {:else}
-                          <XCircle class="h-3.5 w-3.5 text-fg-muted group-hover:text-fg-secondary" />
+                          <XCircle
+                            class="text-fg-muted group-hover:text-fg-secondary h-3.5 w-3.5"
+                          />
                           <span>Not Granted</span>
                         {/if}
                       </button>
@@ -653,9 +662,9 @@
                         </span>
                       {:else}
                         <span
-                          class="inline-flex items-center gap-1.5 rounded-md border border-border-interactive bg-surface-overlay px-2.5 py-1 text-xs font-medium text-fg-muted"
+                          class="border-border-interactive bg-surface-overlay text-fg-muted inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium"
                         >
-                          <Info class="h-3.5 w-3.5 text-fg-muted" />
+                          <Info class="text-fg-muted h-3.5 w-3.5" />
                           <span>Catalog Standard</span>
                         </span>
                       {/if}
@@ -669,7 +678,7 @@
                     <button
                       type="button"
                       onclick={() => (inspectingRuleset = ruleset)}
-                      class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+                      class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1.5 transition-colors"
                       title="Inspect ruleset rules and metadata"
                     >
                       <Eye class="h-4 w-4" />
@@ -678,7 +687,7 @@
                       <button
                         type="button"
                         onclick={() => (deletingRuleset = ruleset)}
-                        class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/60 hover:text-rose-400"
+                        class="text-fg-muted rounded-lg p-1.5 transition-colors hover:bg-rose-950/60 hover:text-rose-400"
                         title="Delete ruleset"
                       >
                         <Trash2 class="h-4 w-4" />
@@ -715,16 +724,16 @@
   >
     {#if isSuperadmin}
       <div class="flex items-center gap-2">
-        <select
-          bind:value={bulkTargetOrgId}
-          aria-label="Target Organization for Bulk Action"
-          class="cursor-pointer appearance-none rounded-lg border border-border-interactive bg-surface-card py-1 pl-2.5 pr-6 text-xs text-fg-secondary focus:outline-hidden"
-        >
-          <option value="all">All Organizations</option>
-          {#each orgs as org (org.id)}
-            <option value={org.id}>{org.name}</option>
-          {/each}
-        </select>
+        <Select
+          bind:value={
+            () => String(bulkTargetOrgId),
+            (v) => (bulkTargetOrgId = v === "all" ? "all" : Number(v))
+          }
+          ariaLabel="Target Organization for Bulk Action"
+          options={orgPickerOptions}
+          class="w-auto min-w-44"
+          triggerClass="h-8"
+        />
         <button
           type="button"
           onclick={handleBulkGrant}

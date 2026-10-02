@@ -136,6 +136,38 @@
       : "",
   );
 
+  const SEVERITY_OPTIONS = [
+    { value: "mandatory", label: "Mandatory" },
+    { value: "recommended", label: "Recommended" },
+    { value: "Critical", label: "Critical" },
+    { value: "High", label: "High" },
+    { value: "Medium", label: "Medium" },
+    { value: "Low", label: "Low" },
+  ];
+  const VALUE_UNIT_OPTIONS = ["mm", "cm", "m", "in", "ft"].map((u) => ({ value: u, label: u }));
+  const UNIQUENESS_SCOPE_OPTIONS = [
+    { value: "building", label: "building (entire model)" },
+    { value: "storey", label: "storey (same floor)" },
+    { value: "space", label: "storey + space (same room)" },
+  ];
+  let operatorOptions = $derived([
+    { value: "==", label: "== (Exact match)" },
+    { value: "!=", label: "!= (Not equal)" },
+    { value: ">", label: "> (Greater than)" },
+    { value: ">=", label: ">= (Greater than or equal)" },
+    { value: "<", label: "< (Less than)" },
+    { value: "<=", label: "<= (Less than or equal)" },
+    { value: "exists", label: "exists" },
+    { value: "not_exists", label: "not_exists" },
+    { value: "matches", label: "matches (Regex)" },
+    ...(compact
+      ? []
+      : [
+          { value: "field_consistency", label: "field_consistency (Element match)" },
+          { value: "unique_within_scope", label: "unique_within_scope (Uniqueness)" },
+        ]),
+  ]);
+
   function applyPropertySuggestion() {
     const match = propertySuggestions.find((p) => p.name === formPropertyName);
     if (match) formPropertySet = match.propertySet;
@@ -322,18 +354,7 @@
           class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary"
           >Severity</label
         >
-        <select
-          id="rule-sev-top"
-          bind:value={formSeverity}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          <option value="mandatory">Mandatory</option>
-          <option value="recommended">Recommended</option>
-          <option value="Critical">Critical</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
+        <Select bind:value={formSeverity} options={SEVERITY_OPTIONS} ariaLabel="Severity" triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas" />
       </div>
     </div>
   {:else}
@@ -368,15 +389,7 @@
           class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary"
           >Mechanism</label
         >
-        <select
-          id="rule-mechanism"
-          bind:value={formMechanism}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each ARCH_MECHANISM_OPTIONS as opt (opt.value)}
-            <option value={opt.value}>{opt.value}</option>
-          {/each}
-        </select>
+        <Select bind:value={formMechanism} options={ARCH_MECHANISM_OPTIONS.map((opt) => ({ value: opt.value, label: opt.value }))} ariaLabel="Mechanism" triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas" />
       </div>
     </div>
   {/if}
@@ -498,17 +511,17 @@
         >Property *</label
       >
       {#if propertySuggestions.length}
-        <select
-          id="rule-pname-{formInstanceId}"
-          bind:value={formPropertyName}
-          onchange={applyPropertySuggestion}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          <option value="" disabled>Choose a property…</option>
-          {#each propertySuggestions as prop (prop.name)}
-            <option value={prop.name}>{prop.label}</option>
-          {/each}
-        </select>
+        <Select
+          value={formPropertyName}
+          onValueChange={(v) => {
+            formPropertyName = v;
+            applyPropertySuggestion();
+          }}
+          options={propertySuggestions.map((prop) => ({ value: prop.name, label: prop.label }))}
+          placeholder="Choose a property…"
+          ariaLabel="Property"
+          triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas"
+        />
       {:else}
         <BsddAutocomplete
           id="rule-pname-{formInstanceId}"
@@ -564,25 +577,7 @@
         class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary"
         >Operator</label
       >
-      <select
-        id="rule-op"
-        bind:value={formOperator}
-        class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-      >
-        <option value="==">== (Exact match)</option>
-        <option value="!=">!= (Not equal)</option>
-        <option value=">">&gt; (Greater than)</option>
-        <option value=">=">&gt;= (Greater than or equal)</option>
-        <option value="<">&lt; (Less than)</option>
-        <option value="<=">&lt;= (Less than or equal)</option>
-        <option value="exists">exists</option>
-        <option value="not_exists">not_exists</option>
-        <option value="matches">matches (Regex)</option>
-        {#if !compact}
-          <option value="field_consistency">field_consistency (Element match)</option>
-          <option value="unique_within_scope">unique_within_scope (Uniqueness)</option>
-        {/if}
-      </select>
+      <Select bind:value={formOperator} options={operatorOptions} ariaLabel="Operator" triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas" />
     </div>
     <div>
       <label
@@ -599,17 +594,7 @@
             placeholder="e.g. 2.03"
             class="min-w-0 flex-1 rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
           />
-          <select
-            bind:value={formValueInputUnit}
-            aria-label="Value unit"
-            class="shrink-0 rounded-xl border border-border-default bg-surface-canvas px-2.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="mm">mm</option>
-            <option value="cm">cm</option>
-            <option value="m">m</option>
-            <option value="in">in</option>
-            <option value="ft">ft</option>
-          </select>
+          <Select bind:value={formValueInputUnit} options={VALUE_UNIT_OPTIONS} ariaLabel="Value unit" class="w-auto shrink-0" triggerClass="h-auto px-2.5 py-2 text-sm bg-surface-canvas" />
         </div>
         <p class="mt-1 h-3.5 text-xs text-fg-muted">
           {convertedValuePreview ||
@@ -683,15 +668,7 @@
         <label for="rule-unique-scope" class="mb-1 block text-xs font-semibold text-fg-secondary"
           >Uniqueness Scope</label
         >
-        <select
-          id="rule-unique-scope"
-          bind:value={formUniquenessScope}
-          class="w-full rounded-xl border border-border-default bg-surface-card px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          <option value="building">building (entire model)</option>
-          <option value="storey">storey (same floor)</option>
-          <option value="space">storey + space (same room)</option>
-        </select>
+        <Select bind:value={formUniquenessScope} options={UNIQUENESS_SCOPE_OPTIONS} ariaLabel="Uniqueness scope" triggerClass="h-auto px-3.5 py-2 text-sm" />
       </div>
     </div>
   {/if}
@@ -773,18 +750,7 @@
           class="mb-1 block text-sm font-semibold uppercase tracking-wider text-fg-secondary"
           >Severity</label
         >
-        <select
-          id="rule-sev"
-          bind:value={formSeverity}
-          class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 text-sm text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          <option value="mandatory">Mandatory</option>
-          <option value="recommended">Recommended</option>
-          <option value="Critical">Critical</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
+        <Select bind:value={formSeverity} options={SEVERITY_OPTIONS} ariaLabel="Severity" triggerClass="h-auto px-3.5 py-2 text-sm bg-surface-canvas" />
       </div>
       <div>
         <label

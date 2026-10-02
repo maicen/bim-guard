@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CloudDownload, CheckCircle2, XCircle, Loader2 } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Select from "./ui/Select.svelte";
   import { documentsApi } from "../api";
   import type { GoogleDriveImportResult } from "../types";
   import { DOCUMENT_TYPES } from "../types";
@@ -68,15 +69,7 @@
 
   <div class="space-y-1.5">
     <label for="drive-doc-type" class="text-xs font-semibold text-fg-secondary">Document type</label>
-    <select
-      id="drive-doc-type"
-      bind:value={docType}
-      class="w-full rounded-lg border border-border-interactive bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-    >
-      {#each DOCUMENT_TYPES as type (type)}
-        <option value={type}>{type}</option>
-      {/each}
-    </select>
+    <Select bind:value={docType} options={DOCUMENT_TYPES.map((t) => ({ value: t, label: t }))} ariaLabel="Document type" />
   </div>
 
   {#if results}

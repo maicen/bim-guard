@@ -16,6 +16,7 @@
   import { cdeApi, projectsApi } from "../api";
   import type { Project, CDEState } from "../types";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   interface Props {
@@ -210,15 +211,12 @@
             <label for="opencde-target-project" class="block font-medium text-fg-muted"
               >BIMGuard Target Project</label
             >
-            <select
-              id="opencde-target-project"
-              bind:value={selectedProjectId}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
-            >
-              {#each projects as p (p.id)}
-                <option value={p.id}>{p.name} (ISO: {p.cde_state || "WIP"})</option>
-              {/each}
-            </select>
+            <Select
+              value={selectedProjectId == null ? "" : String(selectedProjectId)}
+              onValueChange={(v) => (selectedProjectId = v === "" ? null : Number(v))}
+              options={projects.map((p) => ({ value: String(p.id), label: `${p.name} (ISO: ${p.cde_state || "WIP"})` }))}
+              ariaLabel="BIMGuard target project"
+            />
           </div>
 
           <!-- External CDE Provider -->
@@ -227,38 +225,28 @@
               <label for="opencde-platform" class="block font-medium text-fg-muted"
                 >External CDE Platform</label
               >
-              <select
-                id="opencde-platform"
+              <Select
                 bind:value={externalCdeType}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
-              >
-                <option value="BIM-Guard OpenCDE (self-hosted)"
-                  >BIM-Guard OpenCDE (self-hosted)</option
-                >
-                <option value="Autodesk Construction Cloud (ACC)"
-                  >Autodesk Construction Cloud (ACC)</option
-                >
-                <option value="Autodesk BIM 360">Autodesk BIM 360</option>
-                <option value="Dalux Box">Dalux Box</option>
-                <option value="Trimble Connect">Trimble Connect</option>
-                <option value="Procore OpenBIM">Procore OpenBIM</option>
-              </select>
+                options={Object.keys(CDE_PLATFORM_URLS).map((k) => ({ value: k, label: k }))}
+                ariaLabel="External CDE platform"
+              />
             </div>
 
             <div class="space-y-1">
               <label for="opencde-target-state" class="block font-medium text-fg-muted"
                 >Target ISO 19650 State</label
               >
-              <select
-                id="opencde-target-state"
-                bind:value={targetCdeState}
-                class="w-full rounded-xl border border-border-default bg-surface-canvas px-3 py-2 text-xs text-fg-primary focus:border-blue-500 focus:outline-hidden"
-              >
-                <option value="WIP">WIP (Work in Progress)</option>
-                <option value="SHARED">SHARED (Coordination &amp; Review)</option>
-                <option value="PUBLISHED">PUBLISHED (Authorized Contract Deliverable)</option>
-                <option value="ARCHIVED">ARCHIVED</option>
-              </select>
+              <Select
+                value={targetCdeState}
+                onValueChange={(v) => (targetCdeState = v as CDEState)}
+                options={[
+                  { value: "WIP", label: "WIP (Work in Progress)" },
+                  { value: "SHARED", label: "SHARED (Coordination & Review)" },
+                  { value: "PUBLISHED", label: "PUBLISHED (Authorized Contract Deliverable)" },
+                  { value: "ARCHIVED", label: "ARCHIVED" },
+                ]}
+                ariaLabel="Target ISO 19650 state"
+              />
             </div>
           </div>
 

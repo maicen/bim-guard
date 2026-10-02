@@ -4,6 +4,7 @@
   import { X, Check, Pencil } from "lucide-svelte";
   import { bsddApi, projectsApi } from "../api";
   import Alert from "./Alert.svelte";
+  import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
   import {
     PROJECT_CODE_MAX_LENGTH,
@@ -215,31 +216,22 @@
             <label for="edit-proj-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
-            <select
-              id="edit-proj-status"
-              bind:value={status}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Active">Active</option>
-              <option value="Draft">Draft</option>
-              <option value="Archived">Archived</option>
-            </select>
+            <Select
+ bind:value={status}
+ options={[{ value: "Active", label: "Active" }, { value: "Draft", label: "Draft" }, { value: "Archived", label: "Archived" }]}
+ ariaLabel="Project status"
+ />
           </div>
 
           <div class="space-y-1.5">
             <label for="edit-proj-country" class="block text-xs font-semibold text-fg-secondary">
               Jurisdiction
             </label>
-            <select
-              id="edit-proj-country"
-              bind:value={country}
-              class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-            >
-              <option value="Canada">Canada (NBC)</option>
-              <option value="US">United States (IBC)</option>
-              <option value="UK">United Kingdom</option>
-              <option value="EU">European Union</option>
-            </select>
+            <Select
+ bind:value={country}
+ options={[{ value: "Canada", label: "Canada (NBC)" }, { value: "US", label: "United States (IBC)" }, { value: "UK", label: "United Kingdom" }, { value: "EU", label: "European Union" }]}
+ ariaLabel="Jurisdiction"
+ />
           </div>
         </div>
 
@@ -247,44 +239,33 @@
           <label for="edit-proj-domain" class="block text-xs font-semibold text-fg-secondary">
             Analysis Domain
           </label>
-          <select
-            id="edit-proj-domain"
-            bind:value={analysisType}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="Arch">Arch</option>
-          </select>
+          <Select
+ bind:value={analysisType}
+ options={[{ value: "Arch", label: "Arch" }]}
+ ariaLabel="Analysis domain"
+ />
         </div>
 
         <div class="space-y-1.5">
           <label for="edit-proj-type" class="block text-xs font-semibold text-fg-secondary">
             Project Type <span class="text-rose-400">*</span>
           </label>
-          <select
-            id="edit-proj-type"
-            bind:value={projectType}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            {#each PROJECT_TYPES as type (type)}
-              <option value={type}>{type}</option>
-            {/each}
-          </select>
+          <Select
+ bind:value={projectType}
+ options={PROJECT_TYPES.map((t) => ({ value: t, label: t }))}
+ ariaLabel="Project type"
+ />
         </div>
 
         <div class="space-y-1.5">
           <label for="edit-proj-classification" class="block text-xs font-semibold text-fg-secondary">
             Classification Standard
           </label>
-          <select
-            id="edit-proj-classification"
-            bind:value={classificationStandard}
-            class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="">Not set</option>
-            {#each classificationStandards as std (std.uri)}
-              <option value={std.code}>{std.name}</option>
-            {/each}
-          </select>
+          <Select
+ bind:value={classificationStandard}
+ options={[{ value: "", label: "Not set" }, ...classificationStandards.map((std) => ({ value: std.code, label: std.name }))]}
+ ariaLabel="Classification standard"
+ />
           <p class="text-caption text-fg-muted">
             Element and property codes are resolved against this bSDD dictionary throughout the project.
           </p>
