@@ -6,7 +6,6 @@
     CheckCircle2,
     Circle,
     FolderOpen,
-    ChevronDown,
     RefreshCw,
     UploadCloud,
     Boxes,
@@ -17,6 +16,7 @@
   import ProjectWizardModal from "../lib/components/ProjectWizardModal.svelte";
   import UploadModelsModal from "../lib/components/UploadModelsModal.svelte";
   import Alert from "../lib/components/Alert.svelte";
+  import Select from "../lib/components/ui/Select.svelte";
   import { projectsApi, modelsApi, rulesApi, documentsApi, analyzeApi } from "../lib/api";
   import { authState } from "../lib/auth.svelte";
   import { toasts } from "../lib/toast.svelte";
@@ -199,21 +199,17 @@
             Choose Existing Project
           </span>
           <div class="relative">
-            <select
-              bind:value={selectedExistingProjectId}
-              onchange={handleSelectExistingProject}
+            <Select
+              options={existingProjects.map((p) => ({ value: String(p.id), label: p.name }))}
+              value={selectedExistingProjectId === null ? "" : String(selectedExistingProjectId)}
+              onValueChange={(v) => {
+                selectedExistingProjectId = v ? Number(v) : null;
+                handleSelectExistingProject();
+              }}
+              placeholder={isLoadingProjects ? "Loading…" : "-- Select a project --"}
               disabled={isLoadingProjects}
-              class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
-            >
-              <option value={null}
-                >{isLoadingProjects ? "Loading…" : "-- Select a project --"}</option
-              >
-              {#each existingProjects as p (p.id)}
-                <option value={p.id}>{p.name}</option>
-              {/each}
-            </select>
-            <ChevronDown
-              class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+              ariaLabel="Existing project"
+              triggerClass="h-8"
             />
           </div>
           <p class="text-micro text-fg-muted">Pick up where you left off on a saved project.</p>
@@ -301,18 +297,13 @@
           </button>
         </div>
         <div class="relative">
-          <select
+          <Select
+            options={ruleFolders.map((f) => ({ value: f.ruleset_id, label: f.display_name }))}
             bind:value={selectedFolder}
+            placeholder={isFoldersLoading ? "Loading…" : "-- Select a ruleset --"}
             disabled={isFoldersLoading}
-            class="w-full appearance-none rounded-lg border border-border-interactive bg-surface-overlay py-1.5 pl-3 pr-8 text-xs font-medium text-fg-primary focus:border-accent focus:outline-hidden disabled:opacity-60"
-          >
-            <option value="">{isFoldersLoading ? "Loading…" : "-- Select a ruleset --"}</option>
-            {#each ruleFolders as folder (folder.ruleset_id)}
-              <option value={folder.ruleset_id}>{folder.display_name}</option>
-            {/each}
-          </select>
-          <ChevronDown
-            class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+            ariaLabel="Ruleset"
+            triggerClass="h-8"
           />
         </div>
         <p class="text-micro text-fg-muted">
@@ -332,18 +323,17 @@
         {/if}
         <input
           type="file"
+          aria-label="Document file"
           accept=".pdf,.doc,.docx,.txt"
           onchange={(e) => (uploadFile = (e.target as HTMLInputElement).files?.[0] || null)}
           class="block w-full text-micro text-fg-muted file:mr-2 file:rounded-lg file:border-0 file:bg-surface-overlay file:px-2.5 file:py-1.5 file:text-micro file:font-semibold file:text-fg-secondary hover:file:bg-surface-hover"
         />
-        <select
+        <Select
+          options={DOCUMENT_TYPES.map((t) => ({ value: t, label: t }))}
           bind:value={uploadDocType}
-          class="w-full rounded-lg border border-border-interactive bg-surface-overlay px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-        >
-          {#each DOCUMENT_TYPES as type (type)}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
+          ariaLabel="Document type"
+          triggerClass="h-8"
+        />
         <button
           type="button"
           onclick={handleUploadDocument}

@@ -73,6 +73,7 @@
     RuleSnapshotModal,
     RulesetImportModal,
   } from "../lib/components/rules";
+  import Select from "../lib/components/ui/Select.svelte";
   import { describeMechanism } from "../lib/glossary";
   import { toasts } from "../lib/toast.svelte";
   import { createTableState } from "../lib/tableState.svelte";
@@ -1224,14 +1225,17 @@
             />
           </div>
 
-          <select
+          <Select
+            options={[
+              { value: "all", label: "All Mechanisms" },
+              { value: "CODE", label: "Building Code" },
+              { value: "IFC", label: "IFC Geometry" },
+            ]}
             bind:value={selectedMechanism}
-            class="rounded-xl border border-border-default bg-surface-canvas px-3 py-1.5 text-xs text-fg-primary focus:border-accent focus:outline-hidden"
-          >
-            <option value="all">All Mechanisms</option>
-            <option value="CODE">Building Code</option>
-            <option value="IFC">IFC Geometry</option>
-          </select>
+            ariaLabel="Filter by mechanism"
+            class="w-44"
+            triggerClass="h-8"
+          />
 
           <label
             class="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-fg-muted"

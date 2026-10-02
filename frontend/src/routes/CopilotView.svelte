@@ -5,6 +5,7 @@
   and collapsible Neo4j knowledge artifact inspector on the right.
 -->
 <script lang="ts">
+  import Select from "../lib/components/ui/Select.svelte";
   import { onMount } from "svelte";
   import { push, router } from "svelte-spa-router";
   import {
@@ -105,19 +106,17 @@
         {#if projects.length > 0}
           <div class="flex items-center gap-2 text-xs">
             <span class="text-fg-muted font-medium">Project:</span>
-            <select
-              value={targetProjectId ?? ""}
-              onchange={(e) => {
-                const val = Number((e.target as HTMLSelectElement).value);
-                if (val) handleProjectChange(val);
+            <Select
+              options={projects.map((p) => ({ value: String(p.id), label: `${p.name} (${p.project_code})` }))}
+              value={targetProjectId ? String(targetProjectId) : ""}
+              onValueChange={(v) => {
+                if (v) handleProjectChange(Number(v));
               }}
-              class="px-2.5 py-1.5 rounded-xl border border-border-default bg-surface-card text-fg-primary text-xs font-semibold focus:ring-2 focus:ring-accent focus:outline-hidden cursor-pointer"
-            >
-              <option value="" disabled>Select project...</option>
-              {#each projects as p}
-                <option value={p.id}>{p.name} ({p.project_code})</option>
-              {/each}
-            </select>
+              placeholder="Select project..."
+              ariaLabel="Project"
+              class="w-56"
+              triggerClass="h-8"
+            />
           </div>
         {/if}
       </div>
