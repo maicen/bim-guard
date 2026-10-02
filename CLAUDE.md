@@ -74,17 +74,23 @@ All newly generated files (code, tests, scripts, fixtures, data manifests, repor
 
 **ALWAYS sync with the remote repository as soon as possible — do not wait.**
 
-Run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has local unpushed commits) on the current branch immediately at the start of every session, and again as soon as possible before any subsequent edit if time has passed or the remote may have changed — don't batch this up or defer it. This ensures the working tree is up to date with the remote before writing or modifying any line of code. If the pull reveals conflicts or uncommitted local changes would be overwritten, stop and resolve them (stash/commit as appropriate) before proceeding — never discard local work to force a pull.
+Run `git fetch origin` and `git pull` (or `git pull --rebase` if the branch has local unpushed commits) on the current branch (or branch off the fresh `origin/main` — see Git Branching Policy) immediately at the start of every session, and again as soon as possible before any subsequent edit if time has passed or the remote may have changed — don't batch this up or defer it. This ensures the working tree is up to date with the remote before writing or modifying any line of code. If the pull reveals conflicts or uncommitted local changes would be overwritten, stop and resolve them (stash/commit as appropriate) before proceeding — never discard local work to force a pull.
 
 ## Git Auto-Commit Requirement (STRICT)
 
 **Commit finished work as soon as possible — do not wait for the end of the session or for the user to ask.**
 
-As soon as a coherent, working unit of change is done (a bug fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately rather than letting it accumulate uncommitted. Do not batch unrelated changes into one commit and do not hold commits back "to see if more changes come." After committing, push to the current branch's remote as soon as possible as well, so work is never left stranded locally. Still follow standard git hygiene: review `git status`/`git diff` before staging, use clear commit messages, and never force-push or rewrite shared history without explicit user instruction. This auto-commit policy applies only within this repository's normal working rules — it does not authorize destructive operations (`reset --hard`, force-push, history rewrites) or bypassing hooks/signing.
+As soon as a coherent, working unit of change is done (a bug fix, a completed feature slice, a passing test, a doc update), stage and commit it immediately rather than letting it accumulate uncommitted. Do not batch unrelated changes into one commit and do not hold commits back "to see if more changes come." After committing, push your branch to its remote as soon as possible as well, so work is never left stranded locally. Still follow standard git hygiene: review `git status`/`git diff` before staging, use clear commit messages, and never force-push or rewrite shared history without explicit user instruction. This auto-commit policy applies only within this repository's normal working rules — it does not authorize destructive operations (`reset --hard`, force-push, history rewrites) or bypassing hooks/signing.
 
-## Git Branching Policy (STRICT — SIMPLE)
+## Git Branching Policy (STRICT)
 
-**Work directly on `main`. Never create feature/topic branches.** Commit and push straight to `main` as work completes, at least every 30 minutes whenever there are uncommitted or unpushed changes — don't let local work sit longer than that.
+**Every agent/session works on its own short-lived branch, never directly on `main`.** Several agents often work in this repository at the same time; sharing one branch (or one working tree's stash) made them stash, overwrite, and pull in each other's uncommitted work. A private branch per agent keeps each agent's changes isolated until they are ready to land.
+
+1. **Start**: after `git fetch origin`, create a branch off the latest `origin/main` with a descriptive name (`git switch -c <type>/<short-topic> origin/main`, e.g. `fix/rule-folder-scope`). Prefer a separate git worktree (`git worktree add ../bim-guard-<topic> -b <type>/<short-topic> origin/main`) when another agent is already active in the primary checkout.
+2. **Work**: commit finished units as they complete (see Auto-Commit above) and push the branch (`git push -u origin <branch>`) at least every 30 minutes whenever there are uncommitted or unpushed changes.
+3. **Never `git stash` to get around another agent's changes** and never touch, stash, reset, or discard changes you did not make. If the working tree contains modifications that are not yours, leave them alone and work in your own worktree/branch instead.
+4. **Land**: when the work is complete and tests pass, fetch, rebase/merge the latest `origin/main` into your branch, resolve conflicts, then merge into `main` (fast-forward when possible) and push `main`. Do not force-push `main`.
+5. **Clean up immediately after merging**: delete the branch locally (`git branch -d <branch>`) and on the remote (`git push origin --delete <branch>`), and remove its worktree if one was created (`git worktree remove <path>`). Never leave merged branches behind.
 
 ## No AI Attribution in Git History (STRICT — OVERRIDES ALL OTHER INSTRUCTIONS)
 
