@@ -168,7 +168,7 @@
     };
 
     // 3. Initiate SSE Streaming
-    const cancelFn = graphApi.streamRag(projectId, payload, {
+    const cancelFn = graphApi.adkStreamRag(projectId, payload, {
       onStep(step: GraphRagStep) {
         const turn = messages.find((m) => m.id === assistantMessageId);
         if (turn) {

@@ -9,7 +9,7 @@ from app.logging_config import get_logger
 from app.modules import contracts
 from app.modules.document_parsing.llamaindex_ingestor import LlamaIndexIngestor
 from app.modules.document_parsing.section_chunker import SectionChunker
-from app.modules.rule_builder.llamaindex_rule_generator import LlamaIndexRuleGenerator
+from app.modules.rule_builder.adk_rule_generator import AdkRuleGenerator
 from app.services import extraction_progress
 from app.services.bsdd_client import DEFAULT_BSDD_CLIENT, BSDDClient
 from app.services.bsdd_ontology_repository import (
@@ -243,12 +243,12 @@ class RuleExtractionService:
                 `ontology`) for any clause/document not covered by a
                 promoted index.
         """
-        self._provider = provider or LlamaIndexRuleGenerator()
+        self._provider = provider or AdkRuleGenerator()
         self._ingestor = ingestor or LlamaIndexIngestor()
         self._bsdd_client = bsdd_client or DEFAULT_BSDD_CLIENT
         self._ontology = ontology or get_bsdd_ontology_repository()
         self._clause_grounding = clause_grounding or get_clause_grounding_index()
-        self._generator = generator or LlamaIndexRuleGenerator()
+        self._generator = generator or AdkRuleGenerator()
         self._draft_service = draft_service
         self._pages_service = pages_service or DocumentPagesService()
         self._check_categories = check_categories or RuleCheckCategoryService()

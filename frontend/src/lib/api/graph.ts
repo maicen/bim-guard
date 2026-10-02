@@ -230,6 +230,87 @@ export const graphApi = {
 
     return () => controller.abort();
   },
+
+  adkStreamRag(
+    projectId: number,
+    payload: GraphRagQueryRequest,
+    callbacks: {
+      onStep?: (step: GraphRagStep) => void;
+      onToolCall?: (toolCall: GraphRagToolCall) => void;
+      onCitation?: (citation: GraphRagCitation) => void;
+      onToken?: (token: string) => void;
+      onDone?: (result: GraphRagQueryResponse) => void;
+      onError?: (error: string) => void;
+    },
+  ): () => void {
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/graph/${projectId}/rag/adk-stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+
+        if (!res.body) throw new Error("No response body");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const events = buffer.split("\n\n");
+          buffer = events.pop() || "";
+
+          for (const rawEvent of events) {
+            if (!rawEvent.trim()) continue;
+            let eventType = "message";
+            let dataStr = "";
+
+            for (const line of rawEvent.split("\n")) {
+              if (line.startsWith("event: ")) {
+                eventType = line.slice(7).trim();
+              } else if (line.startsWith("data: ")) {
+                dataStr = line.slice(6);
+              }
+            }
+
+            if (!dataStr) continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (eventType === "step") {
+                callbacks.onStep?.(parsed as GraphRagStep);
+              } else if (eventType === "tool_call") {
+                callbacks.onToolCall?.(parsed as GraphRagToolCall);
+              } else if (eventType === "citation") {
+                callbacks.onCitation?.(parsed as GraphRagCitation);
+              } else if (eventType === "token") {
+                callbacks.onToken?.(parsed.token || "");
+              } else if (eventType === "done") {
+                callbacks.onDone?.(parsed as GraphRagQueryResponse);
+              } else if (eventType === "error") {
+                callbacks.onError?.(parsed.detail || "Stream error occurred");
+              }
+            } catch (err) {
+              console.warn("Failed parsing SSE frame:", err, dataStr);
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          callbacks.onError?.(err.message || String(err));
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  },
 };
 
 

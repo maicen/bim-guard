@@ -18,6 +18,7 @@ from app.services.documents_service import DocumentService
 from app.services.evaluation_service import EvaluationService
 from app.services.github_repo_service import GitHubRepoService
 from app.services.graph_database import GraphService
+from app.services.graph_rag.adk_service import GraphRagAdkService
 from app.services.graph_rag_service import GraphRagService
 from app.services.graph_triplestore_service import GraphTriplestoreService
 from app.services.ifc_pipeline_service import IFCPipelineService
@@ -154,6 +155,15 @@ def get_graph_rag_service() -> GraphRagService:
         graph_service=get_container().graph_service,
         models_service=get_container().models_service,
         rule_service=get_container().rules_service,
+        projects_service=get_container().projects_service,
+    )
+
+
+def get_graph_rag_adk_service() -> GraphRagAdkService:
+    """Return the configured GraphRagAdkService instance for ADK copilot queries."""
+    return GraphRagAdkService(
+        graph_service=get_container().graph_service,
+        models_service=get_container().models_service,
         projects_service=get_container().projects_service,
     )
 

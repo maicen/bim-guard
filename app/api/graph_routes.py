@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import (
+    get_graph_rag_adk_service,
     get_graph_rag_service,
     get_graph_service,
     get_model_health_service,
@@ -677,6 +678,30 @@ async def stream_graph_rag(
     """Stream live tokens and reasoning milestones using Server-Sent Events."""
     project_access(project_id)
     stream_gen = rag_service.stream_query(project_id=project_id, request=payload)
+    return StreamingResponse(
+        stream_gen,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post(
+    "/{project_id}/rag/adk-stream",
+    summary="Stream Graph-RAG using ADK Multi-Agent Workflow",
+)
+async def stream_graph_rag_adk(
+    project_id: int,
+    payload: GraphRagQueryRequest,
+    project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],
+    adk_service: Annotated[Any, Depends(get_graph_rag_adk_service)],
+) -> StreamingResponse:
+    """Stream live tokens and reasoning milestones using ADK Server-Sent Events."""
+    project_access(project_id)
+    stream_gen = adk_service.stream_query(project_id=project_id, request=payload)
     return StreamingResponse(
         stream_gen,
         media_type="text/event-stream",
