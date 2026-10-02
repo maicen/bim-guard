@@ -64,6 +64,18 @@
     </div>
   </div>
 
+  <!-- Verify Export -->
+  <div class="space-y-2 rounded-2xl border border-border-default bg-surface-card p-6">
+    <h2 class="text-base font-bold tracking-tight text-fg-primary">Check Your Export Is IFC4</h2>
+    <p class="text-xs text-fg-muted">
+      Open the exported <code class="font-mono text-fg-secondary">.ifc</code> file in a text editor. Near
+      the top it should read <code class="font-mono text-fg-secondary">FILE_SCHEMA(('IFC4'));</code>. If it
+      says <code class="font-mono text-fg-secondary">IFC2X3</code>, Revit exported with a different setup:
+      pick this profile in the <span class="font-semibold text-fg-secondary">Current setup</span> dropdown
+      of the IFC export dialog and export again.
+    </p>
+  </div>
+
   <!-- What's Included -->
   <div class="space-y-3 rounded-2xl border border-border-default bg-surface-card p-6">
     <h2 class="text-base font-bold tracking-tight text-fg-primary">What's Included</h2>

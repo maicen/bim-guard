@@ -66,6 +66,18 @@ Design Transfer View and re-save the setup (this rewrites the setting
 correctly from Revit's own UI, which is safer than hand-editing the number
 in the JSON).
 
+## Check the exported file is IFC4
+
+Open the exported `.ifc` file in a text editor. Near the top it should read:
+
+```
+FILE_SCHEMA(('IFC4'));
+```
+
+If it says `IFC2X3` instead, Revit exported with a different setup. In the
+IFC export dialog, pick this profile in the **Current setup** dropdown and
+export again.
+
 ## Phase to export: pick it per-project, it isn't baked in
 
 The profile ships with **`ActivePhaseId: -1`** ("Default Phase"), not a
