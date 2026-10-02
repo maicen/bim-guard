@@ -293,6 +293,24 @@ class ReportArtifactService:
         self._artifacts.delete(artifact_id)
         return True
 
+    def delete_all_for_project(self, project_id: int) -> None:
+        """Delete the stored file behind every report a project owns.
+
+        Called ahead of deleting the project. The ``report_artifacts`` rows go
+        with the project row (``project_id`` is ``ON DELETE CASCADE``) but the
+        files they point at do not, so each deleted project used to leave its
+        BCF/PDF/CSV/XLSX exports behind in object storage. Best-effort: a
+        failed delete is logged and does not block deleting the project.
+        """
+        for artifact in self._artifacts.rows_where("project_id = ?", [project_id]):
+            storage_ref = artifact.get("storage_ref")
+            if not storage_ref:
+                continue
+            try:
+                self._storage.delete(storage_ref)
+            except Exception:
+                logger.warning("Failed to delete storage object %s", storage_ref, exc_info=True)
+
     def materialize(self, artifact: dict[str, Any]):
         """Return a local cache path for a persisted report artifact."""
         return self._storage.materialize_local_path(str(artifact.get("storage_ref") or ""))

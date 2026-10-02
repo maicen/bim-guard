@@ -53,6 +53,7 @@ from app.services.persistence import PersistenceService
 from app.services.pipeline_services import AnalysisService
 from app.services.profile_service import ProfileService
 from app.services.projects_service import ProjectsService
+from app.services.report_artifacts import ReportArtifactService
 from app.services.report_service import ReportService
 from app.services.rule_check_category_service import RuleCheckCategoryService
 from app.services.rules_service import (
@@ -602,6 +603,7 @@ def build_default_container() -> ApplicationContainer:
         client_documents_repo=client_documents_repo,
         storage=storage,
         models_service=models_service,
+        report_artifacts=ReportArtifactService(storage=storage),
     )
     models_service.bind_project_mirror(projects_service)
 

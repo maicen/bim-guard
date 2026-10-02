@@ -702,6 +702,23 @@ class ModelsService:
                         file_path,
                         exc_info=True,
                     )
+        # Enhanced models: each lineage row's output is a stored IFC, and not
+        # every one is also registered as a project_ifc_files row, so the loop
+        # above misses them. Deleting an already-removed object is a no-op.
+        # Only outputs are removed -- source_reference is a model the loop
+        # above (or another project) owns.
+        for lineage_row in self._lineage.list_for_project(project_id):
+            output_reference = lineage_row.get("output_reference") or ""
+            if output_reference:
+                try:
+                    self._storage.delete(output_reference)
+                except Exception:  # noqa: BLE001 - best-effort cleanup, project deletion proceeds
+                    logger.warning(
+                        "Enhancement storage not deleted project_id=%d ref=%s",
+                        project_id,
+                        output_reference,
+                        exc_info=True,
+                    )
         self._invalidate(project_id)
 
     def resolve_primary_path(self, project_id: int) -> Path | None:

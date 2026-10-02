@@ -49,6 +49,7 @@ class ProjectsService:
         client_documents_repo=None,
         storage=None,
         models_service=None,
+        report_artifacts=None,
     ):
         """Initialize project storage and repositories with explicit dependency injection."""
         self._storage = storage if storage is not None else ObjectStorage()
@@ -60,6 +61,11 @@ class ProjectsService:
 
             models_service = ModelsService(storage=self._storage, project_mirror=self)
         self._models = models_service
+        if report_artifacts is None:
+            from app.services.report_artifacts import ReportArtifactService
+
+            report_artifacts = ReportArtifactService(storage=self._storage)
+        self._report_artifacts = report_artifacts
         # Bound after construction via bind_graph_services: bootstrap builds
         # GraphService/GraphTriplestoreService well after ProjectsService, so
         # neither can be a constructor argument here.
@@ -562,11 +568,14 @@ class ProjectsService:
         app.services.graph_triplestore_service), and were previously left
         behind after the owning project row was gone -- a GDPR erasure gap.
         Best-effort: a graph/triplestore failure must not block deleting the
-        project itself.
+        project itself. Stored files go too -- every model, enhancement output
+        and report export the project owns -- since their rows cascade away
+        with the project but the objects in storage do not.
         """
         project = self.get_project(project_id)
         if project is not None:
             self._models.delete_all_for_project(project_id)
+            self._report_artifacts.delete_all_for_project(project_id)
         try:
             for cd in self.get_client_documents_by_project(project_id):
                 if cd.get("id"):
