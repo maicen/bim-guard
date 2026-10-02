@@ -465,6 +465,10 @@ def get_document_upload_url(
         )
 
 @router.post("/confirm", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Confirm document upload")
+# Plain ``def``: everything below (access lookups, the possible storage
+# download + MD5 in register_pending_document, inserts, grant writes) is
+# synchronous I/O. FastAPI threadpools sync routes; as ``async def`` they ran
+# on the event loop and stalled every other request on the worker.
 def confirm_document_upload(
     payload: DocumentConfirmRequest,
     background_tasks: BackgroundTasks,

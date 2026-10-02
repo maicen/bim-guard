@@ -546,6 +546,10 @@ def export_json(
     )
 
 
+# Ruleset import routes stay ``async`` only to ``await file.read()``; every
+# RuleService call they make is synchronous PostgREST I/O, so it goes through
+# ``run_in_threadpool`` to keep the worker's event loop free. Follow the same
+# pattern for any blocking call added to an async route.
 def _check_existing_ruleset(
     service: RuleService, ruleset_check: RulesetAccessChecker, ruleset_id: str
 ) -> None:

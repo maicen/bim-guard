@@ -407,6 +407,16 @@ Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernel
 - **Error Handling**: Raise standard `fastapi.HTTPException` with appropriate status codes (400, 404, 409, 500) and clear detail messages.
 - **Real-Time Events**: Publish progress through `PipelineTracker` and stream via `/api/events/{project_id}`. `PipelineTracker`'s store is keyed by `(project_id, run_key)`, `run_key` defaulting to `"default"`. A second, genuinely concurrent analysis path for the same project (such as the graph engine's `GRAPH-001`) must pass its own `run_key` to `tracking(project_id, run_key=...)`/`tracker_for(...)`/`snapshot(...)`, or its `reset=True` will discard the default run's in-flight progress for the same project id.
 
+### Backend Performance Conventions
+
+Each production worker serves every request from one asyncio event loop, so these rules exist to stop one slow call from stalling the whole worker (SSE streams included):
+
+- **No blocking work in `async def` routes.** Supabase/PostgREST, Neo4j, pyoxigraph, storage, IFC parsing and file hashing are all synchronous. Write the route as plain `def` (FastAPI threadpools it), or keep it `async` only for `await file.read()` and wrap every blocking call in `await run_in_threadpool(...)` / `asyncio.to_thread(...)`. Examples: `analyze_upload_ifc` in `app/api/analyze.py`, `import_json_rules` in `app/api/rules.py`.
+- **Filter in the database, not in Python.** Use `adapter.rows_where("col = ?", [value])` instead of iterating `adapter.rows` (which pages through the entire table). Example: `DocumentPagesService.get_pages`.
+- **Batch writes.** Use `insert_many` / `RuleService.create_rules_bulk` instead of `insert` in a loop. Test fakes of table adapters must implement `insert_many` too.
+- **Fetch only what the caller uses.** e.g. `RuleService.get_folder_meta` when only a folder's name/description is needed, rather than `get_folder` (which also loads its rules).
+- **Index foreign keys** in the same migration that adds them (see `supabase/migrations/20261002194152_index_unindexed_foreign_keys.sql`).
+
 ### Database & Rule Management
 
 Supabase Postgres stores application data. The primary tables are:

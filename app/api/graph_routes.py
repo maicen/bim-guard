@@ -77,6 +77,11 @@ def _run_background_ingest(path: str, graph_service: GraphService, project_id: s
     "/{project_id}/ingest",
     summary="Ingest project IFC into graph database on demand or in background",
 )
+# Plain ``def``, not ``async def``: the non-background branch parses the IFC,
+# writes to Neo4j and builds spatial adjacency -- seconds to minutes of
+# blocking work. FastAPI runs sync routes in its threadpool; inside an async
+# route the same calls would freeze this worker's event loop (every other
+# request and SSE stream on it) until they finished.
 def ingest_project_graph(
     project_id: int,
     background_tasks: BackgroundTasks,
