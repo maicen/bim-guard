@@ -679,10 +679,29 @@ async def og_image():
 
 # Production SPA Client Serving & Fallback
 frontend_dist = Path("frontend/dist")
+
+_IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+_REVALIDATE_CACHE_CONTROL = "no-cache"
+
+
+class ImmutableStaticFiles(StaticFiles):
+    """Serve Vite's content-hashed bundles with a one-year immutable cache policy.
+
+    Every file under ``/assets`` carries a content hash in its name, so a changed
+    file always gets a new URL and the old one can be cached forever.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = _IMMUTABLE_CACHE_CONTROL
+        return response
+
+
 if (frontend_dist / "index.html").exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+        app.mount("/assets", ImmutableStaticFiles(directory=str(assets_dir)), name="frontend-assets")
 
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     async def serve_spa(full_path: str):
@@ -702,7 +721,11 @@ if (frontend_dist / "index.html").exists():
                 raise HTTPException(status_code=404, detail="Endpoint not found.")
             if html_candidate.is_file():
                 return FileResponse(html_candidate)
-        return FileResponse(frontend_dist / "index.html")
+        # index.html names the current hashed bundles, so it must revalidate.
+        return FileResponse(
+            frontend_dist / "index.html",
+            headers={"Cache-Control": _REVALIDATE_CACHE_CONTROL},
+        )
 else:
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
     def root_dev():

@@ -17,42 +17,10 @@
   import { toasts } from "./lib/toast.svelte";
   import { pipelineTracker } from "./lib/stores/activePipelines.svelte";
 
-  // Routes
-  import DashboardView from "./routes/DashboardView.svelte";
-  import NewProjectView from "./routes/NewProjectView.svelte";
-  import RunComplianceTestView from "./routes/RunComplianceTestView.svelte";
-  import ProjectDashboardView from "./routes/ProjectDashboardView.svelte";
-  import ModelsView from "./routes/ModelsView.svelte";
-  import ViewerView from "./routes/ViewerView.svelte";
-  import DocumentsView from "./routes/DocumentsView.svelte";
-  import DocumentView from "./routes/DocumentView.svelte";
-  import RuleSourceView from "./routes/RuleSourceView.svelte";
-  import RulesetSourceMapView from "./routes/RulesetSourceMapView.svelte";
-  import RuleExtractionView from "./routes/RuleExtractionView.svelte";
-  import EvaluationView from "./routes/EvaluationView.svelte";
-  import RulesView from "./routes/RulesView.svelte";
-  import ManualRuleEditorView from "./routes/ManualRuleEditorView.svelte";
-  import ArchAnalyzeView from "./routes/ArchAnalyzeView.svelte";
-  import WorkflowView from "./routes/WorkflowView.svelte";
-  import QueryConsoleView from "./routes/QueryConsoleView.svelte";
-  import CopilotView from "./routes/CopilotView.svelte";
-  import ReportsView from "./routes/ReportsView.svelte";
-  import UserManualView from "./routes/UserManualView.svelte";
-  import ModelingManualView from "./routes/ModelingManualView.svelte";
-  import BsddWikiView from "./routes/BsddWikiView.svelte";
-  import DesignSystemView from "./routes/DesignSystemView.svelte";
-  import RevitSyncView from "./routes/RevitSyncView.svelte";
-  import IfcExportSettingView from "./routes/IfcExportSettingView.svelte";
-  import SettingsView from "./routes/SettingsView.svelte";
-  import OrgSettingsView from "./routes/OrgSettingsView.svelte";
-  import ExternalProvidersView from "./routes/ExternalProvidersView.svelte";
-  import PermissionsView from "./routes/PermissionsView.svelte";
-  import SuperadminRulesetsView from "./routes/SuperadminRulesetsView.svelte";
-  import SuperadminProjectGrantsView from "./routes/SuperadminProjectGrantsView.svelte";
-  import SuperadminDocumentGrantsView from "./routes/SuperadminDocumentGrantsView.svelte";
-  import SuperadminUsersView from "./routes/SuperadminUsersView.svelte";
+  // Routes: every view except Login/Landing is code-split (see LazyView)
   import LoginView from "./routes/LoginView.svelte";
   import LandingView from "./routes/LandingView.svelte";
+  import LazyView from "./lib/components/LazyView.svelte";
   import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
 
   import { dashboardApi, projectsApi } from "./lib/api";
@@ -603,28 +571,28 @@
           <!-- The $effect above is already redirecting to "/"; render
                nothing of the protected view in the meantime. -->
         {:else if activeView === "dashboard" && isProjectView && targetProjectId}
-          <ProjectDashboardView
+          <LazyView loader={() => import("./routes/ProjectDashboardView.svelte")}
             initialProjectId={targetProjectId}
             {selectedProject}
             onNavigate={(view) => push(buildTargetUrl(view, targetProjectId!))}
           />
         {:else if activeView === "dashboard"}
-          <DashboardView
+          <LazyView loader={() => import("./routes/DashboardView.svelte")}
             onSelectProjectForAudit={handleSelectProjectForAudit}
             onSelectProjectForViewer={handleSelectProjectForViewer}
             onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
           />
         {:else if activeView === "new-project"}
-          <NewProjectView onCancel={() => push("/")} onProjectCreated={handleProjectCreated} />
+          <LazyView loader={() => import("./routes/NewProjectView.svelte")} onCancel={() => push("/")} onProjectCreated={handleProjectCreated} />
         {:else if activeView === "run-compliance-test"}
-          <RunComplianceTestView />
+          <LazyView loader={() => import("./routes/RunComplianceTestView.svelte")} />
         {:else if activeView === "models"}
-          <ModelsView
+          <LazyView loader={() => import("./routes/ModelsView.svelte")}
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
         {:else if activeView === "viewer"}
-          <ViewerView
+          <LazyView loader={() => import("./routes/ViewerView.svelte")}
             initialProjectId={targetProjectId}
             initialElementGuid={targetElementGuid}
             initialBcfArtifactId={targetBcfArtifactId}
@@ -632,29 +600,29 @@
             initialAnalysisSlug={targetAnalysisSlug}
           />
         {:else if (activeView === "document" || activeView === "documents") && targetDocId != null}
-          <DocumentView
+          <LazyView loader={() => import("./routes/DocumentView.svelte")}
             documentId={targetDocId}
             initialPage={targetPage}
             onBack={() => handleSelectView("documents")}
           />
         {:else if activeView === "documents"}
-          <DocumentsView />
+          <LazyView loader={() => import("./routes/DocumentsView.svelte")} />
         {:else if activeView === "document"}
-          <DocumentView
+          <LazyView loader={() => import("./routes/DocumentView.svelte")}
             documentId={targetDocId}
             initialPage={targetPage}
             onBack={() => handleSelectView("documents")}
           />
         {:else if activeView === "rule-source"}
-          <RuleSourceView documentId={targetDocId} onBack={() => handleSelectView("documents")} />
+          <LazyView loader={() => import("./routes/RuleSourceView.svelte")} documentId={targetDocId} onBack={() => handleSelectView("documents")} />
         {:else if activeView === "ruleset-source-map"}
-          <RulesetSourceMapView rulesetId={targetRulesetId} onBack={() => push("/rules")} />
+          <LazyView loader={() => import("./routes/RulesetSourceMapView.svelte")} rulesetId={targetRulesetId} onBack={() => push("/rules")} />
         {:else if activeView === "extract"}
-          <RuleExtractionView initialDocId={targetDocId} {fromQuickTest} />
+          <LazyView loader={() => import("./routes/RuleExtractionView.svelte")} initialDocId={targetDocId} {fromQuickTest} />
         {:else if activeView === "rules"}
-          <RulesView onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
+          <LazyView loader={() => import("./routes/RulesView.svelte")} onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
         {:else if activeView === "manual-rule-editor"}
-          <ManualRuleEditorView onBack={() => push("/rules")} />
+          <LazyView loader={() => import("./routes/ManualRuleEditorView.svelte")} onBack={() => push("/rules")} />
         {:else if activeView === "arch"}
           <!-- "Compliance Audit" destination for the Arch domain -- the only
              one BIM-Guard analyses today (see AnalysisDomainTabs.svelte). -->
@@ -664,49 +632,49 @@
               onSelect={handleSelectAuditDomain}
               allowedDomains={projectAuditDomain ? [projectAuditDomain] : undefined}
             />
-            <ArchAnalyzeView initialProjectId={targetProjectId} />
+            <LazyView loader={() => import("./routes/ArchAnalyzeView.svelte")} initialProjectId={targetProjectId} />
           </div>
         {:else if activeView === "workflow"}
-          <WorkflowView initialProjectId={targetProjectId} onNavigate={handleSelectView} />
+          <LazyView loader={() => import("./routes/WorkflowView.svelte")} initialProjectId={targetProjectId} onNavigate={handleSelectView} />
         {:else if activeView === "copilot"}
-          <CopilotView projectId={targetProjectId} />
+          <LazyView loader={() => import("./routes/CopilotView.svelte")} projectId={targetProjectId} />
         {:else if activeView === "query-console"}
-          <QueryConsoleView initialProjectId={targetProjectId} />
+          <LazyView loader={() => import("./routes/QueryConsoleView.svelte")} initialProjectId={targetProjectId} />
         {:else if activeView === "reports"}
-          <ReportsView
+          <LazyView loader={() => import("./routes/ReportsView.svelte")}
             initialProjectId={targetProjectId}
             onSelectProjectForViewer={handleSelectProjectForViewer}
           />
         {:else if activeView === "evaluation"}
-          <EvaluationView initialProjectId={targetProjectId} />
+          <LazyView loader={() => import("./routes/EvaluationView.svelte")} initialProjectId={targetProjectId} />
         {:else if activeView === "user-manual"}
-          <UserManualView onNavigate={handleSelectView} />
+          <LazyView loader={() => import("./routes/UserManualView.svelte")} onNavigate={handleSelectView} />
         {:else if activeView === "modeling-manual"}
-          <ModelingManualView />
+          <LazyView loader={() => import("./routes/ModelingManualView.svelte")} />
         {:else if activeView === "bsdd-wiki"}
-          <BsddWikiView />
+          <LazyView loader={() => import("./routes/BsddWikiView.svelte")} />
         {:else if activeView === "design-system"}
-          <DesignSystemView />
+          <LazyView loader={() => import("./routes/DesignSystemView.svelte")} />
         {:else if activeView === "revit-sync"}
-          <RevitSyncView />
+          <LazyView loader={() => import("./routes/RevitSyncView.svelte")} />
         {:else if activeView === "ifc-export-setting"}
-          <IfcExportSettingView />
+          <LazyView loader={() => import("./routes/IfcExportSettingView.svelte")} />
         {:else if activeView === "settings"}
-          <SettingsView />
+          <LazyView loader={() => import("./routes/SettingsView.svelte")} />
         {:else if activeView === "org-settings" || activeView === "admin"}
-          <OrgSettingsView />
+          <LazyView loader={() => import("./routes/OrgSettingsView.svelte")} />
         {:else if activeView === "external-providers"}
-          <ExternalProvidersView />
+          <LazyView loader={() => import("./routes/ExternalProvidersView.svelte")} />
         {:else if activeView === "permissions"}
-          <PermissionsView />
+          <LazyView loader={() => import("./routes/PermissionsView.svelte")} />
         {:else if activeView === "superadmin-rulesets"}
-          <SuperadminRulesetsView />
+          <LazyView loader={() => import("./routes/SuperadminRulesetsView.svelte")} />
         {:else if activeView === "superadmin-project-grants"}
-          <SuperadminProjectGrantsView />
+          <LazyView loader={() => import("./routes/SuperadminProjectGrantsView.svelte")} />
         {:else if activeView === "superadmin-document-grants"}
-          <SuperadminDocumentGrantsView />
+          <LazyView loader={() => import("./routes/SuperadminDocumentGrantsView.svelte")} />
         {:else if activeView === "superadmin-users"}
-          <SuperadminUsersView />
+          <LazyView loader={() => import("./routes/SuperadminUsersView.svelte")} />
         {:else if activeView === "login"}
           <LoginView />
         {/if}
