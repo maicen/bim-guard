@@ -38,7 +38,7 @@ international building codes:
 > (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, MM-001 material-media,
 > XM-001 cross-material) and a Seismic domain (SB-001 "Blue Halo" nonstructural
 > clearance). Both were removed from the backend and the database now enforces
-> Architecture-only rule categories (`supabase/migrations/20260921035016_purge_piping_and_seismic_domains.sql`).
+> Architecture-only rule categories (`supabase/migrations_archive/20260921035016_purge_piping_and_seismic_domains.sql`).
 
 ## Standards Ingestion & Document Processing
 

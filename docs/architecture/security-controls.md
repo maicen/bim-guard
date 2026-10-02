@@ -18,13 +18,13 @@ certification plan this supports.
 ## Authorization (RBAC & multi-tenancy)
 
 - Organizations and memberships establish tenant boundaries
-  (`supabase/migrations/20260904235344_create_organizations_and_memberships.sql`).
+  (`supabase/migrations_archive/20260904235344_create_organizations_and_memberships.sql`).
 - A superadmin-configurable role-permission matrix (owner/admin/member) gates every
   role-sensitive action platform-wide, with per-organization overrides
-  (`supabase/migrations/20260915091908_create_role_permissions.sql`,
+  (`supabase/migrations_archive/20260915091908_create_role_permissions.sql`,
   [app/services/permission_service.py](../../app/services/permission_service.py)).
 - Project- and document-level access grants scope visibility below the organization level
-  (`supabase/migrations/20260905123245_project_and_document_access_grants.sql`).
+  (`supabase/migrations_archive/20260905123245_project_and_document_access_grants.sql`).
 
 ## Row-Level Security
 
@@ -35,11 +35,11 @@ through the FastAPI layer's own authorization checks, never a direct table query
 browser. This is the consistent pattern across every migration in `supabase/migrations/`
 (see `role_permissions`, `parsing_engine_instances`, and the new `audit_log` table below
 for representative examples), and was actively maintained, not bolted on once — see
-`supabase/migrations/20260902144438_fix_github_repositories_rls_and_cde_function_search_path.sql`.
+`supabase/migrations_archive/20260902144438_fix_github_repositories_rls_and_cde_function_search_path.sql`.
 
 ## Audit logging
 
-`public.audit_log` (`supabase/migrations/20260915100001_create_audit_log.sql`) is an
+`public.audit_log` (`supabase/migrations_archive/20260915100001_create_audit_log.sql`) is an
 append-only record of sensitive mutations: organization role changes, role-permission
 matrix edits, and project/document deletion. Written via
 [app/services/audit_log_service.py](../../app/services/audit_log_service.py), called from
