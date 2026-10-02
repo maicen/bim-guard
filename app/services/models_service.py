@@ -718,6 +718,32 @@ class ModelsService:
             return None
         return self._storage.materialize_local_path(primary.get("file_path") or "")
 
+    def resolve_model_path(
+        self, project_id: int, model_id: int
+    ) -> tuple[dict | None, Path | None]:
+        """Materialise one attached model, by ``project_ifc_files.id``.
+
+        Only the requested row is fetched from storage. Resolving every model
+        to serve one (as ``resolve_all_paths`` does) made a single unreadable
+        sibling fail the viewer for every model of the project, and paid a
+        storage download per model on each request.
+
+        Returns:
+            ``(row, local_path)``. ``row`` is ``None`` when the project holds no
+            such model; ``local_path`` is ``None`` when storage has no bytes for
+            it. Storage transport errors propagate to the caller.
+        """
+        row = next(
+            (r for r in self.list_models(project_id) if r.get("id") == model_id),
+            None,
+        )
+        if row is None:
+            return None, None
+        local_path = self._storage.materialize_local_path(row.get("file_path") or "")
+        if local_path is not None and not local_path.exists():
+            local_path = None
+        return row, local_path
+
     def resolve_all_paths(
         self, project_id: int
     ) -> tuple[list[tuple[dict, Path]], list[dict]]:

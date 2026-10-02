@@ -649,7 +649,13 @@ def download_project_ifc(
             detail="No IFC file is attached to this project.",
         )
 
-    file_path = service.resolve_ifc_file(project_id)
+    try:
+        file_path = service.resolve_ifc_file(project_id)
+    except Exception:
+        # Storage raises on transport/not-found errors; surface that as the
+        # same 502 as "no bytes" rather than an opaque 500.
+        logger.exception("Project IFC download failed project_id=%d", project_id)
+        file_path = None
     if file_path is None or not file_path.exists():
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

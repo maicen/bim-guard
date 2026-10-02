@@ -264,3 +264,88 @@ def test_delete_of_an_unknown_file_returns_none() -> None:
     # id 4 belongs to project 14, not 10 -- must not be deletable through it.
     assert service.delete_model(10, 4) is None
     assert len(service.list_models(14)) == 2
+
+
+# ── serving one model to the viewer ──────────────────────────────────────────
+
+
+class FlakyStorage(NoopStorage):
+    """Storage that serves ``present`` refs and raises for ``failing`` ones.
+
+    Raising mirrors Supabase Storage on a transport error or a missing object.
+    """
+
+    def __init__(self, root: Any, present: set[str], failing: set[str]) -> None:
+        super().__init__()
+        self.root = root
+        self.present = present
+        self.failing = failing
+        self.fetched: list[str] = []
+
+    def materialize_local_path(self, reference: str) -> Any:
+        self.fetched.append(reference)
+        if reference in self.failing:
+            raise RuntimeError(f"storage unavailable for {reference}")
+        if reference not in self.present:
+            return None
+        path = self.root / reference.rsplit("/", 1)[-1]
+        path.write_bytes(b"ISO-10303-21;")
+        return path
+
+
+def test_resolving_one_model_fetches_only_that_model(tmp_path: Any) -> None:
+    """A sibling that storage cannot serve never blocks the requested model."""
+    storage = FlakyStorage(tmp_path, present={"sb://m/arch.ifc"}, failing={"sb://m/plumb.ifc"})
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES), storage)
+
+    row, path = service.resolve_model_path(10, 1)
+
+    assert row is not None and row["file_name"] == "arch.ifc"
+    assert path is not None and path.exists()
+    assert storage.fetched == ["sb://m/arch.ifc"]
+
+
+def test_resolving_a_model_of_another_project_finds_nothing(tmp_path: Any) -> None:
+    """A model of another project is not found through this one."""
+    storage = FlakyStorage(tmp_path, present={"sb://m/a.ifc"}, failing=set())
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES), storage)
+
+    assert service.resolve_model_path(10, 4) == (None, None)
+    assert storage.fetched == []
+
+
+@pytest.mark.parametrize(
+    ("model_id", "expected_status"),
+    [(1, 502), (2, 502), (999, 404)],
+    ids=["storage-raises", "storage-has-no-bytes", "unknown-model"],
+)
+def test_download_route_maps_failures_to_explicit_statuses(
+    tmp_path: Any, model_id: int, expected_status: int
+) -> None:
+    """Storage errors are a 502 the viewer can explain, never an opaque 500."""
+    from fastapi import HTTPException
+
+    from app.api.models import download_model
+
+    storage = FlakyStorage(tmp_path, present=set(), failing={"sb://m/arch.ifc"})
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES), storage)
+
+    with pytest.raises(HTTPException) as excinfo:
+        download_model(model_id=model_id, project_id=10, project={"id": 10}, service=service)
+
+    assert excinfo.value.status_code == expected_status
+
+
+def test_download_route_serves_a_model_whose_sibling_is_unreadable(tmp_path: Any) -> None:
+    """The model the user picked loads even when another model is broken."""
+    from app.api.models import download_model
+
+    storage = FlakyStorage(
+        tmp_path, present={"sb://m/struct.ifc"}, failing={"sb://m/plumb.ifc", "sb://m/arch.ifc"}
+    )
+    service, _projects_service = build_service(PROJECTS, FakeTable(IFC_FILES), storage)
+
+    response = download_model(model_id=3, project_id=10, project={"id": 10}, service=service)
+
+    assert response.status_code == 200
+    assert "struct.ifc" in response.headers["content-disposition"]

@@ -421,16 +421,16 @@ def test_each_attached_model_downloads_its_own_bytes(client: TestClient) -> None
     attached = upload(client).json()["files"]
     by_name = {f["file_name"]: f["id"] for f in attached}
 
-    piping = client.get(f"/api/models/{by_name['PRJ-ORG-VS-L1-M3-P-0001.ifc']}/download", params={"project_id": 7})
+    plumbing = client.get(f"/api/models/{by_name['PRJ-ORG-VS-L1-M3-P-0001.ifc']}/download", params={"project_id": 7})
     structural = client.get(f"/api/models/{by_name['PRJ-ORG-VS-L1-M3-S-0001.ifc']}/download", params={"project_id": 7})
 
-    assert piping.status_code == 200
+    assert plumbing.status_code == 200
     assert structural.status_code == 200
     # The non-primary request must not be quietly answered with the primary,
     # which is the failure that would make a file picker look like it works.
-    assert SPF["pipe"] in piping.content
+    assert SPF["pipe"] in plumbing.content
     assert SPF["beam"] in structural.content
-    assert SPF["beam"] not in piping.content
+    assert SPF["beam"] not in plumbing.content
 
 
 def test_downloaded_model_is_named_after_its_row(client: TestClient) -> None:

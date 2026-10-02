@@ -857,20 +857,29 @@ def download_model(
         HTTPException: 404 if the project does not exist or holds no such model;
             502 if the row names bytes that storage cannot produce.
     """
-    resolved, missing = service.resolve_all_paths(project_id)
-    for row, local_path in resolved:
-        if row.get("id") == model_id and local_path.exists():
-            return FileResponse(
-                str(local_path),
-                media_type="application/octet-stream",
-                filename=row.get("file_name") or f"model-{model_id}.ifc",
-            )
-
-    # Separated so "storage is down" does not read to the caller as "you asked
-    # for a model this project never had".
-    if any(row.get("id") == model_id for row in missing):
+    try:
+        row, local_path = service.resolve_model_path(project_id, model_id)
+    except Exception:
+        # Storage raises on transport/not-found errors; left uncaught that is
+        # an opaque 500 the viewer cannot tell apart from a server bug.
+        logger.exception(
+            "Model download failed project_id=%d model_id=%d", project_id, model_id
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not retrieve the IFC file from storage.",
         )
-    raise _not_found(project_id, model_id)
+    if row is None:
+        raise _not_found(project_id, model_id)
+    # Separated so "storage is down" does not read to the caller as "you asked
+    # for a model this project never had".
+    if local_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve the IFC file from storage.",
+        )
+    return FileResponse(
+        str(local_path),
+        media_type="application/octet-stream",
+        filename=row.get("file_name") or f"model-{model_id}.ifc",
+    )
