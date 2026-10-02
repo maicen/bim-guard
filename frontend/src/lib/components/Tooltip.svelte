@@ -57,6 +57,28 @@
 
   let displayText = $derived(text || content);
   let renderTrigger = $derived(trigger || children);
+
+  /**
+   * Names an icon-only control from the tooltip text. The tooltip is the only
+   * label such a button has, so without this screen readers and DOM/a11y-tree
+   * agents see an unnamed button. Controls that already have text or an
+   * aria-label are left alone.
+   */
+  function nameIconControl(node: HTMLElement, label: () => string) {
+    $effect(() => {
+      const control = node.querySelector<HTMLElement>(
+        "button, a[href], [role='button']",
+      );
+      if (
+        control &&
+        !control.textContent?.trim() &&
+        !control.hasAttribute("aria-label") &&
+        !control.hasAttribute("aria-labelledby")
+      ) {
+        control.setAttribute("aria-label", label());
+      }
+    });
+  }
 </script>
 
 {#if disabled || !displayText}
@@ -65,7 +87,11 @@
   <TooltipPrimitive.Root>
     <TooltipPrimitive.Trigger>
       {#snippet child({ props })}
-        <span {...props} class="inline-flex {triggerClass}">
+        <span
+          {...props}
+          class="inline-flex {triggerClass}"
+          use:nameIconControl={() => displayText}
+        >
           {@render renderTrigger?.()}
         </span>
       {/snippet}
