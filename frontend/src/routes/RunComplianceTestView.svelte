@@ -265,9 +265,10 @@
 
   <!-- Step 2: Ruleset -->
   <div
-    class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 {!project
-      ? 'pointer-events-none opacity-50'
-      : ''}"
+    inert={!project}
+    class="space-y-4 rounded-2xl border bg-surface-card/40 p-6 {!project
+      ? 'border-dashed border-border-subtle'
+      : 'border-border-default'}"
   >
     <div class="flex items-center gap-2.5">
       {#if hasRuleset}
@@ -351,9 +352,10 @@
 
   <!-- Step 3: Run -->
   <div
-    class="space-y-4 rounded-2xl border border-border-default bg-surface-card/40 p-6 {!project || !hasRuleset
-      ? 'pointer-events-none opacity-50'
-      : ''}"
+    inert={!project || !hasRuleset}
+    class="space-y-4 rounded-2xl border bg-surface-card/40 p-6 {!project || !hasRuleset
+      ? 'border-dashed border-border-subtle'
+      : 'border-border-default'}"
   >
     <div class="flex items-center gap-2.5">
       <Circle class="h-5 w-5 shrink-0 text-accent" />

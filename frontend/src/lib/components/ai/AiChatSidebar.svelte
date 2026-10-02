@@ -197,7 +197,14 @@
     </div>
 
     <!-- Scrollable Conversation Groups -->
-    <div class="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-4">
+    <!-- Scroll container must be keyboard-focusable (axe scrollable-region-focusable). -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+      class="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-4"
+      role="region"
+      aria-label="Conversation history"
+      tabindex="0"
+    >
       {#if copilotStore.isLoadingList}
         <div class="p-4 space-y-2">
           {#each Array(4) as _}
@@ -385,7 +392,14 @@
     </div>
   {:else}
     <!-- Collapsed View Quick Icons -->
-    <div class="flex-1 flex flex-col items-center py-4 space-y-2 overflow-y-auto">
+    <!-- Scroll container must be keyboard-focusable (axe scrollable-region-focusable). -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+      class="flex-1 flex flex-col items-center py-4 space-y-2 overflow-y-auto"
+      role="region"
+      aria-label="Conversation shortcuts"
+      tabindex="0"
+    >
       {#each copilotStore.conversations.slice(0, 10) as conv (conv.id)}
         <button
           type="button"

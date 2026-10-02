@@ -156,7 +156,7 @@
       />
 
       <!-- Right: Main Chat Area with Streaming, Turns, and Artifact Inspector -->
-      <main class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <section class="flex-1 flex flex-col min-w-0 h-full overflow-hidden" aria-label="Chat">
         <AiChatbot
           projectId={targetProjectId}
           persistent={true}
@@ -170,7 +170,7 @@
             push(`/viewer?project_id=${targetProjectId}&guid=${encodeURIComponent(guid)}`);
           }}
         />
-      </main>
+      </section>
     </div>
   {/if}
 </div>
