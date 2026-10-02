@@ -193,7 +193,7 @@
             <label for="topic-type" class="block text-xs font-semibold text-fg-secondary">
               Type
             </label>
-            <Select options={typeOptions} bind:value={topicType} />
+            <Select options={typeOptions} bind:value={topicType} ariaLabel="Topic type" />
           </div>
 
           <!-- Status -->
@@ -201,7 +201,7 @@
             <label for="topic-status" class="block text-xs font-semibold text-fg-secondary">
               Status
             </label>
-            <Select options={statusOptions} bind:value={topicStatus} />
+            <Select options={statusOptions} bind:value={topicStatus} ariaLabel="Topic status" />
           </div>
 
           <!-- Priority -->
@@ -209,7 +209,7 @@
             <label for="topic-priority" class="block text-xs font-semibold text-fg-secondary">
               Priority
             </label>
-            <Select options={priorityOptions} bind:value={priority} />
+            <Select options={priorityOptions} bind:value={priority} ariaLabel="Priority" />
           </div>
         </div>
 
@@ -264,14 +264,14 @@
               <label for="topic-cde" class="block text-caption font-semibold text-fg-muted"
                 >CDE State</label
               >
-              <Select options={cdeOptions} bind:value={cdeState} />
+              <Select options={cdeOptions} bind:value={cdeState} ariaLabel="CDE state" />
             </div>
 
             <div class="space-y-1">
               <label for="topic-suitability" class="block text-caption font-semibold text-fg-muted"
                 >Suitability</label
               >
-              <Select options={suitabilityOptions} bind:value={suitabilityCode} />
+              <Select options={suitabilityOptions} bind:value={suitabilityCode} ariaLabel="Suitability code" />
             </div>
 
             <div class="space-y-1">

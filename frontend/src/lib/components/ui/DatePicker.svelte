@@ -71,6 +71,7 @@
           {/each}
         </div>
         <DatePickerPrimitive.Trigger
+          aria-label="Open calendar"
           class="rounded p-1 text-fg-muted transition-colors hover:text-fg-primary focus-visible:outline-hidden"
         >
           <CalendarIcon class="h-3.5 w-3.5" />
