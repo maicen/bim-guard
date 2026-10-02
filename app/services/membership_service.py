@@ -80,7 +80,12 @@ class MembershipService:
         consume invites with, so it can only ever land someone in the default
         organization; :meth:`ensure_membership` is what handles invites.
         """
-        memberships = self.list_for_user(user_id)
+        # Reads only the user's membership rows. ``list_for_user`` would also
+        # read the whole ``organizations`` table to attach names, which this
+        # caller discards; it runs on most authorised requests. Skipping the
+        # join is safe because ``memberships.organization_id`` is
+        # ``ON DELETE CASCADE``, so no membership outlives its organization.
+        memberships = self._memberships.rows_where("user_id = ?", [user_id])
         if not memberships:
             memberships = self.ensure_default_membership(user_id)
         return {m["organization_id"] for m in memberships}
@@ -359,8 +364,13 @@ class MembershipService:
         self._memberships.update(updates={"group_id": group_id}, pk_values=membership["id"])
 
     def _membership_row(self, organization_id: int, user_id: str) -> dict[str, Any] | None:
-        rows = self._memberships.rows_where("organization_id = ?", [organization_id])
-        return next((r for r in rows if r["user_id"] == user_id), None)
+        # Filter on the user, not the organization: a user has a handful of
+        # memberships while an organization can have hundreds, and this exact
+        # ``user_id`` query is the one ``org_ids_for_user`` already made, so it
+        # is usually an adapter-cache hit. (``rows_where`` takes one predicate,
+        # so the second one is applied here.)
+        rows = self._memberships.rows_where("user_id = ?", [user_id])
+        return next((r for r in rows if r["organization_id"] == organization_id), None)
 
     # -- Group -> project grants ------------------------------------------------
 

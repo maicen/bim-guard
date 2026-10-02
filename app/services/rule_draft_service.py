@@ -94,26 +94,33 @@ class RuleDraftService:
 
     def save_drafts(self, drafts: list[RuleExtractionDraft]) -> list[RuleExtractionDraft]:
         """Persist a batch of extraction drafts as `pending_review`, returning them with DB ids."""
-        saved: list[RuleExtractionDraft] = []
-        for draft in drafts:
-            row = self._drafts.insert(
-                {
-                    "source_document_id": draft.source_document_id,
-                    "source_node_id": draft.source_node_id or "",
-                    "source_element_id": draft.source_element_id or "",
-                    "source_snippet": draft.source_snippet or "",
-                    "clause": draft.clause.model_dump() if draft.clause else None,
-                    "bbox": draft.bbox or (draft.clause.bbox if draft.clause else None),
-                    "proposed_rule": draft.proposed_rule.model_dump(),
-                    "confidence": draft.confidence,
-                    "extraction_method": draft.extraction_method,
-                    "status": draft.status.value,
-                    # Carries e.g. the bSDD grounding note, so the label survives a reload.
-                    "review_notes": draft.review_notes,
-                    "created_at": now_iso_utc(),
-                }
-            )
-            saved.append(draft.model_copy(update={"id": row.get("id"), "created_at": row.get("created_at")}))
+        payloads = [
+            {
+                "source_document_id": draft.source_document_id,
+                "source_node_id": draft.source_node_id or "",
+                "source_element_id": draft.source_element_id or "",
+                "source_snippet": draft.source_snippet or "",
+                "clause": draft.clause.model_dump() if draft.clause else None,
+                "bbox": draft.bbox or (draft.clause.bbox if draft.clause else None),
+                "proposed_rule": draft.proposed_rule.model_dump(),
+                "confidence": draft.confidence,
+                "extraction_method": draft.extraction_method,
+                "status": draft.status.value,
+                # Carries e.g. the bSDD grounding note, so the label survives a reload.
+                "review_notes": draft.review_notes,
+                "created_at": now_iso_utc(),
+            }
+            for draft in drafts
+        ]
+        # One batched insert instead of a PostgREST round trip per draft:
+        # extraction saves every draft of a node at once, and this runs inside
+        # the extraction request. Both adapters return rows in payload order,
+        # which is what lets each draft be paired with its new id below.
+        rows = self._drafts.insert_many(payloads) if payloads else []
+        saved: list[RuleExtractionDraft] = [
+            draft.model_copy(update={"id": row.get("id"), "created_at": row.get("created_at")})
+            for draft, row in zip(drafts, rows)
+        ]
         logger.info("Saved %d rule extraction drafts", len(saved))
         return saved
 

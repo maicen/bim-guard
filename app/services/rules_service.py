@@ -1121,12 +1121,31 @@ class RuleService:
         invalidate_cache("bimguard:rules:folders")
         return deleted
 
+    def get_folder_meta(self, ruleset_id: str) -> dict | None:
+        """Return the ``rule_folders`` row for ``ruleset_id`` without its rules.
+
+        For callers that need only a folder's display name or description: it
+        reads the (small, cached) folder table and never touches ``rules``.
+        Returns ``None`` when the ruleset has no folder row.
+        """
+        norm_id = self.normalize_ruleset_id(ruleset_id)
+        if not norm_id:
+            return None
+        for folder in self._folder_rows():
+            if self.normalize_ruleset_id(folder.get("ruleset_id") or "") == norm_id:
+                return folder
+        return None
+
     def get_folder(self, ruleset_id: str) -> dict | None:
         """Return a single folder dictionary matching ruleset_id with its member rules."""
         norm_id = self.normalize_ruleset_id(ruleset_id)
         if not norm_id:
             return None
-        for f in self.list_folders_with_rules():
+        # Group only this ruleset's rules (one filtered query) rather than the
+        # whole rules table: callers such as the report builder ask for a
+        # folder once per rule.
+        members = self.list_by_ruleset(norm_id)
+        for f in self.list_folders_with_rules(rules=members):
             if self.normalize_ruleset_id(f.get("ruleset_id") or "") == norm_id:
                 return f
         return None
@@ -1359,14 +1378,17 @@ class RuleService:
 
         top_mechanism = str(json_data.get("mechanism") or "")
         top_category = str(json_data.get("category") or "")
-        saved = 0
+        # Rows are collected and written with one create_rules_bulk call:
+        # create_rule per rule cost an INSERT plus a full rules-cache
+        # invalidation each, which made large rulesets take minutes.
+        to_create: list[dict] = []
         for rule in rules:
             if not isinstance(rule, dict):
                 continue
             desc = str(rule.get("desc") or rule.get("description") or "").strip()
             if not desc:
                 continue
-            self.create_rule(
+            to_create.append(dict(
                 reference=str(rule.get("ref") or rule.get("reference") or "").strip(),
                 rule_type=str(rule.get("rule_type") or "numeric_comparison"),
                 description=desc,
@@ -1407,9 +1429,9 @@ class RuleService:
                     str(rule.get("target") or rule.get("target_ifc_class") or ""),
                 ),
                 parameters=json.dumps(rule.get("parameters") or {}),
-            )
-            saved += 1
-        return saved
+            ))
+        self.create_rules_bulk(to_create)
+        return len(to_create)
 
     @staticmethod
     def export_ruleset(ruleset_id: str, rules: list[dict]) -> dict:

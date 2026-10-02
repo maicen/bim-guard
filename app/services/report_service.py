@@ -469,17 +469,17 @@ class ReportService:
             generated_by="BIM Guard",
         )
 
+    # Name and citation need only the folder row; get_folder would also fetch
+    # and group the ruleset's rules, and these run once per rule in a report.
     def _ruleset_name(self, ruleset_id: str) -> str:
-        folder = self._rules.get_folder(ruleset_id) if ruleset_id else None
+        folder = self._rules.get_folder_meta(ruleset_id) if ruleset_id else None
         if folder:
-            return str(folder.get("display_name") or ruleset_id)
+            return str((folder.get("display_name") or "").strip() or ruleset_id)
         return ruleset_id or "Unspecified ruleset"
 
     def _ruleset_citation(self, ruleset_id: str) -> str:
-        folder = self._rules.get_folder(ruleset_id) if ruleset_id else None
-        if folder and folder.get("description"):
-            return str(folder["description"])
-        return ""
+        folder = self._rules.get_folder_meta(ruleset_id) if ruleset_id else None
+        return str((folder or {}).get("description") or "").strip()
 
     def _build_results_by_ruleset(self, rule_compliance: list[dict]) -> list[ReportRulesetResultContract]:
         groups: dict[str, list[dict]] = {}

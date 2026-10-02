@@ -123,19 +123,28 @@ class _MemoryTable:
 
 
 class _MemoryInsertQuery:
-    """Query object that appends one row when executed."""
+    """Query object that appends one row, or a list of rows, when executed.
 
-    def __init__(self, client: "_MemoryClient", table_name: str, payload: dict[str, Any]):
+    Accepts a list like PostgREST does, so adapters' batched ``insert_many``
+    (one round trip per chunk rather than per row) behaves the same here as
+    against Supabase.
+    """
+
+    def __init__(
+        self, client: "_MemoryClient", table_name: str, payload: dict[str, Any] | list[dict[str, Any]]
+    ):
         self._client = client
         self._table_name = table_name
-        self._payload = dict(payload)
+        payloads = payload if isinstance(payload, list) else [payload]
+        self._payloads = [dict(p) for p in payloads]
 
     def execute(self):
         rows = self._client._tables.setdefault(self._table_name, [])
-        if "id" not in self._payload:
-            self._payload["id"] = max((int(row.get("id", 0)) for row in rows), default=0) + 1
-        rows.append(self._payload)
-        return _MemoryResult([dict(self._payload)])
+        for payload in self._payloads:
+            if "id" not in payload:
+                payload["id"] = max((int(row.get("id", 0)) for row in rows), default=0) + 1
+            rows.append(payload)
+        return _MemoryResult([dict(p) for p in self._payloads])
 
 
 class _MemoryQueryWithMutation(_MemoryQuery):

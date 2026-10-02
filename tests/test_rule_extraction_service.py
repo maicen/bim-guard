@@ -594,6 +594,9 @@ class FakeDraftsTable:
         self._next_id += 1
         return dict(row)
 
+    def insert_many(self, payloads: list[dict]) -> list[dict]:
+        return [self.insert(p) for p in payloads]
+
     def get(self, pk):
         row = self._rows.get(pk)
         return dict(row) if row is not None else None
