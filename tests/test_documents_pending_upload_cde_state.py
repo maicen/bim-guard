@@ -1,4 +1,4 @@
-"""Pending uploads must only ever write ISO 19650 CDE states to documents.cde_state.
+"""Pending uploads: valid CDE states, and text extraction that recovers on re-upload.
 
 Regression: register_pending_document used cde_state="Processing" (and the
 background task "Failed"), which violates documents_cde_state_check, so every
@@ -7,8 +7,13 @@ upload through POST /api/documents/confirm failed with a 500.
 
 from __future__ import annotations
 
-import pytest
+import asyncio
 
+import pytest
+from fastapi import BackgroundTasks
+
+import app.api.documents as documents_api
+from app.modules.contracts import DocumentConfirmRequest
 from app.modules.contracts.base import CDEState
 from app.services.documents_service import DocumentService
 
@@ -55,3 +60,55 @@ def test_background_failure_does_not_write_an_invalid_cde_state(monkeypatch):
     service.process_pending_document_background(1, "OBC_clauses.txt", "docs/missing.txt")
 
     assert all(u.get("cde_state", "WIP") in _VALID_STATES for u in updates)
+
+
+# -- confirm_document_upload re-queues text extraction for an empty existing row --
+
+class _ExistingRowService:
+    def __init__(self, row):
+        self._row = row
+
+    def register_pending_document(self, **_kwargs):
+        return self._row, False
+
+    def process_pending_document_background(self, **_kwargs):
+        pass
+
+
+class _Grants:
+    def add_org_grant(self, *_args):
+        pass
+
+
+def _confirm(row, monkeypatch) -> BackgroundTasks:
+    monkeypatch.setattr(documents_api, "_row_to_detail_response", lambda r, _s: r)
+    tasks = BackgroundTasks()
+    asyncio.run(
+        documents_api.confirm_document_upload(
+            payload=DocumentConfirmRequest(
+                file_name="OBC_clauses.txt", storage_reference="docs/new-key.txt", doc_type="Specification",
+                organization_id=1,
+            ),
+            background_tasks=tasks,
+            service=_ExistingRowService(row),
+            instances_service=object(),
+            document_access=_Grants(),
+            memberships=object(),
+            profiles=object(),
+            permissions=object(),
+            current_user=None,
+        )
+    )
+    return tasks
+
+
+def test_reupload_requeues_extraction_for_existing_row_without_text(monkeypatch):
+    row = {"id": 5, "file_path": "docs/original-key.txt", "doclang_xml": "", "doclang_storage_path": None}
+    tasks = _confirm(row, monkeypatch)
+    assert len(tasks.tasks) == 1
+    assert tasks.tasks[0].kwargs["storage_reference"] == "docs/original-key.txt"
+
+
+def test_reupload_does_not_reprocess_a_document_that_has_text(monkeypatch):
+    row = {"id": 6, "file_path": "docs/k.txt", "doclang_xml": "<doclang/>", "doclang_storage_path": None}
+    assert _confirm(row, monkeypatch).tasks == []

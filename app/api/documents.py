@@ -505,13 +505,16 @@ async def confirm_document_upload(
             revision_code=payload.revision_code,
         )
         
-        # 2. Enqueue the extraction if doclang generation is requested or it's a new file
-        if _created or (payload.generate_doclang and not row.get("doclang_xml")):
+        # 2. Enqueue the extraction for a new file, or for an existing row that never got
+        #    its text (e.g. an earlier confirm failed after the insert, so its background
+        #    task never ran) -- otherwise re-uploading the same file can't recover it.
+        has_text = bool(row.get("doclang_xml") or row.get("doclang_storage_path"))
+        if _created or not has_text:
             background_tasks.add_task(
                 service.process_pending_document_background,
                 document_id=row["id"],
                 filename=payload.file_name,
-                storage_reference=payload.storage_reference,
+                storage_reference=row.get("file_path") or payload.storage_reference,
                 parser=payload.parser,
                 instance=resolved_instance if payload.generate_doclang else None,
             )
