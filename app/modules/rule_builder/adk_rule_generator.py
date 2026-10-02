@@ -1,15 +1,14 @@
-"""rule_builder/adk_rule_generator.py
+"""ADK-powered Evaluator-Optimizer loop for rule extraction (rule_builder/adk_rule_generator.py).
 
-ADK-powered Evaluator-Optimizer loop for rule extraction.
 Replaces the single-shot LlamaIndex approach with an iterative
 Writer -> Critic -> Refiner workflow.
 """
 
-import json
-from typing import Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from google.adk.agents import LlmAgent, LoopAgent, SequentialAgent
-from google.adk.events import Event
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import InMemoryRunner
 from google.adk.tools import ToolContext
@@ -29,7 +28,10 @@ from app.modules.rule_builder._extraction_prompts import (
     format_check_category_context,
     format_kg_context,
 )
-from app.services.clause_grounding_index import ClauseGroundingIndex
+
+if TYPE_CHECKING:
+    # Type-only: a runtime import cycles back through app.services -> rule_extraction_service.
+    from app.services.clause_grounding_index import ClauseGroundingIndex
 
 logger = get_logger(__name__)
 
@@ -56,9 +58,10 @@ def exit_loop(tool_context: ToolContext) -> dict:
     tool_context.actions.escalate = True
     return {}
 
+
 class AdkRuleGenerator:
     """Generates Pydantic-validated rule drafts using an ADK Evaluator-Optimizer loop."""
-    
+
     async def generate_drafts_from_node(
         self,
         node: DocumentNodeContract,
@@ -163,46 +166,45 @@ Otherwise, apply the requested fixes to the Current Rules and output the correct
             max_iterations=2,
         )
 
-        workflow = SequentialAgent(
-            name="RuleExtractionWorkflow",
-            sub_agents=[initial_writer, loop]
-        )
+        workflow = SequentialAgent(name="RuleExtractionWorkflow", sub_agents=[initial_writer, loop])
 
         # 3. Run the workflow
         runner = InMemoryRunner(workflow)
         session_id = f"extract_{node.node_id}"
-        
-        # We need a valid session to avoid SessionNotFoundError in Runner
-        try:
-            from google.adk.types import Session
-            session = Session(id=session_id)
-            runner.session_service._sessions[session_id] = session
-        except Exception:
-            pass 
+
+        # The runner only executes against an existing session; its state is
+        # where each agent's output_key result lands.
+        await runner.session_service.create_session(
+            app_name=runner.app_name, user_id="system", session_id=session_id
+        )
 
         msg = Content(role="user", parts=[Part(text="Start extraction")])
-        
-        final_rules_obj = None
 
         # Execute the workflow stream. A genuine failure (bad API key, model
         # unavailable, ...) propagates instead of being swallowed into an
         # empty list here -- RuleExtractionService.extract_rule_drafts
         # counts these per-node exceptions to tell "the model failed on
         # every clause" apart from "the model legitimately found nothing".
-        async for event in runner.run_async(user_id="system", session_id=session_id, new_message=msg):
-            if hasattr(event, "state") and "current_rules" in event.state:
-                final_rules_obj = event.state["current_rules"]
+        async for _event in runner.run_async(
+            user_id="system", session_id=session_id, new_message=msg
+        ):
+            pass
+
+        session = await runner.session_service.get_session(
+            app_name=runner.app_name, user_id="system", session_id=session_id
+        )
+        final_rules_obj = session.state.get("current_rules") if session else None
 
         if not final_rules_obj:
             return []
-            
+
         # Parse output if it's a dict
         if isinstance(final_rules_obj, dict):
             try:
                 final_rules_obj = _LLMRuleExtractionResult.model_validate(final_rules_obj)
             except Exception:
                 pass
-        
+
         if not isinstance(final_rules_obj, _LLMRuleExtractionResult):
             logger.warning("Final output was not a valid _LLMRuleExtractionResult")
             return []
