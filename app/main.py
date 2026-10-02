@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Thread
@@ -100,7 +102,7 @@ from app.api import (
     sparql_routes as api_sparql,
 )
 from app.environment import load_env_file
-from app.logging_config import configure_logging, get_logger
+from app.logging_config import TRACE, configure_logging, get_logger, reset_request_id, set_request_id
 from app.modules.contracts import HealthCheckResponse
 
 try:
@@ -355,23 +357,59 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
+_SLOW_REQUEST_MS = float(os.environ.get("BIM_GUARD_SLOW_REQUEST_MS", "2000") or 2000)
+_QUIET_PATHS = frozenset({"/api/health"})
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log API and page responses at DEBUG level with latency."""
+    """Tag each request with an id and log its latency.
+
+    The id (an incoming ``X-Request-ID`` if the client or proxy sent a sane
+    one, else a fresh one) is bound to the log context so every record the
+    request produces carries it, and is echoed back in the response header.
+    Requests slower than ``BIM_GUARD_SLOW_REQUEST_MS`` (default 2000) and all
+    5xx responses are logged at WARNING; the rest at DEBUG. Health checks are
+    TRACE-only so they do not drown the log.
+    """
 
     async def dispatch(self, request: Request, call_next):
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if 0 < len(incoming) <= 64 and incoming.isprintable() else uuid.uuid4().hex[:12]
+        token = set_request_id(request_id)
         started = perf_counter()
-        response = await call_next(request)
         path = request.url.path
-        if not path.startswith("/static/") and not path.startswith("/assets/"):
-            duration_ms = (perf_counter() - started) * 1000
-            logger.debug(
-                "Request method=%s path=%s status=%d duration_ms=%.1f",
-                request.method,
-                path,
-                response.status_code,
-                duration_ms,
-            )
-        return response
+        try:
+            try:
+                response = await call_next(request)
+            except Exception:
+                logger.exception(
+                    "Request failed method=%s path=%s duration_ms=%.1f",
+                    request.method,
+                    path,
+                    (perf_counter() - started) * 1000,
+                )
+                raise
+            response.headers["X-Request-ID"] = request_id
+            if not path.startswith("/static/") and not path.startswith("/assets/"):
+                duration_ms = (perf_counter() - started) * 1000
+                if path in _QUIET_PATHS and response.status_code < 500:
+                    level = TRACE
+                elif response.status_code >= 500 or duration_ms >= _SLOW_REQUEST_MS:
+                    level = logging.WARNING
+                else:
+                    level = logging.DEBUG
+                logger.log(
+                    level,
+                    "Request method=%s path=%s status=%d duration_ms=%.1f%s",
+                    request.method,
+                    path,
+                    response.status_code,
+                    duration_ms,
+                    " SLOW" if duration_ms >= _SLOW_REQUEST_MS else "",
+                )
+            return response
+        finally:
+            reset_request_id(token)
 
 
 class AgentDiscoveryLinkMiddleware(BaseHTTPMiddleware):

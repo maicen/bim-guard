@@ -11,10 +11,17 @@ Verbosity degrees (``BIM_GUARD_VERBOSITY``)::
 An explicit level name in ``BIM_GUARD_LOG_LEVEL`` (or ``LOG_LEVEL``) overrides
 the numeric verbosity. Levels can also be changed while the app is running via
 :func:`set_log_level` / :func:`set_verbosity`.
+
+Every record carries the current request id (``rid=``), set per HTTP request by
+the request-logging middleware, so one request's lines can be followed across
+modules and threads. ``BIM_GUARD_LOG_FORMAT=json`` switches the output to one
+JSON object per line for log shippers.
 """
 
 from __future__ import annotations
 
+import contextvars
+import json
 import logging
 import os
 import sys
@@ -29,6 +36,9 @@ __all__ = [
     "configure_logging",
     "current_level_name",
     "get_logger",
+    "get_request_id",
+    "reset_request_id",
+    "set_request_id",
     "set_log_level",
     "set_verbosity",
     "trace",
@@ -50,13 +60,61 @@ VERBOSITY_LEVELS = {
 DEFAULT_VERBOSITY = 2
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
-_PLAIN_FORMAT = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | %(message)s"
+_PLAIN_FORMAT = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | rid=%(request_id)s | %(message)s"
 _VERBOSE_FORMAT = (
-    "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | "
+    "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | rid=%(request_id)s | "
     "%(module)s:%(funcName)s:%(lineno)d | %(message)s"
 )
 
 _configured = False
+
+_request_id: contextvars.ContextVar[str] = contextvars.ContextVar("bimguard_request_id", default="-")
+
+
+def set_request_id(value: str) -> contextvars.Token:
+    """Bind *value* as the request id for log records in this context."""
+    return _request_id.set(value)
+
+
+def reset_request_id(token: contextvars.Token) -> None:
+    _request_id.reset(token)
+
+
+def get_request_id() -> str:
+    return _request_id.get()
+
+
+class _RequestIdFilter(logging.Filter):
+    """Stamp every record with the current request id."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = _request_id.get()
+        return True
+
+
+class _HealthAccessFilter(logging.Filter):
+    """Drop successful health-probe lines from the uvicorn access log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not ("/api/health" in message and message.rstrip().endswith(" 200"))
+
+
+class _JsonFormatter(logging.Formatter):
+    """One JSON object per line: easy to ship to Loki/ELK/CloudWatch."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S") + f".{int(record.msecs):03d}",
+            "level": record.levelname,
+            "logger": record.name,
+            "rid": getattr(record, "request_id", "-"),
+            "msg": record.getMessage(),
+            "src": f"{record.module}:{record.funcName}:{record.lineno}",
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def _resolve_level(level: str | int | None = None) -> int:
@@ -81,6 +139,8 @@ def _resolve_level(level: str | int | None = None) -> int:
 
 def _build_formatter(level: int) -> logging.Formatter:
     """Use call-site details in the format once DEBUG or lower is active."""
+    if os.environ.get("BIM_GUARD_LOG_FORMAT", "").strip().lower() == "json":
+        return _JsonFormatter(datefmt=_TIMESTAMP_FORMAT)
     fmt = _VERBOSE_FORMAT if level <= logging.DEBUG else _PLAIN_FORMAT
     return logging.Formatter(fmt=fmt, datefmt=_TIMESTAMP_FORMAT)
 
@@ -108,6 +168,7 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
 
     stream_handler = logging.StreamHandler(sys.stderr)
     stream_handler.setFormatter(formatter)
+    stream_handler.addFilter(_RequestIdFilter())
     root.addHandler(stream_handler)
 
     log_file = os.environ.get("BIM_GUARD_LOG_FILE", "").strip()
@@ -116,6 +177,7 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
         path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(path, encoding="utf-8")
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(_RequestIdFilter())
         root.addHandler(file_handler)
 
     root.setLevel(effective)
@@ -139,6 +201,12 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
         uvicorn_logger.handlers.clear()
         uvicorn_logger.propagate = True
         uvicorn_logger.setLevel(max(effective, logging.INFO))
+    # Docker/Kubernetes probes hit /api/health every few seconds; keep them out
+    # of the access log unless the level is DEBUG or lower.
+    access = logging.getLogger("uvicorn.access")
+    access.filters[:] = [f for f in access.filters if not isinstance(f, _HealthAccessFilter)]
+    if effective > logging.DEBUG:
+        access.addFilter(_HealthAccessFilter())
 
     _configured = True
     return effective
