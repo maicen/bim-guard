@@ -540,11 +540,11 @@ async def confirm_document_upload(
         
     # Grant access
     if payload.organization_id is not None:
-        document_access.grant_org_access(payload.organization_id, row["id"])
+        document_access.add_org_grant(payload.organization_id, row["id"])
     elif current_user is not None and not profiles.is_superadmin(current_user.id):
         user_org_ids = memberships.org_ids_for_user(current_user.id)
         if user_org_ids:
-            document_access.grant_org_access(user_org_ids[0], row["id"])
+            document_access.add_org_grant(user_org_ids[0], row["id"])
 
     return _row_to_detail_response(row, service)
 

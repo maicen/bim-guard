@@ -36,6 +36,20 @@ class DocumentAccessService:
         rows = self._org_grants.rows_where("organization_id = ?", [organization_id])
         return [r["document_id"] for r in rows]
 
+    def add_org_grant(self, organization_id: int, document_id: int) -> None:
+        """Grant *organization_id* access to *document_id* without touching its other grants.
+
+        Unlike :meth:`set_org_grants` (a full replace, used by the superadmin
+        grants screen), this only adds -- used right after an organization
+        uploads a document through ``POST /api/documents/confirm``. Without the
+        grant, the new document is filtered out of that org's library listing
+        (``GET /api/documents``), so the upload would look like it vanished.
+        Mirrors :meth:`RulesetAccessService.add_org_grant`.
+        """
+        if document_id in self.list_org_grants(organization_id):
+            return
+        self._org_grants.insert({"organization_id": organization_id, "document_id": document_id})
+
     def set_org_grants(self, organization_id: int, document_ids: list[int]) -> None:
         """Replace *organization_id*'s entire set of granted documents.
 
