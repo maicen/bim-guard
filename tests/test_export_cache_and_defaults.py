@@ -10,6 +10,7 @@ from the stored result.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import zipfile
 from unittest.mock import patch
@@ -25,6 +26,7 @@ client = TestClient(app)
 
 PROJECT_ID = 4242
 MODEL_BYTES = b"ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
+MODEL_SHA256 = hashlib.sha256(MODEL_BYTES).hexdigest()
 
 
 def _issues() -> list[Issue]:
@@ -121,7 +123,7 @@ def test_second_run_with_identical_arguments_is_served_from_the_cache():
         return _result()
 
     with (
-        patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
+        patch.object(analysis_runner, "model_digest", return_value=(MODEL_SHA256, None)),
         patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
         first = analysis_runner.run_analysis("architecture", PROJECT_ID)
@@ -150,7 +152,7 @@ def test_export_is_served_from_the_run_the_page_already_computed():
         return _result()
 
     with (
-        patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
+        patch.object(analysis_runner, "model_digest", return_value=(MODEL_SHA256, None)),
         patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
         analysis_runner.run_analysis("architecture", PROJECT_ID)
@@ -179,7 +181,7 @@ def test_export_asking_to_drop_low_reuses_the_full_run():
         return _result()
 
     with (
-        patch.object(analysis_runner, "model_bytes", return_value=(MODEL_BYTES, None)),
+        patch.object(analysis_runner, "model_digest", return_value=(MODEL_SHA256, None)),
         patch.object(analysis_runner, "_run_architecture", side_effect=fake_architecture),
     ):
         analysis_runner.run_analysis("architecture", PROJECT_ID)

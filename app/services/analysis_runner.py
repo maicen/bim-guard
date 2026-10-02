@@ -19,9 +19,13 @@ CACHING
 
 from __future__ import annotations
 
+import hashlib
+import threading
+from concurrent.futures import Future
+from pathlib import Path
+
 from app.logging_config import get_logger
 from app.modules.comparator.issue_schema import Issue, RiskBand
-from app.modules.pipeline_io.ifc_bytes_parser import sha256_of
 from app.services.analysis_cache import ANALYSIS_CACHE, CacheKey
 from app.services.models_service import ModelsService
 from app.services.projects_service import ProjectsService
@@ -75,6 +79,67 @@ def model_bytes(project_id: int) -> tuple[bytes | None, str | None]:
     except OSError as exc:
         logger.warning("IFC unreadable project_id=%d error=%s", project_id, exc)
         return None, f"The IFC model could not be read: {exc}"
+
+
+#: Digests already computed, keyed on ``(path, size, mtime_ns)``. Reading and
+#: hashing a large model on every cache lookup cost more than the lookup saved;
+#: a file whose size or mtime changes misses here and is re-hashed, so a
+#: replaced model still yields a new digest and a cache miss.
+_DIGESTS: dict[tuple[str, int, int], str] = {}
+_DIGESTS_LOCK = threading.Lock()
+_DIGESTS_MAX = 256
+
+
+def _file_digest(path: Path) -> str:
+    """Return the SHA-256 of ``path``, memoised on its size and mtime."""
+    stat = path.stat()
+    memo_key = (str(path), stat.st_size, stat.st_mtime_ns)
+    with _DIGESTS_LOCK:
+        cached = _DIGESTS.get(memo_key)
+    if cached is not None:
+        return cached
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    hexdigest = digest.hexdigest()
+    with _DIGESTS_LOCK:
+        if len(_DIGESTS) >= _DIGESTS_MAX:
+            _DIGESTS.clear()
+        _DIGESTS[memo_key] = hexdigest
+    return hexdigest
+
+
+def model_digest(project_id: int) -> tuple[str | None, str | None]:
+    """Return the SHA-256 of a project's primary IFC, or a reason it is unavailable.
+
+    Same lookup and failure messages as :func:`model_bytes`, but streams the
+    file through the hash instead of holding it in memory, and skips the read
+    entirely when the file is unchanged since it was last hashed.
+
+    Returns:
+        ``(digest, None)`` on success, ``(None, reason)`` on failure.
+    """
+    project = _projects_service.get_project(project_id)
+    if project is None:
+        return None, "That project no longer exists."
+
+    path = _models_service.resolve_primary_path(project_id)
+    if path is None:
+        if not _models_service.list_models(project_id):
+            return None, "No IFC model is attached to this project yet."
+        return None, "The IFC model could not be retrieved from storage."
+    try:
+        return _file_digest(path), None
+    except OSError as exc:
+        logger.warning("IFC unreadable project_id=%d error=%s", project_id, exc)
+        return None, f"The IFC model could not be read: {exc}"
+
+
+#: Runs in progress, keyed like the cache. A second request for the same key
+#: waits on the first run's future instead of starting the whole pipeline again.
+_IN_FLIGHT: dict[CacheKey, Future] = {}
+_IN_FLIGHT_LOCK = threading.Lock()
 
 
 #: Band names an ``AuditIssue`` dict may carry, mapped onto the enum the
@@ -220,14 +285,14 @@ def run_analysis(
             f"Unknown analysis {slug!r}; expected one of {', '.join(RUNNABLE_SLUGS)}."
         )
 
-    content, error = model_bytes(project_id)
+    digest, error = model_digest(project_id)
     if error:
         return failure_result(error)
 
     key = CacheKey(
         project_id=project_id,
         slug=slug,
-        source_sha256=sha256_of(content),
+        source_sha256=digest,
         engines=(),
         include_low=True,
         enable_shacl=enable_shacl,
@@ -243,13 +308,32 @@ def run_analysis(
             # result. The copy is per-request; the entry stays flag-free.
             return {**hit, "cached": True}
 
-    result = _run_architecture(project_id, enable_shacl=enable_shacl)
+    # Single flight: whoever registers the key first runs the pipeline; any
+    # concurrent caller for the same key waits on that run's result.
+    with _IN_FLIGHT_LOCK:
+        pending = _IN_FLIGHT.get(key)
+        owner = pending is None
+        if owner:
+            pending = Future()
+            _IN_FLIGHT[key] = pending
+    if not owner:
+        return {**pending.result(), "cached": True}
 
-    # Failures are not cached: an unreachable storage object or an unreadable
-    # model is usually transient, and caching it would make one bad moment
-    # persist for the whole TTL.
-    if not result.get("compliance_error"):
-        ANALYSIS_CACHE.put(key, result)
+    try:
+        result = _run_architecture(project_id, enable_shacl=enable_shacl)
+
+        # Failures are not cached: an unreachable storage object or an
+        # unreadable model is usually transient, and caching it would make one
+        # bad moment persist for the whole TTL.
+        if not result.get("compliance_error"):
+            ANALYSIS_CACHE.put(key, result)
+        pending.set_result(result)
+    except BaseException as exc:
+        pending.set_exception(exc)
+        raise
+    finally:
+        with _IN_FLIGHT_LOCK:
+            _IN_FLIGHT.pop(key, None)
 
     logger.info(
         "Analysis computed project_id=%d slug=%s issues=%d ok=%s",

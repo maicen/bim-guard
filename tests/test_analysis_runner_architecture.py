@@ -61,7 +61,7 @@ class TestArchitectureFailuresAreValues:
 
     def test_run_analysis_reports_it_as_a_failed_result(self, orchestrator_raises, monkeypatch):
         """Through the public entry point, too -- and it is not cached."""
-        monkeypatch.setattr(runner, "model_bytes", lambda project_id: (b"IFC", None))
+        monkeypatch.setattr(runner, "model_digest", lambda project_id: ("abc", None))
         result = runner.run_analysis("architecture", 1, use_cache=False)
         assert result["compliance_error"]
         assert result["audit_issues"] == []

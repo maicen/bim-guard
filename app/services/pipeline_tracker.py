@@ -67,7 +67,7 @@ import asyncio
 import itertools
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -1173,7 +1173,10 @@ class PipelineEvent:
 
 
 _EVENT_SUBSCRIBERS: list[Callable[[PipelineEvent], None]] = []
-_EVENT_HISTORY: list[PipelineEvent] = []
+#: Bounded so a long-lived worker does not accumulate every event it has ever
+#: emitted; the oldest events fall off once the cap is reached.
+_EVENT_HISTORY_MAX = 5000
+_EVENT_HISTORY: deque[PipelineEvent] = deque(maxlen=_EVENT_HISTORY_MAX)
 
 
 def subscribe_event(handler: Callable[[PipelineEvent], None]) -> None:
@@ -1218,33 +1221,48 @@ class EventBroadcaster:
     """Thread-safe bridge between synchronous engine emits and async SSE queues."""
 
     def __init__(self) -> None:
-        self._subscribers: dict[int, set[asyncio.Queue]] = {}
+        # Each queue remembers the event loop that owns it: engines emit from
+        # worker threads, and asyncio.Queue is not thread-safe, so a put has to
+        # be scheduled onto the owning loop or the waiting reader may not wake.
+        self._subscribers: dict[int, dict[asyncio.Queue, asyncio.AbstractEventLoop | None]] = {}
         self._lock = threading.Lock()
 
     def subscribe(self, project_id: int) -> asyncio.Queue:
         """Register an asyncio.Queue to receive events for project_id."""
         q: asyncio.Queue = asyncio.Queue()
+        try:
+            loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
         with self._lock:
-            if project_id not in self._subscribers:
-                self._subscribers[project_id] = set()
-            self._subscribers[project_id].add(q)
+            self._subscribers.setdefault(project_id, {})[q] = loop
         return q
 
     def unsubscribe(self, project_id: int, q: asyncio.Queue) -> None:
         """Remove a previously registered asyncio.Queue."""
         with self._lock:
             if project_id in self._subscribers:
-                self._subscribers[project_id].discard(q)
+                self._subscribers[project_id].pop(q, None)
                 if not self._subscribers[project_id]:
                     del self._subscribers[project_id]
 
     def broadcast(self, event: PipelineEvent) -> None:
         """Forward an event to all subscribed queues for this project."""
         with self._lock:
-            queues = list(self._subscribers.get(event.project_id, []))
-        for q in queues:
+            queues = list(self._subscribers.get(event.project_id, {}).items())
+        for q, loop in queues:
             try:
-                q.put_nowait(event)
+                if loop is None or loop.is_closed():
+                    q.put_nowait(event)
+                    continue
+                try:
+                    on_loop = asyncio.get_running_loop() is loop
+                except RuntimeError:
+                    on_loop = False
+                if on_loop:
+                    q.put_nowait(event)
+                else:
+                    loop.call_soon_threadsafe(q.put_nowait, event)
             except Exception:
                 pass
 
