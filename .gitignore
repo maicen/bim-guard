@@ -149,3 +149,6 @@ data/*_demo.ifc
 .kuzu_db/
 .oxigraph_db/
 
+# Local Claude Code plan files (kept at the bg workspace level, not per-repo)
+plans/
+
