@@ -372,6 +372,11 @@
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  /** Fails first, then undetermined rooms, then passes. */
+  function daylightRank(r: DaylightResult): number {
+    return r.passes ? 2 : r.undetermined ? 1 : 0;
+  }
+
   function formatDuration(seconds?: number | null): string {
     if (seconds === undefined || seconds === null) return "";
     if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -1457,7 +1462,8 @@
                 {@const daylight = (result.spatial_checks || {}).daylight || []}
                 {#if daylight.length}
                   {@const dPass = daylight.filter((r: DaylightResult) => r.passes).length}
-                  {@const dFail = daylight.length - dPass}
+                  {@const dUnknown = daylight.filter((r: DaylightResult) => r.undetermined)}
+                  {@const dFail = daylight.length - dPass - dUnknown.length}
                   <div>
                     <button
                       type="button"
@@ -1469,9 +1475,13 @@
                         />{:else}<ChevronRight class="h-3.5 w-3.5" />{/if}
                       Daylight Ratio
                       <span class="font-mono text-micro text-fg-muted"
-                        >{dPass}/{daylight.length} pass</span
+                        >{dPass}/{daylight.length} pass{#if dUnknown.length}
+                          · {dUnknown.length} undetermined{/if}</span
                       >
                     </button>
+                    {#if dUnknown.length}
+                      <p class="mb-2 text-xs text-caution">{dUnknown[0].undetermined_reason}</p>
+                    {/if}
                     {#if openSections["daylight"] || dFail > 0}
                       <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
                         <table class="w-full text-xs">
@@ -1498,7 +1508,7 @@
                             </tr></thead
                           >
                           <tbody>
-                            {#each [...daylight].sort( (a, b) => (a.passes === b.passes ? 0 : a.passes ? 1 : -1) ) as r (r)}
+                            {#each [...daylight].sort((a, b) => daylightRank(a) - daylightRank(b)) as r (r)}
                               <tr class="border-b border-border-subtle last:border-0">
                                 <td class="px-3 py-2 text-xs text-fg-muted"
                                   >{r.storey_name || "—"}</td
@@ -1517,8 +1527,11 @@
                                 >
                                 <td
                                   class="px-3 py-2 text-xs font-semibold {r.passes
-                                    ? 'text-emerald-400'
-                                    : 'text-rose-400'}">{r.passes ? "✓ Pass" : "✗ Fail"}</td
+                                    ? 'text-success'
+                                    : r.undetermined
+                                      ? 'text-caution'
+                                      : 'text-critical'}"
+                                  >{r.passes ? "✓ Pass" : r.undetermined ? "? Undetermined" : "✗ Fail"}</td
                                 >
                               </tr>
                             {/each}

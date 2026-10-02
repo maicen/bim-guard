@@ -594,26 +594,72 @@ def heal_spatial_boundaries(ifc_file, tolerance_mm: float = 200.0) -> dict[str, 
 # ── Tier 2 checks ─────────────────────────────────────────────────────────────
 
 def _get_storey_name(space) -> str | None:
-    """Resolve the IfcBuildingStorey name for a space via ContainedInStructure."""
+    """Resolve the IfcBuildingStorey name for a space.
+
+    Exporters put a space under its storey in one of two ways -- contained in
+    it (IfcRelContainedInSpatialStructure) or aggregated by it
+    (IfcRelAggregates, what Revit writes) -- so both are followed, plus one
+    level of nesting inside a parent space.
+    """
+    def _parents(entity) -> list:
+        parents = [rel.RelatingStructure for rel in getattr(entity, "ContainedInStructure", None) or []]
+        parents += [rel.RelatingObject for rel in getattr(entity, "Decomposes", None) or []]
+        return [p for p in parents if p is not None]
+
     try:
-        for rel in getattr(space, "ContainedInStructure", []):
-            container = rel.RelatingStructure
+        for container in _parents(space):
             if container.is_a("IfcBuildingStorey"):
                 return getattr(container, "Name", None)
-            # Space may be nested inside another space — walk one level up
             if container.is_a("IfcSpace"):
-                for rel2 in getattr(container, "ContainedInStructure", []):
-                    cont2 = rel2.RelatingStructure
-                    if cont2.is_a("IfcBuildingStorey"):
-                        return getattr(cont2, "Name", None)
+                for parent in _parents(container):
+                    if parent.is_a("IfcBuildingStorey"):
+                        return getattr(parent, "Name", None)
     except Exception:
         pass
     return None
 
 
+def _place_windows(adjacency: IFCSpatialAdjacency, room_linker=None) -> tuple[dict[str, dict], str | None]:
+    """Map each space to the windows it has, and say whether that can be trusted.
+
+    A room's windows are those its space boundaries name, plus -- when
+    ``room_linker`` (``ifc_rooms.ElementRoomLinker``) is given -- those it
+    links to the room through the wall they fill. Many exports (Revit's
+    IFC2X3 among them) bound spaces by walls and slabs only and never name a
+    window. A window neither source can place belongs to SOME room we cannot
+    name, so any room that comes up short may be short only because its
+    window went unplaced. The second value is the reason to give for such a
+    room, or None when every window in the model was placed.
+    """
+    windows_by_space: dict[str, dict] = {}
+    for space_guid, data in adjacency._space_data.items():
+        windows = {
+            b["element"].GlobalId: b["element"]
+            for b in data["boundaries"]
+            if b["element_type"] == "IfcWindow" and b["physical"]
+        }
+        if room_linker is not None:
+            for win in room_linker.windows_for(space_guid):
+                windows.setdefault(win.GlobalId, win)
+        windows_by_space[space_guid] = windows
+    placed = {guid for windows in windows_by_space.values() for guid in windows}
+    try:
+        model_windows = {w.GlobalId for w in adjacency.ifc_file.by_type("IfcWindow")}
+    except Exception:
+        model_windows = placed
+    unplaced = len(model_windows - placed)
+    if not unplaced:
+        return windows_by_space, None
+    return windows_by_space, (
+        f"{unplaced} of {len(model_windows)} windows in the model could not be placed in any "
+        "room (no space boundary or host-wall link names them), so this room's windows are unknown."
+    )
+
+
 def check_daylight_ratios(
     adjacency: IFCSpatialAdjacency,
     min_ratio: float | None = None,
+    room_linker=None,
 ) -> list[dict]:
     """
     Evaluate daylight ratio: every habitable room should have window area >= min_ratio floor area.
@@ -624,6 +670,10 @@ def check_daylight_ratios(
     nothing to verify rooms against, matching how a missing boundary
     precondition is already handled above rather than silently checking
     against a residential-default ratio.
+
+    A room's windows are placed by ``_place_windows``. A room that falls
+    short while some of the model's windows remain unplaced is reported
+    ``undetermined`` (``passes`` False) rather than failed.
 
     Returns one result dict per IfcSpace that has floor area data.
     Spaces with no floor area are skipped (cannot evaluate).
@@ -650,6 +700,8 @@ def check_daylight_ratios(
         return []
     required_ratio = min_ratio
 
+    windows_by_space, undetermined_reason = _place_windows(adjacency, room_linker)
+
     results = []
 
     for space_guid, data in adjacency._space_data.items():
@@ -666,11 +718,7 @@ def check_daylight_ratios(
             continue  # can't evaluate without floor area
 
         # Sum glazed area of all windows bounding this space
-        windows = [
-            b["element"]
-            for b in data["boundaries"]
-            if b["element_type"] == "IfcWindow" and b["physical"]
-        ]
+        windows = list(windows_by_space[space_guid].values())
 
         total_window_area = 0.0
         window_details = []
@@ -683,6 +731,7 @@ def check_daylight_ratios(
 
         ratio = total_window_area / floor_area if floor_area else 0.0
         passes = ratio >= required_ratio
+        undetermined = not passes and undetermined_reason is not None
 
         results.append(
             {
@@ -696,6 +745,8 @@ def check_daylight_ratios(
                 "daylight_ratio": round(ratio, 4),
                 "required_ratio": required_ratio,
                 "passes": passes,
+                "undetermined": undetermined,
+                "undetermined_reason": undetermined_reason if undetermined else None,
                 "window_count": len(windows),
                 "windows": window_details,
                 "severity": "mandatory",
@@ -840,6 +891,7 @@ def check_egress_window_openings(
     min_clear_width_mm: float | None = None,
     min_clear_height_mm: float | None = None,
     max_sill_height_mm: float | None = None,
+    room_linker=None,
 ) -> list[dict]:
     """
     Evaluate the emergency-escape-and-rescue-opening requirement: every
@@ -860,7 +912,9 @@ def check_egress_window_openings(
     not penalised for also having smaller or fixed ones. A room with no
     assessable window still gets a result (``best_window`` is None, and
     ``passes`` is False), so a missing rescue opening is a reported
-    failure, not a silently-skipped one.
+    failure, not a silently-skipped one -- unless some of the model's
+    windows could not be placed in any room (see ``_place_windows``), when
+    a room without a compliant window is ``undetermined`` instead.
     """
     if not adjacency.has_boundaries:
         return []
@@ -898,6 +952,8 @@ def check_egress_window_openings(
     ):
         return []
 
+    windows_by_space, undetermined_reason = _place_windows(adjacency, room_linker)
+
     results = []
     for space_guid, data in adjacency._space_data.items():
         space = data["space"]
@@ -910,11 +966,7 @@ def check_egress_window_openings(
             continue
         storey_name = _get_storey_name(space)
 
-        windows = [
-            b["element"]
-            for b in data["boundaries"]
-            if b["element_type"] == "IfcWindow" and b["physical"]
-        ]
+        windows = list(windows_by_space[space_guid].values())
 
         candidates = []
         for win in windows:
@@ -953,7 +1005,10 @@ def check_egress_window_openings(
                 checks["sill_height"] = best["sill_height_mm"] <= max_sill_height_mm
 
         passes = bool(checks) and all(checks.values())
-        if best is None:
+        undetermined = not passes and undetermined_reason is not None
+        if undetermined:
+            reason = undetermined_reason
+        elif best is None:
             reason = (
                 "no window found bounding this sleeping room"
                 if not windows
@@ -978,6 +1033,7 @@ def check_egress_window_openings(
             "required_max_sill_height_mm": max_sill_height_mm,
             "checks": checks,
             "passes": passes,
+            "undetermined": undetermined,
             "reason": reason,
             "severity": "mandatory",
         })

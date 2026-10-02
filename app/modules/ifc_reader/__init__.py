@@ -2705,7 +2705,9 @@ class IFCReader:
         fire_min = self._as_float(rule_ctx.get("fire_min"))
         fire_unit = str(rule_ctx.get("fire_unit") or "min")
 
-        daylight = check_daylight_ratios(adj, min_ratio=daylight_ratio)
+        daylight = check_daylight_ratios(
+            adj, min_ratio=daylight_ratio, room_linker=self.room_linker
+        )
         fire_sep = check_fire_separation(adj, min_rating_min=fire_min)
         garage_sep = check_garage_separation(adj)
         space_connection = check_door_space_connection(adj, self.ifc_file)
@@ -2716,6 +2718,7 @@ class IFCReader:
             min_clear_width_mm=self._as_float(rule_ctx.get("egress_window_clear_width_mm")),
             min_clear_height_mm=self._as_float(rule_ctx.get("egress_window_clear_height_mm")),
             max_sill_height_mm=self._as_float(rule_ctx.get("egress_window_max_sill_mm")),
+            room_linker=self.room_linker,
         )
 
         if daylight_ratio is None:
@@ -2724,11 +2727,17 @@ class IFCReader:
             )
         else:
             daylight_ratio_label = f"1/{int(round(1 / daylight_ratio))}" if daylight_ratio > 0 else "0"
-            daylight_fails = sum(1 for r in daylight if not r["passes"])
+            daylight_fails = sum(1 for r in daylight if not r["passes"] and not r.get("undetermined"))
             if daylight_fails:
                 warnings.append(
                     f"{daylight_fails} room(s) do not meet the {daylight_ref} "
                     f"{daylight_ratio_label} daylight ratio requirement."
+                )
+            daylight_unknown = [r for r in daylight if r.get("undetermined")]
+            if daylight_unknown:
+                warnings.append(
+                    f"Daylight ratio could not be determined for {len(daylight_unknown)} room(s): "
+                    f"{daylight_unknown[0]['undetermined_reason']}"
                 )
 
         if fire_min is None:

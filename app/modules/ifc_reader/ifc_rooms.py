@@ -202,26 +202,6 @@ def _space_text_candidates(space) -> list[tuple[str, str | None]]:
     return candidates
 
 
-def _storey_of(space) -> str | None:
-    """Return the name of the storey a space is on.
-
-    Exporters put a space under its storey in one of two ways -- contained in it
-    (IfcRelContainedInSpatialStructure) or aggregated by it (IfcRelAggregates) --
-    and ``_get_storey_name`` only follows the first.
-    """
-    name = _get_storey_name(space)
-    if name:
-        return name
-    try:
-        for rel in getattr(space, "Decomposes", None) or []:
-            parent = getattr(rel, "RelatingObject", None)
-            if parent is not None and parent.is_a("IfcBuildingStorey"):
-                return getattr(parent, "Name", None)
-    except Exception:
-        pass
-    return None
-
-
 def _display_name(space) -> str:
     return (
         getattr(space, "LongName", None)
@@ -302,7 +282,7 @@ class RoomIndex:
                 name=name,
                 types=tuple(types),
                 type_source=source,
-                storey=_storey_of(space),
+                storey=_get_storey_name(space),
                 suggestion=(
                     suggest_name_correction(name) if UNKNOWN_ROOM_TYPE in types else None
                 ),
@@ -504,6 +484,11 @@ class ElementRoomLinker:
             "counts": {key: len(per_class.get(key, ())) for key in _COUNT_CLASSES},
             "coverage": dict(self._coverage),
         }
+
+    def windows_for(self, space_guid: str) -> list:
+        """Return the windows usably linked to a room (see ``links_for``)."""
+        guids = self._ensure_inversion().get(space_guid, {}).get("WindowCount", ())
+        return [self._ifc_file.by_guid(g) for g in sorted(guids)]
 
     # ── Resolution tiers ──────────────────────────────────────────────────────
 

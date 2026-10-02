@@ -262,6 +262,9 @@ export interface DaylightResult {
   total_window_area_m2: number;
   daylight_ratio: number;
   passes: boolean;
+  /** Fell short while some of the model's windows could not be placed in any room. */
+  undetermined?: boolean;
+  undetermined_reason?: string | null;
   code_ref?: string;
 }
 

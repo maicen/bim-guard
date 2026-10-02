@@ -165,6 +165,12 @@ class EgressAnalysisEngine(RuleEvaluator):
 
         if passes:
             band, score, status, action = "Low", 0.1, "PASS", "Compliant"
+        elif data.get("undetermined"):
+            # Some of the model's windows could not be placed in any room, so
+            # this room's missing window is missing evidence, not a failure.
+            band, score, status = None, 0.0, "NOT_ASSESSED"
+            action = str(data.get("reason") or "This room's windows could not be determined")
+            passes = None
         else:
             band, score, status = "High", 0.8, "FAIL"
             if best is None:
@@ -443,6 +449,14 @@ class SpatialDaylightEngine(RuleEvaluator):
             score = 0.0
             status = "NOT_ASSESSED"
             action = "No rule was found for daylight ratio"
+        elif data.get("undetermined"):
+            # The room's windows could not all be placed, so a shortfall here
+            # is missing evidence, not a measured failure.
+            passes = None
+            band = None
+            score = 0.0
+            status = "NOT_ASSESSED"
+            action = str(data.get("undetermined_reason") or "Window area for this room could not be determined")
         else:
             passes = ratio >= min_ratio
             if passes:

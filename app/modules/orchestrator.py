@@ -406,7 +406,9 @@ class BIMGuard_App:
                         spaces=spatial_checks.get("space_count", 0),
                         daylight_results=len(spatial_checks.get("daylight", [])),
                         daylight_failures=sum(
-                            1 for item in spatial_checks.get("daylight", []) if not item.get("passes")
+                            1
+                            for item in spatial_checks.get("daylight", [])
+                            if not item.get("passes") and not item.get("undetermined")
                         ),
                         fire_results=len(spatial_checks.get("fire_separation", [])),
                         fire_failures=sum(
