@@ -175,17 +175,7 @@
               {/each}
             </td>
             <td class="px-3 py-2"
-              ><!-- The tail, not the head: one export's IFC GUIDs share a long
-                   prefix, so the first characters read identical across rows. -->
-              {#if el.guid}
-                <Tooltip text={el.guid}>
-                  {#snippet trigger()}
-                    <span class="font-mono text-xs text-fg-muted"
-                      >{el.guid!.length > 12 ? `…${el.guid!.slice(-12)}` : el.guid}</span
-                    >
-                  {/snippet}
-                </Tooltip>
-              {/if}</td
+              ><span class="font-mono text-xs text-fg-muted whitespace-nowrap select-all">{el.guid || ""}</span></td
             >
             <td class="px-3 py-2 font-mono text-xs text-fg-secondary {statusClass(el)}">{actualText(el)}</td>
             <td class="px-3 py-2 text-xs text-fg-muted">{requiredText}</td>

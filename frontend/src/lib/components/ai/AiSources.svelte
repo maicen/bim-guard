@@ -95,8 +95,8 @@
           </div>
 
           <div class="pt-2 mt-1 flex items-center justify-between border-t border-border-subtle/50 text-[10px] text-fg-muted">
-            <span class="font-mono truncate max-w-[120px]">
-              {citation.element_guid ? citation.element_guid.slice(0, 12) + "…" : citation.reference}
+            <span class="font-mono break-all select-all">
+              {citation.element_guid || citation.reference}
             </span>
 
             {#if onSelect}
