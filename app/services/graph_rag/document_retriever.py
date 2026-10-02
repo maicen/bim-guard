@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from app.logging_config import get_logger
 from app.modules.contracts.graph import GraphRagCitation, GraphRagToolCall
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_shared_embedding_service
 from app.services.graph_database import GraphService
 from app.services.graph_rag.constants import _DOC_QUERY_STOPWORDS
 from app.services.graph_rag.fusion import compute_reciprocal_rank_fusion
@@ -24,7 +24,7 @@ class DocumentGraphRetriever:
         projects_service: Optional[Any] = None,
     ):
         self.graph_service = graph_service
-        self.embedding_service = embedding_service or EmbeddingService()
+        self.embedding_service = embedding_service or get_shared_embedding_service()
         self.projects_service = projects_service
 
     # GraphService.execute is the synchronous Neo4j driver. Every call below

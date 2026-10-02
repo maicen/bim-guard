@@ -1231,8 +1231,13 @@ async def import_document_sections_tree(
     if graph_service:
         try:
             doc_title = getattr(doc, "name", None) or getattr(doc, "title", None) or f"Document {document_id}"
-            DocumentGraphService(graph_service).ingest_document_tree(
-                document_id, tree, flat, document_title=doc_title
+            # Embeddings + Neo4j writes are synchronous; keep them off the loop.
+            await asyncio.to_thread(
+                DocumentGraphService(graph_service).ingest_document_tree,
+                document_id,
+                tree,
+                flat,
+                document_title=doc_title,
             )
         except Exception as exc:
             logger.warning("Graph RAG tree ingestion failed on import for doc %d: %s", document_id, exc)

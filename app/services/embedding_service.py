@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import threading
+from collections import OrderedDict
 import os
 from typing import Optional
 
@@ -17,6 +19,41 @@ logger = get_logger(__name__)
 
 DEFAULT_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 DEFAULT_EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
+
+
+#: Cached vectors per process. A 1536-float vector is ~50 KB as a Python list,
+#: so 2000 entries bound the cache at roughly 100 MB.
+_CACHE_MAX_ENTRIES = 2000
+
+
+class _BoundedCache(OrderedDict):
+    """Dict with LRU eviction once ``maxsize`` entries are held.
+
+    Locked because the shared instance is used both on the event loop and
+    from worker threads (asyncio.to_thread callers).
+    """
+
+    def __init__(self, maxsize: int) -> None:
+        super().__init__()
+        self.maxsize = maxsize
+        self._mutex = threading.Lock()
+
+    def __contains__(self, key) -> bool:
+        with self._mutex:
+            return super().__contains__(key)
+
+    def __getitem__(self, key):
+        with self._mutex:
+            value = super().__getitem__(key)
+            self.move_to_end(key)
+            return value
+
+    def __setitem__(self, key, value) -> None:
+        with self._mutex:
+            super().__setitem__(key, value)
+            self.move_to_end(key)
+            while len(self) > self.maxsize:
+                self.popitem(last=False)
 
 
 class EmbeddingService:
@@ -32,8 +69,10 @@ class EmbeddingService:
         self.model = model
         self.dimension = dimension
         self.max_batch_size = max_batch_size
-        self._cache: dict[str, list[float]] = {}
-        self._lock = asyncio.Lock()
+        # Bounded LRU (see _CACHE_MAX_ENTRIES): the instance is shared per
+        # process via get_shared_embedding_service(), so an unbounded dict
+        # would grow for the life of the worker.
+        self._cache: _BoundedCache = _BoundedCache(_CACHE_MAX_ENTRIES)
 
     @staticmethod
     def _hash_text(text: str) -> str:
@@ -168,3 +207,21 @@ class EmbeddingService:
         if norm > 0:
             vec = [v / norm for v in vec]
         return vec
+
+
+_shared_service: EmbeddingService | None = None
+
+
+def get_shared_embedding_service() -> EmbeddingService:
+    """Return the per-process EmbeddingService.
+
+    WHY: callers used to build a fresh ``EmbeddingService()`` per request
+    (GraphRagService and its retrievers are constructed per request) or per
+    Smart TOC build, so the text-hash cache never survived beyond one call
+    and identical query/section texts were re-embedded through the provider
+    every time. Sharing one instance keeps that cache warm across calls.
+    """
+    global _shared_service
+    if _shared_service is None:
+        _shared_service = EmbeddingService()
+    return _shared_service

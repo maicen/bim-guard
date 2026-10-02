@@ -14,7 +14,7 @@ import re
 from typing import Any, Optional
 
 from app.logging_config import get_logger
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_shared_embedding_service
 from app.services.graph_database import GraphService
 
 logger = get_logger(__name__)
@@ -105,7 +105,7 @@ class DocumentGraphService:
         # Compute dense vector embeddings for sections in batch if enabled
         embeddings: list[list[float]] | None = None
         if compute_embeddings:
-            emb_svc = self.embedding_service or EmbeddingService()
+            emb_svc = self.embedding_service or get_shared_embedding_service()
             texts_to_embed = [
                 f"{item.get('section_number', '')} {item.get('section_name', '')}: {item.get('summary', '')}".strip()
                 for item in flat

@@ -12,7 +12,7 @@ from app.modules.contracts.graph import (
     GraphRagStep,
     GraphRagToolCall,
 )
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingService, get_shared_embedding_service
 from app.services.graph_database import GraphService
 from app.services.graph_rag.document_retriever import DocumentGraphRetriever
 from app.services.graph_rag.model_retriever import ModelGraphRetriever
@@ -38,7 +38,7 @@ class GraphRagService:
         projects_service: Optional[Any] = None,
     ):
         self.graph_service = graph_service
-        self.embedding_service = embedding_service or EmbeddingService()
+        self.embedding_service = embedding_service or get_shared_embedding_service()
         self.rule_service = rule_service or rules_service or RuleService()
         self.models_service = models_service or ModelsService()
         self.projects_service = projects_service

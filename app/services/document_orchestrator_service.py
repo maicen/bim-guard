@@ -16,6 +16,7 @@ These helpers are kept here so the router endpoints themselves stay thin
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -202,8 +203,15 @@ class DocumentOrchestratorService:
                     or getattr(doc, "title", None)
                     or f"Document {document_id}"
                 )
-                DocumentGraphService(graph_service).ingest_document_tree(
-                    document_id, tree, flat, document_title=doc_title
+                # Synchronous: batch embeddings (provider round trips) plus Neo4j
+                # writes. In a thread so this async endpoint does not freeze the
+                # worker's event loop for the duration (up to ~60s before).
+                await asyncio.to_thread(
+                    DocumentGraphService(graph_service).ingest_document_tree,
+                    document_id,
+                    tree,
+                    flat,
+                    document_title=doc_title,
                 )
             except Exception as exc:
                 logger.warning("Graph RAG tree ingestion failed for doc %d: %s", document_id, exc)
