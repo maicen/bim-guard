@@ -10,6 +10,16 @@ from app.services.models_service import ModelsService
 logger = get_logger(__name__)
 
 
+# CYPHER LABELS: every query here matches IFC element nodes as
+# ``(x:IfcProduct {project_id: $pid})``. Ingestion (ingest_ifc_to_graph) adds
+# the secondary :IfcProduct label to every IFC entity node, and
+# ``IfcProduct.project_id`` is indexed (app/bootstrap.py). A label-less
+# ``MATCH (x {project_id: ...})`` cannot use any index, so it scanned every
+# node in the database on every RAG query -- and also matched compliance-
+# lineage nodes (ComplianceVerdict, Issue, ...) that carry project_id too,
+# which made the "already ingested?" check below report a model as ingested
+# when only its compliance results were. Keep the label on new queries.
+
 class ModelGraphRetriever:
     """Traverse IFC model entities with degree penalization, spatial containment, and model inventory."""
 
@@ -30,7 +40,7 @@ class ModelGraphRetriever:
 
         pid_str = str(project_id)
         try:
-            check_cypher = "MATCH (elem {project_id: $pid}) RETURN count(elem) as cnt LIMIT 1"
+            check_cypher = "MATCH (elem:IfcProduct {project_id: $pid}) RETURN count(elem) as cnt LIMIT 1"
             rows = self.graph_service.execute(check_cypher, {"pid": pid_str})
             if rows and rows[0].get("cnt", 0) > 0:
                 return
@@ -99,7 +109,7 @@ class ModelGraphRetriever:
             if self.graph_service and self.graph_service.provider:
                 try:
                     cypher_summary = """
-                    MATCH (elem {project_id: $pid})
+                    MATCH (elem:IfcProduct {project_id: $pid})
                     WHERE elem.ifc_type IS NOT NULL
                     RETURN count(elem) as total_elements, count(DISTINCT elem.ifc_type) as class_count
                     """
@@ -160,7 +170,7 @@ class ModelGraphRetriever:
                 text_lines.append(f"### Project IFC Model Inventory:\nTotal attached models: 0.\nNo IFC models are currently attached to project {project_id}.")
 
             output_summary = f"Identified {len(models)} attached IFC model(s) for project {project_id}."
-            cypher_str = "MATCH (elem {project_id: $pid}) RETURN count(elem)" if graph_element_count > 0 else ""
+            cypher_str = "MATCH (elem:IfcProduct {project_id: $pid}) RETURN count(elem)" if graph_element_count > 0 else ""
             return {
                 "text": "\n".join(text_lines),
                 "citations": citations,
@@ -264,7 +274,7 @@ class ModelGraphRetriever:
         # Global Search Mode: Map-Reduce Summary Report (Microsoft GraphRAG / DRIFT)
         if retrieval_mode == "global":
             cypher = """
-            MATCH (elem {project_id: $pid})
+            MATCH (elem:IfcProduct {project_id: $pid})
             WHERE elem.ifc_type IS NOT NULL
             OPTIONAL MATCH (storey:IfcBuildingStorey {project_id: $pid})-[:CONTAINS*1..2]->(elem)
             RETURN elem.ifc_type as ifc_type,
@@ -322,7 +332,7 @@ class ModelGraphRetriever:
             if not storeys_found:
                 # Fallback matching on property if label indexing differs
                 cypher = """
-                MATCH (storey {project_id: $pid})
+                MATCH (storey:IfcProduct {project_id: $pid})
                 WHERE storey.ifc_type = 'IfcBuildingStorey'
                 RETURN storey.guid as guid, storey.name as name, storey.ifc_type as ifc_type,
                        0 as element_count, [] as element_types
@@ -393,7 +403,7 @@ class ModelGraphRetriever:
         # Targeted query matching specific element GUIDs
         if element_guids:
             cypher = """
-            MATCH (elem {project_id: $pid})
+            MATCH (elem:IfcProduct {project_id: $pid})
             WHERE elem.guid IN $guids
             OPTIONAL MATCH (space:IfcSpace {project_id: $pid})-[:CONTAINS]->(elem)
             OPTIONAL MATCH (storey:IfcBuildingStorey {project_id: $pid})-[:CONTAINS*1..2]->(elem)
@@ -434,7 +444,7 @@ class ModelGraphRetriever:
         if not elements_found and primary_class != "IfcProduct":
             # Fallback property match when Neo4j nodes have generic labels
             cypher_prop = """
-            MATCH (elem {project_id: $pid})
+            MATCH (elem:IfcProduct {project_id: $pid})
             WHERE elem.ifc_type = $cls
             OPTIONAL MATCH (space:IfcSpace {project_id: $pid})-[:CONTAINS]->(elem)
             OPTIONAL MATCH (storey:IfcBuildingStorey {project_id: $pid})-[:CONTAINS*1..2]->(elem)

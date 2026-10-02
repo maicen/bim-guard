@@ -82,6 +82,10 @@ def test_graph_rag_service_hybrid_query():
                     "target_classes": ["IfcDoor"],
                 }
             ]
+        elif "ifc_classes" in cypher or "count(n)" in cypher:
+            # Checked before the element branch: the class-count query also
+            # names the :IfcProduct label.
+            return [{"class_name": "IfcDoor", "element_count": 12}]
         elif "IfcDoor" in cypher or "IfcProduct" in cypher:
             return [
                 {
@@ -93,8 +97,6 @@ def test_graph_rag_service_hybrid_query():
                     "storey_name": "Level 1",
                 }
             ]
-        elif "ifc_classes" in cypher or "count(n)" in cypher:
-            return [{"class_name": "IfcDoor", "element_count": 12}]
         return []
 
     mock_graph.execute.side_effect = mock_execute

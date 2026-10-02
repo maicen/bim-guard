@@ -1,5 +1,6 @@
 """GraphRagService orchestrator coordinating modular query routing, retrievers, fusion, and synthesis."""
 
+import asyncio
 from typing import Any, AsyncGenerator, Optional
 
 from app.logging_config import get_logger
@@ -169,8 +170,10 @@ class GraphRagService:
 
         # 3. Check IFC element classes in model graph
         try:
+            # :IfcProduct lets Neo4j use the IfcProduct.project_id index instead
+            # of scanning every node (see the note in model_retriever.py).
             cypher_classes = """
-            MATCH (n {project_id: $pid})
+            MATCH (n:IfcProduct {project_id: $pid})
             WHERE n.ifc_type IS NOT NULL
             RETURN n.ifc_type as class_name, count(n) as element_count
             ORDER BY element_count DESC
@@ -362,7 +365,11 @@ class GraphRagService:
 
         # Step 2: Model Graph Retrieval (Hub-Suppressed Spatial Traversal)
         if request.scope in ("model", "hybrid"):
-            model_res = self.model_retriever.retrieve(
+            # model_retriever.retrieve is synchronous (Neo4j driver calls, and
+            # on first use a whole-model ingest); run it in a thread so the
+            # event loop keeps serving other requests and SSE streams meanwhile.
+            model_res = await asyncio.to_thread(
+                self.model_retriever.retrieve,
                 project_id=project_id,
                 query=request.query,
                 target_classes=detected_ifc_classes,
@@ -523,7 +530,11 @@ class GraphRagService:
             )
             yield self.synthesizer.format_sse_event("step", step_2_active.model_dump())
 
-            model_res = self.model_retriever.retrieve(
+            # model_retriever.retrieve is synchronous (Neo4j driver calls, and
+            # on first use a whole-model ingest); run it in a thread so the
+            # event loop keeps serving other requests and SSE streams meanwhile.
+            model_res = await asyncio.to_thread(
+                self.model_retriever.retrieve,
                 project_id=project_id,
                 query=request.query,
                 target_classes=detected_ifc_classes,

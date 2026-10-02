@@ -1,5 +1,6 @@
 """Hybrid specification and document graph retriever using Vector, BM25, and Topological RRF."""
 
+import asyncio
 import re
 from typing import Any, Optional
 
@@ -26,6 +27,10 @@ class DocumentGraphRetriever:
         self.embedding_service = embedding_service or EmbeddingService()
         self.projects_service = projects_service
 
+    # GraphService.execute is the synchronous Neo4j driver. Every call below
+    # goes through asyncio.to_thread so a slow vector/BM25/graph query blocks
+    # only a worker thread, not the event loop serving every other request
+    # (including SSE streams) on this uvicorn worker.
     async def retrieve(
         self,
         query: str,
@@ -60,7 +65,7 @@ class DocumentGraphRetriever:
                     RETURN d.id as doc_id, d.title as title, count(s) as root_sections
                     ORDER BY d.id ASC
                     """
-                    graph_docs = self.graph_service.execute(cypher_doc_summary, {}) or []
+                    graph_docs = await asyncio.to_thread(self.graph_service.execute, cypher_doc_summary, {}) or []
                 except Exception as exc:
                     logger.debug("Notice querying graph documents for inventory: %s", exc)
 
@@ -173,7 +178,7 @@ class DocumentGraphRetriever:
                    score as stream_score
             ORDER BY score DESC
             """
-            v_rows = self.graph_service.execute(cypher_vector, {"emb": query_embedding})
+            v_rows = await asyncio.to_thread(self.graph_service.execute, cypher_vector, {"emb": query_embedding})
             if v_rows:
                 # Discard low-similarity distant noise unless explicit domain terms exist
                 filtered_v_rows = [r for r in v_rows if (r.get("stream_score") or 0.0) >= 0.60]
@@ -199,7 +204,7 @@ class DocumentGraphRetriever:
                 ORDER BY score DESC
                 LIMIT 10
                 """
-                b_rows = self.graph_service.execute(cypher_bm25, {"query": lucene_query})
+                b_rows = await asyncio.to_thread(self.graph_service.execute, cypher_bm25, {"query": lucene_query})
                 if b_rows:
                     streams["bm25"] = b_rows
                     cypher_runs.append(cypher_bm25.strip())
@@ -220,7 +225,7 @@ class DocumentGraphRetriever:
                        1.0 as stream_score
                 LIMIT 5
                 """
-                g_rows = self.graph_service.execute(cypher_graph, {"clause": clause})
+                g_rows = await asyncio.to_thread(self.graph_service.execute, cypher_graph, {"clause": clause})
                 if g_rows:
                     streams["graph"].extend(g_rows)
                     cypher_runs.append(cypher_graph.strip())
@@ -234,7 +239,7 @@ class DocumentGraphRetriever:
                    0.5 as stream_score
             LIMIT 5
             """
-            fb_rows = self.graph_service.execute(cypher_fallback, {})
+            fb_rows = await asyncio.to_thread(self.graph_service.execute, cypher_fallback, {})
             if fb_rows:
                 streams["vector"] = fb_rows
                 cypher_runs.append(cypher_fallback.strip())
