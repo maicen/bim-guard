@@ -60,7 +60,8 @@
     >
       {#snippet children({ segments })}
         <div class="flex flex-1 items-center gap-0.5">
-          {#each segments as { part, value: segVal } (part)}
+          <!-- Keyed by index: a date field has several "literal" separator segments, so `part` is not unique. -->
+          {#each segments as { part, value: segVal }, i (i)}
             <DatePickerPrimitive.Segment
               {part}
               class="rounded px-0.5 text-xs text-fg-primary focus:bg-accent focus:text-white focus:outline-hidden"
