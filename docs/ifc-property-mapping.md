@@ -26,12 +26,12 @@ equivalent and what action closes the gap.*
 | IfcStairFlight | `IndividualWinderAngle` | *(none standard)* | — | ❌ Missing | Add Shared Param `IndividualWinderAngle` |
 | IfcStairFlight | `WinderSetSeparation` | *(none standard)* | — | ❌ Missing | Add Shared Param `WinderSetSeparation` |
 | IfcStairFlight | `Name` | `Name` | Direct attribute | ✅ Yes | Nothing needed |
-| IfcDoor | `ClearWidth` | `OverallWidth` *(closest)* | Direct attribute | ⚠️ Name mismatch | Update rule → `OverallWidth` (note: overall ≠ clear, but best available) OR add Shared Param `ClearWidth` |
+| IfcDoor | `ClearWidth` | *(none standard)* | — | ❌ Missing unless authored | Add Shared Param `ClearWidth` (`Pset_BIMGuardDoor`). Never estimated from `OverallWidth`: Revit exports the frame/leaf dimensions empty, so BIM Guard reports MISSING with that reason |
 | IfcDoor | `Height` | `Height` / `OverallHeight` | Qto_DoorBaseQuantities / Direct | ✅ Partial | Ensure **Export base quantities** is on; or update rule → `OverallHeight` |
 | IfcDoor | `Width` | `Width` / `OverallWidth` | Qto_DoorBaseQuantities / Direct | ✅ Partial | Ensure **Export base quantities** is on |
-| IfcWindow | `ClearOpeningArea` | *(none standard)* | — | ❌ Missing | Add Shared Param `ClearOpeningArea` OR update rule → `Area` (Qto_WindowBaseQuantities) |
-| IfcWindow | `ClearOpeningHeight` | `OverallHeight` *(closest)* | Direct attribute | ⚠️ Name mismatch | Add Shared Param `ClearOpeningHeight` OR update rule → `OverallHeight` |
-| IfcWindow | `ClearOpeningWidth` | `OverallWidth` *(closest)* | Direct attribute | ⚠️ Name mismatch | Add Shared Param `ClearOpeningWidth` OR update rule → `OverallWidth` |
+| IfcWindow | `ClearOpeningArea` | *(none standard)* | — | ❌ Missing unless authored | Add Shared Param `ClearOpeningArea` (`Pset_BIMGuardWindow`). `Area` is the gross window area, not the clear opening |
+| IfcWindow | `ClearOpeningHeight` | *(none standard)* | — | ❌ Missing unless authored | Add Shared Param `ClearOpeningHeight` (`Pset_BIMGuardWindow`) |
+| IfcWindow | `ClearOpeningWidth` | *(none standard)* | — | ❌ Missing unless authored | Add Shared Param `ClearOpeningWidth` (`Pset_BIMGuardWindow`) |
 | IfcRailing | `Height` | *(none standard)* | — | ❌ Missing | Add Shared Param `Height` mapped to custom Pset `Pset_BIMGuardRailing` |
 | IfcRailing | `HandrailHeight` | *(none standard)* | — | ❌ Missing | Add Shared Param `HandrailHeight` mapped to custom Pset |
 | IfcSlab | `HeadroomClearance` | *(none standard)* | — | ❌ Missing | Add Shared Param `HeadroomClearance` mapped to custom Pset |
@@ -65,14 +65,14 @@ what action maps it correctly.*
 | Pset_DoorCommon | IfcDoor | `IsExternal` | *(not used)* | — | — |
 | Qto_DoorBaseQuantities | IfcDoor | `Width` | `Width` | ✅ Match via Qto | Ensure **Export base quantities** is on |
 | Qto_DoorBaseQuantities | IfcDoor | `Height` | `Height` | ✅ Match via Qto | Ensure **Export base quantities** is on |
-| Direct — IfcDoor | IfcDoor | `OverallWidth` | `ClearWidth` | ⚠️ Mismatch | Update rule → `OverallWidth` |
+| Direct — IfcDoor | IfcDoor | `OverallWidth` | `ClearWidth` | ❌ Not equivalent | Overall ≠ clear; add Shared Param `ClearWidth` |
 | Direct — IfcDoor | IfcDoor | `OverallHeight` | `Height` | ⚠️ Partial | Qto `Height` is preferred; also available as direct `OverallHeight` |
 | Pset_WindowCommon | IfcWindow | `FireRating` | *(not used)* | — | — |
 | Pset_WindowCommon | IfcWindow | `GlazingAreaFraction` | *(not used)* | — | — |
 | Pset_WindowCommon | IfcWindow | `ThermalTransmittance` | *(not used)* | — | — |
-| Direct — IfcWindow | IfcWindow | `OverallWidth` | `ClearOpeningWidth` | ⚠️ Mismatch | Update rule → `OverallWidth` (overall ≠ clear) OR add Shared Param |
-| Direct — IfcWindow | IfcWindow | `OverallHeight` | `ClearOpeningHeight` | ⚠️ Mismatch | Update rule → `OverallHeight` OR add Shared Param |
-| Qto_WindowBaseQuantities | IfcWindow | `Area` | `ClearOpeningArea` | ⚠️ Mismatch | Update rule → `Area` (gross area, not clear opening) OR add Shared Param |
+| Direct — IfcWindow | IfcWindow | `OverallWidth` | `ClearOpeningWidth` | ❌ Not equivalent | Overall ≠ clear; add Shared Param `ClearOpeningWidth` |
+| Direct — IfcWindow | IfcWindow | `OverallHeight` | `ClearOpeningHeight` | ❌ Not equivalent | Overall ≠ clear; add Shared Param `ClearOpeningHeight` |
+| Qto_WindowBaseQuantities | IfcWindow | `Area` | `ClearOpeningArea` | ❌ Not equivalent | Gross area ≠ clear opening; add Shared Param `ClearOpeningArea` |
 | Pset_WallCommon | IfcWall | `FireRating` | `FireRating` | ✅ Match | None — fill Fire Rating in Revit |
 | Pset_WallCommon | IfcWall | `IsLoadBearing` | *(not used)* | — | — |
 | Pset_WallCommon | IfcWall | `IsExternal` | *(not used)* | — | — |
@@ -103,12 +103,8 @@ what action maps it correctly.*
 |---|---|
 | `TreadDepth` → `TreadLength` | Table 9.8.4.1 |
 | `HeadroomClearance` → `RequiredHeadroom` | 9.8.2.2.(3) |
-| `ClearWidth` → `OverallWidth` | CODE 9.6.4 |
 | `Slope` → `RequiredSlope` | CODE 3.8.3.4 |
 | `MaxSlope` → `PitchAngle` | 9.8.6.3 |
-| `ClearOpeningHeight` → `OverallHeight` | CODE 9.7.2 |
-| `ClearOpeningWidth` → `OverallWidth` | CODE 9.7.2 |
-| `ClearOpeningArea` → `Area` | CODE 9.7.2 |
 
 ### Fix in Revit (add Shared Parameters → export via user-defined Psets file)
 
@@ -120,7 +116,8 @@ what action maps it correctly.*
 | `HeadroomClearance` | IfcSlab | `Pset_BIMGuardSlab` |
 | `LimitingDistance` | IfcWall | `Pset_BIMGuardWall` |
 | `FlightHeight` | IfcStairFlight | `Pset_BIMGuardStair` |
-| `ClearOpeningArea` | IfcWindow | `Pset_BIMGuardWindow` *(if true clear area needed)* |
+| `ClearWidth` | IfcDoor | `Pset_BIMGuardDoor` |
+| `ClearOpeningArea` / `ClearOpeningHeight` / `ClearOpeningWidth` | IfcWindow | `Pset_BIMGuardWindow` |
 
 ### Ensure Export Base Quantities is ON in Revit IFC setup
 
