@@ -10,9 +10,8 @@ from typing import Annotated, Optional
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
-    File,
-    Form,
     Header,
     HTTPException,
     Query,
@@ -437,7 +436,6 @@ def get_document_upload_url(
     service: Annotated[DocumentService, Depends(get_documents_service)],
 ) -> UploadUrlResponse:
     """Generate a direct-to-cloud upload URL for a document."""
-    
     if payload.md5_hash:
         existing_doc = service.find_by_md5(payload.md5_hash)
         if existing_doc and existing_doc.get("storage_reference"):
@@ -465,8 +463,6 @@ def get_document_upload_url(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to generate upload URL: {exc}"
         )
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 
 @router.post("/confirm", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Confirm document upload")
 async def confirm_document_upload(
@@ -504,7 +500,7 @@ async def confirm_document_upload(
             md5_hash=payload.md5_hash,
             doc_type=payload.doc_type,
             project_code=payload.project_code,
-            originator=resolved_originator,
+            originator=payload.originator or "",
             suitability_code=payload.suitability_code,
             revision_code=payload.revision_code,
         )
@@ -1488,7 +1484,7 @@ async def extract_rule_drafts(
     except RuleGenerationFailedError as exc:
         # The model rejected every clause (bad/missing key, no credit, ...): report the
         # provider's own reason, not an empty "success".
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     # Each run mints a fresh EXTRACTED-<timestamp> ruleset, the same way
     # create_rule_folder mints a new folder. Reviewing and promoting its drafts
