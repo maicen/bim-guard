@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from app.api.dependencies import get_graph_triplestore_service
 from app.api.projects import ProjectAccessChecker, get_project_access_checker
@@ -35,7 +36,7 @@ async def execute_sparql_query(
     The query can be sent as JSON `{"query": "SELECT..."}` or as raw text/plain
     or application/sparql-query in the request body.
     """
-    project_access(project_id)
+    await run_in_threadpool(project_access, project_id)
 
     content_type = request.headers.get("content-type", "")
     query_str = ""
@@ -61,7 +62,9 @@ async def execute_sparql_query(
         )
         
     try:
-        results = triplestore_service.query(project_id, query_str)
+        # pyoxigraph evaluates the query synchronously and its cost is
+        # unbounded; keep it off the event loop.
+        results = await run_in_threadpool(triplestore_service.query, project_id, query_str)
         return results
     except Exception as exc:
         raise HTTPException(

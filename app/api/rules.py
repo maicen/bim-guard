@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Optional
 
+from starlette.concurrency import run_in_threadpool
 from fastapi import (
     APIRouter,
     Depends,
@@ -545,6 +546,14 @@ def export_json(
     )
 
 
+def _check_existing_ruleset(
+    service: RuleService, ruleset_check: RulesetAccessChecker, ruleset_id: str
+) -> None:
+    """Grant-check ``ruleset_id`` only if it already exists (see :func:`import_json_rules`)."""
+    if service.get_folder(ruleset_id):
+        ruleset_check(ruleset_id)
+
+
 @router.post("/import-json", response_model=IdsImportResponse, summary="Import rules from a canonical JSON ruleset file")
 async def import_json_rules(
     service: Annotated[RuleService, Depends(get_rules_service)],
@@ -559,8 +568,7 @@ async def import_json_rules(
     ruleset" case ``create_rule_folder`` leaves ungated, since there is no
     existing grant boundary to violate yet.
     """
-    if service.get_folder(ruleset_id):
-        ruleset_check(ruleset_id)
+    await run_in_threadpool(_check_existing_ruleset, service, ruleset_check, ruleset_id)
     content_bytes = await file.read()
     try:
         json_data = json.loads(content_bytes.decode("utf-8"))
@@ -579,7 +587,7 @@ async def import_json_rules(
         )
 
     try:
-        created_count = service.import_ruleset(json_data)
+        created_count = await run_in_threadpool(service.import_ruleset, json_data)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -603,12 +611,11 @@ async def import_ids_rules(
     Grant-checked only when ``ruleset_id`` already exists -- see
     :func:`import_json_rules`.
     """
-    if service.get_folder(ruleset_id):
-        ruleset_check(ruleset_id)
+    await run_in_threadpool(_check_existing_ruleset, service, ruleset_check, ruleset_id)
     content_bytes = await file.read()
     xml_text = content_bytes.decode("utf-8", errors="replace")
     try:
-        rows = service.import_ids_xml(xml_text, ruleset_id=ruleset_id)
+        rows = await run_in_threadpool(service.import_ids_xml, xml_text, ruleset_id=ruleset_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not rows:

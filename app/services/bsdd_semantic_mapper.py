@@ -21,6 +21,8 @@ promotion.
 
 from __future__ import annotations
 
+import asyncio
+
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -119,7 +121,8 @@ class BsddSemanticMapper:
         self, query: str, *, model: Optional[str] = None, organization_id: Optional[int] = None
     ) -> SemanticMatch | None:
         """Return the best bSDD class match for *query*, or None on no candidates/LLM failure."""
-        candidates = self._candidate_classes(query)
+        # The local ontology lookup is a CPU-bound scan; keep it off the loop.
+        candidates = await asyncio.to_thread(self._candidate_classes, query)
         if not candidates:
             return None
         lines = [f"- {c.name} (code={c.code}, uri={c.uri})" for c in candidates]
@@ -139,7 +142,7 @@ class BsddSemanticMapper:
         given) -- candidates themselves are not filtered by it, since a
         property can be legitimately shared across many classes.
         """
-        candidates = self._candidate_properties(query)
+        candidates = await asyncio.to_thread(self._candidate_properties, query)
         if not candidates:
             return None
         lines = [f"- {p.name} (code={p.code or ''}, uri={p.uri})" for p in candidates]
@@ -167,10 +170,12 @@ class BsddSemanticMapper:
                     ChatMessage(role=MessageRole.USER, content=_MATCH_PROMPT),
                 ]
             )
+            # build_llm resolves the API key with a synchronous DB query.
+            llm = await asyncio.to_thread(build_llm, model, organization_id=organization_id)
             program = LLMTextCompletionProgram.from_defaults(
                 output_cls=SemanticMatch,
                 prompt=chat_prompt,
-                llm=build_llm(model, organization_id=organization_id),
+                llm=llm,
             )
             return await program.acall(query=query, candidates="\n".join(candidate_lines))
         except Exception:

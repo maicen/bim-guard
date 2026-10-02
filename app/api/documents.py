@@ -465,7 +465,7 @@ def get_document_upload_url(
         )
 
 @router.post("/confirm", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED, summary="Confirm document upload")
-async def confirm_document_upload(
+def confirm_document_upload(
     payload: DocumentConfirmRequest,
     background_tasks: BackgroundTasks,
     service: Annotated[DocumentService, Depends(get_documents_service)],
@@ -541,13 +541,11 @@ async def confirm_document_upload(
             detail=str(exc)
         )
         
-    # Grant access
-    if payload.organization_id is not None:
-        document_access.add_org_grant(payload.organization_id, row["id"])
-    elif current_user is not None and not profiles.is_superadmin(current_user.id):
-        user_org_ids = memberships.org_ids_for_user(current_user.id)
-        if user_org_ids:
-            document_access.add_org_grant(user_org_ids[0], row["id"])
+    # Grant access. ``target_org_id`` is the payload's organisation, or for a
+    # non-superadmin who named none, one of their own -- resolved above, so
+    # no second membership lookup is needed here.
+    if target_org_id is not None:
+        document_access.add_org_grant(target_org_id, row["id"])
 
     return _row_to_detail_response(row, service)
 

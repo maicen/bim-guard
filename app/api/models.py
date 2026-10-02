@@ -23,6 +23,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.api.dependencies import (
     get_github_repo_service,
@@ -452,7 +453,7 @@ def get_model_upload_url(
     status_code=status.HTTP_201_CREATED,
     summary="Confirm a direct-to-cloud model upload and attach it",
 )
-async def confirm_model_upload(
+def confirm_model_upload(
     project_id: int,
     payload: ModelConfirmRequest,
     project: Annotated[dict, Depends(get_authorized_project)],
@@ -749,11 +750,15 @@ async def replace_model(
     [name] = _validated_ifc_names([file])
     content = await file.read()
 
-    rejection = _validate(name, content, kind="ifc")
+    # Validation scans the whole file, and replace_model uploads it and parses
+    # the IFC summary: all blocking, so keep them off the event loop.
+    rejection = await run_in_threadpool(_validate, name, content, kind="ifc")
     if rejection:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=rejection)
 
-    row = service.replace_model(project_id, model_id, content=content, file_name=name)
+    row = await run_in_threadpool(
+        service.replace_model, project_id, model_id, content=content, file_name=name
+    )
     if row is None:
         raise _not_found(project_id, model_id)
     return ModelResponse(**{"project_id": project_id, **row})

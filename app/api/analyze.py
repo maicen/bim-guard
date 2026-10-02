@@ -17,6 +17,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from starlette.concurrency import run_in_threadpool
 
 from app.api.dependencies import (
     get_arch_analysis_service,
@@ -203,16 +204,40 @@ async def analyze_upload_ifc(
     ifc_pipeline_service: Annotated[IFCPipelineService, Depends(get_ifc_pipeline_service)],
 ) -> IfcUploadAttachResponse:
     """Upload and attach an IFC model to a project."""
-    project_access(project_id)
-    if not ifc_file.filename or not ifc_file.filename.lower().endswith((".ifc", ".ifczip", ".zip")):
+    # Checked before the body is read so a caller without access never gets
+    # their upload buffered.
+    await run_in_threadpool(project_access, project_id)
+    content = await ifc_file.read()
+    # Pre-flight validation (decodes and regex-scans the whole
+    # file), the storage upload and the model summary parse are all blocking.
+    # Run them off the event loop so one upload does not stall every other
+    # request, SSE streams included, on this worker.
+    return await run_in_threadpool(
+        _attach_uploaded_ifc,
+        project_id,
+        ifc_file.filename,
+        content,
+        models_service,
+        ifc_pipeline_service,
+    )
+
+
+def _attach_uploaded_ifc(
+    project_id: int,
+    filename: str | None,
+    content: bytes,
+    models_service: ModelsService,
+    ifc_pipeline_service: IFCPipelineService,
+) -> IfcUploadAttachResponse:
+    """Synchronous body of :func:`analyze_upload_ifc`."""
+    if not filename or not filename.lower().endswith((".ifc", ".ifczip", ".zip")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A valid .ifc, .ifczip, or .zip file is required.",
         )
 
-    content = await ifc_file.read()
     response = ifc_pipeline_service.upload_service.upload(
-        ifc_file.filename, content, project_id=project_id, kind="ifc"
+        filename, content, project_id=project_id, kind="ifc"
     )
     if not response.success:
         # Distinguish user errors (bad file) from server errors (storage down).
@@ -220,7 +245,7 @@ async def analyze_upload_ifc(
         # rejection is a 400; an I/O failure reaching this branch is a 502.
         from app.modules.pipeline_io.file_upload import _validate
 
-        is_validation_error = bool(_validate(ifc_file.filename, content, kind="ifc"))
+        is_validation_error = bool(_validate(filename, content, kind="ifc"))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST if is_validation_error else status.HTTP_502_BAD_GATEWAY,
             detail=response.error or "Upload failed.",

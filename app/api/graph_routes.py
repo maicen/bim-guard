@@ -77,7 +77,7 @@ def _run_background_ingest(path: str, graph_service: GraphService, project_id: s
     "/{project_id}/ingest",
     summary="Ingest project IFC into graph database on demand or in background",
 )
-async def ingest_project_graph(
+def ingest_project_graph(
     project_id: int,
     background_tasks: BackgroundTasks,
     project_access: Annotated[ProjectAccessChecker, Depends(get_project_access_checker)],

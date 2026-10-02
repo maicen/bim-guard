@@ -13,6 +13,7 @@ to thread custom metadata through to litellm's call.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from litellm.integrations.custom_logger import CustomLogger
@@ -44,12 +45,18 @@ class LLMCallLoggingCallback(CustomLogger):
             error=str(exception) if exception is not None else "unknown error",
         )
 
+    # The async hooks run on the caller's event loop, and ``record`` is a
+    # synchronous DB insert. ``asyncio.to_thread`` copies the current context,
+    # so ``llm_call_context.current()`` still sees the caller's tag.
     async def async_log_success_event(self, kwargs: dict, response_obj: Any, start_time, end_time) -> None:
-        self._log(kwargs, response_obj, start_time, end_time, status="success", error=None)
+        await asyncio.to_thread(
+            self._log, kwargs, response_obj, start_time, end_time, status="success", error=None
+        )
 
     async def async_log_failure_event(self, kwargs: dict, response_obj: Any, start_time, end_time) -> None:
         exception = kwargs.get("exception")
-        self._log(
+        await asyncio.to_thread(
+            self._log,
             kwargs,
             response_obj,
             start_time,
