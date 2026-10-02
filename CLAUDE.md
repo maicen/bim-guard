@@ -245,7 +245,10 @@ VITE_SUPABASE_URL=https://supabase.bim-guard.xyz
 VITE_SUPABASE_ANON_KEY=<anon-jwt-token>
 
 # ── Inter-Service Networking ──────────────────────────────────────────────────
-DOCLING_LOCAL_URL=http://docling-serve:5001
+# Host-side dev runs reach docling-serve on the published port; the app container
+# gets DOCLING_INTERNAL_URL instead (docker-compose.yml), defaulting to docling-serve.
+DOCLING_LOCAL_URL=http://localhost:5001
+DOCLING_INTERNAL_URL=http://docling-serve:5001
 NEO4J_URI=bolt://neo4j:7687
 ```
 

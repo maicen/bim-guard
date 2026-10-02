@@ -66,7 +66,11 @@ services:
       # Document Parsing — Docling (self-hosted by default)
       - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}
       - DOCLING_API_KEY=${DOCLING_API_KEY:-}
-      - DOCLING_LOCAL_URL=${DOCLING_LOCAL_URL:-http://docling-serve:5001}
+      # Container-side URL of the docling-serve service. Deliberately NOT read from
+      # DOCLING_LOCAL_URL: the root .env sets that to http://localhost:5001 for
+      # host-side dev runs, and inside this container localhost is the app itself.
+      # The docling driver also rewrites a localhost engine URL to this value.
+      - DOCLING_LOCAL_URL=${DOCLING_INTERNAL_URL:-http://docling-serve:5001}
 
       # ── Graph Database — Neo4j (default) ────────────────────────────────────
       # The neo4j service below starts automatically with a plain
