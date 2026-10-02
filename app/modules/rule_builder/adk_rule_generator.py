@@ -6,7 +6,8 @@ Writer -> Critic -> Refiner workflow.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any
 
 from google.adk.agents import LlmAgent, LoopAgent, SequentialAgent
 from google.adk.models.lite_llm import LiteLlm
@@ -50,6 +51,33 @@ def _build_adk_model(model: str | None, *, organization_id: int | None):
     provider = resolved_model.split("/", 1)[0]
     api_key = resolve_api_key(provider, organization_id)
     return LiteLlm(model=resolved_model, api_key=api_key)
+
+
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.MULTILINE | re.DOTALL)
+
+
+def _parse_llm_rules_json(text: str, result_cls: type) -> Any | None:
+    """Extract and validate the rules JSON object from a free-text LLM response.
+
+    Mirrors llama_index.core.output_parsers.utils.extract_json_str +
+    PydanticOutputParser.parse, which is how the working LlamaIndex rule
+    generator turns a plain-text chat response into a validated
+    _LLMRuleExtractionResult -- used here instead of ADK's output_schema=
+    (see the comment at its call site) since that forces a provider-level
+    strict JSON schema incompatible with this schema's open-ended dict
+    fields. Returns None (rather than raising) on malformed output -- the
+    LLM call itself succeeded, so this is "no usable rules", not a
+    RuleGenerationFailedError-worthy failure.
+    """
+    match = _JSON_OBJECT_RE.search(text.strip())
+    if not match:
+        logger.warning("No JSON object found in LLM rule-extraction output")
+        return None
+    try:
+        return result_cls.model_validate_json(match.group())
+    except Exception as exc:
+        logger.warning("Failed to validate LLM rule-extraction JSON: %s", exc)
+        return None
 
 
 def exit_loop(tool_context: ToolContext) -> dict:
@@ -103,12 +131,26 @@ class AdkRuleGenerator:
             clause_text=node.text,
         )
 
-        # 2. Define the ADK Agents
+        # 2. Define the ADK Agents.
+        #
+        # Deliberately NOT using LlmAgent's output_schema= here: ADK turns
+        # that into an OpenAI/Azure "strict" JSON-schema response_format
+        # (see _enforce_strict_openai_schema in google/adk/models/lite_llm.py),
+        # which requires additionalProperties: false on every object -- but
+        # rase_applicability/rase_selection/rase_exception are open-ended
+        # dicts (arbitrary range-bound keys like "projection_mm_min"), which
+        # that enforcement step can't make strict-compliant (no "properties"
+        # to lock down) and the provider rejects outright. Prompted JSON +
+        # manual parsing (_parse_llm_rules_json below) sidesteps this, the
+        # same approach the working LlamaIndex generator uses via
+        # PydanticOutputParser -- plain achat() + regex-extracted JSON, no
+        # provider-level schema enforcement at all.
+        schema_instructions = SYSTEM_PROMPT + "\n\n" + formatted_rule_prompt
+
         initial_writer = LlmAgent(
             name="InitialRuleWriter",
             model=adk_model,
-            instruction=SYSTEM_PROMPT + "\n\n" + formatted_rule_prompt,
-            output_schema=_LLMRuleExtractionResult,
+            instruction=schema_instructions,
             output_key="current_rules",
         )
 
@@ -153,10 +195,12 @@ Criticism (from state):
 
 Task:
 If the Criticism is exactly "Rules are perfect.", you MUST call the `exit_loop` tool immediately. Do not output rules.
-Otherwise, apply the requested fixes to the Current Rules and output the corrected rules as structured JSON.
+Otherwise, apply the requested fixes to the Current Rules and output the corrected rules as JSON matching this
+schema exactly (the same one the initial extraction used):
+
+{schema_instructions}
 """,
             tools=[exit_loop],
-            output_schema=_LLMRuleExtractionResult,
             output_key="current_rules",
         )
 
@@ -198,12 +242,13 @@ Otherwise, apply the requested fixes to the Current Rules and output the correct
         if not final_rules_obj:
             return []
 
-        # Parse output if it's a dict
-        if isinstance(final_rules_obj, dict):
+        if isinstance(final_rules_obj, str):
+            final_rules_obj = _parse_llm_rules_json(final_rules_obj, _LLMRuleExtractionResult)
+        elif isinstance(final_rules_obj, dict):
             try:
                 final_rules_obj = _LLMRuleExtractionResult.model_validate(final_rules_obj)
             except Exception:
-                pass
+                final_rules_obj = None
 
         if not isinstance(final_rules_obj, _LLMRuleExtractionResult):
             logger.warning("Final output was not a valid _LLMRuleExtractionResult")
