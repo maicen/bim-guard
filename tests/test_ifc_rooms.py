@@ -38,6 +38,7 @@ from app.modules.ifc_reader.ifc_rooms import (  # noqa: E402
     SOURCE_BOUNDARY,
     SOURCE_CONTAINMENT,
     SOURCE_GEOMETRIC,
+    SOURCE_HOST_LINING,
     SOURCE_HOST_WALL,
     SOURCE_NONE,
     SOURCE_SELF,
@@ -50,6 +51,7 @@ from app.modules.ifc_reader.ifc_rooms import (  # noqa: E402
 from app.modules.ifc_reader.ifc_spatial import (  # noqa: E402
     BOUNDARY_SOURCE_GEOMETRIC,
     IFCSpatialAdjacency,
+    check_daylight_ratios,
 )
 from app.modules.room_types import UNKNOWN_ROOM_TYPE  # noqa: E402
 
@@ -288,6 +290,143 @@ class TestHostWall:
         linker = ElementRoomLinker(adjacency, model, geometry_extractor=extractor)
 
         assert linker.links_for(named["door_far"]).source == SOURCE_NONE
+
+
+def _build_lined_house():
+    """Rooms bounded only by finish walls laid against the walls openings sit in.
+
+    The shape of a Revit export: ``host_ext`` (the external block wall the
+    window fills) and ``host_part`` (the partition the door fills) bound no
+    room. ``lining_bed`` / ``lining_wic`` are the paint layers on their faces,
+    and the only walls any IfcRelSpaceBoundary names.
+    """
+    model = ifcopenshell.file(schema="IFC4")
+    run("root.create_entity", model, ifc_class="IfcProject", name="Lined")
+    run("unit.assign_unit", model)
+    storey = run("root.create_entity", model, ifc_class="IfcBuildingStorey", name="L01")
+    named: dict = {}
+
+    def make(ifc_class, name, **attrs):
+        entity = run("root.create_entity", model, ifc_class=ifc_class, name=name)
+        for key, value in attrs.items():
+            setattr(entity, key, value)
+        named[name] = entity
+        return entity
+
+    bedroom = make("IfcSpace", "Bedroom", LongName="Bedroom")
+    wic = make("IfcSpace", "WIC", LongName="WIC")
+    run("aggregate.assign_object", model, products=[bedroom, wic], relating_object=storey)
+    for name in ("host_ext", "host_part", "lining_bed", "lining_wic"):
+        make("IfcWall", name)
+    window = make("IfcWindow", "win", OverallWidth=2000.0)
+    door = make("IfcDoor", "door", OverallWidth=900.0)
+    for space, wall in [(bedroom, named["lining_bed"]), (wic, named["lining_wic"])]:
+        _boundary(model, space, wall)
+    for filler, host, opening_name in [(window, "host_ext", "op_win"), (door, "host_part", "op_door")]:
+        opening = make("IfcOpeningElement", opening_name)
+        run("feature.add_feature", model, feature=opening, element=named[host])
+        run("feature.add_filling", model, opening=opening, element=filler)
+    return model, named
+
+
+class LinedExtractor(FakeExtractor):
+    """Distances by element name, standing in for the mesh-based measurements.
+
+    Mirrors what a real Revit export measured: the window's opening touches
+    both linings (the WIC partition ends at its jamb), but the Bedroom faces
+    its centre at 90 mm while the WIC is 1004 mm away, beyond the jamb.
+    """
+
+    def __init__(self, distances: dict[frozenset, float], from_centre: dict[tuple, float]):
+        near = {"min_x": 0.0, "max_x": 100.0, "min_y": 0.0, "max_y": 100.0, "min_z": 0.0, "max_z": 100.0}
+        super().__init__({n: near for n in ("lining_bed", "lining_wic", "op_win", "op_door")})
+        self._distances = distances
+        self._from_centre = from_centre
+
+    def calculate_shortest_distance(self, a, b):
+        return self._distances.get(frozenset((a.Name, b.Name)))
+
+    def get_centroid_or_none(self, element):
+        return element.Name
+
+    def distance_from_point_mm(self, element, point):
+        return self._from_centre.get((element.Name, point))
+
+
+LINED_DISTANCES = {
+    frozenset(("lining_bed", "op_win")): 0.0,
+    frozenset(("lining_bed", "host_ext")): 10.0,
+    frozenset(("lining_wic", "op_win")): 0.0,
+    frozenset(("lining_wic", "host_ext")): 20.0,
+    frozenset(("lining_bed", "op_door")): 0.0,
+    frozenset(("lining_bed", "host_part")): 0.0,
+    frozenset(("lining_wic", "op_door")): 0.0,
+    frozenset(("lining_wic", "host_part")): 0.0,
+}
+LINED_FROM_CENTRE = {
+    ("Bedroom", "op_win"): 90.0,
+    ("WIC", "op_win"): 1004.0,
+    ("Bedroom", "op_door"): 70.0,
+    ("WIC", "op_door"): 70.0,
+}
+
+
+class TestHostLining:
+    @pytest.fixture(scope="class")
+    def lined(self):
+        return _build_lined_house()
+
+    def _linker(self, model, distances=LINED_DISTANCES, from_centre=LINED_FROM_CENTRE):
+        adjacency = IFCSpatialAdjacency(model, fallback_to_geometric=False).build()
+        return ElementRoomLinker(
+            adjacency, model, geometry_extractor=LinedExtractor(distances, from_centre)
+        )
+
+    def test_window_inherits_the_room_its_opening_faces_through_the_lining(self, lined):
+        model, named = lined
+        links = self._linker(model).links_for(named["win"])
+        assert links.source == SOURCE_HOST_LINING
+        assert links.usable
+        # The WIC lining touches the window too, but only at its jamb.
+        assert _names(links) == ["Bedroom"]
+
+    def test_door_through_a_lined_partition_reaches_both_rooms(self, lined):
+        model, named = lined
+        links = self._linker(model).links_for(named["door"])
+        assert links.source == SOURCE_HOST_LINING
+        assert _names(links) == ["Bedroom", "WIC"]
+
+    def test_a_lining_clear_of_the_host_is_not_a_lining(self, lined):
+        model, named = lined
+        detached = {
+            **LINED_DISTANCES,
+            frozenset(("lining_bed", "host_ext")): 300.0,
+            frozenset(("lining_wic", "host_ext")): 300.0,
+        }
+        assert self._linker(model, distances=detached).links_for(named["win"]).source == SOURCE_NONE
+
+    def test_no_geometry_means_no_lining_link(self, lined):
+        model, named = lined
+        adjacency = IFCSpatialAdjacency(model, fallback_to_geometric=False).build()
+        links = ElementRoomLinker(adjacency, model).links_for(named["win"])
+        assert links.source == SOURCE_NONE
+        assert "finish-layer" in links.note
+
+    def test_lined_windows_count_toward_daylight(self, lined):
+        model, named = lined
+        bedroom = named["Bedroom"]
+        qto = run("pset.add_qto", model, product=bedroom, name="Qto_SpaceBaseQuantities")
+        run("pset.edit_qto", model, qto=qto, properties={"NetFloorArea": 12.0})
+        wqto = run("pset.add_qto", model, product=named["win"], name="Qto_WindowBaseQuantities")
+        run("pset.edit_qto", model, qto=wqto, properties={"Area": 6.0})
+        linker = self._linker(model)
+
+        results = check_daylight_ratios(linker._adjacency, min_ratio=0.1, room_linker=linker)
+
+        [room] = [r for r in results if r["space_name"] == "Bedroom"]
+        assert room["total_window_area_m2"] == 6.0
+        assert room["passes"] is True
+        assert room["undetermined"] is False
 
 
 class TestUnlinked:

@@ -445,6 +445,61 @@ class IFCGeometryExtractor:
             logger.debug(f"prefetch_centroids failed, falling back to sequential: {exc}")
             return 0
 
+    def prefetch_meshes(self, elements, num_threads: int | None = None) -> int:
+        """Tessellate many elements on multiple threads, caching their meshes.
+
+        The mesh counterpart of ``prefetch_centroids``: room linking through a
+        finish layer needs the mesh of every room-bounding wall (hundreds, on
+        a Revit export), and building them one ``create_shape`` at a time cost
+        ~30 s on one model. The iterator's shape memory is invalidated on each
+        step, so vertices and faces are copied out into ``_mesh_cache`` (and
+        the centroid into ``_centroid_cache``); ``get_bounding_box`` and
+        ``calculate_shortest_distance`` read that cache. Elements the iterator
+        does not return fall back to the sequential path on first use.
+        Returns the number of meshes cached.
+        """
+        if self._settings is None or self.model is None or not (_NP_AVAILABLE and IFCOS_AVAILABLE):
+            return 0
+        todo = []
+        for el in elements:
+            try:
+                eid = el.id()
+            except Exception:
+                continue
+            if eid not in self._mesh_cache and eid not in self._shape_cache:
+                todo.append(el)
+        if len(todo) < 16:
+            return 0
+        try:
+            import os
+
+            threads = num_threads or max(1, (os.cpu_count() or 1))
+            iterator = ifcopenshell.geom.iterator(
+                self._settings, self.model, threads, include=todo
+            )
+            cached = 0
+            if iterator.initialize():
+                while True:
+                    shape = iterator.get()
+                    verts = np.array(
+                        _ifcos_shape.get_vertices(shape.geometry), dtype=float
+                    ) * self._mesher_scale
+                    if len(verts):
+                        faces = np.array(_ifcos_shape.get_faces(shape.geometry), dtype=np.intp)
+                        faces = faces.reshape(-1, 3) if faces.size else None
+                        self._mesh_cache[shape.id] = (verts, faces)
+                        cx, cy, cz = verts.mean(axis=0)
+                        self._centroid_cache.setdefault(
+                            shape.id, (round(float(cx), 4), round(float(cy), 4), round(float(cz), 4))
+                        )
+                        cached += 1
+                    if not iterator.next():
+                        break
+            return cached
+        except Exception as exc:
+            logger.debug(f"prefetch_meshes failed, falling back to sequential: {exc}")
+            return 0
+
     def _create_shape(self, element):
         """Tessellate *element*, returning None if ifcopenshell cannot."""
         try:
@@ -462,6 +517,17 @@ class IFCGeometryExtractor:
         Uses ifcopenshell.util.shape.get_vertices() on the world-coord
         tessellation (USE_WORLD_COORDS=True).
         """
+        # A mesh prefetch_meshes already built answers without re-tessellating.
+        try:
+            cached_verts = self._mesh_cache.get(element.id(), (None, None))[0]
+        except Exception:
+            cached_verts = None
+        if cached_verts is not None:
+            return {
+                "min_x": float(cached_verts[:, 0].min()), "max_x": float(cached_verts[:, 0].max()),
+                "min_y": float(cached_verts[:, 1].min()), "max_y": float(cached_verts[:, 1].max()),
+                "min_z": float(cached_verts[:, 2].min()), "max_z": float(cached_verts[:, 2].max()),
+            }
         shape = self._get_shape(element)
         if shape is None:
             return None
@@ -854,6 +920,33 @@ class IFCGeometryExtractor:
         if distances.size == 0:
             return None
         return float(np.min(distances))
+
+    def distance_from_point_mm(self, element, point) -> float | None:
+        """Return the exact distance (mm) from a world point to an element's surface.
+
+        Unlike the narrow phase of calculate_shortest_distance, which only
+        measures the triangles around the nearest vertex, this measures every
+        triangle: a point opposite the middle of a large, sparsely
+        tessellated face (a room's wall face, seen from a window) is often
+        nowhere near any of its vertices. Returns None when the element has no
+        resolvable mesh or numpy is unavailable.
+        """
+        if point is None:
+            return None
+        verts, faces = self._get_mesh_mm(element)
+        if verts is None:
+            return None
+        try:
+            p = np.asarray(point, dtype=float)
+            if faces is None:
+                return round(float(np.min(np.linalg.norm(verts - p, axis=1))), 4)
+            distances = _point_to_triangle_distance(
+                p, verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+            )
+            return round(float(np.min(distances)), 4) if distances.size else None
+        except Exception as exc:
+            logger.debug(f"point distance failed for {element}: {exc}")
+            return None
 
     def calculate_shortest_distance(self, element_a, element_b) -> float | None:
         """Return the shortest distance between two elements in millimetres.

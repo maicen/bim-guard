@@ -16,9 +16,14 @@ between models. A link is one of:
     containment  the element is contained in the IfcSpace directly
     host_wall    a door/window inherits the rooms of the wall it fills, narrowed
                  to the ones its own geometry actually touches
+    host_lining  the wall it fills bounds no room, because the rooms are bounded
+                 by a separate finish wall/covering laid against it (a Revit
+                 habit); the element inherits the rooms of the finish layer
+                 lying flush against both its host and itself, narrowed to
+                 those its opening faces
     geometric_bbox   bounding-box contact only -- NOT usable (see below)
 
-The first four are *usable*: a rule may be scoped by them. ``geometric_bbox`` is
+The first five are *usable*: a rule may be scoped by them. ``geometric_bbox`` is
 not. Measured on a real residential model that ships rooms but no space
 boundaries, bounding-box contact linked one door to six rooms and one wall to
 twenty-two, so scoping "bedroom doors" by it would put half the doors of the
@@ -63,9 +68,9 @@ except ImportError:
     _IFC_AVAILABLE = False
 
 try:
-    from .ifc_penetrations import resolve_hosts
+    from .ifc_penetrations import resolve_hosts, resolve_openings
 except ImportError:  # pragma: no cover - penetrations module is a sibling
-    resolve_hosts = None
+    resolve_hosts = resolve_openings = None
 
 # ── Link provenance ───────────────────────────────────────────────────────────
 
@@ -73,18 +78,19 @@ SOURCE_SELF = "self"
 SOURCE_BOUNDARY = "boundary"
 SOURCE_CONTAINMENT = "containment"
 SOURCE_HOST_WALL = "host_wall"
+SOURCE_HOST_LINING = "host_lining"
 SOURCE_GEOMETRIC = "geometric_bbox"
 SOURCE_NONE = "none"
 
 #: Sources a rule may be scoped or counted by. ``geometric_bbox`` is excluded on
 #: purpose -- see the module docstring.
 USABLE_SOURCES = frozenset(
-    {SOURCE_SELF, SOURCE_BOUNDARY, SOURCE_CONTAINMENT, SOURCE_HOST_WALL}
+    {SOURCE_SELF, SOURCE_BOUNDARY, SOURCE_CONTAINMENT, SOURCE_HOST_WALL, SOURCE_HOST_LINING}
 )
 
 _NOTE_UNLINKED = (
-    "no room could be linked to this element (no space boundary, containment "
-    "or host-wall relationship names one)"
+    "no room could be linked to this element (no space boundary, containment, "
+    "host-wall or finish-layer relationship names one)"
 )
 _NOTE_COARSE = (
     "room links were only inferred from bounding-box contact, which is too "
@@ -96,6 +102,27 @@ _NOTE_COARSE = (
 #: fallback uses, because the candidates are already restricted to the rooms the
 #: host wall bounds, and a window may sit on the far face of a thick wall.
 _HOST_PROXIMITY_MM = 500.0
+
+#: How close (mm) a finish wall/covering must be to BOTH a door/window's host
+#: wall and the door/window itself to count as the lining its room is bounded
+#: by. Measured on a Revit export whose rooms are bounded by 10-20 mm paint and
+#: plaster walls laid against 200 mm block walls: the lining in front of a
+#: window sat 0-22 mm from host and window alike, every other room-bounding
+#: wall 150 mm or more from one of them.
+_LINING_CONTACT_MM = 50.0
+
+#: A partition ending at a window's jamb touches the window as closely as the
+#: lining in front of it does, so contact alone cannot tell the room the window
+#: faces from the room beside it. Distance from the opening's centre can: a room
+#: the opening faces is reached through the wall's depth, one beside it only
+#: around the jamb, at least half the opening's width away. A room is kept when
+#: it is nearer the centre than half the width less this margin. On the same
+#: export the rooms windows and doors faced sat 70-154 mm from their centres;
+#: the room beside a 2000 mm window's jamb sat 1004 mm away.
+_JAMB_MARGIN_MM = 100.0
+
+#: Element classes a finish layer is modelled as.
+_LINING_CLASSES = ("IfcWall", "IfcCovering")
 
 #: Property name (separators stripped, lower-case) -> what it resolves to.
 #: ``types`` / ``names`` describe the element's connected rooms (an IfcSpace's
@@ -449,6 +476,8 @@ class ElementRoomLinker:
         self._space_boxes: dict[str, dict | None] = {}
         self._space_elements: dict[str, dict[str, set[str]]] | None = None
         self._coverage: dict[str, tuple[int, int]] = {}
+        self._linings: list[tuple] | None = None
+        self._unit_mm: float | None = None
 
     # ── Public ────────────────────────────────────────────────────────────────
 
@@ -516,7 +545,12 @@ class ElementRoomLinker:
         if inherited:
             return ElementRoomLinks(inherited, SOURCE_HOST_WALL)
 
-        # 4. Bounding-box contact: recorded, but not usable.
+        # 4. ...or from the finish layer laid against that wall.
+        lined = self._lining_rooms(element)
+        if lined:
+            return ElementRoomLinks(lined, SOURCE_HOST_LINING)
+
+        # 5. Bounding-box contact: recorded, but not usable.
         coarse = self._rooms_for(
             [g for g, src in by_space.items() if src == BOUNDARY_SOURCE_GEOMETRIC]
         )
@@ -573,6 +607,129 @@ class ElementRoomLinker:
             if narrowed:
                 return self._rooms_for(narrowed)
         return ()
+
+    def _lining_rooms(self, element) -> tuple[RoomInfo, ...]:
+        """Rooms a door/window opens onto through the finish layer on its host.
+
+        Revit exports often bound rooms by thin paint/plaster walls modelled
+        separately from the block wall a window actually sits in, so the host
+        bounds no room at all. A room-bounding wall or covering within
+        ``_LINING_CONTACT_MM`` of both the host and the opening the element
+        fills is that finish layer; its rooms are the candidates, narrowed to
+        those the opening faces (see ``_JAMB_MARGIN_MM``). Every step needs
+        real geometry -- without it, flush contact cannot be told from a
+        partition merely ending nearby, so no link is made.
+
+        The geometry measured is the opening's, not the door/window's: it is
+        a plain box spanning the wall's depth at the element's width and
+        height, so a lining on either face touches it and its centre sits
+        mid-wall. Detailed door/window families took ~70 ms each to
+        tessellate on a Revit export; their openings ~1.5 ms.
+        """
+        extractor = self._extractor
+        if resolve_hosts is None or self._adjacency is None or extractor is None:
+            return ()
+        if not all(
+            hasattr(extractor, name)
+            for name in ("calculate_shortest_distance", "get_centroid_or_none", "distance_from_point_mm")
+        ):
+            return ()
+        try:
+            openings = resolve_openings(element)
+            hosts = resolve_hosts(element)
+        except Exception:
+            return ()
+        # Only hosts that bound no room: one that does was _host_rooms' to judge.
+        hosts = [
+            h for h in hosts
+            if getattr(h, "GlobalId", None)
+            and BOUNDARY_SOURCE_MODEL not in self._adjacency.get_element_spaces(h.GlobalId).values()
+        ]
+        width = self._overall_width_mm(element)
+        if not hosts or not openings or width is None:
+            return ()
+        linings = self._lining_index()
+        boxed = [(o, box) for o in openings if (box := self._box(o)) is not None]
+        if not boxed:
+            return ()
+
+        host_guids = {h.GlobalId for h in hosts}
+        candidates: set[str] = set()
+        for lining, lining_box, space_guids in linings:
+            if lining.GlobalId in host_guids:
+                continue
+            # Broad phase on boxes: mesh distances are the expensive part.
+            near = [o for o, box in boxed if boxes_touch(lining_box, box, _LINING_CONTACT_MM)]
+            if not any(
+                (d := extractor.calculate_shortest_distance(lining, o)) is not None
+                and d <= _LINING_CONTACT_MM
+                for o in near
+            ):
+                continue
+            if not any(
+                (d := extractor.calculate_shortest_distance(lining, h)) is not None
+                and d <= _LINING_CONTACT_MM
+                for h in hosts
+            ):
+                continue
+            candidates.update(space_guids)
+        if not candidates:
+            return ()
+
+        reach = width / 2.0 - _JAMB_MARGIN_MM
+        faced: set[str] = set()
+        for opening, _box in boxed:
+            centre = extractor.get_centroid_or_none(opening)
+            if centre is None:
+                continue
+            for guid in candidates:
+                entity = self.rooms.entity(guid)
+                d = extractor.distance_from_point_mm(entity, centre) if entity else None
+                if d is not None and d <= reach:
+                    faced.add(guid)
+        return self._rooms_for(sorted(faced))
+
+    def _overall_width_mm(self, element) -> float | None:
+        """Return the door/window's authored ``OverallWidth`` in mm, or None."""
+        width = getattr(element, "OverallWidth", None)
+        if not width:
+            return None
+        if self._unit_mm is None:
+            from .ifc_geometry import IFCGeometryExtractor
+
+            self._unit_mm = IFCGeometryExtractor._detect_length_unit_scale(self._ifc_file)
+        return float(width) * self._unit_mm
+
+    def _lining_index(self) -> list[tuple]:
+        """``(element, box, room guids)`` for every room-bounding wall/covering, built once."""
+        if self._linings is None:
+            by_element: dict[str, tuple] = {}
+            for space_guid, data in self._adjacency._space_data.items():
+                if space_guid not in self.rooms:
+                    continue
+                for b in data["boundaries"]:
+                    el = b["element"]
+                    if b.get("source") != BOUNDARY_SOURCE_MODEL or not b["physical"]:
+                        continue
+                    if not any(el.is_a(cls) for cls in _LINING_CLASSES):
+                        continue
+                    by_element.setdefault(b["element_guid"], (el, set()))[1].add(space_guid)
+            # Tessellate every lining, room, door/window opening and host wall
+            # in one multi-threaded pass rather than ~800 sequential
+            # create_shape calls (~30 s on a Revit export; ~3 s this way).
+            prefetch = getattr(self._extractor, "prefetch_meshes", None)
+            if prefetch is not None:
+                fillers = [e for cls in ("IfcDoor", "IfcWindow") for e in self._ifc_file.by_type(cls)]
+                openings = [o for e in fillers for o in resolve_openings(e)]
+                hosts = [h for e in fillers for h in resolve_hosts(e)]
+                rooms = [e for g in self._adjacency._space_data if (e := self.rooms.entity(g))]
+                prefetch([el for el, _ in by_element.values()] + rooms + openings + hosts)
+            self._linings = [
+                (el, box, guids)
+                for el, guids in by_element.values()
+                if (box := self._box(el)) is not None
+            ]
+        return self._linings
 
     def _narrow_by_proximity(self, element, candidates: list[str]) -> list[str]:
         if self._extractor is not None:
