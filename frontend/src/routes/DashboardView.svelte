@@ -467,7 +467,7 @@
         </div>
       {:else}
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-fg-secondary">
+          <table aria-label="Projects" class="w-full text-left text-xs text-fg-secondary">
             <thead
               class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
             >

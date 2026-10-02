@@ -524,7 +524,7 @@
         </div>
       {:else}
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-fg-secondary">
+          <table aria-label="IFC models" class="w-full text-left text-xs text-fg-secondary">
             <thead class="border-b border-border-default">
               <tr>
                 <th scope="col" class="w-10 px-4 py-3">
@@ -816,7 +816,7 @@
               onValueChange={(val) => (primaryRepoPath = val)}
             >
               <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-fg-secondary">
+                <table aria-label="Repository IFC models" class="w-full text-left text-xs text-fg-secondary">
                   <thead
                     class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >

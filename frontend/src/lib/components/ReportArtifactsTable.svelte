@@ -129,7 +129,7 @@
   </div>
 {:else}
   <div class="overflow-x-auto rounded-xl border border-border-default">
-    <table class="w-full border-collapse text-left text-xs">
+    <table aria-label="Report artifacts" class="w-full border-collapse text-left text-xs">
       <thead>
         <tr class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted">
           <th scope="col" class="w-10 px-4 py-3">

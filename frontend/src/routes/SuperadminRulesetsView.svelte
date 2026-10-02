@@ -443,7 +443,7 @@
       class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border shadow-xl"
     >
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+        <table aria-label="Rulesets" class="w-full text-left text-xs">
           <thead>
             <tr class="border-border-default bg-surface-canvas/80 border-b">
               <!-- Master Checkbox Column -->

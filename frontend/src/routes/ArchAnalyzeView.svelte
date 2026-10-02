@@ -959,7 +959,7 @@
               <div>
                 <h3 class="mb-2 text-xs font-semibold text-fg-secondary">Floor Breakdown</h3>
                 <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
-                  <table class="w-full text-xs">
+                  <table aria-label="Floor breakdown" class="w-full text-xs">
                     <thead>
                       <tr class="bg-surface-overlay">
                         <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
@@ -1153,7 +1153,7 @@
                   </button>
                   {#if openSections["exit-count"]}
                     <div class="overflow-auto rounded-lg border border-border-default">
-                      <table class="w-full text-xs">
+                      <table aria-label="Exit count by storey" class="w-full text-xs">
                         <thead
                           ><tr class="bg-surface-overlay">
                             <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
@@ -1217,7 +1217,7 @@
                   </button>
                   {#if openSections["travel-dist"]}
                     <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
-                      <table class="w-full text-xs">
+                      <table aria-label="Travel distance by room" class="w-full text-xs">
                         <thead
                           ><tr class="bg-surface-overlay">
                             <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
@@ -1353,7 +1353,7 @@
           {#if isOpen && gResults.length}
             <div class="px-4 pb-5">
               <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
-                <table class="w-full text-xs">
+                <table aria-label="Garage adjacency results" class="w-full text-xs">
                   <thead
                     ><tr class="bg-surface-overlay">
                       <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Type</th>
@@ -1484,7 +1484,7 @@
                     {/if}
                     {#if openSections["daylight"] || dFail > 0}
                       <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
-                        <table class="w-full text-xs">
+                        <table aria-label="Daylight results by room" class="w-full text-xs">
                           <thead
                             ><tr class="bg-surface-overlay">
                               <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
@@ -1565,7 +1565,7 @@
                     </button>
                     {#if openSections["fire-sep"] || fFail > 0}
                       <div class="max-h-64 overflow-auto rounded-lg border border-border-default">
-                        <table class="w-full text-xs">
+                        <table aria-label="Fire separation results" class="w-full text-xs">
                           <thead
                             ><tr class="bg-surface-overlay">
                               <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"

@@ -378,7 +378,7 @@ print(response.read())
       <!-- Results Table -->
       <div class="border-border-default bg-surface-canvas/50 overflow-hidden rounded-2xl border">
         <div class="overflow-x-auto">
-          <table class="w-full border-collapse text-left text-xs">
+          <table aria-label="Revit sync results" class="w-full border-collapse text-left text-xs">
             <thead>
               <tr
                 class="border-border-default bg-surface-canvas/80 text-micro text-fg-muted border-b font-semibold tracking-wider uppercase"

@@ -405,7 +405,7 @@
         />
       {:else}
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
+          <table aria-label="Organization members" class="w-full text-left text-xs">
             <thead>
               <tr class="border-b border-border-default">
                 <th scope="col" class="w-10 py-3 px-4">

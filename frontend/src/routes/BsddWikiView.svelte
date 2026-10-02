@@ -418,7 +418,7 @@
               />
             </div>
             <div class="max-h-96 overflow-y-auto rounded-xl border border-border-default">
-              <table class="w-full text-xs">
+              <table aria-label="bSDD properties" class="w-full text-xs">
                 <thead class="sticky top-0 bg-surface-card">
                   <tr class="border-b border-border-default text-micro uppercase tracking-wider text-fg-muted">
                     <th scope="col" class="px-3 py-2 text-left">Property</th>

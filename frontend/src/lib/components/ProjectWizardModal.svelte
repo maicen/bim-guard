@@ -834,7 +834,7 @@
                 {:else}
                   <RadioGroupRoot value={primaryRepoPath} onValueChange={(val) => (primaryRepoPath = val)}>
                     <div class="max-h-64 overflow-x-auto overflow-y-auto rounded-xl border border-border-default">
-                      <table class="w-full text-left text-xs text-fg-secondary">
+                      <table aria-label="Repository IFC models" class="w-full text-left text-xs text-fg-secondary">
                         <thead
                           class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                         >

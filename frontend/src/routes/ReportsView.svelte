@@ -649,7 +649,7 @@
           </div>
         {:else}
           <div class="overflow-x-auto rounded-xl border border-border-default">
-            <table class="w-full border-collapse text-left text-xs">
+            <table aria-label="Reports" class="w-full border-collapse text-left text-xs">
               <thead>
                 <tr
                   class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted"

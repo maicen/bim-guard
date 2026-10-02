@@ -603,7 +603,7 @@ SELECT ?storey WHERE {
 
                       {#if check.details && check.details.length > 0}
                         <div class="max-h-56 overflow-auto rounded-xl border border-border-default bg-surface-card">
-                          <table class="w-full text-left text-xs">
+                          <table aria-label="Check detail elements" class="w-full text-left text-xs">
                             <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle">
                               <tr>
                                 <th scope="col" class="px-3 py-2">Element GUID</th>
@@ -718,7 +718,7 @@ SELECT ?storey WHERE {
 
                 {#if regRequirements.requirements.length > 0}
                   <div class="max-h-64 overflow-auto rounded-xl border border-border-default bg-surface-card">
-                    <table class="w-full text-left text-xs">
+                    <table aria-label="Regulatory requirements" class="w-full text-left text-xs">
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle">
                         <tr>
                           <th scope="col" class="px-3 py-2">Standard & Clause</th>
@@ -920,7 +920,7 @@ SELECT ?storey WHERE {
 
                 {#if presetResult.rows.length > 0}
                   <div class="max-h-96 overflow-auto rounded-xl border border-border-default bg-surface-card">
-                    <table class="w-full text-left text-xs">
+                    <table aria-label="Preset query results" class="w-full text-left text-xs">
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                         <tr>
                           {#each presetColumns as col (col)}
@@ -1018,7 +1018,7 @@ SELECT ?storey WHERE {
 
                 {#if sparqlResult.results.bindings.length > 0}
                   <div class="max-h-96 overflow-auto rounded-xl border border-border-default bg-surface-card">
-                    <table class="w-full text-left text-xs">
+                    <table aria-label="SPARQL query results" class="w-full text-left text-xs">
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                         <tr>
                           {#each sparqlVars as v (v)}
@@ -1100,7 +1100,7 @@ SELECT ?storey WHERE {
 
           {#if filteredTraceEntries.length > 0}
             <div class="overflow-auto rounded-xl border border-border-default bg-surface-card max-h-[500px]">
-              <table class="w-full text-left text-xs">
+              <table aria-label="Rule evaluation trace" class="w-full text-left text-xs">
                 <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                   <tr>
                     <th scope="col" class="px-4 py-2.5">Rule Reference</th>

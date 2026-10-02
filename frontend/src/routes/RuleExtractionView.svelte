@@ -1298,7 +1298,7 @@
 
         <div class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border">
           <div class="overflow-x-auto">
-            <table class="text-fg-secondary w-full text-left text-xs">
+            <table aria-label="Extracted rule drafts" class="text-fg-secondary w-full text-left text-xs">
               <thead
                 class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
               >
@@ -1577,7 +1577,7 @@
       <!-- Table Container -->
       <div class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border">
         <div class="overflow-x-auto">
-          <table class="text-fg-secondary w-full text-left text-xs">
+          <table aria-label="Draft rules" class="text-fg-secondary w-full text-left text-xs">
             <thead
               class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
             >

@@ -1415,7 +1415,7 @@
                         </span>
                       </div>
                       <div class="overflow-x-auto p-3">
-                        <table class="w-full text-left text-xs text-fg-secondary">
+                        <table aria-label="Extracted document table" class="w-full text-left text-xs text-fg-secondary">
                           {#if block.rows.length > 0}
                             <thead class="border-b border-border-default bg-surface-card/90 font-semibold uppercase text-caption text-fg-muted">
                               <tr>

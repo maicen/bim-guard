@@ -1270,7 +1270,7 @@
             </div>
           {:else}
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-fg-secondary">
+              <table aria-label="Rules catalog" class="w-full text-left text-xs text-fg-secondary">
                 <thead
                   class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                 >
@@ -1654,7 +1654,7 @@
         />
       {:else}
         <div class="overflow-x-auto rounded-2xl border border-border-default bg-surface-card/60">
-          <table class="w-full text-xs">
+          <table aria-label="Ruleset snapshots" class="w-full text-xs">
             <thead>
               <tr class="border-b border-border-default">
                 <th scope="col" class="w-10 px-4 py-3">

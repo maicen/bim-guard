@@ -123,7 +123,7 @@
     />
   </div>
   <div class="max-h-64 overflow-auto">
-    <table class="w-full text-xs">
+    <table aria-label="Element compliance results" class="w-full text-xs">
       <thead>
         <tr class="bg-surface-overlay">
           <SortHeader column="element" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"

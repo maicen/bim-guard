@@ -447,7 +447,7 @@
                 Classification Matrix (Binary Action Threshold: FAIL)
               </div>
               <div class="overflow-hidden rounded-xl border border-border-default bg-surface-overlay/50">
-                <table class="w-full text-xs text-center border-collapse">
+                <table aria-label="Classification matrix" class="w-full text-xs text-center border-collapse">
                   <thead>
                     <tr class="border-b border-border-default bg-surface-overlay text-fg-muted">
                       <th scope="col" class="p-2.5 text-left font-medium">BIM-Guard \ Expert</th>
@@ -614,7 +614,7 @@
     </BulkActionBar>
 
     <div class="overflow-x-auto rounded-2xl border border-border-default">
-      <table class="w-full text-left text-xs">
+      <table aria-label="Expert verdict evaluations" class="w-full text-left text-xs">
         <thead class="bg-surface-card">
           <tr>
             <th scope="col" class="w-10 px-4 py-3">

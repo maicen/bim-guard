@@ -19,7 +19,7 @@
 </script>
 
 <div class={cn("overflow-x-auto rounded-3xl border border-border-default bg-surface-card shadow-sm", className)}>
-  <table class="w-full text-left text-xs border-collapse">
+  <table aria-label="BIM-Guard feature comparison" class="w-full text-left text-xs border-collapse">
     <thead>
       <tr class="border-b border-border-default bg-surface-overlay/60">
         <th scope="col" class="p-4 sm:p-5 font-bold text-fg-primary">Feature & Workflow Capability</th>

@@ -509,7 +509,7 @@
       class="border-border-default bg-surface-card/40 overflow-hidden rounded-2xl border shadow-xl"
     >
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+        <table aria-label="Project access grants" class="w-full text-left text-xs">
           <thead>
             <tr class="border-border-default bg-surface-canvas/80 border-b">
               <th scope="col" class="w-12 px-4 py-3 text-center">
