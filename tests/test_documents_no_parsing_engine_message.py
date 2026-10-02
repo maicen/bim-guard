@@ -152,7 +152,7 @@ def test_llm_org_falls_back_to_the_single_organization_holding_a_grant():
     assert _org_resolution(user_orgs=(1, 2), grants={}) is None
 
 
-def test_extract_drafts_route_reports_a_total_model_failure_as_502():
+def test_extract_drafts_route_reports_a_total_model_failure_as_400():
     import asyncio
     from unittest.mock import MagicMock, patch
 
@@ -190,7 +190,7 @@ def test_extract_drafts_route_reports_a_total_model_failure_as_502():
                 )
             )
 
-    assert exc_info.value.status_code == 502
+    assert exc_info.value.status_code == 400
     assert "failed on all 2 clauses" in exc_info.value.detail
 
 

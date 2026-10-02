@@ -17,7 +17,7 @@ def test_low_quality_reader_reports_warning_without_improving(tmp_path, monkeypa
     opened_paths = []
 
     class FakeValidator:
-        def __init__(self, path):
+        def __init__(self, path, ifc_file=None):
             assert Path(path) == source_path
 
         def validate(self):

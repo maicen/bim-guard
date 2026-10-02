@@ -9,7 +9,11 @@ import httpx
 import pytest
 from starlette.testclient import TestClient
 
-from app.api.dependencies import get_membership_service, get_profile_service
+from app.api.dependencies import (
+    get_membership_service,
+    get_permission_service,
+    get_profile_service,
+)
 from app.main import app
 from app.services.llm_provider_instances_service import LLMProviderInstancesService
 
@@ -75,6 +79,7 @@ def test_api_test_connection_endpoint(monkeypatch):
     mock_membership_service.get_organization.return_value = {"id": 1, "name": "Default"}
 
     app.dependency_overrides[get_profile_service] = lambda: mock_profile_service
+    app.dependency_overrides[get_permission_service] = lambda: MagicMock()
     app.dependency_overrides[get_membership_service] = lambda: mock_membership_service
 
     try:
@@ -113,3 +118,4 @@ def test_api_test_connection_endpoint(monkeypatch):
     finally:
         app.dependency_overrides.pop(get_profile_service, None)
         app.dependency_overrides.pop(get_membership_service, None)
+        app.dependency_overrides.pop(get_permission_service, None)
