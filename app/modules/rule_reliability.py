@@ -120,6 +120,17 @@ _RELATIONSHIP_LOOKUPS: dict[str, str] = {
     "fillsopening": "IfcRelFillsElement (the opening this element fills)",
     "hostelement": "IfcRelVoidsElement (the wall/slab the opening this element fills belongs to)",
     "typeglobalid": "IfcRelDefinesByType (the element's type object)",
+    "typename": "IfcRelDefinesByType (the element's type object)",
+    "typeobject": "IfcRelDefinesByType (the element's type object)",
+    "elementtype": "IfcRelDefinesByType (the element's type object)",
+    # "WindowType", "IfcDoorStyle", ...: the reader answers these for any
+    # element class; the door/window spellings are the ones rules use.
+    **{
+        f"{prefix}{cls}{suffix}": "IfcRelDefinesByType (the element's type object)"
+        for cls in ("door", "window")
+        for prefix in ("", "ifc")
+        for suffix in ("type", "style")
+    },
     "placementmatrix": "IfcLocalPlacement (the element's own placement)",
 }
 

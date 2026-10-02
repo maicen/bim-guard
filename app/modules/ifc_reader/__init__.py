@@ -107,6 +107,53 @@ _OPENING_RELATIONSHIP_PROPERTIES: dict[str, str] = {
     "hostifcclass": "host_ifc_class",
 }
 
+#: Rule property names (lower-cased, separators stripped) answered from the
+#: element's type object (IfcRelDefinesByType), mapped to what they read. The
+#: class-specific names ("WindowType", "IfcDoorStyle", ...) are matched by
+#: :func:`_type_relationship_value` against the element's own class instead.
+#: Kept in step with ``_RELATIONSHIP_LOOKUPS`` in ``rule_reliability``.
+_TYPE_RELATIONSHIP_PROPERTIES: dict[str, str] = {
+    "typename": "name",
+    "typeobject": "name",
+    "elementtype": "name",
+    "typeglobalid": "global_id",
+}
+
+
+def _type_relationship_keys(el) -> set[str]:
+    """Class-specific type property names for ``el``, e.g. IfcWindow -> windowtype.
+
+    Both the IFC4 ``<Class>Type`` and the IFC2x3 ``<Class>Style`` spellings are
+    included: Revit's IFC2x3 export types windows/doors with IfcWindowStyle /
+    IfcDoorStyle, since IfcWindowType/IfcDoorType do not exist in that schema.
+    """
+    base = el.is_a().lower().removeprefix("ifc").removesuffix("standardcase")
+    return {f"{prefix}{base}{suffix}" for prefix in ("", "ifc") for suffix in ("type", "style")}
+
+
+def _type_relationship_value(el, el_type, prop_key_name: str) -> tuple[object, dict]:
+    """Answer a type-assignment property from the element's type object.
+
+    "Every window must have an assigned IfcWindowType" is a statement about
+    IfcRelDefinesByType, not about any Pset key -- no exporter writes a
+    property literally named ``WindowType``, so a Pset search fails every
+    window, typed or not. Returns ``(None, {})`` when the property is not a
+    type-assignment name or the element has no type, so the rule still fails
+    for a genuinely untyped element.
+    """
+    if el_type is None:
+        return None, {}
+    read = _TYPE_RELATIONSHIP_PROPERTIES.get(prop_key_name)
+    if read is None and prop_key_name in _type_relationship_keys(el):
+        read = "name"
+    if read is None:
+        return None, {}
+    global_id = getattr(el_type, "GlobalId", None)
+    name = getattr(el_type, "Name", None)
+    value = global_id if read == "global_id" else (name or global_id)
+    detail = {"type_ifc_class": el_type.is_a(), "type_global_id": global_id, "type_name": name}
+    return value, detail
+
 
 def _opening_relationship_value(el, field: str) -> tuple[object, dict]:
     """Read ``field`` off the openings ``el`` fills (IfcRelFillsElement).
@@ -1296,6 +1343,7 @@ class IFCReader:
         Resolve one property value for one element via the resolution cascade
         (relationship shortcut -> instance Pset -> rich metadata -> direct
         attribute -> type-level Pset -> alias -> fallback_property ->
+        type assignment ->
         geometry -> unit conversion).
 
         Used both for a rule's main property and for property-referencing
@@ -1536,6 +1584,18 @@ class IFCReader:
                 except Exception:
                     pass
 
+        # ── Pass 6b: type assignment (IfcRelDefinesByType) ───────
+        # After every authored-data pass, so a model that stores e.g. a
+        # "WindowType" Pset value ("Sliding") keeps it for value comparisons;
+        # only when nothing is authored does the type link itself answer.
+        if actual_value is None:
+            try:
+                v, detail = _type_relationship_value(el, self._type_of(el), prop_key_name)
+                if v is not None:
+                    actual_value, found_pset, rich_detail = v, "relationship:type", detail
+            except Exception:
+                pass
+
         # ── Pass 7: bounding-box geometry (Tier 1) ───────────────
         # Only runs when all Pset/attribute passes returned nothing.
         if actual_value is None and self.geometry_extractor and not frame_dependent:
@@ -1557,7 +1617,7 @@ class IFCReader:
         if (
             unit_scale_mm != 1.0
             and actual_value is not None
-            and found_pset != "geometry"
+            and found_pset not in ("geometry", "relationship:type")
         ):
             # A quantity can arrive as a numeric string -- e.g. an
             # IfcLabel('1.2') where the authoring tool typed the Pset value

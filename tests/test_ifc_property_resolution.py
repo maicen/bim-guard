@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ifcopenshell
 import ifcopenshell.api
+import ifcopenshell.guid
 import pytest
 
 from app.modules.ifc_reader import IFCReader
@@ -212,3 +213,103 @@ class TestGlobalIdAttribute:
 
         assert value == window.GlobalId
         assert found_pset == "direct_attribute"
+
+
+def _typed_window(schema: str, type_class: str, type_name: str = "Sliding 2500x2980"):
+    """Return ``(file, window)`` with the window assigned a ``type_class`` type."""
+    f = ifcopenshell.api.run("project.create_file", version=schema)
+    ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcProject", name="Test")
+    window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+    window_type = ifcopenshell.api.run("root.create_entity", f, ifc_class=type_class, name=type_name)
+    ifcopenshell.api.run("type.assign_type", f, related_objects=[window], relating_type=window_type)
+    return f, window
+
+
+class TestTypeAssignment:
+    """"Every window must have an assigned IfcWindowType" reads IfcRelDefinesByType.
+
+    No exporter writes a Pset property literally named ``WindowType``, so the
+    Pset passes alone failed every window -- typed or not.
+    """
+
+    @pytest.mark.parametrize("prop_name", ["WindowType", "IfcWindowType", "Window Type"])
+    def test_ifc4_window_type_answers_from_the_type_object(self, prop_name):
+        f, window = _typed_window("IFC4", "IfcWindowType")
+
+        value, found_pset, detail = _empty_reader(f)._resolve_element_property(window, prop_name)
+
+        assert value == "Sliding 2500x2980"
+        assert found_pset == "relationship:type"
+        assert detail["type_ifc_class"] == "IfcWindowType"
+
+    def test_ifc2x3_window_style_counts_as_the_window_type(self):
+        """IfcWindowType does not exist in IFC2x3; Revit types windows with IfcWindowStyle."""
+        # Built directly: ifcopenshell.api refuses IFC2x3 roots without an
+        # owner history, which is irrelevant to the type link under test.
+        f = ifcopenshell.file(schema="IFC2X3")
+        window = f.create_entity("IfcWindow", GlobalId=ifcopenshell.guid.new())
+        style = f.create_entity(
+            "IfcWindowStyle",
+            GlobalId=ifcopenshell.guid.new(),
+            Name="Sliding 2500x2980",
+            ConstructionType="NOTDEFINED",
+            OperationType="NOTDEFINED",
+            ParameterTakesPrecedence=False,
+            Sizeable=False,
+        )
+        f.create_entity(
+            "IfcRelDefinesByType",
+            GlobalId=ifcopenshell.guid.new(),
+            RelatedObjects=[window],
+            RelatingType=style,
+        )
+
+        value, found_pset, detail = _empty_reader(f)._resolve_element_property(window, "IfcWindowType")
+
+        assert value == "Sliding 2500x2980"
+        assert found_pset == "relationship:type"
+        assert detail["type_ifc_class"] == "IfcWindowStyle"
+
+    def test_untyped_window_still_has_no_window_type(self):
+        f = _metre_model()
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, "WindowType")
+
+        assert value is None
+        assert found_pset is None
+
+    def test_an_authored_window_type_property_wins_over_the_type_link(self):
+        """A model storing "WindowType" itself keeps that value for comparisons."""
+        f, window = _typed_window("IFC4", "IfcWindowType")
+        _add_pset_property(f, window, "Custom", "WindowType", f.createIfcLabel("Sliding"))
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, "WindowType")
+
+        assert value == "Sliding"
+        assert found_pset == "Custom"
+
+    def test_type_global_id_reads_the_type_objects_guid(self):
+        f, window = _typed_window("IFC4", "IfcWindowType")
+        expected = f.by_type("IfcWindowType")[0].GlobalId
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(window, "TypeGlobalId")
+
+        assert value == expected
+
+    def test_a_numeric_type_name_is_not_rescaled_as_a_length(self):
+        f, window = _typed_window("IFC4", "IfcWindowType", type_name="1200")
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(
+            window, "WindowType", unit_scale_mm=1000.0
+        )
+
+        assert value == "1200"
+
+    def test_another_class_type_name_does_not_match(self):
+        """A window is never answered for "DoorType"."""
+        f, window = _typed_window("IFC4", "IfcWindowType")
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(window, "DoorType")
+
+        assert value is None
