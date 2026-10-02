@@ -43,14 +43,14 @@ from app.modules.contracts import (
     RuleImpactResponse,
     SpatialTreeResponse,
 )
-from app.modules.ifc_reader.bot_graph import build_bot_graph, get_element_relationships
+from app.modules.ifc_reader.bot_graph import get_element_relationships
 from app.modules.ifc_reader.ifc_graph import (
     build_ifc_graph,
     build_ifc_graph_summary,
-    build_spatial_tree,
     ingest_ifc_to_graph,
 )
 from app.modules.ifc_reader.ifc_spatial import IFCSpatialAdjacency, heal_spatial_boundaries
+from app.services import ifc_graph_cache
 from app.services.graph_database import GraphService
 from app.services.graph_query_presets import GRAPH_QUERY_PRESETS, get_preset, run_preset
 from app.services.models_service import ModelsService
@@ -159,19 +159,16 @@ def get_graph_status(
         )
 
     try:
-        import ifcopenshell
-
-        model = ifcopenshell.open(str(path))
-        graph = build_ifc_graph(model)
-        summary = build_ifc_graph_summary(graph)
-        adj = IFCSpatialAdjacency(model, fallback_to_geometric=True).build()
+        # Cached per model version; see app/services/ifc_graph_cache.py for why.
+        summary = ifc_graph_cache.graph_summary(path)
+        has_boundaries, is_fallback = ifc_graph_cache.adjacency_flags(path)
 
         return GraphStatusContract(
             project_id=project_id,
             node_count=summary["node_count"],
             edge_count=summary["edge_count"],
-            has_spatial_boundaries=adj.has_boundaries,
-            is_geometric_fallback=adj.is_geometric_fallback,
+            has_spatial_boundaries=has_boundaries,
+            is_geometric_fallback=is_fallback,
             centrality_summary=summary.get("centrality_summary", {}),
         )
     except Exception as exc:
@@ -210,11 +207,7 @@ def get_spatial_tree(
         return SpatialTreeResponse(project_id=project_id, root=None)
 
     try:
-        import ifcopenshell
-
-        model = ifcopenshell.open(str(path))
-        graph = build_ifc_graph(model)
-        tree = build_spatial_tree(graph)
+        tree = ifc_graph_cache.spatial_tree(path)  # cached per model version
         return SpatialTreeResponse(project_id=project_id, root=tree)
     except Exception as exc:
         logger.warning("Failed to build spatial tree for project %d: %s", project_id, exc)
@@ -249,13 +242,9 @@ def get_element_relationships_route(
         return ElementRelationshipsResponse(project_id=project_id, guid=guid, exists=False)
 
     try:
-        import ifcopenshell
-
-        model = ifcopenshell.open(str(path))
-        ifc_graph = build_ifc_graph(model)
-        adjacency = IFCSpatialAdjacency(model, fallback_to_geometric=True).build()
-        bot_graph = build_bot_graph(ifc_graph, adjacency)
-        relationships = get_element_relationships(bot_graph, guid)
+        # The viewer calls this once per clicked element; the BOT graph is
+        # built once per model version and reused (ifc_graph_cache).
+        relationships = get_element_relationships(ifc_graph_cache.bot_graph(path), guid)
         return ElementRelationshipsResponse(project_id=project_id, guid=guid, **relationships)
     except Exception as exc:
         logger.warning(
@@ -356,11 +345,9 @@ def get_code_to_ifc_trace(
         return CodeToIfcTraceResponse(project_id=project_id, entries=[])
 
     try:
-        import ifcopenshell
-
-        model = ifcopenshell.open(str(path))
-        graph = build_ifc_graph(model)
-        summary = build_ifc_graph_summary(graph, include_centrality=False)
+        # type_counts does not depend on centrality, so the cached full
+        # summary (shared with /status) answers this too.
+        summary = ifc_graph_cache.graph_summary(path)
         type_counts: dict[str, int] = summary.get("type_counts", {})
 
         entries: list[CodeToIfcTraceEntry] = []
@@ -585,9 +572,7 @@ def get_model_health_audit(
     total_elements = 0
     if path and path.exists():
         try:
-            import ifcopenshell
-            model = ifcopenshell.open(str(path))
-            total_elements = len(model.by_type("IfcProduct"))
+            total_elements = ifc_graph_cache.product_count(path)  # cached per model version
         except Exception:
             total_elements = 0
 
