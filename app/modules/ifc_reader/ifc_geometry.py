@@ -31,6 +31,8 @@ logger = logging.getLogger("bimguard.geometry")
 try:
     import ifcopenshell
     import ifcopenshell.geom
+    import ifcopenshell.util.element
+    import ifcopenshell.util.placement
     import ifcopenshell.util.shape as _ifcos_shape
 
     IFCOS_AVAILABLE = True
@@ -90,7 +92,8 @@ _GEOMETRY_PROPERTY_MAP: dict[str, str] = {
     "windowsillheight":    "sill_height",
     "thresholdheight":     "sill_height",
     "doorthreshold":       "sill_height",
-    # Top-above-floor (handrail / guard)
+    # Top-above-floor (handrail / guard / door or window head)
+    "headheight":          "handrail_height",
     "handrailheight":      "handrail_height",
     "railingheight":       "handrail_height",
     "barrierheight":       "handrail_height",
@@ -524,6 +527,23 @@ class IFCGeometryExtractor:
             return None
         try:
             return round(_ifcos_shape.get_top_elevation(shape.geometry) * self._mesher_scale, 1)
+        except Exception:
+            return None
+
+    def get_floor_z_mm(self, element) -> float | None:
+        """World Z in mm of the floor of the storey containing *element*.
+
+        Measured in the same frame as get_bottom_z_mm / get_top_z_mm: the
+        storey's placement, with its Elevation attribute only as a fallback.
+        Exporters may write Elevation against another datum -- Revit writes
+        it relative to the survey/base point -- which would put a sill height
+        metres out.
+        """
+        try:
+            storey = ifcopenshell.util.element.get_container(element, ifc_class="IfcBuildingStorey")
+            if storey is None:
+                return None
+            return round(ifcopenshell.util.placement.get_storey_elevation(storey) * self._unit_scale, 1)
         except Exception:
             return None
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
 from app.modules.ifc_reader.ifc_spatial import (
     _is_sleeping_room,
     check_egress_window_openings,
@@ -112,6 +113,9 @@ class _FakeGeometryExtractor:
     def get_bottom_z_mm(self, element):
         return self._bottom_z_mm
 
+    # The real storey-floor lookup: it only needs _unit_scale and the model.
+    get_floor_z_mm = IFCGeometryExtractor.get_floor_z_mm
+
 
 class _FakeAdjacency:
     def __init__(self, space_data: dict):
@@ -119,7 +123,12 @@ class _FakeAdjacency:
         self._space_data = space_data
 
 
-def _build_space_and_window(space_name: str, operation_type: str | None, storey_elevation_mm: float = 0.0):
+def _build_space_and_window(
+    space_name: str,
+    operation_type: str | None,
+    storey_elevation_mm: float = 0.0,
+    storey_placement_z_mm: float | None = None,
+):
     from ifcopenshell.api import run
 
     model = ifcopenshell.file(schema="IFC4")
@@ -129,6 +138,12 @@ def _build_space_and_window(space_name: str, operation_type: str | None, storey_
     building = run("root.create_entity", model, ifc_class="IfcBuilding", name="B")
     storey = run("root.create_entity", model, ifc_class="IfcBuildingStorey", name="L1")
     storey.Elevation = storey_elevation_mm
+    if storey_placement_z_mm is not None:
+        import numpy as np
+
+        matrix = np.eye(4)
+        matrix[2][3] = storey_placement_z_mm
+        run("geometry.edit_object_placement", model, product=storey, matrix=matrix, is_si=False)
     run("aggregate.assign_object", model, products=[site], relating_object=model.by_type("IfcProject")[0])
     run("aggregate.assign_object", model, products=[building], relating_object=site)
     run("aggregate.assign_object", model, products=[storey], relating_object=building)
@@ -227,3 +242,17 @@ class TestCheckEgressWindowOpenings:
         adjacency.has_boundaries = False
         geo = _FakeGeometryExtractor(900.0, 1200.0, 200.0)
         assert check_egress_window_openings(adjacency, geo, **_THRESHOLDS) == []
+
+    def test_sill_is_measured_from_the_storey_placement_not_its_elevation(self):
+        # Revit writes Elevation against the survey point while the geometry
+        # sits on the storey's placement, here 6400mm apart. A 900mm sill must
+        # read as 900mm, not 900 - 6400.
+        space, window = _build_space_and_window(
+            "Master Bedroom", "SLIDINGVERTICAL",
+            storey_elevation_mm=17350.0, storey_placement_z_mm=10950.0,
+        )
+        adjacency = _adjacency_for(space, window)
+        geo = _FakeGeometryExtractor(width_mm=900.0, height_mm=1200.0, bottom_z_mm=11850.0)
+
+        results = check_egress_window_openings(adjacency, geo, **_THRESHOLDS)
+        assert results[0]["best_window"]["sill_height_mm"] == pytest.approx(900.0, abs=0.5)

@@ -883,10 +883,14 @@ def _resolve_window_operation_type(window) -> str | None:
 
 def _get_floor_z_mm(element, geometry_extractor) -> float | None:
     """Storey floor elevation in mm, for measuring a window's sill height
-    above its OWN floor rather than an arbitrary world Z=0 -- same
-    ContainedInStructure walk and unit-scale convention already used
-    elsewhere in this codebase (see ifc_reader.__init__'s SillHeight path).
+    above its OWN floor rather than an arbitrary world Z=0.
+
+    With a geometry extractor this is the storey's world placement (see
+    IFCGeometryExtractor.get_floor_z_mm), the frame sill geometry is measured
+    in; the Elevation attribute is only used without one.
     """
+    if geometry_extractor is not None:
+        return geometry_extractor.get_floor_z_mm(element)
     try:
         for rel in getattr(element, "ContainedInStructure", []):
             container = rel.RelatingStructure

@@ -177,6 +177,26 @@ class TestOpeningRelationship:
         assert value is None
 
 
+class TestRevitSillAndHeadHeight:
+    """Revit exports these as "Sill Height" / "Head Height", spaces included."""
+
+    @pytest.mark.parametrize(
+        ("prop_name", "revit_name", "metres", "mm"),
+        [("SillHeight", "Sill Height", 0.9, 900.0), ("HeadHeight", "Head Height", 2.1, 2100.0)],
+    )
+    def test_revit_parameter_resolves_and_scales_to_mm(self, prop_name, revit_name, metres, mm):
+        f = _metre_model()
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+        _add_pset_property(f, window, "Constraints", revit_name, f.createIfcLengthMeasure(metres))
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(
+            window, prop_name, unit_scale_mm=1000.0
+        )
+
+        assert value == pytest.approx(mm)
+        assert found_pset == "alias:Constraints"
+
+
 class TestGlobalIdAttribute:
     """GlobalId is a direct schema attribute and must resolve like one.
 

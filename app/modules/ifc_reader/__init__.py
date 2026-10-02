@@ -252,6 +252,11 @@ _PROPERTY_ALIASES: dict[str, list[str]] = {
     "HasNonSkidSurface":  ["NonSkidSurface", "SlipResistant", "SlipResistance", "AntiSlip"],
     "WalkingLineOffset":  ["WalklineOffset", "WalkLineOffset"],
     "FireExit":           ["IsFireExit", "EmergencyExit"],
+    # Revit's door/window instance parameters, exported with their spaces
+    # intact (in the "Constraints" set when Revit property sets are on).
+    # Both are measured from the host level, like the geometry fallback.
+    "SillHeight":         ["Sill Height"],
+    "HeadHeight":         ["Head Height"],
     # NOTE: deliberately NOT aliasing a landing's clear width to
     # Qto_SlabBaseQuantities' "Width" — that Qto property is slab THICKNESS,
     # not the landing's clear walking width, on every IfcSlab including
@@ -309,7 +314,7 @@ _LENGTH_MEASURE_TYPES: frozenset[str] = frozenset([
 _LENGTH_DIRECT_ATTRS: frozenset[str] = frozenset([
     "overallwidth", "overallheight", "width", "height",
     "treadlength", "treaddepth", "going", "riserheight",
-    "handrailheight", "sillheight", "headroomclearance",
+    "handrailheight", "sillheight", "headheight", "headroomclearance",
     "requiredheadroom", "headroom", "clearwidth", "nominalwidth", "nominalheight",
     "clearheight", "elevationwithflooring",
     "grosswidth", "grossheight", "netwidth", "netheight",
@@ -1535,12 +1540,8 @@ class IFCReader:
         # Only runs when all Pset/attribute passes returned nothing.
         if actual_value is None and self.geometry_extractor and not frame_dependent:
             try:
-                floor_z = spatial.get("storey_elevation")
-                # storey_elevation from IFC is in model units; convert to mm
-                if floor_z is not None and self.geometry_extractor._unit_scale != 1.0:
-                    floor_z = floor_z * self.geometry_extractor._unit_scale
                 geo_val = self.geometry_extractor.get_geometry_value(
-                    el, prop_name, floor_z
+                    el, prop_name, self.geometry_extractor.get_floor_z_mm(el)
                 )
                 if geo_val is not None:
                     actual_value = geo_val
