@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import { registerWebMcpTools } from "./lib/webmcp";
   import { router, push, replace } from "svelte-spa-router";
   import { Tooltip } from "bits-ui";
   import OrgSidebar from "./lib/components/OrgSidebar.svelte";
@@ -321,6 +322,9 @@
     }
     return `/${view}?${params.toString()}`;
   }
+
+  // Expose the main actions to in-browser AI agents (WebMCP); no-op when unsupported.
+  onMount(() => registerWebMcpTools());
 
   onMount(() => {
     initTheme();
