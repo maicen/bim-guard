@@ -7,7 +7,6 @@ upload through POST /api/documents/confirm failed with a 500.
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 from fastapi import BackgroundTasks
@@ -83,21 +82,19 @@ class _Grants:
 def _confirm(row, monkeypatch) -> BackgroundTasks:
     monkeypatch.setattr(documents_api, "_row_to_detail_response", lambda r, _s: r)
     tasks = BackgroundTasks()
-    asyncio.run(
-        documents_api.confirm_document_upload(
-            payload=DocumentConfirmRequest(
-                file_name="OBC_clauses.txt", storage_reference="docs/new-key.txt", doc_type="Specification",
-                organization_id=1,
-            ),
-            background_tasks=tasks,
-            service=_ExistingRowService(row),
-            instances_service=object(),
-            document_access=_Grants(),
-            memberships=object(),
-            profiles=object(),
-            permissions=object(),
-            current_user=None,
-        )
+    documents_api.confirm_document_upload(
+        payload=DocumentConfirmRequest(
+            file_name="OBC_clauses.txt", storage_reference="docs/new-key.txt", doc_type="Specification",
+            organization_id=1,
+        ),
+        background_tasks=tasks,
+        service=_ExistingRowService(row),
+        instances_service=object(),
+        document_access=_Grants(),
+        memberships=object(),
+        profiles=object(),
+        permissions=object(),
+        current_user=None,
     )
     return tasks
 
