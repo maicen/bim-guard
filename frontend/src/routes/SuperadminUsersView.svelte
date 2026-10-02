@@ -227,11 +227,11 @@
             <table class="w-full text-left text-xs">
               <thead>
                 <tr class="border-border-default bg-surface-canvas/80 border-b">
-                  <th class="text-fg-secondary px-4 py-3 font-semibold">Name</th>
-                  <th class="text-fg-secondary px-4 py-3 font-semibold">Slug</th>
-                  <th class="text-fg-secondary px-4 py-3 font-semibold">Org Code</th>
-                  <th class="text-fg-secondary px-4 py-3 text-center font-semibold">Members</th>
-                  <th class="text-fg-secondary w-16 px-4 py-3 text-center font-semibold">Delete</th>
+                  <th scope="col" class="text-fg-secondary px-4 py-3 font-semibold">Name</th>
+                  <th scope="col" class="text-fg-secondary px-4 py-3 font-semibold">Slug</th>
+                  <th scope="col" class="text-fg-secondary px-4 py-3 font-semibold">Org Code</th>
+                  <th scope="col" class="text-fg-secondary px-4 py-3 text-center font-semibold">Members</th>
+                  <th scope="col" class="text-fg-secondary w-16 px-4 py-3 text-center font-semibold">Delete</th>
                 </tr>
               </thead>
               <tbody class="divide-border-subtle divide-y">
@@ -290,11 +290,11 @@
             <table class="w-full text-left text-xs">
               <thead>
                 <tr class="border-border-default bg-surface-canvas/80 border-b">
-                  <th class="text-fg-secondary px-4 py-3 font-semibold">User</th>
-                  <th class="text-fg-secondary min-w-[16rem] px-4 py-3 font-semibold"
+                  <th scope="col" class="text-fg-secondary px-4 py-3 font-semibold">User</th>
+                  <th scope="col" class="text-fg-secondary min-w-[16rem] px-4 py-3 font-semibold"
                     >Organizations</th
                   >
-                  <th class="text-fg-secondary w-32 px-4 py-3 text-center font-semibold">Actions</th
+                  <th scope="col" class="text-fg-secondary w-32 px-4 py-3 text-center font-semibold">Actions</th
                   >
                 </tr>
               </thead>

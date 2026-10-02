@@ -144,11 +144,17 @@
       </p>
     </div>
 
+    <!-- Announces run state changes to screen readers and DOM-reading agents. -->
+    <p class="sr-only" role="status" aria-live="polite">
+      Analysis pipeline {currentStatus?.status ?? "idle"}, {Math.round(avgProgress ?? 0)}% complete
+    </p>
+
     <!-- Overall Progress Bar -->
     <div class="min-w-[220px]">
       <Progress
         value={avgProgress}
         showLabel={true}
+        ariaLabel="Analysis pipeline progress"
         indicatorClass="bg-linear-to-r from-blue-500 via-indigo-500 to-emerald-400 shadow-xs"
       />
     </div>

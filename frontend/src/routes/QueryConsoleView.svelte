@@ -606,9 +606,9 @@ SELECT ?storey WHERE {
                           <table class="w-full text-left text-xs">
                             <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle">
                               <tr>
-                                <th class="px-3 py-2">Element GUID</th>
-                                <th class="px-3 py-2">Element Name</th>
-                                <th class="px-3 py-2">IFC Entity Type</th>
+                                <th scope="col" class="px-3 py-2">Element GUID</th>
+                                <th scope="col" class="px-3 py-2">Element Name</th>
+                                <th scope="col" class="px-3 py-2">IFC Entity Type</th>
                               </tr>
                             </thead>
                             <tbody class="divide-y divide-border-subtle">
@@ -721,10 +721,10 @@ SELECT ?storey WHERE {
                     <table class="w-full text-left text-xs">
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle">
                         <tr>
-                          <th class="px-3 py-2">Standard & Clause</th>
-                          <th class="px-3 py-2">Target Property</th>
-                          <th class="px-3 py-2">Criterion</th>
-                          <th class="px-3 py-2">Severity</th>
+                          <th scope="col" class="px-3 py-2">Standard & Clause</th>
+                          <th scope="col" class="px-3 py-2">Target Property</th>
+                          <th scope="col" class="px-3 py-2">Criterion</th>
+                          <th scope="col" class="px-3 py-2">Severity</th>
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-border-subtle">
@@ -924,7 +924,7 @@ SELECT ?storey WHERE {
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                         <tr>
                           {#each presetColumns as col (col)}
-                            <th class="px-3.5 py-2">{col}</th>
+                            <th scope="col" class="px-3.5 py-2">{col}</th>
                           {/each}
                         </tr>
                       </thead>
@@ -1022,7 +1022,7 @@ SELECT ?storey WHERE {
                       <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                         <tr>
                           {#each sparqlVars as v (v)}
-                            <th class="px-3.5 py-2 font-mono">?{v}</th>
+                            <th scope="col" class="px-3.5 py-2 font-mono">?{v}</th>
                           {/each}
                         </tr>
                       </thead>
@@ -1103,10 +1103,10 @@ SELECT ?storey WHERE {
               <table class="w-full text-left text-xs">
                 <thead class="bg-surface-canvas/80 font-semibold text-fg-muted border-b border-border-subtle sticky top-0">
                   <tr>
-                    <th class="px-4 py-2.5">Rule Reference</th>
-                    <th class="px-4 py-2.5">Target IFC Class</th>
-                    <th class="px-4 py-2.5">Rule Description</th>
-                    <th class="px-4 py-2.5 text-right">Model Element Count</th>
+                    <th scope="col" class="px-4 py-2.5">Rule Reference</th>
+                    <th scope="col" class="px-4 py-2.5">Target IFC Class</th>
+                    <th scope="col" class="px-4 py-2.5">Rule Description</th>
+                    <th scope="col" class="px-4 py-2.5 text-right">Model Element Count</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border-subtle">

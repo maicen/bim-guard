@@ -527,7 +527,7 @@
           <table class="w-full text-left text-xs text-fg-secondary">
             <thead class="border-b border-border-default">
               <tr>
-                <th class="w-10 px-4 py-3">
+                <th scope="col" class="w-10 px-4 py-3">
                   <TableCheckbox
                     checked={table.allFilteredSelected}
                     indeterminate={table.someFilteredSelected}
@@ -547,7 +547,7 @@
                   sortAsc={table.sortAsc}
                   onSort={(f) => table.toggleSort(f)}>Role</SortHeader
                 >
-                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >ISO 19650</th
                 >
                 <SortHeader
@@ -568,7 +568,7 @@
                   sortAsc={table.sortAsc}
                   onSort={(f) => table.toggleSort(f)}>Elements</SortHeader
                 >
-                <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Discipline</th
                 >
                 <SortHeader
@@ -577,7 +577,7 @@
                   sortAsc={table.sortAsc}
                   onSort={(f) => table.toggleSort(f)}>Uploaded</SortHeader
                 >
-                <th
+                <th scope="col"
                   class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Actions</th
                 >
@@ -821,7 +821,7 @@
                     class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >
                     <tr>
-                      <th class="w-10 px-4 py-3">
+                      <th scope="col" class="w-10 px-4 py-3">
                         <TableCheckbox
                           checked={selectedRepoPaths.size > 0 &&
                             selectedRepoPaths.size === filteredRepoItems.length}
@@ -831,12 +831,12 @@
                           title="Select or deselect all visible models"
                         />
                       </th>
-                      <th class="px-4 py-3">IFC Model Name</th>
-                      <th class="px-4 py-3">Repository Path</th>
-                      <th class="px-4 py-3">Category</th>
-                      <th class="px-4 py-3">Size</th>
-                      <th class="px-4 py-3 text-center">Primary</th>
-                      <th class="px-4 py-3 text-right">Download</th>
+                      <th scope="col" class="px-4 py-3">IFC Model Name</th>
+                      <th scope="col" class="px-4 py-3">Repository Path</th>
+                      <th scope="col" class="px-4 py-3">Category</th>
+                      <th scope="col" class="px-4 py-3">Size</th>
+                      <th scope="col" class="px-4 py-3 text-center">Primary</th>
+                      <th scope="col" class="px-4 py-3 text-right">Download</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-border-subtle">

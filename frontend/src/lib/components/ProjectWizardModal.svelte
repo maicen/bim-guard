@@ -839,7 +839,7 @@
                           class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                         >
                           <tr>
-                            <th class="w-10 px-3 py-2">
+                            <th scope="col" class="w-10 px-3 py-2">
                               <TableCheckbox
                                 checked={selectedRepoPaths.size > 0 &&
                                   selectedRepoPaths.size === filteredRepoItems.length}
@@ -849,10 +849,10 @@
                                 title="Select or deselect all visible models"
                               />
                             </th>
-                            <th class="px-3 py-2">Model</th>
-                            <th class="px-3 py-2">Category</th>
-                            <th class="px-3 py-2">Size</th>
-                            <th class="px-3 py-2 text-center">Primary</th>
+                            <th scope="col" class="px-3 py-2">Model</th>
+                            <th scope="col" class="px-3 py-2">Category</th>
+                            <th scope="col" class="px-3 py-2">Size</th>
+                            <th scope="col" class="px-3 py-2 text-center">Primary</th>
                           </tr>
                         </thead>
                         <tbody class="divide-y divide-border-subtle">

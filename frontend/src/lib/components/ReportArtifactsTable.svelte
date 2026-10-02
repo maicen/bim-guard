@@ -132,7 +132,7 @@
     <table class="w-full border-collapse text-left text-xs">
       <thead>
         <tr class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted">
-          <th class="w-10 px-4 py-3">
+          <th scope="col" class="w-10 px-4 py-3">
             <TableCheckbox
               checked={tableState.allFilteredSelected}
               indeterminate={tableState.someFilteredSelected}
@@ -143,9 +143,9 @@
           <SortHeader column="id" sortField={tableState.sortField} sortAsc={tableState.sortAsc} onSort={(f) => tableState.toggleSort(f)}>
             ID
           </SortHeader>
-          <th class="px-4 py-3">Project</th>
-          <th class="px-4 py-3">Ruleset</th>
-          <th class="px-4 py-3">User</th>
+          <th scope="col" class="px-4 py-3">Project</th>
+          <th scope="col" class="px-4 py-3">Ruleset</th>
+          <th scope="col" class="px-4 py-3">User</th>
           <SortHeader column="filename" sortField={tableState.sortField} sortAsc={tableState.sortAsc} onSort={(f) => tableState.toggleSort(f)}>
             Artifact / Filename
           </SortHeader>
@@ -158,7 +158,7 @@
           <SortHeader column="created_at" sortField={tableState.sortField} sortAsc={tableState.sortAsc} onSort={(f) => tableState.toggleSort(f)}>
             Date
           </SortHeader>
-          <th class="px-4 py-3 text-right">Actions</th>
+          <th scope="col" class="px-4 py-3 text-right">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-border-subtle">

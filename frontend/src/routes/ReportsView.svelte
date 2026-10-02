@@ -654,7 +654,7 @@
                 <tr
                   class="border-b border-border-default bg-surface-canvas/60 text-micro font-semibold uppercase tracking-wider text-fg-muted"
                 >
-                  <th class="w-10 px-4 py-3">
+                  <th scope="col" class="w-10 px-4 py-3">
                     <TableCheckbox
                       checked={topicTable.allFilteredSelected}
                       indeterminate={topicTable.someFilteredSelected}
@@ -694,9 +694,9 @@
                   >
                     ISO 19650 Governance
                   </SortHeader>
-                  <th class="px-4 py-3">Elements</th>
-                  <th class="px-4 py-3">Viewpoints</th>
-                  <th class="px-4 py-3 text-right">Actions</th>
+                  <th scope="col" class="px-4 py-3">Elements</th>
+                  <th scope="col" class="px-4 py-3">Viewpoints</th>
+                  <th scope="col" class="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-border-subtle">

@@ -408,7 +408,7 @@
           <table class="w-full text-left text-xs">
             <thead>
               <tr class="border-b border-border-default">
-                <th class="w-10 py-3 px-4">
+                <th scope="col" class="w-10 py-3 px-4">
                   <TableCheckbox
                     checked={allOnPageSelected}
                     indeterminate={someOnPageSelected}
@@ -420,10 +420,10 @@
                   Member
                 </SortHeader>
                 <SortHeader column="role" {sortField} {sortAsc} onSort={handleSort}>Role</SortHeader>
-                <th class="py-3 px-4 text-left text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                <th scope="col" class="py-3 px-4 text-left text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Group</th
                 >
-                <th class="py-3 px-4 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
+                <th scope="col" class="py-3 px-4 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Actions</th
                 >
               </tr>

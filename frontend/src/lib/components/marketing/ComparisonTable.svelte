@@ -22,10 +22,10 @@
   <table class="w-full text-left text-xs border-collapse">
     <thead>
       <tr class="border-b border-border-default bg-surface-overlay/60">
-        <th class="p-4 sm:p-5 font-bold text-fg-primary">Feature & Workflow Capability</th>
-        <th class="p-4 sm:p-5 font-semibold text-fg-muted text-center w-36">Manual PDF Audits</th>
-        <th class="p-4 sm:p-5 font-semibold text-fg-muted text-center w-48">Desktop Checkers (Solibri/Navisworks)</th>
-        <th class="p-4 sm:p-5 font-bold text-accent text-center w-44 bg-surface-selected">BIM-Guard Cloud</th>
+        <th scope="col" class="p-4 sm:p-5 font-bold text-fg-primary">Feature & Workflow Capability</th>
+        <th scope="col" class="p-4 sm:p-5 font-semibold text-fg-muted text-center w-36">Manual PDF Audits</th>
+        <th scope="col" class="p-4 sm:p-5 font-semibold text-fg-muted text-center w-48">Desktop Checkers (Solibri/Navisworks)</th>
+        <th scope="col" class="p-4 sm:p-5 font-bold text-accent text-center w-44 bg-surface-selected">BIM-Guard Cloud</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-border-subtle">

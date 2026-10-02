@@ -522,7 +522,7 @@
             class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
           >
             <tr>
-              <th class="w-10 px-4 py-3">
+              <th scope="col" class="w-10 px-4 py-3">
                 <TableCheckbox
                   checked={table.allFilteredSelected}
                   indeterminate={table.someFilteredSelected}
@@ -554,7 +554,7 @@
               >
                 Type
               </SortHeader>
-              <th class="px-4 py-3 text-left">DocLang</th>
+              <th scope="col" class="px-4 py-3 text-left">DocLang</th>
               <SortHeader
                 column="char_count"
                 sortField={table.sortField}
@@ -571,7 +571,7 @@
               >
                 Uploaded
               </SortHeader>
-              <th class="px-4 py-3 text-right">Actions</th>
+              <th scope="col" class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border-subtle">

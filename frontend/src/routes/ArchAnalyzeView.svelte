@@ -962,16 +962,16 @@
                   <table class="w-full text-xs">
                     <thead>
                       <tr class="bg-surface-overlay">
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                           >Storey</th
                         >
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                           >Floor-to-Floor</th
                         >
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
+                        <th scope="col" class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                           >Rooms</th
                         >
-                        <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
+                        <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                           >Area m²</th
                         >
                       </tr>
@@ -1156,16 +1156,16 @@
                       <table class="w-full text-xs">
                         <thead
                           ><tr class="bg-surface-overlay">
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Storey</th
                             >
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                               >Exits</th
                             >
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-center text-xs font-semibold text-fg-muted"
                               >Required</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Status</th
                             >
                           </tr></thead
@@ -1220,19 +1220,19 @@
                       <table class="w-full text-xs">
                         <thead
                           ><tr class="bg-surface-overlay">
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Floor</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Room</th
                             >
-                            <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                               >Distance</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Nearest Exit</th
                             >
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                            <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                               >Status</th
                             >
                           </tr></thead
@@ -1356,23 +1356,23 @@
                 <table class="w-full text-xs">
                   <thead
                     ><tr class="bg-surface-overlay">
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Type</th>
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Type</th>
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Element</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Garage Space</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Adjacent</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Rating</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Required</th
                       >
-                      <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                      <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                         >Status</th
                       >
                     </tr></thead
@@ -1487,22 +1487,22 @@
                         <table class="w-full text-xs">
                           <thead
                             ><tr class="bg-surface-overlay">
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Floor</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Room</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Floor m²</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Window m²</th
                               >
-                              <th class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-fg-muted"
                                 >Ratio</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Status</th
                               >
                             </tr></thead
@@ -1568,16 +1568,16 @@
                         <table class="w-full text-xs">
                           <thead
                             ><tr class="bg-surface-overlay">
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Wall</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Between Spaces</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Fire Rating</th
                               >
-                              <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
+                              <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted"
                                 >Status</th
                               >
                             </tr></thead

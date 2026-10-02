@@ -383,7 +383,7 @@ print(response.read())
               <tr
                 class="border-border-default bg-surface-canvas/80 text-micro text-fg-muted border-b font-semibold tracking-wider uppercase"
               >
-                <th class="w-10 px-3 py-3">
+                <th scope="col" class="w-10 px-3 py-3">
                   <TableCheckbox
                     checked={table.allFilteredSelected}
                     indeterminate={table.someFilteredSelected}
@@ -436,8 +436,8 @@ print(response.read())
                 >
                   Pass / Fail / Missing
                 </SortHeader>
-                <th class="px-3 py-3">Violations</th>
-                <th class="px-3 py-3 text-right">Actions</th>
+                <th scope="col" class="px-3 py-3">Violations</th>
+                <th scope="col" class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-border-subtle divide-y">

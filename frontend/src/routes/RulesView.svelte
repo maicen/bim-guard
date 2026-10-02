@@ -1275,7 +1275,7 @@
                   class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                 >
                   <tr>
-                    <th class="w-10 px-4 py-3">
+                    <th scope="col" class="w-10 px-4 py-3">
                       <TableCheckbox
                         checked={table.allFilteredSelected}
                         indeterminate={table.someFilteredSelected}
@@ -1320,7 +1320,7 @@
                     >
                       Target Property
                     </SortHeader>
-                    <th class="px-4 py-3">Condition</th>
+                    <th scope="col" class="px-4 py-3">Condition</th>
                     <SortHeader
                       column="severity"
                       sortField={table.sortField}
@@ -1339,7 +1339,7 @@
                     >
                       Reliability
                     </SortHeader>
-                    <th class="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" class="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border-subtle">
@@ -1657,7 +1657,7 @@
           <table class="w-full text-xs">
             <thead>
               <tr class="border-b border-border-default">
-                <th class="w-10 px-4 py-3">
+                <th scope="col" class="w-10 px-4 py-3">
                   <TableCheckbox
                     checked={snapshotTable.allFilteredSelected}
                     indeterminate={snapshotTable.someFilteredSelected}
@@ -1677,7 +1677,7 @@
                   sortAsc={snapshotTable.sortAsc}
                   onSort={(f) => snapshotTable.toggleSort(f)}>Source Folder</SortHeader
                 >
-                <th
+                <th scope="col"
                   class="px-4 py-3 text-left text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Mode</th
                 >
@@ -1700,7 +1700,7 @@
                   sortAsc={snapshotTable.sortAsc}
                   onSort={(f) => snapshotTable.toggleSort(f)}>Saved</SortHeader
                 >
-                <th
+                <th scope="col"
                   class="px-4 py-3 text-right text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >Actions</th
                 >

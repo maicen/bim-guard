@@ -438,7 +438,7 @@
         <table class="w-full text-left text-xs">
           <thead>
             <tr class="border-border-default bg-surface-canvas/80 border-b">
-              <th class="w-12 px-4 py-3 text-center">
+              <th scope="col" class="w-12 px-4 py-3 text-center">
                 <TableCheckbox
                   checked={allOnPageSelected}
                   indeterminate={someOnPageSelected}
@@ -468,7 +468,7 @@
               <!-- Superadmin Multi-Org View -->
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
-                  <th class="min-w-44 px-4 py-3 text-center">
+                  <th scope="col" class="min-w-44 px-4 py-3 text-center">
                     <div class="text-fg-primary truncate font-semibold" title={org.name}>
                       {org.name}
                     </div>
@@ -492,7 +492,7 @@
               {:else}
                 <!-- Org Owner View: Single Org Status & Preview -->
                 {@const singleOrg = displayOrgs[0] || orgs[0]}
-                <th class="min-w-48 px-4 py-3 text-center">
+                <th scope="col" class="min-w-48 px-4 py-3 text-center">
                   <div class="text-fg-primary font-semibold">
                     {singleOrg?.name || "Organization"} Access
                   </div>
@@ -509,7 +509,7 @@
                   {/if}
                 </th>
               {/if}
-              <th class="w-20 px-4 py-3 text-center">Actions</th>
+              <th scope="col" class="w-20 px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-border-subtle divide-y">

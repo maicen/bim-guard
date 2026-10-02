@@ -12,6 +12,8 @@
     max?: number;
     min?: number;
     showLabel?: boolean;
+    /** Accessible name; a progressbar without one is anonymous to agents/AT. */
+    ariaLabel?: string;
     indicatorClass?: string;
     class?: string;
   }
@@ -21,6 +23,7 @@
     max = 100,
     min = 0,
     showLabel = false,
+    ariaLabel = "Progress",
     indicatorClass = "bg-accent",
     class: className,
   }: Props = $props();
@@ -35,6 +38,7 @@
     {value}
     {max}
     {min}
+    aria-label={ariaLabel}
     class="relative h-2 w-full overflow-hidden rounded-full border border-border-subtle bg-surface-canvas"
   >
     {#if percentage === null}

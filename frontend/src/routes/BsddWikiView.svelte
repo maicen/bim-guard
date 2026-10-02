@@ -421,9 +421,9 @@
               <table class="w-full text-xs">
                 <thead class="sticky top-0 bg-surface-card">
                   <tr class="border-b border-border-default text-micro uppercase tracking-wider text-fg-muted">
-                    <th class="px-3 py-2 text-left">Property</th>
-                    <th class="px-3 py-2 text-left">Pset</th>
-                    <th class="px-3 py-2 text-left">Type</th>
+                    <th scope="col" class="px-3 py-2 text-left">Property</th>
+                    <th scope="col" class="px-3 py-2 text-left">Pset</th>
+                    <th scope="col" class="px-3 py-2 text-left">Type</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border-subtle">

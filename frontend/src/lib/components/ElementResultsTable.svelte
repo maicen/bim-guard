@@ -132,11 +132,11 @@
           <SortHeader column="location" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Floor / Room</SortHeader
           >
-          <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">GUID</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">GUID</th>
           <SortHeader column="actual" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Actual</SortHeader
           >
-          <th class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Required</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-fg-muted">Required</th>
           <SortHeader column="status" {sortField} {sortAsc} {onSort} customClass="px-3 py-2"
             >Status</SortHeader
           >

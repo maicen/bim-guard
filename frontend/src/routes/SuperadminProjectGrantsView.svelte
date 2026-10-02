@@ -512,7 +512,7 @@
         <table class="w-full text-left text-xs">
           <thead>
             <tr class="border-border-default bg-surface-canvas/80 border-b">
-              <th class="w-12 px-4 py-3 text-center">
+              <th scope="col" class="w-12 px-4 py-3 text-center">
                 <TableCheckbox
                   checked={allOnPageSelected}
                   indeterminate={someOnPageSelected}
@@ -542,7 +542,7 @@
               <!-- Superadmin Multi-Org Columns -->
               {#if isSuperadmin && displayOrgs.length > 1}
                 {#each displayOrgs as org (org.id)}
-                  <th class="min-w-44 px-4 py-3 text-center">
+                  <th scope="col" class="min-w-44 px-4 py-3 text-center">
                     <div class="text-fg-primary truncate font-semibold" title={org.name}>
                       {org.name}
                     </div>
@@ -565,12 +565,12 @@
                 {/each}
               {:else}
                 <!-- Organization Owner Columns: Ownership Type, Group Access, Manage -->
-                <th class="min-w-32 px-4 py-3">Ownership</th>
-                <th class="min-w-56 px-4 py-3">Group Access (RBAC)</th>
-                <th class="w-24 px-4 py-3 text-center">Manage</th>
+                <th scope="col" class="min-w-32 px-4 py-3">Ownership</th>
+                <th scope="col" class="min-w-56 px-4 py-3">Group Access (RBAC)</th>
+                <th scope="col" class="w-24 px-4 py-3 text-center">Manage</th>
               {/if}
               {#if isSuperadmin}
-                <th class="w-16 px-4 py-3 text-center">Delete</th>
+                <th scope="col" class="w-16 px-4 py-3 text-center">Delete</th>
               {/if}
             </tr>
           </thead>

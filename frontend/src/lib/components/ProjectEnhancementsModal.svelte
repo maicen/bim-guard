@@ -180,12 +180,12 @@
                     class="border-b border-border-default bg-surface-canvas text-caption font-semibold uppercase tracking-wider text-fg-muted"
                   >
                     <tr>
-                      <th class="px-4 py-3">Source Ver</th>
-                      <th class="px-4 py-3">Generated Ver</th>
-                      <th class="px-4 py-3">Status</th>
-                      <th class="px-4 py-3">Summary</th>
-                      <th class="px-4 py-3">Created</th>
-                      <th class="px-4 py-3 text-right">Actions</th>
+                      <th scope="col" class="px-4 py-3">Source Ver</th>
+                      <th scope="col" class="px-4 py-3">Generated Ver</th>
+                      <th scope="col" class="px-4 py-3">Status</th>
+                      <th scope="col" class="px-4 py-3">Summary</th>
+                      <th scope="col" class="px-4 py-3">Created</th>
+                      <th scope="col" class="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-border-subtle">

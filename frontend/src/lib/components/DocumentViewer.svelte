@@ -1420,7 +1420,7 @@
                             <thead class="border-b border-border-default bg-surface-card/90 font-semibold uppercase text-caption text-fg-muted">
                               <tr>
                                 {#each block.rows[0] as colHeader, colIdx (colIdx)}
-                                  <th class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
+                                  <th scope="col" class="px-3 py-2">{colHeader || `Col ${colIdx + 1}`}</th>
                                 {/each}
                               </tr>
                             </thead>

@@ -450,9 +450,9 @@
                 <table class="w-full text-xs text-center border-collapse">
                   <thead>
                     <tr class="border-b border-border-default bg-surface-overlay text-fg-muted">
-                      <th class="p-2.5 text-left font-medium">BIM-Guard \ Expert</th>
-                      <th class="p-2.5 font-semibold text-critical">Expert: FAIL (Violation)</th>
-                      <th class="p-2.5 font-semibold text-success">Expert: PASS (Compliant)</th>
+                      <th scope="col" class="p-2.5 text-left font-medium">BIM-Guard \ Expert</th>
+                      <th scope="col" class="p-2.5 font-semibold text-critical">Expert: FAIL (Violation)</th>
+                      <th scope="col" class="p-2.5 font-semibold text-success">Expert: PASS (Compliant)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -617,7 +617,7 @@
       <table class="w-full text-left text-xs">
         <thead class="bg-surface-card">
           <tr>
-            <th class="w-10 px-4 py-3">
+            <th scope="col" class="w-10 px-4 py-3">
               <TableCheckbox
                 checked={table.allFilteredSelected}
                 indeterminate={table.someFilteredSelected}
@@ -629,7 +629,7 @@
             <SortHeader column="element_name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Element</SortHeader>
             <SortHeader column="storey" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Location</SortHeader>
             <SortHeader column="bimguard_verdict" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>BIM-Guard</SortHeader>
-            <th class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted">Human Verdict</th>
+            <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted">Human Verdict</th>
             <SortHeader column="captured_at" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Captured</SortHeader>
           </tr>
         </thead>

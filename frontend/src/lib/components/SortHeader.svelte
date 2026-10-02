@@ -23,13 +23,15 @@
 </script>
 
 <th
-  class="{customClass} group cursor-pointer select-none text-caption font-semibold uppercase tracking-wider text-fg-muted transition-colors hover:text-fg-primary"
-  onclick={() => onSort(column)}
-  role="columnheader"
+  scope="col"
+  class="{customClass} group select-none text-caption font-semibold uppercase tracking-wider text-fg-muted transition-colors hover:text-fg-primary"
   aria-sort={sortField === column ? (sortAsc ? "ascending" : "descending") : "none"}
 >
-  <div
-    class="flex items-center gap-1 {align === 'center'
+  <button
+    type="button"
+    onclick={() => onSort(column)}
+    class="flex w-full cursor-pointer items-center gap-1 uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-accent {align ===
+    'center'
       ? 'justify-center'
       : align === 'right'
         ? 'justify-end'
@@ -47,5 +49,5 @@
         class="h-3 w-3 shrink-0 text-fg-muted transition-colors group-hover:text-fg-secondary"
       />
     {/if}
-  </div>
+  </button>
 </th>

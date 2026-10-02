@@ -1303,7 +1303,7 @@
                 class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
               >
                 <tr>
-                  <th class="w-10 px-3 py-3 text-center">
+                  <th scope="col" class="w-10 px-3 py-3 text-center">
                     <TableCheckbox
                       checked={draftTable.allFilteredSelected}
                       indeterminate={draftTable.someFilteredSelected}
@@ -1311,14 +1311,14 @@
                       title="Select all drafts"
                     />
                   </th>
-                  <th class="px-3 py-3">Status</th>
-                  <th class="px-3 py-3">Rule Ref</th>
-                  <th class="px-3 py-3">Description</th>
-                  <th class="px-3 py-3">Pset / Property</th>
-                  <th class="px-3 py-3">Check</th>
-                  <th class="px-3 py-3">Severity</th>
-                  <th class="px-3 py-3">Reliability</th>
-                  <th class="px-3 py-3 text-right">Actions</th>
+                  <th scope="col" class="px-3 py-3">Status</th>
+                  <th scope="col" class="px-3 py-3">Rule Ref</th>
+                  <th scope="col" class="px-3 py-3">Description</th>
+                  <th scope="col" class="px-3 py-3">Pset / Property</th>
+                  <th scope="col" class="px-3 py-3">Check</th>
+                  <th scope="col" class="px-3 py-3">Severity</th>
+                  <th scope="col" class="px-3 py-3">Reliability</th>
+                  <th scope="col" class="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-border-subtle divide-y">
@@ -1582,7 +1582,7 @@
               class="border-border-default bg-surface-canvas text-caption text-fg-muted border-b font-semibold tracking-wider uppercase"
             >
               <tr>
-                <th class="w-10 px-3 py-3 text-center">
+                <th scope="col" class="w-10 px-3 py-3 text-center">
                   <TableCheckbox
                     checked={table.allFilteredSelected}
                     indeterminate={table.someFilteredSelected}
@@ -1635,7 +1635,7 @@
                 >
                   Op
                 </SortHeader>
-                <th class="px-3 py-3">Target Value</th>
+                <th scope="col" class="px-3 py-3">Target Value</th>
                 <SortHeader
                   column="severity"
                   sortField={table.sortField}
@@ -1645,8 +1645,8 @@
                 >
                   Severity
                 </SortHeader>
-                <th class="px-3 py-3">Reliability</th>
-                <th class="px-3 py-3 text-right">Actions</th>
+                <th scope="col" class="px-3 py-3">Reliability</th>
+                <th scope="col" class="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-border-subtle divide-y">
