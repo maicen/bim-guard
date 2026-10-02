@@ -276,6 +276,8 @@ Frontend auth (`frontend/src/lib/auth.svelte.ts`) supports Google OAuth and emai
 1. Copy `frontend/.env.example` to `frontend/.env` — it ships the shared dev account's `VITE_DEV_AUTH_EMAIL` / `VITE_DEV_AUTH_PASSWORD` values, but `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are placeholders you must fill from the team's shared values, or sign-in fails with `401 Invalid API key`.
 2. Run `cd frontend && npm run dev`. A "Sign in as dev test user" button appears on the login screen automatically in dev builds (gated on `import.meta.env.DEV`); click it to sign in as `dev@bim-guard.local`.
 
+To test a **production build** locally (e.g. the Docker image) without Google OAuth credentials, also set `VITE_ALLOW_DEV_LOGIN=true` in `frontend/.env` — this opts the production bundle into showing the same button. Leave it unset for the real `bim-guard.xyz` deployment.
+
 **Rules:**
 
 - Never re-seed unless the account is missing or the password needs rotating. If needed: `uv run python scripts/seed_dev_auth_user.py` (reads `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` and optional `DEV_AUTH_EMAIL` / `DEV_AUTH_PASSWORD` from the root `.env`).

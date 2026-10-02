@@ -15,7 +15,7 @@
   let confirmationSent = $state(false);
 
   const devAuthConfigured =
-    import.meta.env.DEV &&
+    (import.meta.env.DEV || import.meta.env.VITE_ALLOW_DEV_LOGIN === "true") &&
     Boolean(import.meta.env.VITE_DEV_AUTH_EMAIL && import.meta.env.VITE_DEV_AUTH_PASSWORD);
 
   // Already signed in (or just finished the Google redirect) — nothing left to do here.

@@ -88,6 +88,34 @@ bim-guard/
 
 ## Getting Started
 
+### Contributor Quickstart (local Docker, no external accounts needed)
+
+The fastest way to get the full stack running locally, without Cloudflare or Google OAuth credentials:
+
+```bash
+cp example.env .env
+cp frontend/.env.example frontend/.env
+cp docker/supabase/.env.example docker/supabase/.env
+
+docker compose up --build
+```
+
+Then, once the containers are healthy, apply the database schema (the self-hosted Supabase
+Docker stack starts with an empty database — unlike `supabase start`, it does not apply
+migrations automatically):
+
+```bash
+uv run python scripts/migrate_production.py --apply
+```
+
+Visit [http://localhost:8000](http://localhost:8000) and use the **"Sign in as dev test user"**
+button on the login screen (seeded by default via `frontend/.env.example`'s
+`VITE_DEV_AUTH_EMAIL`/`VITE_DEV_AUTH_PASSWORD`) — no Google OAuth setup required.
+
+This does not use the Cloudflare Tunnel or `bim-guard.xyz` domain — see
+[§5](#5-internal-production-deployment-httpsbim-guardxyz-docker-compose--cloudflare-tunnel) for
+that internal deployment path, which needs credentials external contributors won't have.
+
 ### 1. Install dependencies
 
 ```bash
@@ -142,7 +170,7 @@ Supabase schema changes are now tracked in-repo under `supabase/migrations/`. Fo
 
 The platform runs a self-hosted Supabase Docker Compose stack (`docker/supabase/docker-compose.yml`) integrated directly into production via `docker-compose.yml`:
 - **Production Host**: Database (PostgreSQL 17 on `54322`), Kong Gateway (`54321` host / `8000` internal), Auth, Storage, and Studio (`54323`).
-- **Dev-Only Hosted Supabase**: The team's remote hosted Supabase project is preserved exclusively for development and staging tests. To point your local development environment at the hosted project instead of the local Docker stack, copy the credentials from `.env.hosted_dev`.
+- **Dev-Only Hosted Supabase (internal team only)**: The team's remote hosted Supabase project is preserved exclusively for development and staging tests. Internal team members with access to the shared credentials vault can copy them into a local, gitignored `.env.hosted_dev` file to point at the hosted project instead of the local Docker stack. This isn't required (or available) for external contributors — use the Contributor Quickstart above or the Disposable CLI Stack below instead.
 - **Disposable CLI Stack**: Alternatively, `supabase start` boots a lightweight temporary local stack using the Supabase CLI. Copy values from [`example.env.local`](example.env.local) if using this path.
 
 ### 3. Run Development Servers (FastAPI Backend + Svelte Frontend)
@@ -164,6 +192,7 @@ Interactive FastAPI Swagger docs are at [http://127.0.0.1:8000/api/docs](http://
 **Svelte SPA Frontend:**
 ```bash
 cd frontend
+cp .env.example .env   # fill in VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 npm install
 npm run dev
 ```
@@ -176,7 +205,12 @@ To build the frontend and serve the compiled single-page application with multi-
 - **macOS / Linux / WSL**: `./run_production_server.sh` (or `./run_production_server.bat`)
 - **Windows**: `run_production_server.bat`
 
-### 5. Serving at https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
+### 5. Internal Production Deployment: https://bim-guard.xyz (Docker Compose & Cloudflare Tunnel)
+
+This section documents the **internal** production deployment and requires credentials
+(Cloudflare Zero Trust tunnel token, `bim-guard.xyz` domain access) that external
+contributors won't have. For running the stack locally, use the
+[Contributor Quickstart](#contributor-quickstart-local-docker-no-external-accounts-needed) above instead.
 
 To serve the complete production platform at `https://bim-guard.xyz` using OrbStack/Docker and Cloudflare Zero Trust:
 
@@ -199,6 +233,12 @@ To serve the complete production platform at `https://bim-guard.xyz` using OrbSt
    docker compose --profile tunnel up -d --build bim-guard
    ```
    *(Or simply `docker compose up -d --build [bim-guard]` if `COMPOSE_PROFILES=tunnel` is set in `.env`)*.
+
+   On a fresh database, apply migrations once (the self-hosted Supabase Docker stack does not
+   auto-apply them the way `supabase start` does):
+   ```bash
+   uv run python scripts/migrate_production.py --apply
+   ```
 
 3. **Services running in `docker-compose.yml`**:
    - **`bim-guard-app`**: Production 4-worker FastAPI gateway + compiled Svelte 5 SPA on `:8000`.
