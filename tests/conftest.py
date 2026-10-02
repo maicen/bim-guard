@@ -1,7 +1,7 @@
 """Shared fixtures and defect registry for the BIMGUARD validation suite.
 
 This conftest is deliberately additive: it defines fixtures and constants and
-installs no hooks, so the pre-existing tests under ``tests/`` behave exactly as
+installs only a session-end cleanup hook, so the pre-existing tests under ``tests/`` behave exactly as
 they did before it existed.
 
 Two registries live here, and the difference between them is the point:
@@ -240,6 +240,55 @@ except ImportError:
 # TEST_USER acts as an org owner (full access to whatever it creates) via the
 # synthetic membership stubbed in above -- there is no real membership row to
 # promote, since the fake user is not in auth.users.
+
+
+def purge_test_user_audit_rows() -> int:
+    """Delete the ``audit_log`` rows written by the fake test user; return how many.
+
+    Every project or document a test creates and deletes is audited under
+    ``TEST_USER``, and the table is append-only, so the suite left hundreds of
+    ``project.deleted`` rows behind. Only that one fake actor's rows are removed.
+    """
+    from app.bootstrap import get_container
+
+    repo = get_container().audit_log_repo
+    ids = [row["id"] for row in repo.rows_where("actor_id = ?", [TEST_USER.id])]
+    if ids:
+        repo.delete_many(ids)
+    return len(ids)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Purge the test user's audit rows once, on the main process only.
+
+    Under pytest-xdist each worker also runs this hook; skipping workers keeps
+    one worker finishing early from deleting rows another is still asserting on.
+    """
+    if hasattr(session.config, "workerinput"):
+        return
+    try:
+        purge_test_user_audit_rows()
+    except Exception:  # cleanup must never fail the run
+        pass
+
+
+@pytest.fixture(autouse=True)
+def offline_embeddings(monkeypatch):
+    """Keep tests off the real embedding provider.
+
+    With provider keys in ``.env`` the suite made live ``text-embedding-3-small``
+    calls (slow, billable, nondeterministic) and logged each one to the live
+    ``llm_calls`` table. ``EmbeddingService`` already falls back to deterministic
+    pseudo-vectors when the provider call raises, so raising here exercises that
+    path. A test that needs a specific provider response can monkeypatch
+    ``_call_embedding_provider`` itself; its patch is applied after this one.
+    """
+    from app.services.embedding_service import EmbeddingService
+
+    async def _offline(self, texts):
+        raise RuntimeError("embedding provider disabled in tests")
+
+    monkeypatch.setattr(EmbeddingService, "_call_embedding_provider", _offline)
 
 
 @pytest.fixture
