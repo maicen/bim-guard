@@ -186,7 +186,7 @@
           {/if}
         </div>
         <div class="mt-1 truncate text-xs font-bold text-fg-primary">{stage.name}</div>
-        <div class="mt-0.5 line-clamp-1 text-micro text-fg-muted opacity-70">{stage.desc}</div>
+        <div class="mt-0.5 line-clamp-1 text-micro text-fg-muted">{stage.desc}</div>
       </div>
     {/each}
   </div>
