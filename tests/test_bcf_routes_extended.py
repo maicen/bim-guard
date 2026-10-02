@@ -2,12 +2,15 @@
 PUT+DELETE, list pagination, and BCF-XML (.bcfzip) import.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.modules.reporter.bcf_generator import BCFIssue, generate_bcf
 
 client = TestClient(app)
+
+pytestmark = pytest.mark.usefixtures("purge_created_bcf_topics")
 
 
 def test_bcf_current_user():
@@ -129,13 +132,13 @@ def test_bcf_import_round_trips_export():
         due_date="",
         labels=["ImportTest"],
         component_guid="2O2Fr$t4X7Zf8NOew3FL01",
-        component_name="Test Pipe",
-        service_type="Domestic Water",
+        component_name="Test Door",
+        service_type="Architectural",
         floor="Level 01",
         risk_band="high",
-        mechanism="galvanic",
+        mechanism="code",
         risk_score=0.82,
-        mitigation="Insert dielectric isolation.",
+        mitigation="Widen the door leaf.",
     )
     archive_bytes = generate_bcf([issue])
 

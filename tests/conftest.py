@@ -242,6 +242,40 @@ except ImportError:
 # promote, since the fake user is not in auth.users.
 
 
+@pytest.fixture
+def purge_created_bcf_topics(monkeypatch):
+    """Delete every BCF topic the test creates, whether or not the test passes.
+
+    BCF topics are written to the live database and the BCF API tests use fixed
+    project ids ("0", "999"), so uncleaned runs piled up hundreds of rows and
+    pushed new topics off the first page of list results. Creation is recorded
+    per test (not diffed against a snapshot) so parallel xdist workers sharing
+    those project ids never delete each other's in-flight topics.
+    """
+    from app.services.bcf_sync_service import BCFSyncService
+
+    created: list[tuple[str, str]] = []
+    real_create = BCFSyncService.create_topic
+    real_import = BCFSyncService.import_topic
+
+    def create_topic(self, project_id, *args, **kwargs):
+        topic = real_create(self, project_id, *args, **kwargs)
+        created.append((str(project_id), topic.guid))
+        return topic
+
+    def import_topic(self, project_id, *args, **kwargs):
+        topic = real_import(self, project_id, *args, **kwargs)
+        created.append((str(project_id), topic.guid))
+        return topic
+
+    monkeypatch.setattr(BCFSyncService, "create_topic", create_topic)
+    monkeypatch.setattr(BCFSyncService, "import_topic", import_topic)
+    yield
+    service = BCFSyncService()
+    for project_id, guid in created:
+        service.delete_topic(project_id, guid)
+
+
 @pytest.fixture(autouse=True)
 def reset_in_memory_cache():
     """Reset the global database query cache before and after every test."""

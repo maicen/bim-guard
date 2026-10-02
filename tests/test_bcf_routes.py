@@ -2,11 +2,14 @@
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 client = TestClient(app)
+
+pytestmark = pytest.mark.usefixtures("purge_created_bcf_topics")
 
 
 def test_bcf_list_and_get_projects():
