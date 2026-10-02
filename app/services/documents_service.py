@@ -691,7 +691,13 @@ class DocumentService:
         suitability_code: str = "S0",
         revision_code: str = "P01.01",
     ) -> tuple[dict, bool]:
-        """Register a document that was uploaded to storage, marking it as Processing."""
+        """Register a document that was uploaded to storage, before its text is extracted.
+
+        The row is created in the ``WIP`` CDE state: ``cde_state`` is the ISO 19650
+        workflow state (constrained to WIP/SHARED/PUBLISHED/ARCHIVED by
+        ``documents_cde_state_check`` and the ``CDEState`` enum), not a processing
+        status, so the background extraction must not write "Processing"/"Failed" there.
+        """
         from app.modules.document_parsing.iso_validator import ISO19650Validator
 
         if not md5_hash:
@@ -731,7 +737,7 @@ class DocumentService:
             originator=originator,
             suitability_code=suitability_code,
             revision_code=revision_code,
-            cde_state="Processing",
+            cde_state="WIP",
         )
         return created, True
 
@@ -749,8 +755,7 @@ class DocumentService:
         try:
             local_path = self._storage.materialize_local_path(storage_reference)
             if not local_path or not local_path.exists():
-                logger.error(f"Uploaded file not found at {storage_reference}")
-                self.update_document(document_id, filename, cde_state="Failed")
+                logger.error("Uploaded file not found at %s (document %s)", storage_reference, document_id)
                 return
 
             _text, pages, doclang_xml, element_bboxes = self.extract_document_text_paged(
@@ -765,8 +770,8 @@ class DocumentService:
                 element_bboxes=element_bboxes
             )
         except Exception:
-            logger.exception("Background document processing failed for %s", filename)
-            self.update_document(document_id, filename, cde_state="Failed")
+            # The document stays in WIP with no DocLang; it can be re-run via generate-doclang.
+            logger.exception("Background document processing failed for %s (document %s)", filename, document_id)
 
     def register_pre_uploaded_document(
         self,

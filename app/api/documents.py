@@ -490,7 +490,7 @@ async def confirm_document_upload(
         elif user_orgs:
             target_org_id = next(iter(user_orgs))
 
-    # 1. Register the document as Processing immediately
+    # 1. Register the document immediately (WIP); text extraction runs in the background
     try:
         resolved_instance = _resolve_parsing_instance(payload.engine_instance, target_org_id, instances_service) if payload.generate_doclang else None
 
