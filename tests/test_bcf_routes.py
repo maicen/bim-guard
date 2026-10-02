@@ -1,5 +1,7 @@
 """Tests for BCF REST API v2.1/v3.0 endpoints and bidirectional sync."""
 
+import uuid
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -24,13 +26,16 @@ def test_bcf_list_and_get_projects():
 
 def test_bcf_topics_crud_and_iso19650_metadata():
     proj_id = "0"
+    # Unique assignee: earlier runs leak topics into project 0, so a status-only
+    # filter can push this topic past the first page of results.
+    assignee = f"Lead Architect {uuid.uuid4().hex}"
     create_payload = {
         "title": "Critical Egress Travel Distance Violation",
         "topic_type": "Issue",
         "topic_status": "Open",
         "priority": "Critical",
         "description": "Maximum travel distance exceeded from habitable room to exit.",
-        "assigned_to": "Lead Architect",
+        "assigned_to": assignee,
         "due_date": "2026-10-01",
         "labels": ["Compliance", "Egress", "HighRisk"],
         "component_guids": ["2O2Fr$t4X7Zf8NOew3FL01", "2O2Fr$t4X7Zf8NOew3FL02"],
@@ -44,35 +49,38 @@ def test_bcf_topics_crud_and_iso19650_metadata():
     assert create_resp.status_code == 201
     topic = create_resp.json()
     topic_guid = topic["guid"]
-    assert topic["title"] == create_payload["title"]
-    assert topic["priority"] == "Critical"
-    assert topic["suitability_code"] == "S2"
-    assert topic["cde_state"] == "SHARED"
-    assert len(topic["component_guids"]) == 2
+    try:
+        assert topic["title"] == create_payload["title"]
+        assert topic["priority"] == "Critical"
+        assert topic["suitability_code"] == "S2"
+        assert topic["cde_state"] == "SHARED"
+        assert len(topic["component_guids"]) == 2
 
-    # 2. Get Topic
-    get_resp = client.get(f"/api/bcf/v2.1/projects/{proj_id}/topics/{topic_guid}")
-    assert get_resp.status_code == 200
-    assert get_resp.json()["guid"] == topic_guid
+        # 2. Get Topic
+        get_resp = client.get(f"/api/bcf/v2.1/projects/{proj_id}/topics/{topic_guid}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["guid"] == topic_guid
 
-    # 3. Update Topic
-    update_payload = {
-        "topic_status": "InProgress",
-        "priority": "Major",
-        "cde_state": "PUBLISHED",
-    }
-    update_resp = client.put(f"/api/bcf/v2.1/projects/{proj_id}/topics/{topic_guid}", json=update_payload)
-    assert update_resp.status_code == 200
-    updated_topic = update_resp.json()
-    assert updated_topic["topic_status"] == "InProgress"
-    assert updated_topic["priority"] == "Major"
-    assert updated_topic["cde_state"] == "PUBLISHED"
+        # 3. Update Topic
+        update_payload = {
+            "topic_status": "InProgress",
+            "priority": "Major",
+            "cde_state": "PUBLISHED",
+        }
+        update_resp = client.put(f"/api/bcf/v2.1/projects/{proj_id}/topics/{topic_guid}", json=update_payload)
+        assert update_resp.status_code == 200
+        updated_topic = update_resp.json()
+        assert updated_topic["topic_status"] == "InProgress"
+        assert updated_topic["priority"] == "Major"
+        assert updated_topic["cde_state"] == "PUBLISHED"
 
-    # 4. List Topics with filter
-    list_resp = client.get(f"/api/bcf/v2.1/projects/{proj_id}/topics?topic_status=InProgress")
-    assert list_resp.status_code == 200
-    matched_guids = [t["guid"] for t in list_resp.json()]
-    assert topic_guid in matched_guids
+        # 4. List Topics with filter
+        list_resp = client.get(f"/api/bcf/v2.1/projects/{proj_id}/topics?topic_status=InProgress&assigned_to={assignee}")
+        assert list_resp.status_code == 200
+        matched_guids = [t["guid"] for t in list_resp.json()]
+        assert topic_guid in matched_guids
+    finally:
+        client.delete(f"/api/bcf/v2.1/projects/{proj_id}/topics/{topic_guid}")
 
 
 def test_bcf_comments_and_viewpoints():
