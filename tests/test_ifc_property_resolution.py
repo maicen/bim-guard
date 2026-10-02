@@ -349,3 +349,66 @@ class TestIfcClass:
         value, _, _ = _empty_reader(f)._resolve_element_property(proxy, "ifc_class")
 
         assert value == "IfcBuildingElementProxy"
+
+
+class TestTypeAssignmentCount:
+    """"Each window must resolve exactly one type association" counts IfcRelDefinesByType.
+
+    No exporter writes a ``TypeAssignmentCount`` Pset value, so every window
+    reported missing whether or not it was typed.
+    """
+
+    @pytest.mark.parametrize("prop_name", ["TypeAssignmentCount", "type_assignment_count", "TypeCount"])
+    def test_ifc4_typed_window_counts_one(self, prop_name):
+        f, window = _typed_window("IFC4", "IfcWindowType")
+
+        value, found_pset, detail = _empty_reader(f)._resolve_element_property(window, prop_name)
+
+        assert value == 1
+        assert found_pset == "relationship:type_count"
+        assert detail["type_names"] == ["Sliding 2500x2980"]
+
+    def test_untyped_window_counts_zero_not_missing(self):
+        """0 is a real answer the rule must fail, not a missing value."""
+        f = _metre_model()
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, "TypeAssignmentCount")
+
+        assert value == 0
+        assert found_pset == "relationship:type_count"
+
+    def test_ifc2x3_window_style_counts_via_is_defined_by(self):
+        """IFC2x3 has no IsTypedBy inverse; the type link sits in IsDefinedBy."""
+        f = ifcopenshell.file(schema="IFC2X3")
+        window = f.create_entity("IfcWindow", GlobalId=ifcopenshell.guid.new())
+        style = f.create_entity(
+            "IfcWindowStyle",
+            GlobalId=ifcopenshell.guid.new(),
+            Name="Sliding",
+            ConstructionType="NOTDEFINED",
+            OperationType="NOTDEFINED",
+            ParameterTakesPrecedence=False,
+            Sizeable=False,
+        )
+        f.create_entity(
+            "IfcRelDefinesByType", GlobalId=ifcopenshell.guid.new(), RelatedObjects=[window], RelatingType=style
+        )
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(window, "TypeAssignmentCount")
+
+        assert value == 1
+
+    def test_window_assigned_two_types_counts_two(self):
+        f, window = _typed_window("IFC4", "IfcWindowType")
+        second = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindowType", name="Casement")
+        # Built directly: type.assign_type replaces an existing assignment,
+        # but a malformed export can carry two.
+        f.create_entity(
+            "IfcRelDefinesByType", GlobalId=ifcopenshell.guid.new(), RelatedObjects=[window], RelatingType=second
+        )
+
+        value, _, detail = _empty_reader(f)._resolve_element_property(window, "TypeAssignmentCount")
+
+        assert value == 2
+        assert sorted(detail["type_names"]) == ["Casement", "Sliding 2500x2980"]

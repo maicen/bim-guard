@@ -57,6 +57,7 @@ def test_bimguards_relationship_lookups_are_high_and_cite_the_relationship():
         ("HostGlobalId", "IfcRelVoidsElement"),
         ("OpeningGlobalId", "IfcRelFillsElement"),
         ("TypeGlobalId", "IfcRelDefinesByType"),
+        ("TypeAssignmentCount", "IfcRelDefinesByType"),
         ("PlacementMatrix", "IfcLocalPlacement"),
     ]:
         result = assess_property("", name)

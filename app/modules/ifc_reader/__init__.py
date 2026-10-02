@@ -155,6 +155,34 @@ def _type_relationship_value(el, el_type, prop_key_name: str) -> tuple[object, d
     return value, detail
 
 
+#: Rule property names (lower-cased, separators stripped) answered with the
+#: number of type objects assigned to the element (IfcRelDefinesByType).
+#: Kept in step with ``_RELATIONSHIP_LOOKUPS`` in ``rule_reliability``.
+_TYPE_ASSIGNMENT_COUNT_PROPERTIES = frozenset(
+    {"typeassignmentcount", "typecount", "numberoftypes", "typeassignments"}
+)
+
+
+def _type_assignment_count(el) -> tuple[int, dict]:
+    """Count the distinct type objects ``el`` is assigned via IfcRelDefinesByType.
+
+    "Each window must resolve exactly one type association" is a count of
+    relationships, which no exporter writes as a Pset value -- so without this
+    every window reported missing, typed or not. ``get_type`` cannot answer it:
+    it returns only the first type. IFC4 holds the link in ``IsTypedBy``;
+    IFC2x3 has no such inverse and lists it among ``IsDefinedBy``. An untyped
+    element counts 0 (a real answer that fails "== 1"), never ``None``.
+    """
+    rels = list(getattr(el, "IsTypedBy", None) or [])
+    rels += [r for r in (getattr(el, "IsDefinedBy", None) or []) if r.is_a("IfcRelDefinesByType")]
+    types = {r.RelatingType.id(): r.RelatingType for r in rels if r.RelatingType is not None}
+    detail = {
+        "type_global_ids": [getattr(t, "GlobalId", None) for t in types.values()],
+        "type_names": [getattr(t, "Name", None) for t in types.values()],
+    }
+    return len(types), detail
+
+
 def _opening_relationship_value(el, field: str) -> tuple[object, dict]:
     """Read ``field`` off the openings ``el`` fills (IfcRelFillsElement).
 
@@ -1388,6 +1416,12 @@ class IFCReader:
             # Answered first, ahead of authored data: no Pset value can change
             # an element's runtime class.
             return el.is_a(), "attribute:ifc_class", rich_detail
+        elif prop_key_name in _TYPE_ASSIGNMENT_COUNT_PROPERTIES:
+            # How many types the element is assigned is a relationship count,
+            # answered ahead of authored data and never left missing: an
+            # untyped element is 0, which is exactly what the rule must fail.
+            count, detail = _type_assignment_count(el)
+            return count, "relationship:type_count", detail
         elif prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
             storey_name = spatial.get("storey_name")
             if storey_name:
