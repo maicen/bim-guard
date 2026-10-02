@@ -62,6 +62,16 @@
     "modeling-manual": { section: "Resources", title: "3D Modeling Reference" },
     "bsdd-wiki": { section: "Resources", title: "bSDD Wiki" },
     "design-system": { section: "Resources", title: "Design System Catalog" },
+    "new-project": { section: "Platform", title: "New Project" },
+    "run-compliance-test": { section: "Analysis", title: "Run Compliance Audit" },
+    "copilot": { section: "Coordination", title: "Graph-RAG Copilot" },
+    "permissions": { section: "Admin", title: "Permissions" },
+    "login": { section: "BIM Guard", title: "Sign In" },
+    "external-providers": { section: "Integrations", title: "External Providers" },
+    "superadmin-users": { section: "Governance", title: "User Access" },
+    "document": { section: "Library", title: "Document Viewer" },
+    "rule-source": { section: "Library", title: "Rule Source" },
+    "ruleset-source-map": { section: "Library", title: "Ruleset Source Map" },
     settings: { section: "System", title: "Application Settings" },
     admin: { section: "Admin", title: "Organization Settings" },
     "org-settings": { section: "Admin", title: "Organization Settings" },
@@ -80,6 +90,12 @@
           title: activeView,
         },
   );
+
+  // Distinct per-route title so agents (and screen readers) can confirm which
+  // view a hash navigation landed on.
+  $effect(() => {
+    document.title = `${headerInfo.title} · BIM Guard`;
+  });
 </script>
 
 <header
