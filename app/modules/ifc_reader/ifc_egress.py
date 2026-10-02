@@ -438,16 +438,18 @@ def check_egress_travel_distance(
             best_dist = 0.0
             best_exit_name = name
         else:
+            # One Dijkstra from this space reaches every exit at once; asking
+            # shortest_path_length per exit re-ran the search exits-times over.
+            # Exits are still compared in the same order with the same strict
+            # "<", so the chosen exit (ties included) is unchanged.
+            dist_from_space = nx.single_source_dijkstra_path_length(G, sguid, weight="weight")
             for exit_guid in egress_graph._exit_spaces:
-                if exit_guid not in G:
+                dist = dist_from_space.get(exit_guid)
+                if dist is None:  # not in G, or unreachable (was NetworkXNoPath)
                     continue
-                try:
-                    dist = nx.shortest_path_length(G, sguid, exit_guid, weight="weight")
-                    if best_dist is None or dist < best_dist:
-                        best_dist = dist
-                        best_exit_name = egress_graph._space_names.get(exit_guid, exit_guid)
-                except nx.NetworkXNoPath:
-                    continue
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    best_exit_name = egress_graph._space_names.get(exit_guid, exit_guid)
 
         if best_dist is None:
             results.append({

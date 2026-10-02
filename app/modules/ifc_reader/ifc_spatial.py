@@ -251,9 +251,13 @@ class IFCSpatialAdjacency:
       is_geometric_fallback : bool -- True if populated via geometric proximity
     """
 
-    def __init__(self, ifc_file, fallback_to_geometric: bool = True):
+    def __init__(self, ifc_file, fallback_to_geometric: bool = True, geometry_extractor=None):
         self.ifc_file = ifc_file
         self.fallback_to_geometric = fallback_to_geometric
+        # Optional shared IFCGeometryExtractor. Passing the reader's own lets
+        # the geometric fallback reuse shapes it has already tessellated (and
+        # vice versa) instead of building a second, empty-cache extractor.
+        self._geometry_extractor = geometry_extractor
         self._space_data: dict[str, dict] = {}
         self._wall_spaces: dict[str, list[str]] = {}
         self._door_to_spaces: dict[str, list[str]] | None = None
@@ -343,11 +347,13 @@ class IFCSpatialAdjacency:
         if not spaces:
             return
 
-        try:
-            from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
-            extractor = IFCGeometryExtractor(self.ifc_file)
-        except Exception:
-            extractor = None
+        extractor = self._geometry_extractor
+        if extractor is None:
+            try:
+                from app.modules.ifc_reader.ifc_geometry import IFCGeometryExtractor
+                extractor = IFCGeometryExtractor(self.ifc_file)
+            except Exception:
+                extractor = None
 
         try:
             walls = self.ifc_file.by_type("IfcWall") + self.ifc_file.by_type("IfcWallStandardCase")
@@ -371,14 +377,21 @@ class IFCSpatialAdjacency:
             space_boxes[guid] = (sp, box)
 
         cand_boxes: list[tuple[Any, str, str, dict[str, float] | None]] = []
+        seen_candidates: set[str] = set()
         for c in candidates:
             guid = getattr(c, "GlobalId", None)
-            if not guid:
+            # by_type("IfcWall") already includes IfcWallStandardCase, so those
+            # walls appear twice in candidates; keep the first occurrence only.
+            if not guid or guid in seen_candidates:
                 continue
+            seen_candidates.add(guid)
             box = extractor.get_bounding_box(c) if extractor else None
             cand_boxes.append((c, guid, c.is_a(), box))
 
         found_any = False
+        # Boundary GUIDs already recorded per space, as sets: the previous
+        # any(...) scan over the boundary list made each insert O(boundaries).
+        boundary_guids: dict[str, set[str]] = {}
         for s_guid, (sp, s_box) in space_boxes.items():
             for c_elem, c_guid, c_type, c_box in cand_boxes:
                 is_contact = False
@@ -397,8 +410,13 @@ class IFCSpatialAdjacency:
                             "space": sp,
                             "boundaries": [],
                         }
-                    if any(b["element_guid"] == c_guid for b in self._space_data[s_guid]["boundaries"]):
+                    seen = boundary_guids.get(s_guid)
+                    if seen is None:
+                        seen = {b["element_guid"] for b in self._space_data[s_guid]["boundaries"]}
+                        boundary_guids[s_guid] = seen
+                    if c_guid in seen:
                         continue
+                    seen.add(c_guid)
                     self._space_data[s_guid]["boundaries"].append(
                         {
                             "element": c_elem,
@@ -1041,6 +1059,21 @@ def check_egress_window_openings(
     return results
 
 
+def _wall_by_guid(ifc_file, wall_guid: str):
+    """Return the IfcWall (or subtype) with ``wall_guid``, else None.
+
+    An indexed ``by_guid`` lookup. The separation checks used to scan every
+    wall in the model for each wall they examined (O(walls^2)). The ``is_a``
+    test keeps the old scan's behaviour of ignoring non-wall elements that
+    happen to bound a space.
+    """
+    try:
+        element = ifc_file.by_guid(wall_guid)
+    except Exception:
+        return None
+    return element if element is not None and element.is_a("IfcWall") else None
+
+
 _GARAGE_KW = frozenset(["garage", "carport", "car port", "parking", "vehicle"])
 
 
@@ -1096,15 +1129,7 @@ def check_fire_separation(
         wall_guid = pw["wall_guid"]
         space_guids = pw["space_guids"]
 
-        # Resolve wall element from guid
-        wall = None
-        try:
-            for candidate in adjacency.ifc_file.by_type("IfcWall"):
-                if candidate.GlobalId == wall_guid:
-                    wall = candidate
-                    break
-        except Exception:
-            pass
+        wall = _wall_by_guid(adjacency.ifc_file, wall_guid)
 
         if wall is None:
             continue
@@ -1215,15 +1240,7 @@ def check_garage_separation(adjacency: IFCSpatialAdjacency) -> dict:
         if not garage_side or not living_side:
             continue
 
-        # Resolve wall element
-        wall = None
-        try:
-            for candidate in adjacency.ifc_file.by_type("IfcWall"):
-                if candidate.GlobalId == wall_guid:
-                    wall = candidate
-                    break
-        except Exception:
-            pass
+        wall = _wall_by_guid(adjacency.ifc_file, wall_guid)
         if wall is None:
             continue
 

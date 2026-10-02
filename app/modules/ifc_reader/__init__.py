@@ -560,7 +560,9 @@ class IFCReader:
         if _SPATIAL_AVAILABLE:
             self.spatial_adjacency = _timed(
                 "spatial-adjacency",
-                lambda: IFCSpatialAdjacency(self.ifc_file).build(),
+                lambda: IFCSpatialAdjacency(
+                    self.ifc_file, geometry_extractor=self.geometry_extractor
+                ).build(),
             )
         if _ROOMS_AVAILABLE and self.spatial_adjacency is not None:
             self.room_linker = _timed(

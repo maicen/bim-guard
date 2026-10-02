@@ -415,6 +415,8 @@ Each production worker serves every request from one asyncio event loop, so thes
 - **Filter in the database, not in Python.** Use `adapter.rows_where("col = ?", [value])` instead of iterating `adapter.rows` (which pages through the entire table). Example: `DocumentPagesService.get_pages`.
 - **Batch writes.** Use `insert_many` / `RuleService.create_rules_bulk` instead of `insert` in a loop. Test fakes of table adapters must implement `insert_many` too.
 - **Fetch only what the caller uses.** e.g. `RuleService.get_folder_meta` when only a folder's name/description is needed, rather than `get_folder` (which also loads its rules).
+- **IFC analysis: per element, not per rule × element.** Inside `IFCReader.extract_for_compliance`, read element data through the per-run memo helpers (`_psets`, `_type_of`, `_rich_properties`, `_direct_attributes`, `_memo(...)`) rather than calling `ifcopenshell.util.element` directly; treat memoised values as read-only. Geometry for many elements goes through `IFCGeometryExtractor.prefetch_centroids` (multi-threaded iterator) before per-element calls, never a loop of sequential `create_shape` (see `IFCEgressGraph.build`). Resolve elements by `ifc_file.by_guid(...)`, never by scanning `by_type(...)` for a GUID.
+- **Document every optimization in the file it lives in**: a comment at the change site saying what was slow, why this approach, and the invariant that keeps it correct.
 - **Index foreign keys** in the same migration that adds them (see `supabase/migrations/20261002194152_index_unindexed_foreign_keys.sql`).
 
 ### Database & Rule Management
