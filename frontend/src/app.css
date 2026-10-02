@@ -245,6 +245,7 @@ html.dark {
   --accent-rgb: 0 113 227;        /* #0071e3 - the one chromatic accent */
   --accent-hover-rgb: 0 119 237;  /* #0077ed */
   --focus-ring: #0071e3;            /* resolved accent, for plain-CSS use */
+  --accent-text-rgb: 41 151 255;  /* #2997ff - accent as TEXT on dark surfaces (#0071e3 is 4.3:1, below AA) */
 
   /* Retained for the handful of plain-CSS rules below that cannot use a
      Tailwind utility; component markup must use the `accent` token instead. */
@@ -413,6 +414,12 @@ code, kbd, samp, pre {
 
    `html:root :focus-visible` outranks Tailwind's `.focus\:outline-none:focus`
    and is declared after `@tailwind utilities`, so it wins without !important. */
+/* Accent used as text on the dark canvas needs a lighter tint than the button
+   fill (white-on-#0071e3 stays AA, #0071e3-on-#020617 does not). */
+html.dark .text-accent {
+  color: rgb(var(--accent-text-rgb));
+}
+
 html:root :focus-visible {
   outline-width: 2px;
   outline-style: solid;
