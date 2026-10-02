@@ -302,7 +302,7 @@ def test_folders_bulk_operations():
             json={
                 "ruleset_ids": [f1_id, f2_id],
                 "category": "Arch",
-                "mechanism_scope": "EGRESS",
+                "mechanism_scope": "CODE",
             },
         )
         assert bulk_up_res.status_code == 200
@@ -310,7 +310,7 @@ def test_folders_bulk_operations():
 
         f1_data = client.get(f"/api/rules/folders/{f1_id}").json()
         assert f1_data["category"] == "Arch"
-        assert f1_data["mechanism_scope"] == "EGRESS"
+        assert f1_data["mechanism_scope"] == "CODE"
     finally:
         # Bulk delete
         bulk_del_res = client.post(
