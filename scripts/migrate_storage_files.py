@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-BASE_DIR = Path("/Users/sam/coding/bim-guard")
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "migration"
 STORAGE_CACHE_DIR = DATA_DIR / "storage_artifacts"
 STORAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)

@@ -31,13 +31,13 @@ jobs:
     runs-on: self-hosted
     defaults:
       run:
-        working-directory: /Users/sam/coding/bim-guard
+        working-directory: /Users/sam/coding/bg/bim-guard
     steps:
       - name: Sync Git Repository
         run: |
           TARGET_BRANCH="${{ github.event.inputs.branch || 'main' }}"
           echo "==> Configuring safe.directory..."
-          git config --global --add safe.directory /Users/sam/coding/bim-guard || true
+          git config --global --add safe.directory /Users/sam/coding/bg/bim-guard || true
 
           echo "==> Fetching latest changes for branch '$TARGET_BRANCH' from origin..."
           git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$TARGET_BRANCH":refs/remotes/origin/"$TARGET_BRANCH"

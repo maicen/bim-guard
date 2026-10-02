@@ -6,6 +6,7 @@
         "shd101wyy.markdown-preview-enhanced",
         "anthropic.claude-code",
         "google.google-antigravity",
-        "svelte.svelte-vscode"
+        "svelte.svelte-vscode",
+        "github.vscode-github-actions"
     ]
 }
