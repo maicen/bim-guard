@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 from starlette.testclient import TestClient
 
+from app.bootstrap import get_container
 from app.main import app
 from app.services.rules_service import RuleService
 
@@ -106,6 +107,11 @@ def test_snapshot_crud_and_pdf_download_lifecycle():
         severity="mandatory",
     )
 
+    # The snapshot list is scoped to rulesets the caller's organization is granted;
+    # the rule was created directly (not through the API), so grant it explicitly.
+    access = get_container().ruleset_access_service
+    access.add_org_grant(1, SNAPSHOT_LIFECYCLE_RULESET_ID)
+
     try:
         # Create
         create_res = client.post(
@@ -144,6 +150,9 @@ def test_snapshot_crud_and_pdf_download_lifecycle():
         assert client.get(f"/api/rules/snapshots/{snapshot_id}").status_code == 404
         assert client.delete(f"/api/rules/snapshots/{snapshot_id}").status_code == 404
     finally:
+        access.set_org_grants(
+            1, [g for g in access.list_org_grants(1) if g != SNAPSHOT_LIFECYCLE_RULESET_ID]
+        )
         _cleanup(SNAPSHOT_LIFECYCLE_RULESET_ID)
 
 
