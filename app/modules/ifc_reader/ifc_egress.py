@@ -422,7 +422,10 @@ def check_egress_travel_distance(
 
     results: list[dict] = []
 
-    for sguid in egress_graph._habitable_spaces:
+    # Sorted: these are sets of GUID strings, whose iteration order varies run to
+    # run (hash randomisation), which reordered the results -- and the reports
+    # built from them -- on every analysis.
+    for sguid in sorted(egress_graph._habitable_spaces):
         if sguid not in G:
             continue
 
@@ -440,10 +443,10 @@ def check_egress_travel_distance(
         else:
             # One Dijkstra from this space reaches every exit at once; asking
             # shortest_path_length per exit re-ran the search exits-times over.
-            # Exits are still compared in the same order with the same strict
-            # "<", so the chosen exit (ties included) is unchanged.
+            # Exits are compared in sorted order with a strict "<", so a tie
+            # between equidistant exits always picks the lowest GUID.
             dist_from_space = nx.single_source_dijkstra_path_length(G, sguid, weight="weight")
-            for exit_guid in egress_graph._exit_spaces:
+            for exit_guid in sorted(egress_graph._exit_spaces):
                 dist = dist_from_space.get(exit_guid)
                 if dist is None:  # not in G, or unreachable (was NetworkXNoPath)
                     continue
