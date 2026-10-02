@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import uuid
 from pathlib import Path
 
@@ -280,6 +281,28 @@ class ObjectStorage:
                 "Supabase Storage requires SUPABASE_URL and a server-side API key"
             )
 
-        options = ClientOptions(httpx_client=httpx.Client(timeout=120.0))
-        self._client = create_client(url, key, options=options)
+        self._client = _shared_storage_client(url, key)
         return self._client
+
+
+_storage_clients: dict[tuple[str, str], Client] = {}
+_storage_clients_lock = threading.Lock()
+
+
+def _shared_storage_client(url: str, key: str) -> Client:
+    """Return the per-process Supabase client for ``(url, key)``.
+
+    WHY: ObjectStorage is constructed ad hoc in many routes and services, and
+    each instance used to create its own Supabase client with a new
+    ``httpx.Client`` -- so no storage request reused a pooled connection
+    (every upload/download paid a fresh TCP/TLS handshake) and the clients
+    were never closed. One shared client per credentials pair fixes both;
+    ``httpx.Client`` is safe to share across threads.
+    """
+    with _storage_clients_lock:
+        client = _storage_clients.get((url, key))
+        if client is None:
+            options = ClientOptions(httpx_client=httpx.Client(timeout=120.0))
+            client = create_client(url, key, options=options)
+            _storage_clients[(url, key)] = client
+        return client
