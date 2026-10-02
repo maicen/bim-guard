@@ -175,3 +175,20 @@ class TestOpeningRelationship:
         value, _found_pset, _ = _empty_reader(f)._resolve_element_property(window, "OpeningElement")
 
         assert value is None
+
+
+class TestGlobalIdAttribute:
+    """GlobalId is a direct schema attribute and must resolve like one.
+
+    It used to be on get_direct_attributes' skip list, so an ``exists``
+    rule on GlobalId reported every element as missing it.
+    """
+
+    def test_globalid_resolves_from_the_entity(self):
+        f = _metre_model()
+        window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, "GlobalId")
+
+        assert value == window.GlobalId
+        assert found_pset == "direct_attribute"

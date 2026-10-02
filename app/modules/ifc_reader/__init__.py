@@ -937,6 +937,8 @@ class IFCReader:
         e.g. IfcDoor.OverallHeight, IfcWindow.OverallWidth, IfcSlab.PredefinedType
 
         Excludes relationship handles (those are object references, not values).
+        GlobalId is kept: rules such as "every window must have a GlobalId"
+        resolve it through this method, like any other schema attribute.
         """
         try:
             info = element.get_info()
@@ -946,7 +948,6 @@ class IFCReader:
         _SKIP = {
             "id",
             "type",
-            "GlobalId",
             "OwnerHistory",
             "ObjectPlacement",
             "Representation",
