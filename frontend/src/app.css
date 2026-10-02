@@ -356,6 +356,7 @@ html:not(.dark) {
 
   --accent-rgb: 0 102 204;        /* #0066cc - AA on white (DESIGN.md link blue) */
   --accent-hover-rgb: 0 113 227;  /* #0071e3 */
+  --accent-text-rgb: 0 102 204;   /* #0066cc - same as accent; text-safe on white */
   --focus-ring: #0066cc;
   --bimguard-blue: #0066cc;
   --bimguard-blue-hover: #0071e3;

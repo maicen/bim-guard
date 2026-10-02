@@ -148,6 +148,9 @@
     tabindex="0"
     aria-orientation={direction === "horizontal" ? "vertical" : "horizontal"}
     aria-label="Resize panes"
+    aria-valuenow={Math.round(ratio * 100)}
+    aria-valuemin={0}
+    aria-valuemax={100}
     onpointerdown={onDividerPointerDown}
     onkeydown={onDividerKeydown}
     class="group relative shrink-0 touch-none select-none {direction === 'horizontal'

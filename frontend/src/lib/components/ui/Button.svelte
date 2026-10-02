@@ -32,7 +32,8 @@
     outline:
       "border border-border-default bg-transparent text-fg-secondary hover:bg-surface-hover hover:text-fg-primary active:scale-[0.98]",
     ghost: "bg-transparent text-fg-secondary hover:bg-surface-hover hover:text-fg-primary active:scale-[0.98]",
-    destructive: "bg-critical text-white hover:bg-critical/90 shadow-xs active:scale-[0.98]",
+    destructive:
+      "border border-critical-border bg-critical-bg text-critical hover:bg-critical-bg/70 shadow-xs active:scale-[0.98]",
   };
 
   const sizeStyles: Record<ButtonSize, string> = {

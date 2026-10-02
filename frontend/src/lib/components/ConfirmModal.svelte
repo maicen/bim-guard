@@ -97,8 +97,10 @@
           onclick={handleConfirm}
           disabled={isSubmitting}
           class={cn(
-            "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-semibold text-white shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50",
-            danger ? "bg-critical hover:bg-critical/90" : "bg-accent hover:bg-accent-hover",
+            "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50",
+            danger
+              ? "border border-critical-border bg-critical-bg text-critical hover:bg-critical-bg/70"
+              : "bg-accent text-white hover:bg-accent-hover",
           )}
         >
           {#if isSubmitting}

@@ -133,6 +133,7 @@
 </script>
 
 <div class="mx-auto space-y-4">
+  <h1 class="sr-only">3D OpenBIM Viewer</h1>
   {#if selectedElementGuid}
     <div
       class="flex items-center justify-between rounded-xl border border-info-border bg-info-bg p-3 text-xs text-info"

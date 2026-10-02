@@ -149,6 +149,9 @@
       tabindex="0"
       aria-orientation="vertical"
       aria-label="Resize {title} panel"
+      aria-valuenow={size}
+      aria-valuemin={minSize}
+      aria-valuemax={maxSize}
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
       class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
@@ -242,6 +245,9 @@
       tabindex="0"
       aria-orientation="vertical"
       aria-label="Resize {title} panel"
+      aria-valuenow={size}
+      aria-valuemin={minSize}
+      aria-valuemax={maxSize}
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
       class="group relative w-1 shrink-0 cursor-col-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging
@@ -258,6 +264,9 @@
       tabindex="0"
       aria-orientation="horizontal"
       aria-label="Resize {title} panel"
+      aria-valuenow={size}
+      aria-valuemin={minSize}
+      aria-valuemax={maxSize}
       onpointerdown={onHandlePointerDown}
       onkeydown={onHandleKeydown}
       class="group relative h-1 w-full shrink-0 cursor-row-resize touch-none select-none bg-border-default transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden {dragging

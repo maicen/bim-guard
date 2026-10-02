@@ -514,7 +514,7 @@
   .rbn-btn.active {
     background: rgb(var(--accent-rgb) / 0.15);
     border-color: rgb(var(--accent-rgb) / 0.5);
-    color: var(--color-accent);
+    color: rgb(var(--accent-text-rgb));
   }
   .rbn-btn.active.warning {
     background: var(--color-warning-bg);

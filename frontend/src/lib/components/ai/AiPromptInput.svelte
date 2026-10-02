@@ -108,7 +108,7 @@
         <button
           type="button"
           onclick={onStop}
-          class="w-8 h-8 rounded-lg bg-critical hover:bg-critical/90 text-white flex items-center justify-center transition-colors shadow-xs"
+          class="w-8 h-8 rounded-lg border border-critical-border bg-critical-bg hover:bg-critical-bg/70 text-critical flex items-center justify-center transition-colors shadow-xs"
           title="Stop streaming"
         >
           <Square class="w-3.5 h-3.5 fill-current" />

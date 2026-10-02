@@ -343,6 +343,19 @@
 
   onMount(() => {
     init();
+
+    // ThatOpen's <bim-button> keeps its text in a `label` attribute and
+    // renders it inside a shadow root, so from the page it is an unnamed
+    // role="button". Mirror the label into aria-label as controls appear.
+    const nameBimButtons = () => {
+      for (const el of document.querySelectorAll<HTMLElement>("bim-button[label]:not([aria-label])")) {
+        el.setAttribute("aria-label", el.getAttribute("label") ?? "");
+      }
+    };
+    nameBimButtons();
+    const observer = new MutationObserver(nameBimButtons);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   });
 
   onDestroy(() => {
@@ -448,7 +461,7 @@
           <button
             type="button"
             onclick={() => loadProjectModel(projectId, fileId)}
-            class="flex items-center gap-1 rounded-lg bg-critical px-2.5 py-1 text-caption font-medium text-white transition-opacity hover:opacity-90"
+            class="flex items-center gap-1 rounded-lg border border-critical-border bg-critical-bg px-2.5 py-1 text-caption font-medium text-critical transition-opacity hover:opacity-90"
           >
             <RefreshCw class="h-3 w-3" />
             <span>Retry</span>
@@ -472,7 +485,12 @@
 
   <!-- Docked workspace: one collapsible Properties dock (BCF/Spatial/Layers) around the 3D viewport -->
   <div class="flex min-h-0 flex-1">
-    <div bind:this={viewportHost} class="min-h-0 min-w-0 flex-1 bg-surface-canvas"></div>
+    <div
+      bind:this={viewportHost}
+      role="region"
+      aria-label="3D model viewport"
+      class="min-h-0 min-w-0 flex-1 bg-surface-canvas"
+    ></div>
 
     <CollapsiblePanel
       title="Properties"
