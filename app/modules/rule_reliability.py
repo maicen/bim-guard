@@ -58,6 +58,29 @@ class Assessment:
     bsdd_defined: Optional[bool] = None
 
 
+#: Namespace prefixes a rule may put in front of a property name to say what
+#: kind of thing it reads ("relationships.host_global_id",
+#: "attributes.OverallWidth"). They name a category, not a Pset, so the
+#: resolver reads the bare name after them. A Pset-qualified name
+#: ("Pset_DoorCommon.FireRating") is not one of these and is left untouched.
+_PROPERTY_NAMESPACES = frozenset(
+    {"relationship", "relationships", "attribute", "attributes", "property", "properties", "quantities"}
+)
+
+
+def strip_property_namespace(prop_name: str) -> str:
+    """Drop a leading category namespace, e.g. ``relationships.host_global_id`` -> ``host_global_id``.
+
+    Without this the dotted name matched none of the relationship/attribute
+    lookups, so every element reported the property missing. Shared with the IFC
+    reader, which resolves the same bare name.
+    """
+    prefix, dot, rest = prop_name.strip().partition(".")
+    if dot and rest and prefix.strip().lower() in _PROPERTY_NAMESPACES:
+        return rest.strip()
+    return prop_name
+
+
 def _key(text: Optional[str]) -> str:
     """Lower-case and strip everything but letters and digits, so ``Fire Rating`` == ``FireRating``."""
     return re.sub(r"[^a-z0-9]", "", (text or "").lower())
@@ -273,7 +296,9 @@ def assess_property(property_set: Optional[str], property_name: Optional[str]) -
     order -- the same order the property resolver itself tries a stored value before ever falling
     back to a geometry estimate (see the module docstring for each source).
     """
-    name = _key(property_name)
+    # "relationships.host_global_id" grades as "host_global_id", the name
+    # the reader actually resolves (see strip_property_namespace there).
+    name = _key(strip_property_namespace(property_name or ""))
     if not name:
         return None
     bsdd_defined = (name in _bsdd_property_names()) if _bsdd_property_names() else None

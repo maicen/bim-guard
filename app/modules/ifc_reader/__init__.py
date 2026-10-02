@@ -37,6 +37,7 @@ from pathlib import Path
 
 from app.logging_config import get_logger
 from app.modules.room_types import ROOM_SCOPE_KEYS
+from app.modules.rule_reliability import strip_property_namespace
 
 logger = get_logger(__name__)
 
@@ -1393,6 +1394,7 @@ class IFCReader:
 
         if not prop_name:
             return actual_value, found_pset, rich_detail
+        prop_name = strip_property_namespace(prop_name)
 
         # ── Pass 0: relationship-derived properties ────────────────────────
         # Storey containment (IfcRelContainedInSpatialStructure) and material

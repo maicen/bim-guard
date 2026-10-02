@@ -14,7 +14,7 @@ import pytest
 
 from app.modules import rule_reliability
 from app.modules.contracts import RuleCreateRequest, RuleExtractionDraft, RuleResponse
-from app.modules.rule_reliability import assess_property, assess_rule
+from app.modules.rule_reliability import assess_property, assess_rule, strip_property_namespace
 
 _SCHEMA_ATTRIBUTES = frozenset({"globalid", "name", "overallwidth", "overallheight", "predefinedtype", "tag"})
 #: pset -> the properties it actually contains, mirroring app.services.bsdd_ontology_repository's
@@ -58,6 +58,7 @@ def test_bimguards_relationship_lookups_are_high_and_cite_the_relationship():
         ("OpeningGlobalId", "IfcRelFillsElement"),
         ("TypeGlobalId", "IfcRelDefinesByType"),
         ("TypeAssignmentCount", "IfcRelDefinesByType"),
+        ("relationships.host_global_id", "IfcRelVoidsElement"),
         ("PlacementMatrix", "IfcLocalPlacement"),
     ]:
         result = assess_property("", name)
@@ -224,3 +225,11 @@ def test_assess_reliability_endpoint_grades_before_a_rule_is_saved():
     assert graded.reliability.level == "medium"
     assert graded.reliability.bsdd_defined is True
     assert assess_rule_reliability(RuleReliabilityRequest(property_set="Attributes")).reliability is None
+
+
+def test_only_category_namespaces_are_stripped_from_a_property_name():
+    assert strip_property_namespace("relationships.host_global_id") == "host_global_id"
+    assert strip_property_namespace("Attributes.OverallWidth") == "OverallWidth"
+    # A Pset-qualified name is not a category namespace and is left alone.
+    assert strip_property_namespace("Pset_DoorCommon.FireRating") == "Pset_DoorCommon.FireRating"
+    assert strip_property_namespace("FireRating") == "FireRating"

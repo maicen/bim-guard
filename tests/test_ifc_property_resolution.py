@@ -169,6 +169,16 @@ class TestOpeningRelationship:
         assert m2._resolve_element_property(window, "HostIfcClass")[0] == "IfcWall"
         assert m2._resolve_element_property(window, "HostGlobalId")[0] == wall.GlobalId
 
+    @pytest.mark.parametrize("prop_name", ["relationships.host_global_id", "Relationships.HostGlobalId"])
+    def test_a_namespace_prefix_is_read_as_the_bare_name(self, prop_name):
+        """A rule saying "relationships.host_global_id" means host_global_id."""
+        f, wall, _opening, window = self._window_in_wall()
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(window, prop_name)
+
+        assert value == wall.GlobalId
+        assert found_pset == "relationship:fills_opening"
+
     def test_window_filling_no_opening_stays_missing(self):
         f = _metre_model()
         window = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWindow")
