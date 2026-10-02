@@ -758,6 +758,7 @@ class RuleExtractionService:
 
         extraction_progress.start(document_id, total=len(nodes))
         semaphore = asyncio.Semaphore(self._max_concurrent_nodes)
+        finish_lock = asyncio.Lock()
         failures: list[Exception] = []
 
         async def process_node(node: contracts.DocumentNodeContract) -> list[contracts.RuleExtractionDraft]:
@@ -784,21 +785,32 @@ class RuleExtractionService:
                     return []
                 finally:
                     extraction_progress.increment(document_id)
-                return [
-                    self._apply_mapped_check_category(
-                        self._ground_draft_with_bsdd(
-                            draft.model_copy(
-                                update={
-                                    "source_snippet": node.text,
-                                    "proposed_rule": draft.proposed_rule.model_copy(
-                                        update={"ruleset_id": batch_ruleset_id}
-                                    ),
-                                }
+
+                def finish_drafts() -> list[contracts.RuleExtractionDraft]:
+                    return [
+                        self._apply_mapped_check_category(
+                            self._ground_draft_with_bsdd(
+                                draft.model_copy(
+                                    update={
+                                        "source_snippet": node.text,
+                                        "proposed_rule": draft.proposed_rule.model_copy(
+                                            update={"ruleset_id": batch_ruleset_id}
+                                        ),
+                                    }
+                                )
                             )
                         )
-                    )
-                    for draft in node_drafts
-                ]
+                        for draft in node_drafts
+                    ]
+
+                # bSDD grounding and check-category mapping are synchronous
+                # (local ontology scans, possibly a live bSDD HTTP call with a
+                # time.sleep backoff, DB lookups). Run them in a thread so the
+                # event loop keeps serving other requests, but one node at a
+                # time (finish_lock) as before: the bSDD client's TTL cache is
+                # not thread-safe.
+                async with finish_lock:
+                    return await asyncio.to_thread(finish_drafts)
 
         try:
             per_node_drafts = await asyncio.gather(*(process_node(node) for node in nodes))
@@ -816,7 +828,8 @@ class RuleExtractionService:
             extraction_progress.fail(document_id, message)
             raise RuleGenerationFailedError(message) from failures[0]
 
-        saved_drafts = draft_service.save_drafts(drafts)
+        # Synchronous batched insert; off the event loop like the grounding above.
+        saved_drafts = await asyncio.to_thread(draft_service.save_drafts, drafts)
         extraction_progress.complete(document_id)
         logger.info(
             "LlamaIndex rule-draft extraction complete document_id=%d nodes=%d drafts=%d",

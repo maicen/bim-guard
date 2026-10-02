@@ -26,6 +26,7 @@ Usage:
     statements = await ingestor.extract_deontic_statements(nodes)
 """
 
+import asyncio
 import re
 import uuid
 
@@ -40,6 +41,11 @@ logger = get_logger(__name__)
 # A section number with >=1 dot ("9.8.2") reads as a clause reference; a bare
 # top-level number ("9") is a chapter/heading, not a checkable clause.
 _CLAUSE_ID_PATTERN = re.compile(r"^\d+(?:\.\d+)+")
+
+#: Concurrent deontic-extraction LLM calls per document; matches the rule
+#: drafting stage's _MAX_CONCURRENT_NODES so one document does not flood the
+#: provider's rate limit.
+_DEONTIC_CONCURRENCY = 4
 
 _DEONTIC_KEYWORDS = ("shall", "must", "should", "may")
 
@@ -251,20 +257,45 @@ class LlamaIndexIngestor:
         from app.modules.document_parsing.llamaindex_program import extract_deontic_statement
         from app.services.llm_call_context import llm_call_context
 
-        with llm_call_context(context="deontic_extraction", organization_id=organization_id):
-            for node in llm_candidates:
+        from app.modules.document_parsing.llamaindex_program import build_llm
+
+        # One LLM client for the whole batch, built in a thread: build_llm
+        # resolves the org's API key with a synchronous DB query. If it cannot
+        # be built here, each call falls back to building its own as before.
+        try:
+            llm = await asyncio.to_thread(build_llm, organization_id=organization_id)
+        except Exception:  # noqa: BLE001
+            llm = None
+
+        # Clauses are independent, so they are extracted concurrently (bounded
+        # by _DEONTIC_CONCURRENCY) instead of one LLM round trip after another;
+        # a code with hundreds of "shall" clauses used to take hundreds of
+        # sequential calls before rule drafting even started. gather() keeps
+        # input order, so statements come out in document order as before, and
+        # each task inherits the llm_call_context set around it.
+        semaphore = asyncio.Semaphore(_DEONTIC_CONCURRENCY)
+
+        async def _extract(node: DocumentNodeContract) -> tuple[bool, DeonticStatement | None]:
+            async with semaphore:
                 try:
-                    statement = await extract_deontic_statement(
-                        node.text, clause=node.metadata, organization_id=organization_id
+                    return True, await extract_deontic_statement(
+                        node.text, clause=node.metadata, organization_id=organization_id, llm=llm
                     )
                 except Exception as exc:  # noqa: BLE001 - a single bad node must not abort the batch
                     logger.warning(
                         "Deontic extraction failed node_id=%s error=%s", node.node_id, exc
                     )
-                    continue
-                if statement is not None:
-                    statements.append(statement)
-                node.deontic_statements.append(statement)
+                    return False, None
+
+        with llm_call_context(context="deontic_extraction", organization_id=organization_id):
+            results = await asyncio.gather(*(_extract(node) for node in llm_candidates))
+
+        for node, (ok, statement) in zip(llm_candidates, results):
+            if not ok:
+                continue
+            if statement is not None:
+                statements.append(statement)
+            node.deontic_statements.append(statement)
 
         return statements
 

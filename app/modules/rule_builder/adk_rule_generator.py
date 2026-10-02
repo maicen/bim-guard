@@ -37,6 +37,14 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+#: litellm retry count for transient provider errors (429/5xx), with its
+#: built-in backoff.
+_LLM_NUM_RETRIES = 2
+#: Per-call timeout; a clause's rule-drafting response is small, so a call
+#: still running after this is stuck rather than slow.
+_LLM_TIMEOUT_SECONDS = 180
+
+
 def _build_adk_model(model: str | None, *, organization_id: int | None):
     """Resolve the model argument for an ADK LlmAgent, mirroring build_llm's provider/key logic.
 
@@ -50,7 +58,16 @@ def _build_adk_model(model: str | None, *, organization_id: int | None):
         return resolved_model
     provider = resolved_model.split("/", 1)[0]
     api_key = resolve_api_key(provider, organization_id)
-    return LiteLlm(model=resolved_model, api_key=api_key)
+    # Retries and a timeout are passed through to litellm.acompletion (LiteLlm
+    # forwards extra kwargs). Without them a single transient 429/5xx silently
+    # dropped that clause's drafts, and a hung provider held the clause -- and
+    # one of the extraction's concurrent slots -- for litellm's 600s default.
+    return LiteLlm(
+        model=resolved_model,
+        api_key=api_key,
+        num_retries=_LLM_NUM_RETRIES,
+        timeout=_LLM_TIMEOUT_SECONDS,
+    )
 
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.MULTILINE | re.DOTALL)

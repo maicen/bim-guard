@@ -73,7 +73,7 @@ def test_extract_deontic_statements_skips_non_deontic_nodes(monkeypatch):
     """Only nodes containing a deontic keyword should reach the LLM."""
     calls = []
 
-    async def fake_extract(clause_text, *, clause, organization_id=None):
+    async def fake_extract(clause_text, *, clause, organization_id=None, llm=None):
         calls.append(clause_text)
         return DeonticStatement(
             text=clause_text.strip(),
@@ -128,7 +128,7 @@ def test_extract_deontic_statements_uses_kg_hint_without_calling_llm(monkeypatch
 
     calls = []
 
-    async def fake_extract(clause_text, *, clause, organization_id=None):
+    async def fake_extract(clause_text, *, clause, organization_id=None, llm=None):
         calls.append(clause_text)
         return DeonticStatement(text=clause_text.strip(), modality="must", clause=clause)
 
@@ -161,3 +161,34 @@ def test_clause_metadata_and_document_node_contract_roundtrip():
     )
     node = DocumentNodeContract(node_id="abc-123", text="Every stair shall...", metadata=clause)
     assert node.model_dump()["metadata"]["clause_id"] == "9.8.2.1"
+
+
+def test_extract_deontic_statements_runs_concurrently_and_keeps_order(monkeypatch):
+    """LLM calls overlap (bounded), yet statements come back in document order."""
+    active = 0
+    peak = 0
+
+    async def fake_extract(clause_text, *, clause, organization_id=None, llm=None):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        # Earlier clauses finish later, so completion order is reversed.
+        await asyncio.sleep(0.01 * (10 - len(clause_text) % 10))
+        active -= 1
+        return DeonticStatement(text=clause_text.strip(), modality="shall", clause=clause)
+
+    monkeypatch.setattr(
+        "app.modules.document_parsing.llamaindex_program.extract_deontic_statement",
+        fake_extract,
+    )
+    monkeypatch.setattr(
+        "app.modules.document_parsing.llamaindex_program.build_llm", lambda **kwargs: object()
+    )
+
+    ingestor = LlamaIndexIngestor()
+    nodes = ingestor.nodes_from_text(SAMPLE_TEXT, source_document_id=1)
+    candidates = [n for n in nodes if ingestor._contains_deontic_keyword(n.text)]
+    statements = asyncio.run(ingestor.extract_deontic_statements(nodes))
+
+    assert [s.text for s in statements] == [n.text.strip() for n in candidates]
+    assert peak > 1

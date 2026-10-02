@@ -77,7 +77,11 @@ class _DeonticExtractionResult(BaseModel):
 
 
 async def extract_deontic_statement(
-    clause_text: str, *, clause: ClauseMetadata, organization_id: int | None = None
+    clause_text: str,
+    *,
+    clause: ClauseMetadata,
+    organization_id: int | None = None,
+    llm=None,
 ) -> DeonticStatement | None:
     """Run a LlamaIndex Pydantic program to extract one deontic statement.
 
@@ -89,7 +93,10 @@ async def extract_deontic_statement(
     program = LLMTextCompletionProgram.from_defaults(
         output_cls=_DeonticExtractionResult,
         prompt_template_str=_DEONTIC_PROMPT,
-        llm=build_llm(organization_id=organization_id),
+        # A caller extracting many clauses passes one prebuilt ``llm``:
+        # build_llm resolves the API key with a synchronous DB query, which
+        # per call meant one blocking query on the event loop per clause.
+        llm=llm if llm is not None else build_llm(organization_id=organization_id),
     )
     result: _DeonticExtractionResult = await program.acall(clause_text=clause_text)
 
