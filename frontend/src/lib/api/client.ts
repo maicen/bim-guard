@@ -148,6 +148,52 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
 }
 
 /**
+ * Backoff (ms) for `apiFetchSurvivingRestart`: ~75s in total, longer than a
+ * production redeploy (`docker compose up --build bim-guard` recreates the
+ * app container, ~40s of downtime, during which Cloudflare answers 502).
+ */
+const GATEWAY_RETRY_DELAYS_MS = [2000, 4000, 8000, 15000, 20000, 25000];
+
+/**
+ * True for a 502/503/504 the proxy produced itself (Cloudflare's HTML error
+ * page), i.e. the request never reached FastAPI. The app's own 5xx responses
+ * are always JSON (`HTTPException` / exception handlers), so they are excluded:
+ * those requests *were* processed and must not be replayed.
+ */
+function isProxyGatewayError(res: Response): boolean {
+  if (res.status !== 502 && res.status !== 503 && res.status !== 504) return false;
+  return !(res.headers.get("content-type") || "").includes("application/json");
+}
+
+function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
+/**
+ * `apiFetch` that rides out a backend restart. Use it for the step that ends
+ * a direct-to-storage upload (`/confirm`): by then the bytes are already in
+ * storage, so failing on a transient proxy 502 throws away the whole upload.
+ * Only proxy-generated gateway errors are retried (see `isProxyGatewayError`),
+ * so a request the app actually handled is never sent twice.
+ */
+export async function apiFetchSurvivingRestart(input: string, init: RequestInit = {}): Promise<Response> {
+  let res = await apiFetch(input, init);
+  for (const delay of GATEWAY_RETRY_DELAYS_MS) {
+    if (!isProxyGatewayError(res)) break;
+    await sleep(delay, init.signal);
+    res = await apiFetch(input, init);
+  }
+  return res;
+}
+
+/**
  * Split an `sb://<bucket>/<key>` storage reference from an `/upload-url`
  * endpoint into the tus metadata Supabase Storage expects. The bucket comes
  * from the server's configured bucket, never a hardcoded name.

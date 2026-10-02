@@ -10,7 +10,7 @@ import type {
   ModelUploadResponse,
 } from "../types";
 import { withAuthToken } from "../authToken";
-import { API_BASE, apiFetch, handleResponse, storageUploadTarget } from "./client";
+import { API_BASE, apiFetch, apiFetchSurvivingRestart, handleResponse, storageUploadTarget } from "./client";
 
 export const modelsApi = {
   async list(projectId: number): Promise<Model[]> {
@@ -130,7 +130,7 @@ export const modelsApi = {
     });
 
     // 3. Confirm replace with backend
-    const confirmRes = await apiFetch(`${API_BASE}/models/${modelId}/replace-confirm?project_id=${projectId}`, {
+    const confirmRes = await apiFetchSurvivingRestart(`${API_BASE}/models/${modelId}/replace-confirm?project_id=${projectId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -216,7 +216,7 @@ export const modelsApi = {
       });
 
       // 3. Confirm upload with backend
-      const confirmRes = await apiFetch(`${API_BASE}/projects/${projectId}/models/confirm`, {
+      const confirmRes = await apiFetchSurvivingRestart(`${API_BASE}/projects/${projectId}/models/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

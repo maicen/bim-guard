@@ -19,7 +19,7 @@ import {
   type Unsubscribe,
 } from "../cache";
 import { getActiveOrgId, withAuthToken } from "../authToken";
-import { API_BASE, apiFetch, handleResponse, storageUploadTarget } from "./client";
+import { API_BASE, apiFetch, apiFetchSurvivingRestart, handleResponse, storageUploadTarget } from "./client";
 
 const _documentsStore = new EntityCacheStore<DocumentItem, number>((d) => d.id, 60_000, 60_000);
 const _documentDetailStore = new SWRStore<number, DocumentDetail>(new InMemoryCache(), 60_000);
@@ -155,7 +155,7 @@ export const documentsApi = {
     if (isoOptions?.start_page != null) payload.start_page = isoOptions.start_page;
     if (isoOptions?.end_page != null) payload.end_page = isoOptions.end_page;
 
-    const res = await apiFetch(`${API_BASE}/documents/confirm`, {
+    const res = await apiFetchSurvivingRestart(`${API_BASE}/documents/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
