@@ -16,6 +16,7 @@
   import { githubReposApi } from "../api";
   import type { GitHubRepo } from "../types";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import Modal from "./Modal.svelte";
   import Alert from "./Alert.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
@@ -123,249 +124,219 @@
   }
 </script>
 
-{#if isOpen}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-surface-canvas/80 p-4 backdrop-blur-xs"
-  >
-    <div
-      class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
+<Modal
+  {isOpen}
+  title="GitHub Project Storage Repositories"
+  subtitle="Manage external GitHub repositories hosting OpenBIM IFC models."
+  icon={FolderGit2}
+  maxWidth="max-w-2xl"
+  closeOnBackdrop={false}
+  {onClose}
+>
+    {#if error}
+      <Alert type="error" message={error} errors={errorLog} logTitle="GitHub Repo Error Log" />
+    {/if}
+
+    {#if successMsg}
       <div
-        class="flex items-center justify-between border-b border-border-default bg-surface-canvas/50 px-6 py-4"
+        class="flex items-center gap-2 rounded-xl border border-emerald-800/80 bg-emerald-950/60 p-3.5 text-xs text-emerald-300"
       >
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-accent/30 bg-accent/10 p-2 text-accent">
-            <FolderGit2 class="h-5 w-5" />
+        <Check class="h-4 w-4 shrink-0" />
+        <span>{successMsg}</span>
+      </div>
+    {/if}
+
+    <!-- Control Bar -->
+    <div class="flex items-center justify-between">
+      <div class="text-xs font-semibold uppercase tracking-wider text-fg-secondary">
+        Registered Repositories ({repos.length})
+      </div>
+      <button
+        type="button"
+        onclick={() => (showAddForm = !showAddForm)}
+        aria-expanded={showAddForm}
+        class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shadow-xs transition-all {showAddForm
+          ? 'border border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover'
+          : 'bg-blue-600 text-white hover:bg-blue-500'}"
+      >
+        {#if showAddForm}
+          <X class="h-4 w-4" />
+          <span>Cancel</span>
+        {:else}
+          <Plus class="h-4 w-4" />
+          <span>Add GitHub Repository</span>
+        {/if}
+      </button>
+    </div>
+
+    <!-- Add Repo Form -->
+    {#if showAddForm}
+      <form
+        onsubmit={preventDefault(handleAddRepo)}
+        class="space-y-3 rounded-xl border border-border-default bg-surface-canvas p-4"
+      >
+        <h3 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
+          Register New Repository
+        </h3>
+
+        <div>
+          <label for="repo-url" class="mb-1 block text-caption font-semibold text-fg-muted">
+            Repository URL <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="repo-url"
+            type="url"
+            required
+            bind:value={newUrl}
+            placeholder="https://github.com/maicen/bimguard-test-models"
+            class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label for="repo-name" class="mb-1 block text-caption font-semibold text-fg-muted"
+              >Display Name (Optional)</label
+            >
+            <input
+              id="repo-name"
+              type="text"
+              bind:value={newName}
+              placeholder="bimguard-test-models"
+              class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
+            />
           </div>
           <div>
-            <h2 class="text-lg font-semibold text-fg-primary">GitHub Project Storage Repositories</h2>
-            <p class="text-xs text-fg-muted">
-              Manage external GitHub repositories hosting OpenBIM IFC models.
-            </p>
+            <label
+              for="repo-branch"
+              class="mb-1 block text-caption font-semibold text-fg-muted">Git Branch</label
+            >
+            <input
+              id="repo-branch"
+              type="text"
+              bind:value={newBranch}
+              placeholder="main"
+              class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
+            />
           </div>
         </div>
-        <button
-          type="button"
-          onclick={onClose}
-          class="rounded-xl p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
 
-      <!-- Content -->
-      <div class="flex-1 space-y-4 overflow-y-auto p-6">
-        {#if error}
-          <Alert type="error" message={error} errors={errorLog} logTitle="GitHub Repo Error Log" />
-        {/if}
-
-        {#if successMsg}
-          <div
-            class="flex items-center gap-2 rounded-xl border border-emerald-800/80 bg-emerald-950/60 p-3.5 text-xs text-emerald-300"
+        <div>
+          <label for="repo-desc" class="mb-1 block text-caption font-semibold text-fg-muted"
+            >Description (Optional)</label
           >
-            <Check class="h-4 w-4 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        {/if}
+          <input
+            id="repo-desc"
+            type="text"
+            bind:value={newDescription}
+            placeholder="Repository containing OpenBIM test models..."
+            class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
+          />
+        </div>
 
-        <!-- Control Bar -->
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-semibold uppercase tracking-wider text-fg-secondary">
-            Registered Repositories ({repos.length})
-          </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
           <button
             type="button"
-            onclick={() => (showAddForm = !showAddForm)}
-            aria-expanded={showAddForm}
-            class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shadow-xs transition-all {showAddForm
-              ? 'border border-border-default bg-surface-canvas text-fg-secondary hover:bg-surface-hover'
-              : 'bg-blue-600 text-white hover:bg-blue-500'}"
+            onclick={() => (showAddForm = false)}
+            class="rounded-xl border border-border-default px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg-primary"
           >
-            {#if showAddForm}
-              <X class="h-4 w-4" />
-              <span>Cancel</span>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-50"
+          >
+            {#if isSubmitting}
+              <Loader2 class="h-3.5 w-3.5 animate-spin" />
+              <span>Registering...</span>
             {:else}
-              <Plus class="h-4 w-4" />
-              <span>Add GitHub Repository</span>
+              <span>Save Repository</span>
             {/if}
           </button>
         </div>
+      </form>
+    {/if}
 
-        <!-- Add Repo Form -->
-        {#if showAddForm}
-          <form
-            onsubmit={preventDefault(handleAddRepo)}
-            class="space-y-3 rounded-xl border border-border-default bg-surface-canvas p-4"
+    <!-- Repository List -->
+    {#if isLoading}
+      <div
+        class="flex items-center justify-center gap-2 p-8 text-center text-xs text-fg-muted"
+      >
+        <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
+        <span>Loading registered repositories...</span>
+      </div>
+    {:else if repos.length === 0}
+      <div
+        class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted"
+      >
+        No custom GitHub repositories registered yet.
+      </div>
+    {:else}
+      <div class="space-y-2">
+        {#each repos as repo (repo.id)}
+          <div
+            class="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-canvas/80 p-3.5 transition-colors hover:border-border-interactive"
           >
-            <h3 class="text-xs font-bold uppercase tracking-wider text-fg-secondary">
-              Register New Repository
-            </h3>
-
-            <div>
-              <label for="repo-url" class="mb-1 block text-caption font-semibold text-fg-muted">
-                Repository URL <span class="text-rose-400">*</span>
-              </label>
-              <input
-                id="repo-url"
-                type="url"
-                required
-                bind:value={newUrl}
-                placeholder="https://github.com/maicen/bimguard-test-models"
-                class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
-              />
-            </div>
-
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label for="repo-name" class="mb-1 block text-caption font-semibold text-fg-muted"
-                  >Display Name (Optional)</label
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-fg-primary">{repo.owner}/{repo.name}</span
                 >
-                <input
-                  id="repo-name"
-                  type="text"
-                  bind:value={newName}
-                  placeholder="bimguard-test-models"
-                  class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
-                />
+                <span
+                  class="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface-card px-2 py-0.5 font-mono text-micro text-fg-muted"
+                >
+                  <GitBranch class="h-3 w-3 text-blue-400" />
+                  {repo.branch}
+                </span>
+                {#if repo.url.includes("maicen/bimguard-test-models")}
+                  <span
+                    class="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-semibold text-accent"
+                  >
+                    Default Test Repo
+                  </span>
+                {/if}
               </div>
-              <div>
-                <label
-                  for="repo-branch"
-                  class="mb-1 block text-caption font-semibold text-fg-muted">Git Branch</label
+              {#if repo.description}
+                <p class="text-xs leading-relaxed text-fg-muted">{repo.description}</p>
+              {/if}
+              <div class="flex items-center gap-2 pt-0.5 text-caption text-fg-muted">
+                <a
+                  href={repo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 text-blue-400 hover:underline"
                 >
-                <input
-                  id="repo-branch"
-                  type="text"
-                  bind:value={newBranch}
-                  placeholder="main"
-                  class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
-                />
+                  <span>{repo.url}</span>
+                  <ExternalLink class="h-3 w-3" />
+                </a>
               </div>
             </div>
 
-            <div>
-              <label for="repo-desc" class="mb-1 block text-caption font-semibold text-fg-muted"
-                >Description (Optional)</label
-              >
-              <input
-                id="repo-desc"
-                type="text"
-                bind:value={newDescription}
-                placeholder="Repository containing OpenBIM test models..."
-                class="w-full rounded-xl border border-border-default bg-surface-card px-3 py-2 text-xs text-fg-primary placeholder:text-fg-muted focus:border-blue-500 focus:outline-hidden"
-              />
-            </div>
-
-            <div class="flex items-center justify-end gap-2 pt-2">
+            <div class="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
-                onclick={() => (showAddForm = false)}
-                class="rounded-xl border border-border-default px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg-primary"
+                onclick={() => promptDeleteRepo(repo)}
+                class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
+                title="Remove repository"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-50"
-              >
-                {#if isSubmitting}
-                  <Loader2 class="h-3.5 w-3.5 animate-spin" />
-                  <span>Registering...</span>
-                {:else}
-                  <span>Save Repository</span>
-                {/if}
+                <Trash2 class="h-4 w-4" />
               </button>
             </div>
-          </form>
-        {/if}
-
-        <!-- Repository List -->
-        {#if isLoading}
-          <div
-            class="flex items-center justify-center gap-2 p-8 text-center text-xs text-fg-muted"
-          >
-            <Loader2 class="h-4 w-4 animate-spin text-blue-400" />
-            <span>Loading registered repositories...</span>
           </div>
-        {:else if repos.length === 0}
-          <div
-            class="rounded-xl border border-dashed border-border-default p-8 text-center text-xs text-fg-muted"
-          >
-            No custom GitHub repositories registered yet.
-          </div>
-        {:else}
-          <div class="space-y-2">
-            {#each repos as repo (repo.id)}
-              <div
-                class="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-canvas/80 p-3.5 transition-colors hover:border-border-interactive"
-              >
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-fg-primary">{repo.owner}/{repo.name}</span
-                    >
-                    <span
-                      class="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface-card px-2 py-0.5 font-mono text-micro text-fg-muted"
-                    >
-                      <GitBranch class="h-3 w-3 text-blue-400" />
-                      {repo.branch}
-                    </span>
-                    {#if repo.url.includes("maicen/bimguard-test-models")}
-                      <span
-                        class="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro font-semibold text-accent"
-                      >
-                        Default Test Repo
-                      </span>
-                    {/if}
-                  </div>
-                  {#if repo.description}
-                    <p class="text-xs leading-relaxed text-fg-muted">{repo.description}</p>
-                  {/if}
-                  <div class="flex items-center gap-2 pt-0.5 text-caption text-fg-muted">
-                    <a
-                      href={repo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="inline-flex items-center gap-1 text-blue-400 hover:underline"
-                    >
-                      <span>{repo.url}</span>
-                      <ExternalLink class="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-
-                <div class="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    onclick={() => promptDeleteRepo(repo)}
-                    class="rounded-lg p-1.5 text-fg-muted transition-colors hover:bg-rose-950/30 hover:text-rose-400"
-                    title="Remove repository"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
+        {/each}
       </div>
+    {/if}
 
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-end border-t border-border-default bg-surface-canvas/60 px-6 py-3"
-      >
-        <button
-          type="button"
-          onclick={onClose}
-          class="rounded-xl border border-border-default bg-surface-card px-4 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+  {#snippet footer()}
+    <button
+      type="button"
+      onclick={onClose}
+      class="rounded-xl border border-border-default bg-surface-card px-4 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+    >
+      Close
+    </button>
+  {/snippet}
+</Modal>
 
 <ConfirmModal
   isOpen={repoPendingDelete !== null}

@@ -17,7 +17,6 @@
     ArrowUp,
     ArrowDown,
     Eye,
-    X,
     FileText,
   } from "lucide-svelte";
   import { revitSyncApi } from "../lib/api";
@@ -35,6 +34,7 @@
   import LoadingState from "../lib/components/LoadingState.svelte";
   import BsddBadge from "../lib/components/BsddBadge.svelte";
   import Alert from "../lib/components/Alert.svelte";
+  import Modal from "../lib/components/Modal.svelte";
   import { createTableState } from "../lib/tableState.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../lib/utils/errorLog";
 
@@ -542,98 +542,77 @@ print(response.read())
 </div>
 
 <!-- Rule Inspection Modal -->
-{#if viewingRule}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-    <div
-      class="border-border-default bg-surface-card w-full max-w-lg space-y-4 overflow-hidden rounded-2xl border p-6 shadow-2xl"
-    >
-      <div class="border-border-default flex items-center justify-between border-b pb-3">
-        <div class="flex items-center gap-2">
-          <FileText class="text-accent h-4 w-4" />
-          <h3 class="text-fg-primary font-mono text-sm font-bold">
-            {viewingRule.rule_ref || "Rule Result"}
-          </h3>
-        </div>
-        <button
-          type="button"
-          onclick={() => (viewingRule = null)}
-          class="text-fg-muted hover:bg-surface-hover hover:text-fg-primary rounded-lg p-1 transition-colors"
-        >
-          <X class="h-4 w-4" />
-        </button>
-      </div>
-
-      <div class="space-y-3 text-xs">
-        <div>
-          <span class="text-fg-muted mb-1 block font-semibold">Description</span>
-          <div
-            class="border-border-default bg-surface-canvas/60 text-fg-secondary rounded-xl border p-3"
-          >
-            {viewingRule.rule_desc || "No description provided"}
-          </div>
-        </div>
-
+<Modal
+  isOpen={viewingRule !== null}
+  title={viewingRule?.rule_ref || "Rule Result"}
+  icon={FileText}
+  maxWidth="max-w-lg"
+  onClose={() => (viewingRule = null)}
+>
+  {#if viewingRule}
+    <div class="space-y-3 text-xs">
+      <div>
+        <span class="text-fg-muted mb-1 block font-semibold">Description</span>
         <div
-          class="border-border-default bg-surface-canvas text-caption grid grid-cols-2 gap-2 rounded-xl border p-3 font-mono"
+          class="border-border-default bg-surface-canvas/60 text-fg-secondary rounded-xl border p-3"
         >
-          <div>
-            <span class="text-fg-muted">Target:</span>
-            <BsddBadge kind="class" value={viewingRule.target} class="text-fg-secondary" />
-          </div>
-          <div>
-            <span class="text-fg-muted">Property:</span>
-            <BsddBadge
-              kind="property"
-              value={viewingRule.property_name}
-              class="text-fg-secondary"
-            />
-          </div>
-          <div>
-            <span class="text-fg-muted">Verdict:</span>
-            <span
-              class="font-bold {viewingRule.status === 'PASS'
-                ? 'text-emerald-400'
-                : 'text-rose-400'}">{viewingRule.status}</span
-            >
-          </div>
-          <div>
-            <span class="text-fg-muted">Pass / Fail:</span>
-            <span class="text-fg-secondary"
-              >{viewingRule.pass_count || 0} / {viewingRule.fail_count || 0}</span
-            >
+          {viewingRule.rule_desc || "No description provided"}
+        </div>
+      </div>
+
+      <div
+        class="border-border-default bg-surface-canvas text-caption grid grid-cols-2 gap-2 rounded-xl border p-3 font-mono"
+      >
+        <div>
+          <span class="text-fg-muted">Target:</span>
+          <BsddBadge kind="class" value={viewingRule.target} class="text-fg-secondary" />
+        </div>
+        <div>
+          <span class="text-fg-muted">Property:</span>
+          <BsddBadge kind="property" value={viewingRule.property_name} class="text-fg-secondary" />
+        </div>
+        <div>
+          <span class="text-fg-muted">Verdict:</span>
+          <span class="font-bold {viewingRule.status === 'PASS' ? 'text-success' : 'text-critical'}"
+            >{viewingRule.status}</span
+          >
+        </div>
+        <div>
+          <span class="text-fg-muted">Pass / Fail:</span>
+          <span class="text-fg-secondary"
+            >{viewingRule.pass_count || 0} / {viewingRule.fail_count || 0}</span
+          >
+        </div>
+      </div>
+
+      {#if viewingRule.failures && viewingRule.failures.length > 0}
+        <div>
+          <span class="text-fg-muted mb-1 block font-semibold"
+            >Non-Compliant Element Instances ({viewingRule.failures.length})</span
+          >
+          <div
+            class="border-border-default bg-surface-canvas max-h-48 space-y-1.5 overflow-y-auto rounded-xl border p-2"
+          >
+            {#each viewingRule.failures as f (f.guid)}
+              <div
+                class="text-caption border-critical-border bg-critical-bg text-critical rounded-lg border p-2 font-mono"
+              >
+                <div class="font-bold">{f.guid}</div>
+                {#if f.reason}<div class="text-micro text-fg-muted mt-0.5">{f.reason}</div>{/if}
+              </div>
+            {/each}
           </div>
         </div>
-
-        {#if viewingRule.failures && viewingRule.failures.length > 0}
-          <div>
-            <span class="text-fg-muted mb-1 block font-semibold"
-              >Non-Compliant Element Instances ({viewingRule.failures.length})</span
-            >
-            <div
-              class="border-border-default bg-surface-canvas max-h-48 space-y-1.5 overflow-y-auto rounded-xl border p-2"
-            >
-              {#each viewingRule.failures as f (f.guid)}
-                <div
-                  class="text-caption rounded-lg border border-rose-900/40 bg-rose-950/20 p-2 font-mono text-rose-300"
-                >
-                  <div class="font-bold">{f.guid}</div>
-                  {#if f.reason}<div class="text-micro text-fg-muted mt-0.5">{f.reason}</div>{/if}
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <div class="border-border-default flex justify-end border-t pt-2">
-        <button
-          type="button"
-          onclick={() => (viewingRule = null)}
-          class="bg-surface-overlay text-fg-primary hover:bg-surface-hover rounded-xl px-4 py-2 text-xs font-semibold transition-colors"
-        >
-          Close
-        </button>
-      </div>
+      {/if}
     </div>
-  </div>
-{/if}
+  {/if}
+  {#snippet footer()}
+    <button
+      type="button"
+      onclick={() => (viewingRule = null)}
+      class="bg-surface-overlay text-fg-primary hover:bg-surface-hover rounded-xl px-4 py-2 text-xs font-semibold transition-colors"
+    >
+      Close
+    </button>
+  {/snippet}
+</Modal>

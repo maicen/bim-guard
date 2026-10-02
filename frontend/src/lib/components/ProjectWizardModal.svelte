@@ -4,7 +4,6 @@
 
   import { onMount, onDestroy } from "svelte";
   import {
-    X,
     Check,
     Upload,
     ArrowRight,
@@ -25,6 +24,7 @@
     namingConfigApi,
     githubReposApi,
   } from "../api";
+  import Modal from "./Modal.svelte";
   import { authState } from "../auth.svelte";
   import {
     IFC_FILE_ROLES,
@@ -672,30 +672,19 @@
   }
 </script>
 
-{#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div>
-          <h2 class="text-lg font-bold tracking-tight text-fg-primary">New Project Setup</h2>
-          <p class="text-xs text-fg-muted">Initialize a new OpenBIM compliance audit project</p>
-        </div>
-        <button
-          type="button"
-          onclick={handleClose}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
+<Modal
+  {isOpen}
+  title="New Project Setup"
+  subtitle="Initialize a new OpenBIM compliance audit project"
+  icon={FolderGit2}
+  maxWidth="max-w-2xl"
+  onClose={handleClose}
+  footer={wizardFooter}
+>
       <!-- Step Stepper -->
       <nav
         aria-label="Project setup steps"
-        class="flex items-center justify-between border-b border-border-default bg-surface-canvas/40 px-6 py-3"
+        class="sticky -top-6 z-10 -mx-6 -mt-6 flex items-center justify-between border-b border-border-default bg-surface-canvas px-6 py-3"
       >
         {#each STEPS as step, idx (step)}
           <div class="flex items-center gap-2 {idx < STEPS.length - 1 ? 'flex-1' : ''}">
@@ -741,7 +730,7 @@
       </nav>
 
       <!-- Body -->
-      <div class="max-h-[60vh] flex-1 overflow-y-auto p-6">
+      <div>
         {#if errorMessage}
           <div class="mb-4">
             <Alert
@@ -1330,11 +1319,10 @@
           </div>
         {/if}
       </div>
+</Modal>
 
-      <!-- Footer Buttons -->
-      <div
-        class="flex items-center justify-between border-t border-border-default bg-surface-canvas/60 px-6 py-4"
-      >
+{#snippet wizardFooter()}
+  <div class="flex w-full items-center justify-between">
         {#if currentStep > 1}
           <button
             type="button"
@@ -1383,7 +1371,5 @@
             <Check class="h-3.5 w-3.5" />
           </button>
         {/if}
-      </div>
-    </div>
   </div>
-{/if}
+{/snippet}

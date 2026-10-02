@@ -1,10 +1,11 @@
 <script lang="ts">
   import { run } from "svelte/legacy";
 
-  import { X, Check, SlidersHorizontal } from "lucide-svelte";
+  import { Check, SlidersHorizontal } from "lucide-svelte";
   import { projectsApi } from "../api";
   import { PROJECT_TYPES } from "../types";
   import Alert from "./Alert.svelte";
+  import Modal from "./Modal.svelte";
   import Select from "./ui/Select.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
@@ -69,37 +70,13 @@
   }
 </script>
 
-{#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            <SlidersHorizontal class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              Bulk Edit ({selectedProjectIds.length} Projects)
-            </h2>
-            <p class="text-xs text-fg-muted">
-              Update status, domain, or jurisdiction for all selected projects.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={onClose}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- Body Form -->
-      <div class="space-y-4 overflow-y-auto p-6">
+<Modal
+  {isOpen}
+  {onClose}
+  icon={SlidersHorizontal}
+  title={`Bulk Edit (${selectedProjectIds.length} Projects)`}
+  subtitle="Update status, domain, or jurisdiction for all selected projects."
+>
         {#if errorMessage}
           <Alert
             type="error"
@@ -166,12 +143,8 @@
  ariaLabel="Project type"
  />
         </div>
-      </div>
 
-      <!-- Footer Actions -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/60 px-6 py-3"
-      >
+  {#snippet footer()}
         <button
           type="button"
           onclick={onClose}
@@ -188,7 +161,5 @@
           <Check class="h-3.5 w-3.5" />
           <span>{isSaving ? "Applying Changes..." : "Apply Bulk Update"}</span>
         </button>
-      </div>
-    </div>
-  </div>
-{/if}
+  {/snippet}
+</Modal>

@@ -2,7 +2,6 @@
   import { run } from "svelte/legacy";
 
   import {
-    X,
     Check,
     FolderArchive,
     Tag,
@@ -15,6 +14,7 @@
   import { CDE_STATE_CHOICES, SUITABILITY_CODES } from "../types";
   import { DatePicker, Select, type SelectOption } from "./ui";
   import Alert from "./Alert.svelte";
+  import Modal from "./Modal.svelte";
   import { toErrorLogEntry, type ErrorLogEntry } from "../utils/errorLog";
 
   const typeOptions: SelectOption[] = [
@@ -156,37 +156,14 @@
   }
 </script>
 
-{#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-    <div
-      class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card shadow-2xl"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-border-default px-6 py-4">
-        <div class="flex items-center gap-2.5">
-          <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-blue-400">
-            <FolderArchive class="h-5 w-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold tracking-tight text-fg-primary">
-              {isEditing ? "Edit BCF Topic" : "Create Live BCF 2.1 Topic"}
-            </h2>
-            <p class="text-xs text-fg-muted">
-              buildingSMART BCF standard collaboration issue with ISO 19650 governance.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onclick={onClose}
-          class="rounded-lg p-1 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- Form Body -->
-      <div class="space-y-4 overflow-y-auto p-6">
+<Modal
+  {isOpen}
+  {onClose}
+  icon={FolderArchive}
+  maxWidth="max-w-2xl"
+  title={isEditing ? "Edit BCF Topic" : "Create Live BCF 2.1 Topic"}
+  subtitle="buildingSMART BCF standard collaboration issue with ISO 19650 governance."
+>
         {#if errorMessage}
           <Alert
             type="error"
@@ -325,12 +302,8 @@
             class="w-full rounded-xl border border-border-default bg-surface-canvas px-3.5 py-2 font-mono text-xs text-cyan-300 placeholder:text-fg-muted focus:border-accent focus:outline-hidden"
           />
         </div>
-      </div>
 
-      <!-- Footer Actions -->
-      <div
-        class="flex items-center justify-end gap-2 border-t border-border-default bg-surface-canvas/60 px-6 py-3"
-      >
+  {#snippet footer()}
         <button
           type="button"
           onclick={onClose}
@@ -354,7 +327,5 @@
             <span>{isEditing ? "Save Changes" : "Create Topic"}</span>
           {/if}
         </button>
-      </div>
-    </div>
-  </div>
-{/if}
+  {/snippet}
+</Modal>
