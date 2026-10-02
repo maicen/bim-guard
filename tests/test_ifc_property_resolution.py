@@ -289,6 +289,27 @@ class TestTypeAssignment:
         assert value == "Sliding"
         assert found_pset == "Custom"
 
+    @pytest.mark.parametrize("prop_name", ["IsTypedBy", "RelatingType"])
+    def test_is_typed_by_answers_from_the_type_link(self, prop_name):
+        """"Door must be typed via IfcRelDefinesByType" names the relationship itself."""
+        f = _metre_model()
+        door = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        door_type = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoorType", name="Door_Opening 1045x2300")
+        ifcopenshell.api.run("type.assign_type", f, related_objects=[door], relating_type=door_type)
+
+        value, found_pset, _ = _empty_reader(f)._resolve_element_property(door, prop_name)
+
+        assert value == "Door_Opening 1045x2300"
+        assert found_pset == "relationship:type"
+
+    def test_untyped_element_has_no_is_typed_by(self):
+        f = _metre_model()
+        door = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(door, "IsTypedBy")
+
+        assert value is None
+
     def test_type_global_id_reads_the_type_objects_guid(self):
         f, window = _typed_window("IFC4", "IfcWindowType")
         expected = f.by_type("IfcWindowType")[0].GlobalId

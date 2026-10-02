@@ -123,6 +123,8 @@ _RELATIONSHIP_LOOKUPS: dict[str, str] = {
     "typename": "IfcRelDefinesByType (the element's type object)",
     "typeobject": "IfcRelDefinesByType (the element's type object)",
     "elementtype": "IfcRelDefinesByType (the element's type object)",
+    "istypedby": "IfcRelDefinesByType (the element's type object)",
+    "relatingtype": "IfcRelDefinesByType (the element's type object)",
     "typeassignmentcount": "IfcRelDefinesByType (the type objects assigned to the element)",
     "typecount": "IfcRelDefinesByType (the type objects assigned to the element)",
     "numberoftypes": "IfcRelDefinesByType (the type objects assigned to the element)",

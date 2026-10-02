@@ -117,6 +117,12 @@ _TYPE_RELATIONSHIP_PROPERTIES: dict[str, str] = {
     "typeobject": "name",
     "elementtype": "name",
     "typeglobalid": "global_id",
+    # IFC's own names for the link: IsTypedBy is the IFC4 inverse attribute
+    # (absent in IFC2x3, and an inverse is never in get_info()), RelatingType
+    # the relationship's end -- so a "must be present" rule read neither and
+    # failed every element. Answered with the type name for any schema.
+    "istypedby": "name",
+    "relatingtype": "name",
 }
 
 
