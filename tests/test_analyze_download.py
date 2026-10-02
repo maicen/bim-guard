@@ -24,10 +24,29 @@ from starlette.testclient import TestClient
 from app.main import app
 from app.services.analysis_cache import ANALYSIS_CACHE
 
-#: A project with an IFC model attached and MEP content in it.
-PROJECT_WITH_MODEL = 3
+def _first_project_with_model() -> int:
+    """Return the lowest-id live project in the default org that has an IFC model.
 
-#: A project with no IFC model, used for the 409 path.
+    Project ids are live-database state, so a hard-coded id breaks the moment
+    that row is deleted. Org 1 (or none) is what the fake test user can reach.
+    """
+    from app.bootstrap import get_container
+
+    rows = get_container().projects_service.list_projects()
+    candidates = [
+        r["id"]
+        for r in rows
+        if r.get("ifc_file_path") and r.get("organization_id") in (1, None)
+    ]
+    if not candidates:
+        pytest.skip("no live project with an IFC model in the default organization")
+    return min(candidates)
+
+
+#: A project with an IFC model attached, resolved from the live database.
+PROJECT_WITH_MODEL = _first_project_with_model()
+
+#: A project id that does not exist, used for the 404 path.
 NONEXISTENT_PROJECT = 999_999_999
 
 pytestmark = pytest.mark.slow
@@ -92,7 +111,10 @@ class TestHeaders:
         assert "architecture" in disposition
 
     def test_content_length_matches_the_body(self, client):
-        response = client.get(f"/download/csv/{PROJECT_WITH_MODEL}")
+        # identity: GZipMiddleware would otherwise report the compressed size.
+        response = client.get(
+            f"/download/csv/{PROJECT_WITH_MODEL}", headers={"Accept-Encoding": "identity"}
+        )
         assert int(response.headers["content-length"]) == len(response.content)
 
     def test_downloads_are_not_cached_by_the_browser(self, client):
@@ -128,14 +150,15 @@ class TestSlugSelection:
 class TestFailures:
     """Errors carry a readable reason and an honest status."""
 
-    def test_missing_project_id_is_a_bad_request(self, client):
+    def test_project_id_zero_is_not_found(self, client):
+        """Project access is checked first, so an id with no project is a 404."""
         response = client.get("/download/csv/0")
-        assert response.status_code == 400
+        assert response.status_code == 404
 
-    def test_unknown_project_is_a_conflict_not_a_crash(self, client):
-        """409: the request is well-formed, the analysis just cannot be produced."""
+    def test_unknown_project_is_not_found_not_a_crash(self, client):
+        """404: access is checked before any analysis, so a missing project never reaches it."""
         response = client.get(f"/download/csv/{NONEXISTENT_PROJECT}")
-        assert response.status_code == 409
+        assert response.status_code == 404
         assert "project" in response.text.lower()
 
     def test_unknown_format_has_no_route(self, client):
