@@ -17,7 +17,7 @@ body:
       options:
         - "Frontend (Svelte 5 / ThatOpen 3D Viewer / UI)"
         - "Backend API Gateway (FastAPI / SSE / Endpoints / Contracts)"
-        - "Physics & Compliance Engines (GC-001, CC-001, MC-001, Blue Halo, Arch)"
+        - "Physics & Compliance Engines (Arch)"
         - "IFC Reader & Geometry Extraction (app/modules/ifc_reader)"
         - "OpenBIM Standards (bSDD, IDS XML, BCF REST / Exporter, CDE States)"
         - "Rule Extraction & AI (LlamaIndex Ingestion, LangGraph Digital Inspector)"

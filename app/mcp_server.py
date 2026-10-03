@@ -11,6 +11,13 @@ validation therefore run exactly as they do for the SPA -- the MCP layer
 holds no authorization logic of its own to drift out of sync, and cannot
 reach anything the caller's token could not.
 
+Discovery: unauthenticated requests get ``401`` with a ``WWW-Authenticate``
+header pointing at the RFC 9728 protected-resource metadata served from
+``/.well-known/oauth-protected-resource``. That document names Supabase Auth
+as the authorization server, so an MCP client can run a browser sign-in
+(OAuth 2.1 + dynamic client registration) instead of being handed a token.
+The access token Supabase issues is verified by the same code as a SPA session.
+
 Transport: stateless streamable HTTP with JSON responses. Production runs
 several uvicorn workers with no session affinity, so no server-side MCP
 session may be kept between requests.
@@ -20,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 from collections.abc import Mapping
 from typing import Any
 
@@ -28,6 +36,7 @@ from fastapi import FastAPI, HTTPException
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -46,6 +55,37 @@ _INSTRUCTIONS = (
     "list_rulesets -> run_architecture_analysis -> get_analysis_results. "
     "Access follows the signed-in user's organization membership."
 )
+
+
+_METADATA_PATH = "/.well-known/oauth-protected-resource"
+
+
+def _public_origin(request: Request) -> str:
+    """Return the externally visible origin of this app.
+
+    ``BIM_GUARD_PUBLIC_URL`` wins: behind the Cloudflare tunnel uvicorn sees
+    plain ``http`` and an internal host, which would yield unusable metadata.
+    """
+    configured = os.getenv("BIM_GUARD_PUBLIC_URL", "").strip().rstrip("/")
+    return configured or str(request.base_url).rstrip("/")
+
+
+def _authorization_server() -> str:
+    """Return the Supabase Auth issuer URL clients should authenticate against."""
+    base = (os.getenv("PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL") or "").strip().rstrip("/")
+    if not base:
+        raise HTTPException(status_code=503, detail="Supabase URL is not configured")
+    return f"{base}/auth/v1"
+
+
+def protected_resource_metadata(request: Request) -> dict[str, Any]:
+    """Build the RFC 9728 metadata document for the MCP endpoint."""
+    return {
+        "resource": f"{_public_origin(request)}{MCP_MOUNT_PATH}",
+        "authorization_servers": [_authorization_server()],
+        "bearer_methods_supported": ["header"],
+        "resource_name": "BIM-Guard",
+    }
 
 
 class McpApiError(ToolError):
@@ -85,10 +125,11 @@ class _BearerAuth:
                 _verify(_bearer_token(headers))
             except (McpApiError, HTTPException) as exc:
                 detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+                metadata_url = f"{_public_origin(Request(scope))}{_METADATA_PATH}"
                 response = JSONResponse(
                     {"detail": detail},
                     status_code=401,
-                    headers={"WWW-Authenticate": 'Bearer realm="bim-guard"'},
+                    headers={"WWW-Authenticate": f'Bearer resource_metadata="{metadata_url}"'},
                 )
                 await response(scope, receive, send)
                 return
@@ -263,6 +304,16 @@ def mount_mcp(app: FastAPI) -> MCPServer:
         stateless_http=True,
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
+
+    # RFC 9728 allows the metadata path to carry the resource's path suffix;
+    # serve both forms, since clients try the suffixed one first.
+    for path in (_METADATA_PATH, f"{_METADATA_PATH}{MCP_MOUNT_PATH}"):
+        app.add_api_route(
+            path,
+            protected_resource_metadata,
+            methods=["GET"],
+            include_in_schema=False,
+        )
     app.mount(MCP_MOUNT_PATH, _BearerAuth(mcp_app), name="mcp")
 
     host_lifespan = app.router.lifespan_context

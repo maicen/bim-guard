@@ -83,3 +83,32 @@ def test_mcp_tool_surfaces_api_errors(mcp_client):
     result = response.json()["result"]
     assert result["isError"] is True
     assert "failed (" in result["content"][0]["text"]
+
+
+@pytest.fixture
+def supabase_env(monkeypatch):
+    monkeypatch.setenv("PUBLIC_SUPABASE_URL", "https://supabase.example.test/")
+    monkeypatch.setenv("BIM_GUARD_PUBLIC_URL", "https://app.example.test")
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"],
+)
+def test_protected_resource_metadata(mcp_client, supabase_env, path):
+    response = mcp_client.get(path)
+    assert response.status_code == 200
+    assert response.json() == {
+        "resource": "https://app.example.test/mcp",
+        "authorization_servers": ["https://supabase.example.test/auth/v1"],
+        "bearer_methods_supported": ["header"],
+        "resource_name": "BIM-Guard",
+    }
+
+
+def test_unauthenticated_challenge_points_at_metadata(mcp_client, supabase_env):
+    response = _rpc(mcp_client, "tools/list", headers={"Accept": HEADERS["Accept"]})
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == (
+        'Bearer resource_metadata="https://app.example.test/.well-known/oauth-protected-resource"'
+    )

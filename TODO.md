@@ -138,7 +138,7 @@ Turn BIM-Guard into an agent-callable infrastructure platform for external AI ag
   - Wrap BIM-Guard's compliance analysis, rule extraction, and document APIs as a dedicated MCP server so agent clients (Claude, Cursor, external tools) can execute checks natively.
 - [ ] **Agent-to-Agent (A2A) Agent Card**:
   - Expose BIM-Guard's inspector agent via `/.well-known/agent-card.json`.
-- [ ] **OAuth Discovery & Protected Resource Metadata**:
+- [x] **OAuth Discovery & Protected Resource Metadata** (MCP endpoint done, see [docs/mcp-server.md](docs/mcp-server.md); `/api/*`-wide metadata still open):
   - Publish RFC 8414 OAuth authorization metadata and RFC 9728 `.well-known/oauth-protected-resource` describing `/api/*` resource scopes.
 - [ ] **Skills Index**:
   - Publish machine-readable catalog of BIM-Guard capabilities (analysis, rule drafting, BCF export).

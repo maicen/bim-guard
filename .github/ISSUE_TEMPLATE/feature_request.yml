@@ -15,7 +15,7 @@ body:
       label: Functional Domain
       description: Select the primary area this feature affects.
       options:
-        - "Compliance Engine / Physics (GC-001, CC-001, MC-001, Blue Halo, Arch)"
+        - "Compliance Engine / Physics (Arch)"
         - "3D Viewer & Model Inspection (@thatopen/components / Web-IFC)"
         - "BuildingSMART Standards (bSDD, IDS XML, BCF REST/Export, openCDE)"
         - "AI Extraction, Agents & LLM Providers (LlamaIndex, LangGraph, Vision)"

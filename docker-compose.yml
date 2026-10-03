@@ -95,6 +95,10 @@ services:
       - FEATURE_PATH_B_MM=${FEATURE_PATH_B_MM:-0}
       - FEATURE_PATH_B_XM=${FEATURE_PATH_B_XM:-0}
       - BIM_GUARD_ALLOWED_ORIGINS=${BIM_GUARD_ALLOWED_ORIGINS:-}
+      # MCP OAuth discovery (app/mcp_server.py) must advertise public URLs, not
+      # the internal kong:8000 that SUPABASE_URL points at inside this container.
+      - BIM_GUARD_PUBLIC_URL=${BIM_GUARD_PUBLIC_URL:-https://bim-guard.xyz}
+      - PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL:-}
 
     volumes:
       # Persistent cache for downloaded IFC models & artifacts

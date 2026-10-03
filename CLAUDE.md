@@ -357,7 +357,7 @@ Primary Frontend (frontend/)       → Vite + Svelte 5 SPA, TypeScript, Tailwind
 API Gateway (app/api/)             → FastAPI routers (/projects, /rules, /analyze, /events)
 Data Contracts (app/modules/contracts.py) → Pydantic request/response schemas (mirrored in frontend/src/lib/types.ts)
 Services (app/services/)           → Business logic, pipeline runner, tracker, Supabase persistence
-Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (GC-001 galvanic, CC-001 crevice, MC-001 microbiological, Blue Halo)
+Engines & Modules (app/modules/, app/engines/) → Pure Python compliance kernels (architectural egress, spatial, door, stair, etc.)
 ```
 
 ### Data Flow

@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this template to report a discrepancy in compliance evaluation, physics calculations (galvanic, crevice, MIC, seismic clearance), or property resolution.
+        Use this template to report a discrepancy in compliance evaluation, architectural compliance calculations (egress, spatial, door, stair), or property resolution.
 
   - type: dropdown
     id: engine
@@ -16,10 +16,6 @@ body:
       label: Target Engine / Compliance Domain
       description: Select the compliance engine where the discrepancy was observed.
       options:
-        - "GC-001: Galvanic Corrosion Engine (anode/cathode coupling, voltage gap, area ratio)"
-        - "CC-001: Crevice Corrosion Engine (critical gap width, electrolyte resistivity)"
-        - "MC-001: Microbiological Influenced Corrosion (flow velocity, temp, deadleg, biocide)"
-        - "Blue Halo: Seismic Bracing Clearance (clearance bbox, clash detection, EN 1998 / DIN 4149)"
         - "ARCH Egress: Egress Analysis (door clear width, exit capacity, travel distance, stair rise/run)"
         - "ARCH Spatial: Spatial Daylight & Room Area (glazing ratio, habitable space containment)"
         - "buildingSMART IDS: Information Delivery Specification conformance validation"
@@ -31,8 +27,8 @@ body:
     id: rule_ref
     attributes:
       label: Rule ID / Reference Citation
-      description: The specific rule identifier (e.g. GC-001.VOLTAGE.T3, MC-001.FLOW.STAGNANT, CODE 9.9.10.1, SB-001).
-      placeholder: e.g. GC-001.VOLTAGE.T3 or CODE 9.9.10.1
+      description: The specific rule identifier (e.g. CODE 9.9.10.1, ARCH-EGRESS-001).
+      placeholder: e.g. ARCH-EGRESS-001 or CODE 9.9.10.1
     validations:
       required: true
 
