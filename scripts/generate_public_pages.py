@@ -31,6 +31,8 @@ PUBLIC_DIR = ROOT / "frontend" / "public"
 STATIC_DIR = ROOT / "static"
 SITE = "https://bim-guard.xyz"
 OG_IMAGE = f"{SITE}/og-image.png"
+# Published evaluation site (GitHub Pages); where bim-guard-evaluation deploys today.
+EVAL = "https://maicen.github.io/bim-guard-evaluation"
 
 # Pages that are not generated here but belong in the sitemap.
 EXISTING_PAGES = [
@@ -103,6 +105,8 @@ PAGES = [
                 [
                     "Audits stream stage-by-stage progress in real time, and results "
                     "are available as reports and exports for your team.",
+                    "Accuracy claims are scored independently and published with "
+                    "their limits: <a href=\"/research\">validation and research</a>.",
                 ],
             ),
         ],
@@ -281,6 +285,70 @@ PAGES = [
         ],
     },
     {
+        "slug": "research",
+        "title": "Validation and Research - How BIM Guard Is Evaluated",
+        "h1": "Validation and research",
+        "description": (
+            "BIM Guard's accuracy claims are scored in a separate public repository and "
+            "published with their limits: benchmark results, a claims ledger and known gaps."
+        ),
+        "lastmod": "2026-10-04",
+        "intro": (
+            "Compliance software is only useful if you can trust its findings. BIM "
+            "Guard's evaluation harnesses live in an independent public repository, "
+            "and results are published together with what they cannot show."
+        ),
+        "sections": [
+            (
+                "What the evaluation currently supports",
+                [
+                    ("ul", [
+                        "<strong>22 of 22</strong> architecture-engine benchmark cases "
+                        "classified correctly (13 true positives, 9 true negatives, no "
+                        "false positives or negatives). The cases are few and "
+                        "procedurally generated, so the 95% Wilson confidence interval "
+                        "for accuracy, 85.1% to 100%, matters more than the point "
+                        "estimate.",
+                        "<strong>60 of 60</strong> NLP annotation test cases passing, "
+                        "fully reproducible.",
+                    ]),
+                ],
+            ),
+            (
+                "What is not claimed",
+                [
+                    "Some harnesses in the repository simulate their inputs. Their "
+                    "numbers are labelled as such and are not evidence about BIM "
+                    "Guard. Every headline number in the repository is listed in a "
+                    "claims ledger with its producing script, artifact and "
+                    "verification status.",
+                ],
+            ),
+            (
+                "Read the evidence",
+                [
+                    ("ul", [
+                        f"<a href=\"{EVAL}/\" rel=\"noopener\">BIM-Guard Evaluation site</a> - overview and legend",
+                        f"<a href=\"{EVAL}/results.html\" rel=\"noopener\">Results</a> - the architecture-engine confusion matrix",
+                        f"<a href=\"{EVAL}/claims.html\" rel=\"noopener\">Claims ledger</a> - every headline number and its evidence",
+                        f"<a href=\"{EVAL}/limitations.html\" rel=\"noopener\">Limitations</a> - methodological gaps, stated plainly",
+                        f"<a href=\"{EVAL}/reproduce.html\" rel=\"noopener\">Reproduce</a> - commands to re-run each harness",
+                        "<a href=\"https://github.com/maicen/bim-guard-evaluation\" rel=\"noopener\">bim-guard-evaluation on GitHub</a> - source and citation file",
+                        "<a href=\"https://github.com/maicen/bim-guard\" rel=\"noopener\">bim-guard on GitHub</a> - the platform itself",
+                    ]),
+                ],
+            ),
+            (
+                "Related",
+                [
+                    "<a href=\"/ifc-compliance-checking\">Automated IFC compliance checking</a> · "
+                    "<a href=\"/features\">All features</a> · "
+                    "<a href=\"/docs\">Documentation</a>",
+                ],
+            ),
+        ],
+    },
+    {
         "slug": "docs",
         "title": "Documentation - BIM Guard User Manual and Guides",
         "h1": "BIM Guard documentation",
@@ -316,6 +384,7 @@ PAGES = [
                         "<a href=\"/ifc-compliance-checking\">Automated IFC compliance checking</a>",
                         "<a href=\"/iso-19650-cde\">ISO 19650 and CDE governance</a>",
                         "<a href=\"/bcf-and-ids\">BCF issue management and IDS validation</a>",
+                        "<a href=\"/research\">Validation and research</a>",
                     ]),
                 ],
             ),
@@ -359,6 +428,7 @@ NAV = [
     ("/ifc-compliance-checking", "Compliance checking"),
     ("/iso-19650-cde", "ISO 19650"),
     ("/bcf-and-ids", "BCF & IDS"),
+    ("/research", "Research"),
     ("/docs", "Docs"),
 ]
 
