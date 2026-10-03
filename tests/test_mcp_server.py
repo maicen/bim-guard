@@ -1,0 +1,85 @@
+"""Tests for the /mcp Model Context Protocol endpoint."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from starlette.testclient import TestClient
+
+from app import mcp_server
+from app.auth import CurrentUser
+from app.main import app
+
+pytestmark = pytest.mark.api
+
+HEADERS = {
+    "Authorization": "Bearer test-token",
+    "Accept": "application/json, text/event-stream",
+    "Content-Type": "application/json",
+}
+
+
+@pytest.fixture
+def mcp_client(monkeypatch):
+    """Yield a client with the app lifespan running and token verification stubbed."""
+    monkeypatch.setattr(
+        mcp_server, "_verify", lambda token: CurrentUser(id="u1", email=None, claims={})
+    )
+    with TestClient(app) as client:
+        yield client
+
+
+def _rpc(client: TestClient, method: str, params: dict | None = None, headers=HEADERS):
+    body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}
+    return client.post("/mcp/", json=body, headers=headers)
+
+
+def test_mcp_rejects_missing_token(mcp_client):
+    response = _rpc(mcp_client, "tools/list", headers={k: v for k, v in HEADERS.items() if k != "Authorization"})
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"].startswith("Bearer")
+
+
+def test_mcp_rejects_invalid_token(monkeypatch, mcp_client):
+    from fastapi import HTTPException
+
+    def reject(token):
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
+
+    monkeypatch.setattr(mcp_server, "_verify", reject)
+    assert _rpc(mcp_client, "tools/list").status_code == 401
+
+
+def test_mcp_lists_tools(mcp_client):
+    response = _rpc(mcp_client, "tools/list")
+    assert response.status_code == 200
+    names = {t["name"] for t in response.json()["result"]["tools"]}
+    assert {
+        "list_projects",
+        "list_rulesets",
+        "list_rules",
+        "run_architecture_analysis",
+        "get_analysis_status",
+        "get_analysis_results",
+    } <= names
+
+
+def test_mcp_tool_forwards_to_api(mcp_client):
+    response = _rpc(
+        mcp_client, "tools/call", {"name": "get_analysis_status", "arguments": {"project_id": 999_999_999}}
+    )
+    result = response.json()["result"]
+    assert not result.get("isError")
+    assert json.loads(result["content"][0]["text"])["project_id"] == 999_999_999
+
+
+def test_mcp_tool_surfaces_api_errors(mcp_client):
+    response = _rpc(
+        mcp_client,
+        "tools/call",
+        {"name": "run_architecture_analysis", "arguments": {"project_id": 999_999_999}},
+    )
+    result = response.json()["result"]
+    assert result["isError"] is True
+    assert "failed (" in result["content"][0]["text"]

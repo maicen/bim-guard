@@ -134,7 +134,7 @@ The AI subsystem operates on the periphery of the deterministic compliance engin
 
 Turn BIM-Guard into an agent-callable infrastructure platform for external AI agents:
 
-- [ ] **Model Context Protocol (MCP) Server**:
+- [x] **Model Context Protocol (MCP) Server** (see [docs/mcp-server.md](docs/mcp-server.md)):
   - Wrap BIM-Guard's compliance analysis, rule extraction, and document APIs as a dedicated MCP server so agent clients (Claude, Cursor, external tools) can execute checks natively.
 - [ ] **Agent-to-Agent (A2A) Agent Card**:
   - Expose BIM-Guard's inspector agent via `/.well-known/agent-card.json`.

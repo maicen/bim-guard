@@ -103,6 +103,7 @@ from app.api import (
 )
 from app.environment import load_env_file
 from app.logging_config import TRACE, configure_logging, get_logger, reset_request_id, set_request_id
+from app.mcp_server import mount_mcp
 from app.modules.contracts import HealthCheckResponse
 
 try:
@@ -544,6 +545,9 @@ app.include_router(api_events.router, prefix="/api", tags=["Events"])
 app.include_router(api_audit_log.router, prefix="/api/audit-log", tags=["Audit Log"])
 app.include_router(api_llm_calls.router, prefix="/api/llm-calls", tags=["LLM Call Log"])
 app.include_router(api_scim.router, prefix="/api/scim/v2", tags=["SCIM"])
+
+# MCP server for external agents; forwards to the /api routes registered above.
+mount_mcp(app)
 
 
 
