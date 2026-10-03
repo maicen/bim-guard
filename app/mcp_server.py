@@ -56,7 +56,7 @@ _MAX_ROWS = 200
 _INSTRUCTIONS = (
     "BIM-Guard architectural IFC compliance. Typical flow: list_projects -> "
     "list_rulesets -> run_architecture_analysis -> get_analysis_results. "
-    "Explore with list_models, list_documents, find_elements, "
+    "Run ingest_project_graph once per model before graph-based tools; explore with list_models, list_documents, find_elements, "
     "ask_project_knowledge and the named run_cypher_query presets; "
     "explain_finding, get_model_health and export_findings for follow-up. "
     "Access follows the signed-in user's organization membership."
@@ -330,6 +330,28 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
             )
         )
 
+    @mcp.tool(annotations={"readOnlyHint": False, "idempotentHint": True})
+    async def ingest_project_graph(ctx: Context, project_id: int, background: bool = False) -> str:
+        """Load a project's primary IFC model into the knowledge graph.
+
+        Required before find_elements, run_cypher_query and model-scoped
+        ask_project_knowledge return anything. Safe to repeat. Large models
+        take minutes: pass background=true to queue it and poll
+        get_graph_status.
+        """
+        body = await call(
+            ctx, "POST", f"/graph/{project_id}/ingest", params={"background": background}
+        )
+        return json.dumps(body)
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def get_graph_status(ctx: Context, project_id: int) -> str:
+        """Report a project's graph size (nodes, edges) and spatial-boundary quality.
+
+        Zero nodes means ingest_project_graph has not run yet.
+        """
+        return json.dumps(await call(ctx, "GET", f"/graph/{project_id}/status"))
+
     @mcp.tool(annotations={"readOnlyHint": True})
     async def find_elements(ctx: Context, project_id: int, ifc_class: str) -> str:
         """Find a project's model elements of one IFC class, e.g. IfcDoor.
@@ -337,13 +359,13 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
         Returns up to 100 elements (guid, name, type) from the project's
         knowledge graph, which is built when the model is ingested.
         """
-        rows = await call(
+        body = await call(
             ctx,
             "POST",
             f"/graph/{project_id}/query-presets/elements-by-ifc-class/run",
             json_body={"ifc_class": ifc_class},
         )
-        return json.dumps(rows)
+        return json.dumps(body["rows"])
 
     @mcp.tool(annotations={"readOnlyHint": True})
     async def ask_project_knowledge(
@@ -394,13 +416,13 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
         arbitrary text could read other projects' data. project_id is always
         applied by the server.
         """
-        rows = await call(
+        body = await call(
             ctx,
             "POST",
             f"/graph/{project_id}/query-presets/{query}/run",
             json_body=params or {},
         )
-        return json.dumps(rows[:_MAX_ROWS])
+        return json.dumps({"row_count": body["row_count"], "rows": body["rows"][:_MAX_ROWS]})
 
     @mcp.tool(annotations={"readOnlyHint": True})
     async def explain_finding(ctx: Context, project_id: int, issue_id: str) -> str:

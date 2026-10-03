@@ -19,6 +19,7 @@ BIM-Guard exposes a [Model Context Protocol](https://modelcontextprotocol.io) se
 | `get_analysis_results` | Paged findings (`limit`, `offset`, `band`, `query`) |
 | `list_models` | IFC models attached to a project |
 | `list_documents` | Specification documents bound to a project |
+| `ingest_project_graph` / `get_graph_status` | Load the model into the knowledge graph (needed before the graph tools below); check graph size |
 | `find_elements` | Elements of an IFC class (e.g. `IfcDoor`) from the project graph |
 | `ask_project_knowledge` | Graph-RAG Q&A over documents/model, same engine as the copilot |
 | `list_cypher_queries` / `run_cypher_query` | Named Cypher presets only; free-form Cypher is not accepted (the graph is not partitioned per project) |

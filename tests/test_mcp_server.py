@@ -20,14 +20,20 @@ HEADERS = {
 }
 
 
+@pytest.fixture(scope="module")
+def _lifespan_client():
+    """Run the app lifespan once: the MCP session manager is single-use per process."""
+    with TestClient(app) as client:
+        yield client
+
+
 @pytest.fixture
-def mcp_client(monkeypatch):
-    """Yield a client with the app lifespan running and token verification stubbed."""
+def mcp_client(monkeypatch, _lifespan_client):
+    """Yield the lifespan client with token verification stubbed."""
     monkeypatch.setattr(
         mcp_server, "_verify", lambda token: CurrentUser(id="u1", email=None, claims={})
     )
-    with TestClient(app) as client:
-        yield client
+    return _lifespan_client
 
 
 def _rpc(client: TestClient, method: str, params: dict | None = None, headers=HEADERS):
@@ -167,3 +173,42 @@ def test_export_findings_rejects_bcf(mcp_client):
 def test_summary_resource_surfaces_missing_project(mcp_client):
     body = _rpc(mcp_client, "resources/read", {"uri": "bimguard://projects/999999999/summary"}).json()
     assert "error" in body or body["result"].get("isError")
+
+
+class _FakeGraph:
+    """Stand-in for GraphService returning fixed rows."""
+
+    def execute(self, cypher, params):
+        return [{"guid": "g1", "name": "D1", "type": "IfcDoor"}]
+
+
+def test_preset_tools_unwrap_the_rows_envelope(mcp_client):
+    from app.api.dependencies import get_graph_service
+
+    app.dependency_overrides[get_graph_service] = lambda: _FakeGraph()
+    try:
+        found = _rpc(
+            mcp_client, "tools/call", {"name": "find_elements", "arguments": {"project_id": 1, "ifc_class": "IfcDoor"}}
+        ).json()["result"]
+        ran = _rpc(
+            mcp_client,
+            "tools/call",
+            {"name": "run_cypher_query", "arguments": {"project_id": 1, "query": "element-counts-by-type"}},
+        ).json()["result"]
+    finally:
+        app.dependency_overrides.pop(get_graph_service, None)
+    assert json.loads(found["content"][0]["text"])[0]["guid"] == "g1"
+    assert json.loads(ran["content"][0]["text"]) == {
+        "row_count": 1,
+        "rows": [{"guid": "g1", "name": "D1", "type": "IfcDoor"}],
+    }
+
+
+def test_ingest_tool_surfaces_missing_model(mcp_client):
+    names = {t["name"] for t in _rpc(mcp_client, "tools/list").json()["result"]["tools"]}
+    assert {"ingest_project_graph", "get_graph_status"} <= names
+    result = _rpc(
+        mcp_client, "tools/call", {"name": "ingest_project_graph", "arguments": {"project_id": 999_999_999}}
+    ).json()["result"]
+    assert result["isError"] is True
+    assert "failed (" in result["content"][0]["text"]
