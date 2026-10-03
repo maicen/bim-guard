@@ -1458,12 +1458,15 @@ class IFCReader:
             if room_names:
                 return ", ".join(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("connectedspacecount", "spaceconnectioncount", "numberofconnectedspaces", "connectedspacescount"):
+            # A door with no boundary data counts its room links instead, the
+            # same fallback ConnectedSpaces uses above -- otherwise a door
+            # reports two connected rooms by name and a count of 0.
+            room_names = (room or {}).get("rooms")
+            if room_names and not (door_space_connection or {}).get("has_data"):
+                return len(room_names), "spatial:room_link", self._room_link_detail(room)
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
                 return door_space_connection.get("connected_space_count", 0), "spatial:door_space_connection", dsc_rich
-            room_names = (room or {}).get("rooms")
-            if room_names:
-                return len(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("interiorsinglespacemismatch", "interiorsinglespaceflag", "spaceconnectionmismatch"):
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
