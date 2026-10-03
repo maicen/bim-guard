@@ -1,0 +1,850 @@
+{
+  "model": "ce920dc17ea74abd8929adda300b261e_Architecture Model.ifc",
+  "schema": "IFC2X3",
+  "element_counts": {
+    "IfcDoor": 83,
+    "IfcWindow": 28,
+    "IfcOpeningElement": 1322,
+    "IfcBuildingStorey": 2
+  },
+  "rules": 50,
+  "panels": {
+    "doors": {
+      "pairs": 1992,
+      "matrix": {
+        "VIOLATION": {
+          "VIOLATION": 47,
+          "COMPLIANT": 0,
+          "ABSENT": 0
+        },
+        "COMPLIANT": {
+          "VIOLATION": 498,
+          "COMPLIANT": 617,
+          "ABSENT": 166
+        },
+        "ABSENT": {
+          "VIOLATION": 0,
+          "COMPLIANT": 83,
+          "ABSENT": 581
+        }
+      },
+      "agreement": 0.625,
+      "violations_in_model": 47,
+      "flagged_as_violation": 545,
+      "true_violations_flagged": 47,
+      "false_violations_flagged": 498,
+      "violations_missed": 0,
+      "precision": 0.0862,
+      "recall": 1.0
+    },
+    "door_pack_other": {
+      "pairs": 2646,
+      "matrix": {
+        "VIOLATION": {
+          "VIOLATION": 39,
+          "COMPLIANT": 0,
+          "ABSENT": 0
+        },
+        "COMPLIANT": {
+          "VIOLATION": 1283,
+          "COMPLIANT": 0,
+          "ABSENT": 1324
+        },
+        "ABSENT": {
+          "VIOLATION": 0,
+          "COMPLIANT": 0,
+          "ABSENT": 0
+        }
+      },
+      "agreement": 0.0147,
+      "violations_in_model": 39,
+      "flagged_as_violation": 1322,
+      "true_violations_flagged": 39,
+      "false_violations_flagged": 1283,
+      "violations_missed": 0,
+      "precision": 0.0295,
+      "recall": 1.0
+    },
+    "windows": {
+      "pairs": 560,
+      "matrix": {
+        "VIOLATION": {
+          "VIOLATION": 0,
+          "COMPLIANT": 0,
+          "ABSENT": 0
+        },
+        "COMPLIANT": {
+          "VIOLATION": 0,
+          "COMPLIANT": 252,
+          "ABSENT": 0
+        },
+        "ABSENT": {
+          "VIOLATION": 0,
+          "COMPLIANT": 28,
+          "ABSENT": 280
+        }
+      },
+      "agreement": 0.95,
+      "violations_in_model": 0,
+      "flagged_as_violation": 0,
+      "true_violations_flagged": 0,
+      "false_violations_flagged": 0,
+      "violations_missed": 0,
+      "precision": null,
+      "recall": null
+    }
+  },
+  "per_rule": [
+    {
+      "reference": "DR-001",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "GlobalId",
+      "operator": "matches",
+      "check_value": "22-char IFC GUID",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-002",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "IfcClass",
+      "operator": "==",
+      "check_value": "IfcDoor",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-003",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "Name",
+      "operator": "!=",
+      "check_value": "EMPTY",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-004",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "PredefinedType",
+      "operator": "matches",
+      "check_value": "TEST_ALLOWED_DOOR_TYPES",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-005",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "StoreyGlobalId",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-006",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcBuildingStorey",
+      "property": "StoreyName",
+      "operator": "!=",
+      "check_value": "EMPTY",
+      "rule_status": "MISSING_DATA",
+      "elements": 2,
+      "cells": {
+        "COMPLIANT->ABSENT": 2
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-007",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "PlacementMatrix",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-008",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "OpeningGlobalId",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 61,
+        "VIOLATION->VIOLATION": 22
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-009",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcOpeningElement",
+      "property": "OpeningIfcClass",
+      "operator": "==",
+      "check_value": "IfcOpeningElement",
+      "rule_status": "MISSING_DATA",
+      "elements": 1322,
+      "cells": {
+        "COMPLIANT->ABSENT": 1322
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-010",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcOpeningElement",
+      "property": "HostGlobalId",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "FAIL",
+      "elements": 1322,
+      "cells": {
+        "COMPLIANT->VIOLATION": 1283,
+        "VIOLATION->VIOLATION": 39
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-011",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "HostIfcClass",
+      "operator": "matches",
+      "check_value": "TEST_ALLOWED_HOST_CLASSES",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "UNDEFINED->ABSENT": 22,
+        "UNDEFINED->VIOLATION": 61
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-012",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "OverallWidth",
+      "operator": ">=",
+      "check_value": "800",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 60,
+        "VIOLATION->VIOLATION": 23
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-013",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "OverallHeight",
+      "operator": ">=",
+      "check_value": "2000",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 81,
+        "VIOLATION->VIOLATION": 2
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-014",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "QtoWidth",
+      "operator": ">",
+      "check_value": "0",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->ABSENT": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-015",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "QtoHeight",
+      "operator": ">",
+      "check_value": "0",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->ABSENT": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-016",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "Perimeter",
+      "operator": ">",
+      "check_value": "0",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "ABSENT->COMPLIANT": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-017",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "Area",
+      "operator": ">",
+      "check_value": "0",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-018",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "RepresentationIds",
+      "operator": "exists",
+      "check_value": "Body",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-019",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoorType",
+      "property": "OperationType",
+      "operator": "matches",
+      "check_value": "TEST_ALLOWED_OPERATION_TYPES",
+      "rule_status": "NO_ELEMENTS",
+      "elements": 0,
+      "cells": {},
+      "agrees": false
+    },
+    {
+      "reference": "DR-020",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "OpeningDirectionAxis",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-021",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "Tag",
+      "operator": "!=",
+      "check_value": "EMPTY",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-022",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "TypeGlobalId",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-023",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoorType",
+      "property": "PanelOperation",
+      "operator": "matches",
+      "check_value": "TEST_ALLOWED_PANEL_OPS",
+      "rule_status": "NO_ELEMENTS",
+      "elements": 0,
+      "cells": {},
+      "agrees": false
+    },
+    {
+      "reference": "DR-024",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "FireRating",
+      "operator": ">=",
+      "check_value": "45",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-025",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "IsExternal",
+      "operator": "matches",
+      "check_value": "boolean",
+      "rule_status": "FAIL",
+      "elements": 83,
+      "cells": {
+        "COMPLIANT->VIOLATION": 83
+      },
+      "agrees": false
+    },
+    {
+      "reference": "DR-026",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "ThermalTransmittance",
+      "operator": "<=",
+      "check_value": "2.0",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-027",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "HandicapAccessible",
+      "operator": "==",
+      "check_value": "TRUE",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-028",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "FireExit",
+      "operator": "==",
+      "check_value": "TRUE",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-029",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "SelfClosing",
+      "operator": "==",
+      "check_value": "TRUE",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "DR-030",
+      "pack": "doors",
+      "draft_status": "accepted",
+      "target": "IfcDoor",
+      "property": "SmokeStop",
+      "operator": "==",
+      "check_value": "TRUE",
+      "rule_status": "MISSING_DATA",
+      "elements": 83,
+      "cells": {
+        "ABSENT->ABSENT": 83
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-001",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "OverallWidth",
+      "operator": ">=",
+      "check_value": "800",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-002",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "OverallHeight",
+      "operator": ">=",
+      "check_value": "800",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-005",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "Area",
+      "operator": ">=",
+      "check_value": "0.64",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-035",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "OpeningElement",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-036",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "HostElement",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-039",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "Storey",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-068",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "FireRating",
+      "operator": ">=",
+      "check_value": "60",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-063",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "ThermalTransmittance",
+      "operator": "<=",
+      "check_value": "1.8",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-059",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "SolarHeatGainTransmittance",
+      "operator": "<=",
+      "check_value": "0.40",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-065",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "Infiltration",
+      "operator": "<=",
+      "check_value": "0.30",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-007",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "SillHeight",
+      "operator": "<=",
+      "check_value": "1000",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "ABSENT->COMPLIANT": 28
+      },
+      "agrees": false
+    },
+    {
+      "reference": "WR-012",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "ClearOpeningWidth",
+      "operator": ">=",
+      "check_value": "500",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-013",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "ClearOpeningHeight",
+      "operator": ">=",
+      "check_value": "600",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-014",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "ClearOpeningArea",
+      "operator": ">=",
+      "check_value": "0.35",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-067",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "AcousticRating",
+      "operator": ">=",
+      "check_value": "35",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-057",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "IsSafetyGlass",
+      "operator": "==",
+      "check_value": "TRUE",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-028",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "PredefinedType",
+      "operator": "!=",
+      "check_value": "NOTDEFINED",
+      "rule_status": "MISSING_DATA",
+      "elements": 28,
+      "cells": {
+        "ABSENT->ABSENT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-030",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "WindowType",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-032",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "TypeAssignmentCount",
+      "operator": "==",
+      "check_value": "1",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    },
+    {
+      "reference": "WR-023",
+      "pack": "windows",
+      "draft_status": "pending_review",
+      "target": "IfcWindow",
+      "property": "GlobalId",
+      "operator": "exists",
+      "check_value": "TRUE",
+      "rule_status": "PASS",
+      "elements": 28,
+      "cells": {
+        "COMPLIANT->COMPLIANT": 28
+      },
+      "agrees": true
+    }
+  ]
+}
