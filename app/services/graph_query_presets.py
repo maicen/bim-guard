@@ -54,6 +54,21 @@ GRAPH_QUERY_PRESETS: tuple[GraphQueryPreset, ...] = (
         ),
     ),
     GraphQueryPreset(
+        key="elements-by-ifc-class",
+        label="Elements of one IFC class",
+        description=(
+            "Elements of the given IFC class (e.g. IfcDoor, case-insensitive) with "
+            "their GUID and name, capped at 100."
+        ),
+        cypher=(
+            "MATCH (n) WHERE n.project_id = $project_id "
+            "AND toLower(n.ifc_type) = toLower($ifc_class) "
+            "RETURN n.guid AS guid, n.name AS name, n.ifc_type AS type "
+            "ORDER BY n.name LIMIT 100"
+        ),
+        params=("ifc_class",),
+    ),
+    GraphQueryPreset(
         key="most-connected-elements",
         label="Most-connected elements",
         description=(

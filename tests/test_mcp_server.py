@@ -112,3 +112,36 @@ def test_unauthenticated_challenge_points_at_metadata(mcp_client, supabase_env):
     assert response.headers["www-authenticate"] == (
         'Bearer resource_metadata="https://app.example.test/.well-known/oauth-protected-resource"'
     )
+
+
+def test_mcp_lists_exploration_tools(mcp_client):
+    names = {t["name"] for t in _rpc(mcp_client, "tools/list").json()["result"]["tools"]}
+    assert {
+        "list_models",
+        "list_documents",
+        "find_elements",
+        "ask_project_knowledge",
+        "list_cypher_queries",
+        "run_cypher_query",
+    } <= names
+    # Free-form Cypher must never be reachable: only named presets are.
+    run = next(
+        t for t in _rpc(mcp_client, "tools/list").json()["result"]["tools"] if t["name"] == "run_cypher_query"
+    )
+    assert "cypher" not in run["inputSchema"]["properties"]
+
+
+def test_list_cypher_queries_includes_class_search(mcp_client):
+    result = _rpc(mcp_client, "tools/call", {"name": "list_cypher_queries", "arguments": {}}).json()["result"]
+    presets = json.loads(result["content"][0]["text"])
+    by_key = {p["key"]: p for p in presets}
+    assert by_key["elements-by-ifc-class"]["params"] == ["ifc_class"]
+
+
+def test_unknown_cypher_query_is_rejected(mcp_client):
+    result = _rpc(
+        mcp_client,
+        "tools/call",
+        {"name": "run_cypher_query", "arguments": {"project_id": 1, "query": "MATCH (n) RETURN n"}},
+    ).json()["result"]
+    assert result["isError"] is True

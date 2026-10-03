@@ -53,6 +53,8 @@ _MAX_ROWS = 200
 _INSTRUCTIONS = (
     "BIM-Guard architectural IFC compliance. Typical flow: list_projects -> "
     "list_rulesets -> run_architecture_analysis -> get_analysis_results. "
+    "Explore with list_models, list_documents, find_elements, "
+    "ask_project_knowledge and the named run_cypher_query presets. "
     "Access follows the signed-in user's organization membership."
 )
 
@@ -153,6 +155,7 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
         *,
         params: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
+        json_body: Any = None,
         organization_id: int | None = None,
     ) -> Any:
         """Call ``/api{path}`` as the MCP caller and return the decoded JSON body."""
@@ -163,7 +166,7 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
             transport=transport, base_url="http://bim-guard.internal", timeout=None
         ) as client:
             response = await client.request(
-                method, f"/api{path}", params=params, data=data, headers=headers
+                method, f"/api{path}", params=params, data=data, json=json_body, headers=headers
             )
         if response.is_error:
             try:
@@ -284,6 +287,115 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
         return json.dumps(
             await call(ctx, "GET", f"/analyze/results/{project_id}/architecture", params=params)
         )
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def list_models(ctx: Context, project_id: int) -> str:
+        """List the IFC models attached to a project (primary first)."""
+        body = await call(ctx, "GET", "/models", params={"project_id": project_id})
+        return json.dumps(
+            _compact(
+                body.get("models", []),
+                (
+                    "id",
+                    "file_name",
+                    "is_primary",
+                    "role",
+                    "ifc_schema",
+                    "authoring_application",
+                    "storey_count",
+                    "element_count",
+                    "uploaded_at",
+                ),
+            )
+        )
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def list_documents(ctx: Context, project_id: int) -> str:
+        """List the specification documents bound to a project.
+
+        Pass a returned id as document_id to ask_project_knowledge.
+        """
+        bindings = await call(ctx, "GET", f"/projects/{project_id}/document-bindings")
+        bound = set(bindings.get("document_ids", []))
+        documents = await call(ctx, "GET", "/documents")
+        return json.dumps(
+            _compact(
+                [d for d in documents if d["id"] in bound],
+                ("id", "filename", "doc_type", "upload_date", "char_count"),
+            )
+        )
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def find_elements(ctx: Context, project_id: int, ifc_class: str) -> str:
+        """Find a project's model elements of one IFC class, e.g. IfcDoor.
+
+        Returns up to 100 elements (guid, name, type) from the project's
+        knowledge graph, which is built when the model is ingested.
+        """
+        rows = await call(
+            ctx,
+            "POST",
+            f"/graph/{project_id}/query-presets/elements-by-ifc-class/run",
+            json_body={"ifc_class": ifc_class},
+        )
+        return json.dumps(rows)
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def ask_project_knowledge(
+        ctx: Context,
+        project_id: int,
+        question: str,
+        scope: str = "hybrid",
+        document_id: int | None = None,
+        element_class: str | None = None,
+    ) -> str:
+        """Ask a grounded question over a project's documents and IFC model (Graph-RAG).
+
+        Same engine as the in-app copilot. scope is "document", "model" or
+        "hybrid"; document_id and element_class narrow retrieval. Returns the
+        answer with its citations.
+        """
+        request = {"query": question, "scope": scope}
+        if document_id is not None:
+            request["document_id"] = document_id
+        if element_class:
+            request["element_class"] = element_class
+        body = await call(ctx, "POST", f"/graph/{project_id}/rag/query", json_body=request)
+        return json.dumps(
+            {
+                "answer": body.get("answer"),
+                "citations": _compact(
+                    body.get("citations", []),
+                    ("source_type", "title", "reference", "snippet", "document_id", "page_number", "element_guid"),
+                ),
+                "suggested_followups": body.get("suggested_followups", []),
+            }
+        )
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def list_cypher_queries(ctx: Context) -> str:
+        """List the named Cypher queries run_cypher_query can execute, with their parameters."""
+        return json.dumps((await call(ctx, "GET", "/graph/query-presets"))["presets"])
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def run_cypher_query(
+        ctx: Context, project_id: int, query: str, params: dict[str, str] | None = None
+    ) -> str:
+        """Run a named Cypher query against a project's graph.
+
+        query is a key from list_cypher_queries and params fills the
+        parameters it declares. Free-form Cypher is deliberately not accepted:
+        the graph holds every project's nodes with no partitioning, so
+        arbitrary text could read other projects' data. project_id is always
+        applied by the server.
+        """
+        rows = await call(
+            ctx,
+            "POST",
+            f"/graph/{project_id}/query-presets/{query}/run",
+            json_body=params or {},
+        )
+        return json.dumps(rows[:_MAX_ROWS])
 
     return mcp
 
