@@ -104,6 +104,9 @@ USER bimguard
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)" || exit 1
 
-# Production command: 4 worker processes
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Production command: 4 worker processes. Heavy IFC analysis can hold the GIL for
+# longer than uvicorn's default 5s worker health check, which makes the supervisor
+# kill and respawn the worker mid-request (surfacing as 502s through the tunnel),
+# so allow a much longer health-check window.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--timeout-worker-healthcheck", "120"]
 

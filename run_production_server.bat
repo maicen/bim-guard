@@ -90,4 +90,4 @@ echo - App / SPA (hostname): http://%MACHINE_HOSTNAME%:8000/
 echo - API Docs (local):     http://localhost:8000/api/docs
 echo - API Docs (hostname):  http://%MACHINE_HOSTNAME%:8000/api/docs
 echo.
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --workers 8
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --workers 8 --timeout-worker-healthcheck 120

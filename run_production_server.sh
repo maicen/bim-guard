@@ -408,4 +408,4 @@ echo -e "  ${COLOR_CYAN}➜${COLOR_RESET}  ${COLOR_BOLD}Worker Processes:${COLOR
 echo -e "${COLOR_GREEN}${COLOR_BOLD}============================================================${COLOR_RESET}"
 echo ""
 
-exec uv run uvicorn main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$WORKERS"
+exec uv run uvicorn main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$WORKERS" --timeout-worker-healthcheck 120
