@@ -464,6 +464,8 @@
       </div>
 
       <div class="flex items-center gap-6">
+        <a href="/features" class="hover:text-fg-primary transition-colors">Features</a>
+        <a href="/docs" class="hover:text-fg-primary transition-colors">Docs</a>
         <a href="/terms" class="hover:text-fg-primary transition-colors">Terms of Service</a>
         <a href="/privacy" class="hover:text-fg-primary transition-colors">Privacy Policy</a>
         <a href="/sitemap.xml" class="hover:text-fg-primary transition-colors">Sitemap</a>
