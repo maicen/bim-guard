@@ -2,6 +2,8 @@
 
 BIM-Guard analyzes IFC building models for architectural compliance and ISO 19650 / CDE governance, and lets your team manage projects, documents, and compliance rules in one place.
 
+**[Complete illustrated manual](user-manual.md)** — every page of the app with screenshots (also available as [PDF](BIM-Guard-User-Manual.pdf)).
+
 This manual covers:
 
 - **[Getting Started](getting-started.md)** — installing, running the app, and signing in for the first time.
