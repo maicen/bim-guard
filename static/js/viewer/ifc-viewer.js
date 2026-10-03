@@ -21,7 +21,7 @@ import { normalizeMounts, VIEWER_MOUNTS_API } from "./viewer-mounts.js?v=viewer-
 export { VIEWER_MOUNTS_API };
 
 /** Cache-busting token this file is published under; kept beside the API version. */
-export const VIEWER_ASSET_VERSION = "viewer-bcf-resilience-1";
+export const VIEWER_ASSET_VERSION = "viewer-bcf-frame-1";
 
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
@@ -491,6 +491,25 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
 
         viewpoint.world = world;
         await viewpoint.go({ transition: true, applyVisibility: true });
+        // Frame the selection here, not only on the deep-link path.
+        //
+        // bcf_generator omits PerspectiveCamera unless the finding has real
+        // coordinates, and Viewpoint.go() returns before moving the camera
+        // when the viewpoint's position and direction are both zero. So a
+        // click on a topic row coloured the element and left the camera where
+        // it was — usually pointing somewhere else, which read as "nothing
+        // happened". An empty map means the topic's GUIDs are not in the
+        // loaded model; say so, since nothing on screen will.
+        const selection = await viewpoint.getSelectionMap();
+        if (OBC.ModelIdMapUtils.isEmpty(selection)) {
+            console.warn(`${LOG} topic ${topic.title || topic.guid} matched no element in the loaded model`);
+        } else {
+            try {
+                await world.camera.fitToItems(selection);
+            } catch (error) {
+                console.warn(`${LOG} could not frame topic selection:`, error);
+            }
+        }
         updateTopicPanel({ topic });
     };
     topicsList.addEventListener("rowcreated", (event) => {
@@ -498,7 +517,9 @@ function createTopicsWorkspace(components, world, viewport, highlightTopics) {
         row.style.cursor = "pointer";
         row.addEventListener("click", () => {
             const topic = row?.data?.Guid ? topics.list.get(row.data.Guid) : null;
-            if (topic) selectTopic(topic);
+            if (topic) {
+                selectTopic(topic).catch((error) => console.warn(`${LOG} topic select failed:`, error));
+            }
         });
     });
 

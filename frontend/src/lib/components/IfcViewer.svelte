@@ -203,7 +203,7 @@
       error = null;
 
       // Dynamic runtime import from static assets without bundling through Vite
-      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-bcf-resilience-1";
+      const viewerModuleUrl = "/static/js/viewer/ifc-viewer.js?v=viewer-bcf-frame-1";
       const mod = await import(/* @vite-ignore */ viewerModuleUrl);
 
       // The mount argument is deliberately both shapes at once: it IS the
