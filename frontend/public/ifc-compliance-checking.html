@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IFC Compliance Checking - Automated Building Code Audits | BIM Guard</title>
+  <meta name="description" content="Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="canonical" href="https://bim-guard.xyz/ifc-compliance-checking" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bim-guard.xyz/ifc-compliance-checking" />
+  <meta property="og:site_name" content="BIM Guard" />
+  <meta property="og:title" content="IFC Compliance Checking - Automated Building Code Audits | BIM Guard" />
+  <meta property="og:description" content="Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues." />
+  <meta property="og:image" content="https://bim-guard.xyz/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="IFC Compliance Checking - Automated Building Code Audits | BIM Guard" />
+  <meta name="twitter:description" content="Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues." />
+  <meta name="twitter:image" content="https://bim-guard.xyz/og-image.png" />
+  <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://bim-guard.xyz/ifc-compliance-checking#webpage",
+      "url": "https://bim-guard.xyz/ifc-compliance-checking",
+      "name": "IFC Compliance Checking - Automated Building Code Audits | BIM Guard",
+      "description": "Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues.",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "BIM Guard",
+        "url": "https://bim-guard.xyz"
+      },
+      "dateModified": "2026-10-04"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "BIM Guard",
+          "item": "https://bim-guard.xyz/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Automated IFC compliance checking",
+          "item": "https://bim-guard.xyz/ifc-compliance-checking"
+        }
+      ]
+    }
+  ]
+}</script>
+  <style>
+    :root{--bg:#090d16;--card:#0f172a;--border:#1e293b;--fg:#f8fafc;--fg2:#94a3b8;--accent:#3b82f6}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.65;-webkit-font-smoothing:antialiased;padding:0 1rem}
+    .container{max-width:800px;margin:0 auto;padding:2.5rem 0 5rem}
+    header.site-header{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:1.5rem;margin-bottom:2.5rem}
+    .brand{color:var(--fg);text-decoration:none;font-weight:700;font-size:1.15rem}
+    nav a{color:var(--fg2);text-decoration:none;margin-left:1.1rem;font-size:.95rem}
+    nav a:hover{color:var(--fg)}
+    h1{font-size:2.1rem;line-height:1.2;margin-bottom:1rem}
+    h2{font-size:1.35rem;margin:2.2rem 0 .7rem}
+    p,ul{color:var(--fg2);margin-bottom:1rem}
+    ul{padding-left:1.4rem}li{margin-bottom:.5rem}
+    strong{color:var(--fg)}
+    a{color:var(--accent)}
+    code{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:.05rem .35rem;font-size:.9em}
+    .cta{display:inline-block;margin-top:1.5rem;padding:.7rem 1.4rem;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-weight:600}
+    footer{border-top:1px solid var(--border);margin-top:3rem;padding-top:1.5rem;font-size:.9rem}
+    footer a{color:var(--fg2);margin-right:1.2rem;text-decoration:none}
+</style>
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <a class="brand" href="/">BIM Guard</a>
+      <nav aria-label="Main"><a href="/features">Features</a><a href="/ifc-compliance-checking">Compliance checking</a><a href="/iso-19650-cde">ISO 19650</a><a href="/bcf-and-ids">BCF &amp; IDS</a><a href="/research">Research</a><a href="/docs">Docs</a></nav>
+    </header>
+    <main>
+    <h1>Automated IFC compliance checking</h1>
+    <p>Manual code review of a building model is slow and hard to repeat. BIM Guard reads your IFC file, applies rules from a managed catalog and reports each finding against the element that caused it.</p>
+    <h2>How an audit works</h2>
+    <ul><li><strong>Create a project</strong> and attach an IFC model (IFC2X3, IFC4 or IFC4.3).</li><li><strong>Choose a ruleset</strong> - an existing catalog or one extracted from your own code document.</li><li><strong>Run the audit.</strong> Progress streams live while the model is validated, parsed, checked and scored.</li><li><strong>Review findings</strong> in the report and 3D viewer, then export them as BCF issues.</li></ul>
+    <h2>What gets checked</h2>
+    <ul><li><strong>Egress</strong> - the shortest path from each habitable space to an exterior exit is computed over the building's space-boundary graph, then compared with travel-distance and exit-count limits from the active ruleset.</li><li><strong>Daylight</strong> - glazing area relative to room floor area, compared with the ruleset's ratio threshold.</li></ul>
+    <p>Thresholds come from the rule database, so switching jurisdiction or code edition means switching ruleset, not changing code.</p>
+    <h2>Model quality gate</h2>
+    <p>Before analysis, an IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association.</p>
+    <h2>Related</h2>
+    <p><a href="/features">All features</a> · <a href="/bcf-and-ids">BCF and IDS</a> · <a href="/docs">Documentation</a></p>
+    <a class="cta" href="/">Open BIM Guard</a>
+    </main>
+    <footer>
+      <a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a><a href="/sitemap.xml">Sitemap</a>
+    </footer>
+  </div>
+</body>
+</html>
