@@ -39,6 +39,17 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# The app's in-memory caches share invalidations across processes through a log
+# file in the temp dir (app.services.cache.SharedInvalidationLog). On a dev host
+# that dir is shared with every other Python process -- dev servers, other test
+# runs, and the other pytest-xdist workers of this run (addopts has `-n auto`)
+# -- whose invalidations would evict this process's cache entries mid-test. Give
+# every test process its own directory: assigned unconditionally, because xdist
+# workers inherit the controller's environment. Must run before `app` is imported.
+import tempfile  # noqa: E402
+
+os.environ["BIMGUARD_CACHE_INVALIDATION_DIR"] = tempfile.mkdtemp(prefix=f"bimguard-cache-test-{os.getpid()}-")
+
 # ---------------------------------------------------------------------------
 # Auth override
 # ---------------------------------------------------------------------------

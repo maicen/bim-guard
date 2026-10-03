@@ -10,7 +10,10 @@
 from __future__ import annotations
 
 import inspect
+import os
+import tempfile
 import threading
+import uuid
 from abc import ABC
 from functools import wraps
 from typing import Any, Callable, Optional, Protocol, runtime_checkable
@@ -50,16 +53,108 @@ class ICacheBackend(Protocol):
         ...
 
 
+class SharedInvalidationLog:
+    """Cross-process invalidation for per-process in-memory caches.
+
+    WHY: production runs uvicorn with several workers (``--workers 4`` in the
+    Dockerfile), each holding its own ``TTLCache`` with a 24 h TTL. An
+    ``invalidate_cache(...)`` call used to clear only the worker that handled the
+    write, so the other workers kept serving the stale value -- e.g. a freshly
+    uploaded document stayed missing from ``GET /api/documents`` on 3 of 4
+    requests for up to a day.
+
+    Every worker appends the prefixes it invalidates to one append-only file in
+    the container's shared temp dir, and before each cache read applies whatever
+    other workers appended since it last looked. The read-side cost is one
+    ``os.path.getsize`` (the file is only read when it has grown), so cache hits
+    stay cheap; only matching keys are dropped. Invariant: entries are whole
+    lines written with O_APPEND (atomic for these small writes on POSIX), each
+    process tracks its own byte offset (starting at the end of the file), and
+    each line carries its writer's id so a process never replays its own entries
+    (which would evict values it cached after invalidating).
+    """
+
+    CLEAR_ALL = "*"
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+        self._writer_id = uuid.uuid4().hex[:12]
+        self._lock = threading.Lock()
+        try:
+            self._offset = os.path.getsize(path)
+        except OSError:
+            self._offset = 0
+
+    def publish(self, prefix: str) -> None:
+        try:
+            with open(self._path, "ab") as fh:
+                line = f"{self._writer_id}\t{prefix.replace(chr(10), ' ')}\n"
+                fh.write(line.encode("utf-8"))
+        except OSError:
+            pass  # caching is an optimisation; never fail the write path over it
+
+    def pending(self) -> list[str]:
+        """Prefixes appended (by any process) since this process last checked."""
+        try:
+            size = os.path.getsize(self._path)
+        except OSError:
+            return []
+        with self._lock:
+            if size == self._offset:
+                return []
+            if size < self._offset:  # file was truncated or replaced
+                self._offset = 0
+            try:
+                with open(self._path, "rb") as fh:
+                    fh.seek(self._offset)
+                    chunk = fh.read(size - self._offset)
+            except OSError:
+                return []
+            end = chunk.rfind(b"\n")
+            if end < 0:
+                return []  # a writer is mid-line; pick it up next time
+            self._offset += end + 1
+            prefixes = []
+            for line in chunk[:end].decode("utf-8", "replace").split("\n"):
+                writer, sep, prefix = line.partition("\t")
+                if sep and prefix and writer != self._writer_id:
+                    prefixes.append(prefix)
+            return prefixes
+
+
+def _shared_log(name: str) -> SharedInvalidationLog:
+    directory = os.environ.get("BIMGUARD_CACHE_INVALIDATION_DIR") or tempfile.gettempdir()
+    return SharedInvalidationLog(os.path.join(directory, f"bimguard-cache-invalidations-{name}.log"))
+
+
 class InMemoryTTLCacheBackend(ABC):
     """Concrete thread-safe in-memory cache backend built on cachetools.TTLCache (SRP)."""
 
-    def __init__(self, maxsize: int = DEFAULT_MAXSIZE, ttl: int = DEFAULT_TTL) -> None:
+    def __init__(
+        self,
+        maxsize: int = DEFAULT_MAXSIZE,
+        ttl: int = DEFAULT_TTL,
+        shared_log: Optional[SharedInvalidationLog] = None,
+    ) -> None:
         self._maxsize = maxsize
         self._ttl = ttl
         self._lock = threading.RLock()
         self._store = TTLCache(maxsize=maxsize, ttl=ttl)
         self._hits = 0
         self._misses = 0
+        # Optional cross-worker invalidation (see SharedInvalidationLog); None keeps
+        # the backend purely process-local (tests, single-process tools).
+        self._shared_log = shared_log
+
+    def _apply_remote_invalidations(self) -> None:
+        if self._shared_log is None:
+            return
+        for prefix in self._shared_log.pending():
+            if prefix == SharedInvalidationLog.CLEAR_ALL:
+                with self._lock:
+                    self._store.clear()
+            else:
+                self._invalidate_local(prefix)
 
     @property
     def raw_cache(self) -> TTLCache:
@@ -67,6 +162,7 @@ class InMemoryTTLCacheBackend(ABC):
         return self._store
 
     def get(self, key: str) -> Any:
+        self._apply_remote_invalidations()
         with self._lock:
             if key in self._store:
                 self._hits += 1
@@ -87,8 +183,16 @@ class InMemoryTTLCacheBackend(ABC):
             self._store.clear()
             self._hits = 0
             self._misses = 0
+        if self._shared_log is not None:
+            self._shared_log.publish(SharedInvalidationLog.CLEAR_ALL)
 
     def invalidate_prefix(self, prefix: str) -> int:
+        count = self._invalidate_local(prefix)
+        if self._shared_log is not None and str(prefix).strip():
+            self._shared_log.publish(str(prefix).strip())
+        return count
+
+    def _invalidate_local(self, prefix: str) -> int:
         normalized = str(prefix).strip()
         if not normalized:
             return 0
@@ -202,7 +306,9 @@ class CacheService:
 
 
 # ── Global Singleton & Public Utility Functions ──────────────────────────────
-_default_backend = InMemoryTTLCacheBackend(maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_TTL)
+_default_backend = InMemoryTTLCacheBackend(
+    maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_TTL, shared_log=_shared_log("default")
+)
 cache_service = CacheService(_default_backend)
 local_cache = _default_backend.raw_cache
 
@@ -214,7 +320,9 @@ local_cache = _default_backend.raw_cache
 # Cache-Control header, and bounds cross-worker staleness in a multi-worker
 # production deployment to the same window.
 DEFAULT_ADAPTER_TTL = 20
-_adapter_backend = InMemoryTTLCacheBackend(maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_ADAPTER_TTL)
+_adapter_backend = InMemoryTTLCacheBackend(
+    maxsize=DEFAULT_MAXSIZE, ttl=DEFAULT_ADAPTER_TTL, shared_log=_shared_log("adapter")
+)
 adapter_cache_service = CacheService(_adapter_backend)
 
 
