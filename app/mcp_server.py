@@ -47,6 +47,9 @@ logger = get_logger(__name__)
 
 MCP_MOUNT_PATH = "/mcp"
 
+#: Cap on characters of a text export returned in one tool result.
+_MAX_EXPORT_CHARS = 200_000
+
 #: Cap on rows returned by list tools, so one call cannot flood an agent's context.
 _MAX_ROWS = 200
 
@@ -54,7 +57,8 @@ _INSTRUCTIONS = (
     "BIM-Guard architectural IFC compliance. Typical flow: list_projects -> "
     "list_rulesets -> run_architecture_analysis -> get_analysis_results. "
     "Explore with list_models, list_documents, find_elements, "
-    "ask_project_knowledge and the named run_cypher_query presets. "
+    "ask_project_knowledge and the named run_cypher_query presets; "
+    "explain_finding, get_model_health and export_findings for follow-up. "
     "Access follows the signed-in user's organization membership."
 )
 
@@ -157,8 +161,9 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
         data: dict[str, Any] | None = None,
         json_body: Any = None,
         organization_id: int | None = None,
+        text: bool = False,
     ) -> Any:
-        """Call ``/api{path}`` as the MCP caller and return the decoded JSON body."""
+        """Call ``/api{path}`` as the MCP caller; return the JSON body (or raw text)."""
         headers = {"Authorization": f"Bearer {_bearer_token(ctx.headers)}"}
         if organization_id is not None:
             headers["X-Organization-Id"] = str(organization_id)
@@ -174,7 +179,7 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
             except ValueError:
                 detail = response.text
             raise McpApiError(f"{method} {path} failed ({response.status_code}): {detail}")
-        return response.json()
+        return response.text if text else response.json()
 
     @mcp.tool(annotations={"readOnlyHint": True})
     async def list_projects(ctx: Context, organization_id: int | None = None) -> str:
@@ -396,6 +401,96 @@ def create_mcp_server(api: FastAPI) -> MCPServer:
             json_body=params or {},
         )
         return json.dumps(rows[:_MAX_ROWS])
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def explain_finding(ctx: Context, project_id: int, issue_id: str) -> str:
+        """Explain why a finding was flagged.
+
+        issue_id is an id from get_analysis_results. Returns the deductive proof
+        (rule, element, derivation) and, when the project's graph has been
+        ingested, the causal decision chain behind it.
+        """
+        proof = await call(ctx, "GET", f"/graph/{project_id}/proof/{issue_id}")
+        try:
+            trace = await call(ctx, "GET", f"/graph/{project_id}/decisions/trace/{issue_id}")
+        except McpApiError as exc:
+            # The decision graph only exists once compliance decisions were
+            # ingested into Neo4j; the proof alone still answers "why".
+            trace = {"unavailable": str(exc)}
+        return json.dumps({"proof": proof, "decision_trace": trace})
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def get_model_health(ctx: Context, project_id: int) -> str:
+        """Audit a project's IFC model for data-quality problems before analysis.
+
+        Returns a score, grade and per-check violation counts (e.g. doors
+        missing a fire rating, spaces missing attributes) with sample elements.
+        """
+        return json.dumps(await call(ctx, "GET", f"/graph/{project_id}/model-health"))
+
+    @mcp.tool(annotations={"readOnlyHint": True})
+    async def export_findings(
+        ctx: Context,
+        project_id: int,
+        fmt: str = "csv",
+        band: list[str] | None = None,
+        include_low: bool | None = None,
+    ) -> str:
+        """Export a project's compliance findings as CSV or JSON text.
+
+        band limits the export to risk bands (e.g. ["critical", "high"]).
+        Large exports are cut at 200,000 characters, so narrow with band.
+        BCF is a binary zip and is available from the app, not here.
+        """
+        if fmt.lower() not in ("csv", "json"):
+            raise McpApiError("fmt must be 'csv' or 'json'; BCF is a binary format.")
+        params: dict[str, Any] = {"project_id": project_id, "fmt": fmt.lower()}
+        if band:
+            params["band"] = band
+        if include_low is not None:
+            params["include_low"] = include_low
+        content = await call(ctx, "GET", "/analyze/export", params=params, text=True)
+        return json.dumps(
+            {
+                "format": fmt.lower(),
+                "total_chars": len(content),
+                "truncated": len(content) > _MAX_EXPORT_CHARS,
+                "content": content[:_MAX_EXPORT_CHARS],
+            }
+        )
+
+    @mcp.resource(
+        "bimguard://projects/{project_id}/summary",
+        name="project_summary",
+        description="One-page snapshot of a project: details, models, and latest compliance stats.",
+        mime_type="application/json",
+    )
+    async def project_summary(project_id: int, ctx: Context) -> str:
+        """Return a project's details, attached models and latest analysis stats."""
+        project = await call(ctx, "GET", f"/projects/{project_id}")
+        models = await call(ctx, "GET", "/models", params={"project_id": project_id})
+        status = await call(ctx, "GET", f"/analyze/status/{project_id}")
+        try:
+            results = await call(
+                ctx, "GET", f"/analyze/results/{project_id}/architecture", params={"limit": 1}
+            )
+            stats = results.get("issue_stats")
+        except McpApiError as exc:
+            stats = {"unavailable": str(exc)}
+        return json.dumps(
+            {
+                "project": {
+                    k: project.get(k)
+                    for k in ("id", "name", "project_code", "client_name", "status", "organization_id")
+                },
+                "models": _compact(
+                    models.get("models", []),
+                    ("id", "file_name", "is_primary", "role", "ifc_schema", "element_count"),
+                ),
+                "analysis_status": status.get("status"),
+                "issue_stats": stats,
+            }
+        )
 
     return mcp
 

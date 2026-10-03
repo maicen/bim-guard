@@ -145,3 +145,25 @@ def test_unknown_cypher_query_is_rejected(mcp_client):
         {"name": "run_cypher_query", "arguments": {"project_id": 1, "query": "MATCH (n) RETURN n"}},
     ).json()["result"]
     assert result["isError"] is True
+
+
+def test_mcp_lists_followup_tools_and_summary_resource(mcp_client):
+    tools = {t["name"] for t in _rpc(mcp_client, "tools/list").json()["result"]["tools"]}
+    assert {"explain_finding", "get_model_health", "export_findings"} <= tools
+    templates = _rpc(mcp_client, "resources/templates/list").json()["result"]["resourceTemplates"]
+    assert "bimguard://projects/{project_id}/summary" in {t["uriTemplate"] for t in templates}
+
+
+def test_export_findings_rejects_bcf(mcp_client):
+    result = _rpc(
+        mcp_client,
+        "tools/call",
+        {"name": "export_findings", "arguments": {"project_id": 1, "fmt": "bcf"}},
+    ).json()["result"]
+    assert result["isError"] is True
+    assert "binary" in result["content"][0]["text"]
+
+
+def test_summary_resource_surfaces_missing_project(mcp_client):
+    body = _rpc(mcp_client, "resources/read", {"uri": "bimguard://projects/999999999/summary"}).json()
+    assert "error" in body or body["result"].get("isError")

@@ -17,6 +17,20 @@ BIM-Guard exposes a [Model Context Protocol](https://modelcontextprotocol.io) se
 | `run_architecture_analysis` | Run the analysis on a project's IFC model; returns a summary |
 | `get_analysis_status` | Pipeline status of the latest run |
 | `get_analysis_results` | Paged findings (`limit`, `offset`, `band`, `query`) |
+| `list_models` | IFC models attached to a project |
+| `list_documents` | Specification documents bound to a project |
+| `find_elements` | Elements of an IFC class (e.g. `IfcDoor`) from the project graph |
+| `ask_project_knowledge` | Graph-RAG Q&A over documents/model, same engine as the copilot |
+| `list_cypher_queries` / `run_cypher_query` | Named Cypher presets only; free-form Cypher is not accepted (the graph is not partitioned per project) |
+| `explain_finding` | Proof graph and decision trace for a finding id |
+| `get_model_health` | Pre-flight IFC data-quality audit |
+| `export_findings` | Findings as CSV/JSON text (BCF is binary, use the app) |
+
+## Resources
+
+| URI | Content |
+| --- | --- |
+| `bimguard://projects/{project_id}/summary` | Project details, models, latest analysis status and issue stats |
 
 ## Connecting a client
 
