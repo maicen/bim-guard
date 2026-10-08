@@ -110,6 +110,8 @@
 
   let isCapturingEvaluation = $state(false);
   let evaluationCaptureMessage = $state("");
+  /** True once a capture succeeded, so the review reminder shows only then. */
+  let evaluationCaptured = $state(false);
 
   let prevArchKey = $state("");
 
@@ -285,12 +287,14 @@
     if (!selectedProjectId) return;
     isCapturingEvaluation = true;
     evaluationCaptureMessage = "";
+    evaluationCaptured = false;
     try {
       const { captured_count } = await evaluationApi.capture({
         project_id: selectedProjectId,
         rule_folders: selectedFolders,
       });
       evaluationCaptureMessage = `Captured ${captured_count} result(s) for evaluation.`;
+      evaluationCaptured = captured_count > 0;
     } catch (err: any) {
       evaluationCaptureMessage = err.message || "Failed to capture results for evaluation.";
     } finally {
@@ -818,6 +822,23 @@
     >
       <ClipboardCheck class="h-4 w-4 shrink-0" />
       <span>{evaluationCaptureMessage}</span>
+    </div>
+  {/if}
+  {#if evaluationCaptured}
+    <!-- A captured verdict is only BIM-Guard's own answer until a reviewer
+         confirms it; nothing is scored before that. -->
+    <div
+      role="alert"
+      class="flex flex-wrap items-center gap-2 rounded-xl border border-critical-border bg-critical-bg p-3.5 text-xs font-medium text-critical"
+    >
+      <AlertTriangle class="h-4 w-4 shrink-0" />
+      <span>Not approved yet. Open the Evaluation tab to review and approve these results.</span>
+      <a
+        href={`/#/evaluation?project_id=${selectedProjectId}`}
+        class="ml-auto rounded-lg border border-critical-border px-2.5 py-1 font-semibold text-critical transition-opacity hover:opacity-80"
+      >
+        Open Evaluation
+      </a>
     </div>
   {/if}
 
