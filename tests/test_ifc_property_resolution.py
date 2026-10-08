@@ -529,24 +529,36 @@ class TestTypeAssignmentCount:
 
 
 class TestConnectedSpaceCountFallback:
-    """A door's room count must agree with the room names it reports."""
+    """A room count is read from authored evidence only, never estimated."""
 
     _ROOM = {"rooms": ["CORRIDOR", "WIC"], "link_source": "host_lining"}
+    _AUTHORED_ROOM = {"rooms": ["CORRIDOR", "WIC"], "link_source": "boundary"}
 
     def _door(self):
         f = _metre_model()
         return f, ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
 
-    def test_door_without_boundary_data_counts_its_room_links(self):
+    def test_door_without_boundary_data_counts_its_authored_room_links(self):
         f, door = self._door()
         no_data = {"has_data": False, "connected_space_count": 0}
 
         value, found_pset, _ = _empty_reader(f)._resolve_element_property(
-            door, "ConnectedSpaceCount", door_space_connection=no_data, room=self._ROOM
+            door, "ConnectedSpaceCount", door_space_connection=no_data, room=self._AUTHORED_ROOM
         )
 
         assert value == 2
         assert found_pset == "spatial:room_link"
+
+    def test_estimated_room_links_leave_the_count_missing(self):
+        """A host-wall estimate must not pass or fail a room-count rule."""
+        f, door = self._door()
+        no_data = {"has_data": False, "connected_space_count": 0}
+
+        value, _, _ = _empty_reader(f)._resolve_element_property(
+            door, "ConnectedSpaceCount", door_space_connection=no_data, room=self._ROOM
+        )
+
+        assert value is None
 
     def test_boundary_data_wins_over_room_links(self):
         f, door = self._door()
@@ -559,11 +571,11 @@ class TestConnectedSpaceCountFallback:
         assert value == 1
         assert found_pset == "spatial:door_space_connection"
 
-    def test_door_with_no_evidence_still_counts_zero(self):
+    def test_door_with_no_evidence_is_missing_not_zero(self):
         f, door = self._door()
 
         value, _, _ = _empty_reader(f)._resolve_element_property(
             door, "ConnectedSpaceCount", door_space_connection={"has_data": False, "connected_space_count": 0}
         )
 
-        assert value == 0
+        assert value is None

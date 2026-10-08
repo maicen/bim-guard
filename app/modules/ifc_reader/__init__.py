@@ -109,6 +109,12 @@ _OPENING_RELATIONSHIP_PROPERTIES: dict[str, str] = {
     "hostifcclass": "host_ifc_class",
 }
 
+#: Room-link evidence the model states outright (``link_source`` values from
+#: ``ifc_rooms``): the element is the room, an IfcRelSpaceBoundary names it, or
+#: it is contained in the room. The host-wall and host-lining links are
+#: geometric estimates and are deliberately absent.
+_AUTHORED_ROOM_LINK_SOURCES = frozenset({"self", "boundary", "containment"})
+
 #: Rule property names (lower-cased, separators stripped) answered from the
 #: element's type object (IfcRelDefinesByType), mapped to what they read. The
 #: class-specific names ("WindowType", "IfcDoorStyle", ...) are matched by
@@ -1515,15 +1521,18 @@ class IFCReader:
             if room_names:
                 return ", ".join(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("connectedspacecount", "spaceconnectioncount", "numberofconnectedspaces", "connectedspacescount"):
-            # A door with no boundary data counts its room links instead, the
-            # same fallback ConnectedSpaces uses above -- otherwise a door
-            # reports two connected rooms by name and a count of 0.
-            room_names = (room or {}).get("rooms")
-            if room_names and not (door_space_connection or {}).get("has_data"):
-                return len(room_names), "spatial:room_link", self._room_link_detail(room)
-            if door_space_connection is not None:
+            # Counted only from what the model states: the door's own space
+            # boundaries, else an authored room link. A count estimated from
+            # the host wall failed "== 2" on doors the file says nothing
+            # about (143 false alarms on one residential model), and so did
+            # the asserted 0 for a door with no evidence at all. Both now fall
+            # through unresolved, so the rule reports MISSING instead.
+            if (door_space_connection or {}).get("has_data"):
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
                 return door_space_connection.get("connected_space_count", 0), "spatial:door_space_connection", dsc_rich
+            room_names = (room or {}).get("rooms")
+            if room_names and (room or {}).get("link_source") in _AUTHORED_ROOM_LINK_SOURCES:
+                return len(room_names), "spatial:room_link", self._room_link_detail(room)
         elif prop_lower_name in ("interiorsinglespacemismatch", "interiorsinglespaceflag", "spaceconnectionmismatch"):
             if door_space_connection is not None:
                 dsc_rich = self._door_space_rich_detail(door_space_connection)
