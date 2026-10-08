@@ -128,6 +128,21 @@ def test_capture_persists_one_row_per_element(evaluation_service):
     assert all(f["human_verdict"] is None for f in findings)
 
 
+def test_listing_returns_every_finding_of_a_large_capture(evaluation_service):
+    """A capture larger than the old 2,000-row cap must reach the reviewer whole."""
+    rule = _rule_compliance_fixture()[0]
+    rule["all_elements"] = [
+        {"element_name": f"Door-{i}", "guid": f"guid-{i:05d}", "actual": 950, "status": "PASS", "reason": ""}
+        for i in range(2001)
+    ]
+    evaluation_service._arch_analysis = _FakeArchAnalysisService([rule])
+
+    client.post("/api/evaluation/capture", json={"project_id": 1, "rule_folder": "TEST-RULESET"})
+    findings = client.get("/api/evaluation/findings", params={"project_id": 1}).json()["findings"]
+
+    assert len(findings) == 2001
+
+
 def test_review_finding_records_human_verdict(evaluation_service):
     client.post("/api/evaluation/capture", json={"project_id": 1, "rule_folder": "TEST-RULESET"})
     findings = client.get("/api/evaluation/findings", params={"project_id": 1}).json()["findings"]

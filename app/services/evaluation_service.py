@@ -147,18 +147,27 @@ class EvaluationService:
         project_id: int | None = None,
         rule_id: int | None = None,
         human_verdict: str | None = None,
-        limit: int = 2000,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Return captured findings, most recent first, optionally filtered."""
-        rows = list(self._findings.rows)
+        """Return captured findings, most recent first, optionally filtered.
+
+        Every match is returned unless ``limit`` is given. The previous fixed
+        cap of 2,000 silently hid most of a capture -- two rule packs on one
+        residential model produce about 8,000 rows -- so whole rules never
+        reached the reviewer and the page scored a partial set.
+        """
         if project_id is not None:
-            rows = [row for row in rows if int(row.get("project_id") or 0) == project_id]
+            # Filtered in the database: iterating .rows pages through every
+            # project's findings just to discard most of them.
+            rows = self._findings.rows_where("project_id = ?", [project_id])
+        else:
+            rows = list(self._findings.rows)
         if rule_id is not None:
             rows = [row for row in rows if row.get("rule_id") == rule_id]
         if human_verdict is not None:
             rows = [row for row in rows if row.get("human_verdict") == human_verdict]
         rows.sort(key=lambda row: row.get("id") or 0, reverse=True)
-        return rows[:limit]
+        return rows if limit is None else rows[:limit]
 
     def get_finding(self, finding_id: int) -> dict[str, Any] | None:
         """Return one captured finding by primary key."""
