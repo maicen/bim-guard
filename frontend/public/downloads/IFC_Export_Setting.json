@@ -26,7 +26,7 @@
   "ExportSchedulesAsPsets": false,
   "ExportSpecificSchedules": false,
   "ExportUserDefinedPsets": true,
-  "ExportUserDefinedPsetsFileName": "C:\\Users\\Malak\\OneDrive\\Desktop\\BIMGuard_UserDefinedPsets.txt",
+  "ExportUserDefinedPsetsFileName": "C:\\BIMGuard\\BIMGuard_UserDefinedPsets.txt",
   "UseTypePropertiesInInstacePSets": true,
   "ExportUserDefinedParameterMapping": false,
   "ExportUserDefinedParameterMappingFileName": "",

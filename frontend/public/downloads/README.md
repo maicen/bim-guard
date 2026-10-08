@@ -12,30 +12,32 @@ stairs, railings).
 - **`BIMGuard_UserDefinedPsets.txt`** — **optional.** A companion property
   mapping file for the handful of fields BIM Guard checks that have no
   standard IFC property (door `ClearWidth`; window
-  `ClearOpeningArea/Height/Width`; stair flight `Width`, `FlightHeight`,
-  winder angles; railing `Height`/`HandrailHeight`; slab
-  `HeadroomClearance`). It only takes effect if you've also created matching
-  Shared Parameters on the Door, Window, Stair, Stair Component and Railing
-  categories in the Revit project — the mapping file just tells the exporter
-  which Revit parameter feeds which IFC property, it doesn't create the
-  parameters for you. Skip it if you're not maintaining those Shared
-  Parameters: the rules that read those specific fields will resolve as
-  `MISSING_DATA` instead of failing, and nothing else is affected.
+  `ClearOpeningArea/Height/Width`, `SillHeight`, `HeadHeight`; stair flight
+  `Width`, `FlightHeight`, winder angles; railing `Height`/`HandrailHeight`;
+  slab `HeadroomClearance`). Window `SillHeight` and `HeadHeight` are fed by
+  Revit's built-in **Sill Height** and **Head Height** instance parameters,
+  so they export as soon as the file is loaded. The other fields only take
+  effect if you've also created matching Shared Parameters on the Door,
+  Window, Stair, Stair Component and Railing categories in the Revit project
+  — the mapping file just tells the exporter which Revit parameter feeds
+  which IFC property, it doesn't create the parameters for you. Skip the
+  file if you need none of these: the rules that read those specific fields
+  will resolve as `MISSING_DATA` instead of failing, and nothing else is
+  affected.
 
 ## How to use it
 
 1. Download `IFC_Export_Setting.json`. Download
-   `BIMGuard_UserDefinedPsets.txt` too only if you're using the optional
-   Shared Parameters mapping above.
+   `BIMGuard_UserDefinedPsets.txt` too if you want the mapped fields above,
+   and save it as `C:\BIMGuard\BIMGuard_UserDefinedPsets.txt` — the JSON
+   points at that path (Revit stores it as a full path, so it cannot be
+   relative).
 2. Load `IFC_Export_Setting.json` as the active setup in Revit's Modify
-   Setup dialog. If you downloaded the `.txt` file, also go to
+   Setup dialog. If you saved the `.txt` file somewhere else, go to
    **Property Sets → User-defined Property Sets** and point the file path
-   at wherever you saved it — the JSON ships with that path hard-coded to
-   the machine it was authored on
-   (`C:\Users\Malak\OneDrive\Desktop\BIMGuard_UserDefinedPsets.txt`), which
-   won't exist on yours. If you're skipping the `.txt` file, un-tick
-   **Export user-defined property sets** in that same panel rather than
-   leaving it pointed at a path that doesn't resolve.
+   at it. If you're skipping the `.txt` file, un-tick **Export user-defined
+   property sets** in that same panel rather than leaving it pointed at a
+   path that doesn't resolve.
 3. In the Modify Setup dialog, set **Phase to export** to the phase you're
    auditing (see below — this can't be baked into the shared JSON).
 4. Export to IFC as normal.

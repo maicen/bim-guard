@@ -5,6 +5,8 @@ PropertySet:	Pset_BIMGuardWindow	I	IfcWindow
 	ClearOpeningArea	Area	ClearOpeningArea
 	ClearOpeningHeight	Length	ClearOpeningHeight
 	ClearOpeningWidth	Length	ClearOpeningWidth
+	HeadHeight	Length	Head Height
+	SillHeight	Length	Sill Height
 
 PropertySet:	Pset_BIMGuardStairFlight	I	IfcStairFlight
 	Width	Length	Width
