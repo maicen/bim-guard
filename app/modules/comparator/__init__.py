@@ -33,6 +33,15 @@ from app.modules.room_types import (
 # IFC property (IsExternal, SelfClosing, SmokeStop, HandicapAccessible, …).
 _BOOL_ALIASES = {"true": True, "false": False, "yes": True, "no": False}
 
+#: IFC's enumeration placeholder for "the model does not say". It is a
+#: value the exporter wrote, so it reads as present, but it states nothing.
+_NOT_DEFINED = "NOTDEFINED"
+
+
+def _is_not_defined(value) -> bool:
+    """Whether ``value`` is the IFC NOTDEFINED placeholder (any case)."""
+    return isinstance(value, str) and value.strip().upper() == _NOT_DEFINED
+
 # ── Scope and waiver predicates ───────────────────────────────────────────────
 # A rule may carry `applies_when` (narrowing which elements it governs) and
 # `exceptions` (conditions that waive a failure). Both are dicts of predicate
@@ -235,6 +244,9 @@ class ComplianceComparator:
         name_pattern = str(item.get("name_pattern") or "")
         compare_property = str(item.get("compare_property") or "")
         property_name = str(item.get("property_name") or "")
+        # A rule written about NOTDEFINED itself ("PredefinedType must not be
+        # NOTDEFINED") has to see the raw value, or it could never fail.
+        rule_names_not_defined = _NOT_DEFINED in str(check_val).upper()
 
         for el in elements:
             actual = el.get("actual_value")
@@ -255,6 +267,23 @@ class ComplianceComparator:
                     # not suppress the check.
                     undetermined_notes.extend(details)
                     scope_notes = list(details)
+
+            # NOTDEFINED is the exporter saying it has no value. Counting it
+            # as present passed "must exist" and "documented" rules on
+            # elements that state nothing, so it is reported MISSING for
+            # every operator, with the raw value kept for the reviewer.
+            if _is_not_defined(actual) and not rule_names_not_defined:
+                missing_count += 1
+                missing_elements.append({
+                    "element_name": el.get("name", ""),
+                    "guid": el.get("guid", ""),
+                    "storey": el.get("storey") or "—",
+                    "space": el.get("space") or "—",
+                })
+                all_elements.append(
+                    self._entry(el, actual, "MISSING", "value is NOTDEFINED in the model", scope_notes)
+                )
+                continue
 
             if operator in ("exists", "not_exists"):
                 present = actual is not None

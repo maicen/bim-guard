@@ -284,3 +284,31 @@ class TestDefects:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestNotDefinedIsMissing:
+    """IFC NOTDEFINED states nothing, so no rule may pass or fail on it."""
+
+    @staticmethod
+    def _status(operator, check_value=None, actual="NOTDEFINED"):
+        item = {
+            "rule_ref": "T-1",
+            "property_name": "OperationType",
+            "operator": operator,
+            "check_value": check_value,
+            "elements": [{"name": "Door", "guid": "g1", "actual_value": actual}],
+        }
+        return ComplianceComparator().validate_metadata([item])[0]["all_elements"][0]["status"]
+
+    @pytest.mark.parametrize(("operator", "check_value"), [("exists", None), ("documented", None), ("==", "SWING")])
+    def test_not_defined_reports_missing_for_any_operator(self, operator, check_value):
+        assert self._status(operator, check_value) == "MISSING"
+
+    def test_lower_case_placeholder_is_recognised(self):
+        assert self._status("exists", actual="notdefined") == "MISSING"
+
+    def test_a_rule_about_not_defined_still_fails(self):
+        assert self._status("!=", "NOTDEFINED") == "FAIL"
+
+    def test_a_real_value_is_unaffected(self):
+        assert self._status("exists", actual="SINGLE_SWING_LEFT") == "PASS"
