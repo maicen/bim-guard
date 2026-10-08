@@ -1,8 +1,10 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import {
     BarChart3,
     ChevronDown,
+    ChevronRight,
     ChevronUp,
     ClipboardCheck,
     Download,
@@ -264,6 +266,126 @@
     },
     initialSort: { field: "id", asc: false },
   });
+
+  // ── Grouped-by-rule review ────────────────────────────────────────────────
+  // A verdict is one rule on one element, but a reviewer judges a rule at a
+  // time: what it requires, then each element's value against it. Findings are
+  // grouped under their rule, collapsed by default, and a group renders only a
+  // slice of its rows -- a rule can cover hundreds of elements and every row
+  // carries a Select, so rendering all of them at once stalls the page.
+
+  interface RuleGroup {
+    key: string;
+    label: string;
+    description: string;
+    requirement: string;
+    target: string;
+    rows: EvaluationFinding[];
+    reviewed: number;
+    verdicts: Partial<Record<EvaluationBimguardVerdict, number>>;
+  }
+
+  const GROUP_ROW_STEP = 25;
+  const OPERATOR_SYMBOL: Record<string, string> = { ">=": "≥", "<=": "≤", "==": "=", "!=": "≠" };
+
+  /** Rule thresholds are stored JSON-encoded (`"800"`); show the bare value. */
+  function plainValue(value: unknown): string {
+    let v = value;
+    if (typeof v === "string") {
+      try {
+        v = JSON.parse(v);
+      } catch {
+        // Not JSON: already a plain string.
+      }
+    }
+    if (v === null || v === undefined || v === "") return "";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100);
+    return String(v);
+  }
+
+  function requirementText(snapshot: Record<string, unknown>): string {
+    const prop = (snapshot.property_name as string) || "";
+    const operator = (snapshot.operator as string) || "";
+    const unit = (snapshot.unit as string) || "";
+    if (!prop) return "";
+    if (operator === "exists") return `${prop} must be present`;
+    if (operator === "not_exists") return `${prop} must be absent`;
+    if (operator === "documented") return `${prop} should be documented`;
+    if (operator === "between") {
+      return `${prop} between ${plainValue(snapshot.value_min)} and ${plainValue(snapshot.value_max)} ${unit}`.trim();
+    }
+    return `${prop} ${OPERATOR_SYMBOL[operator] ?? operator} ${plainValue(snapshot.check_value)} ${unit}`.trim();
+  }
+
+  /** The element's measured value; absent on findings captured before it was stored. */
+  function actualText(finding: EvaluationFinding): string {
+    const snapshot = finding.rule_snapshot || {};
+    const text = plainValue(snapshot.element_actual);
+    if (!text) return "";
+    const unit = (snapshot.unit as string) || "";
+    return typeof snapshot.element_actual === "number" && unit ? `${text} ${unit}` : text;
+  }
+
+  const groups = $derived.by(() => {
+    const byRule: Record<string, RuleGroup> = {};
+    for (const finding of table.sorted) {
+      const snapshot = finding.rule_snapshot || {};
+      const label = ruleLabel(finding);
+      const key = `${finding.rule_id ?? ""}|${label}`;
+      let group = byRule[key];
+      if (!group) {
+        group = {
+          key,
+          label,
+          description: (snapshot.rule_desc as string) || "",
+          requirement: requirementText(snapshot),
+          target: (snapshot.target as string) || "",
+          rows: [],
+          reviewed: 0,
+          verdicts: {},
+        };
+        byRule[key] = group;
+      }
+      group.rows.push(finding);
+      if (finding.human_verdict) group.reviewed++;
+      group.verdicts[finding.bimguard_verdict] = (group.verdicts[finding.bimguard_verdict] ?? 0) + 1;
+    }
+    return Object.values(byRule).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  });
+
+  let groupPageSize = $state(10);
+  let requestedGroupPage = $state(1);
+  const groupPage = $derived(
+    Math.min(Math.max(1, requestedGroupPage), Math.max(1, Math.ceil(groups.length / groupPageSize))),
+  );
+  const pagedGroups = $derived(groups.slice((groupPage - 1) * groupPageSize, groupPage * groupPageSize));
+
+  const expandedGroups = new SvelteSet<string>();
+  const shownRows = new SvelteMap<string, number>();
+
+  function toggleExpanded(key: string) {
+    if (expandedGroups.has(key)) expandedGroups.delete(key);
+    else expandedGroups.add(key);
+  }
+
+  function setAllExpanded(open: boolean) {
+    for (const group of pagedGroups) {
+      if (open) expandedGroups.add(group.key);
+      else expandedGroups.delete(group.key);
+    }
+  }
+
+  function selectedInGroup(group: RuleGroup): number {
+    return group.rows.filter((row) => table.selectedIds.has(row.id)).length;
+  }
+
+  function toggleGroupSelection(group: RuleGroup) {
+    const allSelected = selectedInGroup(group) === group.rows.length;
+    for (const row of group.rows) {
+      if (allSelected) table.selectedIds.delete(row.id);
+      else table.selectedIds.add(row.id);
+    }
+  }
 
   async function reviewOne(finding: EvaluationFinding, verdict: EvaluationHumanVerdict) {
     await table.optimisticUpdate({
@@ -613,84 +735,193 @@
       </button>
     </BulkActionBar>
 
-    <div class="overflow-x-auto rounded-2xl border border-border-default">
-      <table aria-label="Expert verdict evaluations" class="w-full text-left text-xs">
-        <thead class="bg-surface-card">
-          <tr>
-            <th scope="col" class="w-10 px-4 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 text-xs text-fg-secondary">
+        <TableCheckbox
+          checked={table.allFilteredSelected}
+          indeterminate={table.someFilteredSelected}
+          ariaLabel="Select all findings"
+          onchange={() => table.toggleSelectAll()}
+        />
+        <span>
+          {table.totalItems} finding{table.totalItems === 1 ? "" : "s"} across {groups.length} rule{groups.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          onclick={() => setAllExpanded(true)}
+          class="rounded-xl border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+        >
+          Expand all
+        </button>
+        <button
+          type="button"
+          onclick={() => setAllExpanded(false)}
+          class="rounded-xl border border-border-interactive bg-surface-overlay px-2.5 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+        >
+          Collapse all
+        </button>
+      </div>
+    </div>
+
+    {#if groups.length === 0}
+      <EmptyState title="No findings match" description="Clear the search or filters to see the captured findings." />
+    {/if}
+
+    <div class="space-y-3">
+      {#each pagedGroups as group (group.key)}
+        {@const open = expandedGroups.has(group.key)}
+        {@const selected = selectedInGroup(group)}
+        {@const limit = shownRows.get(group.key) ?? GROUP_ROW_STEP}
+        <section class="overflow-hidden rounded-2xl border border-border-default bg-surface-card">
+          <div class="flex items-start gap-3 px-4 py-3">
+            <div class="pt-0.5">
               <TableCheckbox
-                checked={table.allFilteredSelected}
-                indeterminate={table.someFilteredSelected}
-                ariaLabel="Select all findings"
-                onchange={() => table.toggleSelectAll()}
+                checked={selected === group.rows.length}
+                indeterminate={selected > 0 && selected < group.rows.length}
+                ariaLabel={`Select all findings for rule ${group.label}`}
+                onchange={() => toggleGroupSelection(group)}
               />
-            </th>
-            <SortHeader column="rule_id" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Rule</SortHeader>
-            <SortHeader column="element_name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Element</SortHeader>
-            <SortHeader column="storey" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Location</SortHeader>
-            <SortHeader column="bimguard_verdict" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>BIM-Guard</SortHeader>
-            <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted">Human Verdict</th>
-            <SortHeader column="captured_at" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Captured</SortHeader>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border-subtle">
-          {#each table.paginated as finding (finding.id)}
-            {@const disagrees = !!finding.human_verdict && finding.human_verdict !== BIMGUARD_TO_HUMAN[finding.bimguard_verdict]}
-            <tr class="hover:bg-surface-hover {table.isSelected(finding.id) ? 'bg-surface-selected' : ''} {table.isPending(finding.id) ? 'opacity-50 pointer-events-none' : ''}">
-              <td class="px-4 py-3">
-                <TableCheckbox
-                  checked={table.isSelected(finding.id)}
-                  ariaLabel={`Select finding ${finding.id}`}
-                  onchange={() => table.toggleSelect(finding.id)}
-                />
-              </td>
-              <td class="px-4 py-3 font-mono text-fg-secondary">{ruleLabel(finding)}</td>
-              <td class="px-4 py-3">
-                <div class="font-medium text-fg-primary">{finding.element_name || "—"}</div>
-                <div class="font-mono text-nano text-fg-muted">{finding.element_global_id}</div>
-              </td>
-              <td class="px-4 py-3 text-fg-secondary">{finding.storey || "—"} / {finding.space || "—"}</td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center rounded-md border px-2.5 py-0.5 text-micro font-semibold uppercase tracking-wider {VERDICT_CLASS[finding.bimguard_verdict]}">
-                  {finding.bimguard_verdict}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <Select
-                    ariaLabel={`Human verdict for finding ${finding.id}`}
-                    options={VERDICT_OPTIONS}
-                    value={finding.human_verdict ?? ""}
-                    placeholder="Not reviewed"
-                    onValueChange={(v) => reviewOne(finding, v as EvaluationHumanVerdict)}
-                    triggerClass="w-40 {finding.human_verdict ? VERDICT_CLASS[finding.human_verdict] : ''}"
-                  />
-                  {#if disagrees}
-                    <span
-                      class="rounded-md border border-critical-border bg-critical-bg px-1.5 py-0.5 text-nano font-bold uppercase tracking-wide text-critical"
-                      title="Human verdict disagrees with BIM-Guard's verdict"
-                    >
-                      Mismatch
+            </div>
+            <button
+              type="button"
+              onclick={() => toggleExpanded(group.key)}
+              aria-expanded={open}
+              class="flex min-w-0 flex-1 items-start gap-3 text-left"
+            >
+              <span class="mt-0.5 text-fg-muted">
+                {#if open}
+                  <ChevronDown class="h-4 w-4" />
+                {:else}
+                  <ChevronRight class="h-4 w-4" />
+                {/if}
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="flex flex-wrap items-center gap-2">
+                  <span class="font-mono text-xs font-semibold text-fg-primary">{group.label}</span>
+                  {#if group.requirement}
+                    <span class="rounded-md border border-border-subtle bg-surface-overlay px-2 py-0.5 font-mono text-micro text-accent">
+                      {group.requirement}
                     </span>
                   {/if}
-                </div>
-                {#if finding.reviewer_email}
-                  <div class="mt-1 text-nano text-fg-muted">by {finding.reviewer_email}</div>
+                  {#if group.target}
+                    <span class="text-micro text-fg-muted">{group.target}</span>
+                  {/if}
+                </span>
+                {#if group.description && group.description !== group.label}
+                  <span class="mt-1 block text-xs text-fg-secondary">{group.description}</span>
                 {/if}
-              </td>
-              <td class="px-4 py-3 text-fg-muted">{finding.captured_at ? new Date(finding.captured_at).toLocaleString() : "—"}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+              </span>
+              <span class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {#each Object.entries(group.verdicts) as [verdict, count] (verdict)}
+                  <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider {VERDICT_CLASS[verdict]}">
+                    {count} {verdict.replace("_", " ")}
+                  </span>
+                {/each}
+                <span class="rounded-full border border-border-subtle bg-surface-overlay px-2 py-0.5 text-micro font-medium text-fg-muted">
+                  {group.reviewed} / {group.rows.length} reviewed
+                </span>
+              </span>
+            </button>
+          </div>
+
+          {#if open}
+            <div class="overflow-x-auto border-t border-border-subtle">
+              <table aria-label={`Findings for rule ${group.label}`} class="w-full text-left text-xs">
+                <thead class="bg-surface-overlay/50">
+                  <tr>
+                    <th scope="col" class="w-10 px-4 py-2.5"><span class="sr-only">Select</span></th>
+                    <SortHeader column="element_name" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Element</SortHeader>
+                    <SortHeader column="storey" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>Location</SortHeader>
+                    <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted">Actual value</th>
+                    <SortHeader column="bimguard_verdict" sortField={table.sortField} sortAsc={table.sortAsc} onSort={table.toggleSort.bind(table)}>BIM-Guard</SortHeader>
+                    <th scope="col" class="px-4 py-3 text-caption font-semibold uppercase tracking-wider text-fg-muted">Human Verdict</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border-subtle">
+                  {#each group.rows.slice(0, limit) as finding (finding.id)}
+                    {@const disagrees = !!finding.human_verdict && finding.human_verdict !== BIMGUARD_TO_HUMAN[finding.bimguard_verdict]}
+                    {@const actual = actualText(finding)}
+                    <tr class="hover:bg-surface-hover {table.isSelected(finding.id) ? 'bg-surface-selected' : ''} {table.isPending(finding.id) ? 'opacity-50 pointer-events-none' : ''}">
+                      <td class="px-4 py-3">
+                        <TableCheckbox
+                          checked={table.isSelected(finding.id)}
+                          ariaLabel={`Select finding ${finding.id}`}
+                          onchange={() => table.toggleSelect(finding.id)}
+                        />
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="font-medium text-fg-primary">{finding.element_name || "—"}</div>
+                        <div class="font-mono text-nano text-fg-muted">{finding.element_global_id}</div>
+                      </td>
+                      <td class="px-4 py-3 text-fg-secondary">{finding.storey || "—"} / {finding.space || "—"}</td>
+                      <td class="px-4 py-3 font-mono text-fg-primary">{actual || "—"}</td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex items-center rounded-md border px-2.5 py-0.5 text-micro font-semibold uppercase tracking-wider {VERDICT_CLASS[finding.bimguard_verdict]}">
+                          {finding.bimguard_verdict}
+                        </span>
+                        {#if finding.bimguard_reason}
+                          <div class="mt-1 max-w-xs text-nano text-fg-muted">{finding.bimguard_reason}</div>
+                        {/if}
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <Select
+                            ariaLabel={`Human verdict for finding ${finding.id}`}
+                            options={VERDICT_OPTIONS}
+                            value={finding.human_verdict ?? ""}
+                            placeholder="Not reviewed"
+                            onValueChange={(v) => reviewOne(finding, v as EvaluationHumanVerdict)}
+                            triggerClass="w-40 {finding.human_verdict ? VERDICT_CLASS[finding.human_verdict] : ''}"
+                          />
+                          {#if disagrees}
+                            <span class="rounded-md border border-critical-border bg-critical-bg px-1.5 py-0.5 text-nano font-bold uppercase tracking-wide text-critical">
+                              Mismatch
+                            </span>
+                          {/if}
+                        </div>
+                        {#if finding.reviewer_email}
+                          <div class="mt-1 text-nano text-fg-muted">by {finding.reviewer_email}</div>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+            {#if group.rows.length > limit}
+              <div class="flex items-center justify-between gap-3 border-t border-border-subtle px-4 py-2.5 text-xs text-fg-muted">
+                <span>Showing {limit} of {group.rows.length}</span>
+                <span class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onclick={() => shownRows.set(group.key, limit + GROUP_ROW_STEP)}
+                    class="rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1 font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+                  >
+                    Show {Math.min(GROUP_ROW_STEP, group.rows.length - limit)} more
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => shownRows.set(group.key, group.rows.length)}
+                    class="rounded-lg border border-border-interactive bg-surface-overlay px-2.5 py-1 font-medium text-fg-secondary transition-colors hover:bg-surface-hover"
+                  >
+                    Show all
+                  </button>
+                </span>
+              </div>
+            {/if}
+          {/if}
+        </section>
+      {/each}
     </div>
 
     <TablePagination
-      currentPage={table.page}
-      pageSize={table.pageSize}
-      totalItems={table.totalItems}
-      onPageChange={(p) => (table.requestedPage = p)}
-      onPageSizeChange={(s) => (table.pageSize = s)}
+      currentPage={groupPage}
+      pageSize={groupPageSize}
+      totalItems={groups.length}
+      onPageChange={(p) => (requestedGroupPage = p)}
+      onPageSizeChange={(s) => (groupPageSize = s)}
     />
   {/if}
 </div>

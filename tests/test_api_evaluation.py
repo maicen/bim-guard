@@ -122,6 +122,9 @@ def test_capture_persists_one_row_per_element(evaluation_service):
     assert by_guid["3Kf7q8XzR1pPguid0001"]["bimguard_verdict"] == "PASS"
     assert by_guid["3Kf7q8XzR1pPguid0002"]["bimguard_verdict"] == "FAIL"
     assert by_guid["3Kf7q8XzR1pPguid0002"]["rule_snapshot"]["rule_ref"] == "OBC-9.6.4"
+    # The reviewer judges each verdict against the element's own value.
+    assert by_guid["3Kf7q8XzR1pPguid0001"]["rule_snapshot"]["element_actual"] == 950
+    assert by_guid["3Kf7q8XzR1pPguid0002"]["rule_snapshot"]["element_actual"] == 800
     assert all(f["human_verdict"] is None for f in findings)
 
 

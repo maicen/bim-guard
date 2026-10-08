@@ -48,6 +48,11 @@ _RULE_SNAPSHOT_KEYS = (
     "severity",
 )
 
+#: Where an element's own measured value rides inside rule_snapshot. A reviewer
+#: cannot judge a verdict without it, and evaluation_findings has no column
+#: for it; the per-row jsonb snapshot carries it until one is added.
+_ELEMENT_ACTUAL_KEY = "element_actual"
+
 
 class EvaluationService:
     """Capture BIM-Guard verdicts for review, and record human-confirmed verdicts against them."""
@@ -113,7 +118,7 @@ class EvaluationService:
                     {
                         "project_id": project_id,
                         "rule_id": rule_result.get("rule_id"),
-                        "rule_snapshot": snapshot,
+                        "rule_snapshot": {**snapshot, _ELEMENT_ACTUAL_KEY: element.get("actual")},
                         "element_global_id": element.get("guid") or "",
                         "element_name": element.get("element_name") or "",
                         "storey": element.get("storey") or "",
