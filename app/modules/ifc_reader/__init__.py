@@ -44,6 +44,7 @@ logger = get_logger(__name__)
 try:
     import ifcopenshell
     import ifcopenshell.util.element
+    import ifcopenshell.util.placement
 
     _IFCOPENSHELL_AVAILABLE = True
 except ImportError:
@@ -196,9 +197,15 @@ def _opening_relationship_value(el, field: str) -> tuple[object, dict]:
     The host is the element each opening voids (IfcRelVoidsElement), usually
     a wall. Several openings or hosts join with ", ". Returns ``(None, {})``
     when the element fills no opening.
+
+    An IfcOpeningElement is its own opening: it fills nothing, so a rule
+    targeting openings ("every opening must have a host") found no opening to
+    read and reported every one missing, hosted or not.
     """
     openings = []
     try:
+        if el.is_a("IfcOpeningElement"):
+            openings.append(el)
         for rel in getattr(el, "FillsVoids", None) or []:
             opening = getattr(rel, "RelatingOpeningElement", None)
             if opening is not None:
@@ -225,11 +232,30 @@ def _opening_relationship_value(el, field: str) -> tuple[object, dict]:
     if not values:
         return None, {}
     detail = {
-        "relationship": "IfcRelFillsElement",
+        "relationship": "IfcRelVoidsElement" if el.is_a("IfcOpeningElement") else "IfcRelFillsElement",
         "opening_global_ids": [o.GlobalId for o in openings],
         "host_global_ids": [h.GlobalId for h in hosts],
     }
     return ", ".join(dict.fromkeys(values)), detail
+
+
+def _placement_matrix_value(el) -> tuple[object, dict]:
+    """Return the element's 4x4 world placement matrix as text, read from its ObjectPlacement.
+
+    ``get_direct_attributes`` drops ObjectPlacement (an entity reference, not a
+    value) and no exporter writes a property named ``PlacementMatrix``, so a
+    "must have a placement" rule failed every element, placed or not. Returns
+    ``(None, {})`` when the element has no placement.
+    """
+    placement = getattr(el, "ObjectPlacement", None)
+    if placement is None:
+        return None, {}
+    try:
+        matrix = [[round(float(v), 6) for v in row] for row in ifcopenshell.util.placement.get_local_placement(placement)]
+    except Exception as exc:  # noqa: BLE001 - a malformed placement must not fail the rule run
+        logger.debug("Placement lookup failed for %s: %s", el, exc)
+        return None, {}
+    return str(matrix), {"relationship": placement.is_a(), "matrix": matrix}
 
 
 try:
@@ -864,10 +890,16 @@ class IFCReader:
         Return the spatial context of an element.
 
         Returns:
-            {storey_name, storey_elevation, space_name, building_name}
+            {storey_name, storey_global_id, storey_elevation, space_name, building_name}
         """
-        storey_name = storey_elev = space_name = building_name = None
+        storey_name = storey_global_id = storey_elev = space_name = building_name = None
         try:
+            # A storey is not contained in a storey; it answers for itself, so
+            # a rule targeting IfcBuildingStorey can read StoreyName.
+            if element.is_a("IfcBuildingStorey"):
+                storey_name = getattr(element, "Name", None)
+                storey_global_id = getattr(element, "GlobalId", None)
+                storey_elev = getattr(element, "Elevation", None)
             for rel in getattr(element, "ContainedInStructure", []):
                 container = rel.RelatingStructure
                 if container.is_a("IfcSpace"):
@@ -876,6 +908,7 @@ class IFCReader:
                     )
                 if container.is_a("IfcBuildingStorey"):
                     storey_name = getattr(container, "Name", None)
+                    storey_global_id = getattr(container, "GlobalId", None)
                     storey_elev = getattr(container, "Elevation", None)
                 if container.is_a("IfcBuilding"):
                     building_name = getattr(container, "Name", None)
@@ -887,10 +920,23 @@ class IFCReader:
                         parent = rel2.RelatingObject
                         if parent.is_a("IfcBuildingStorey"):
                             storey_name = getattr(parent, "Name", None)
+                            storey_global_id = getattr(parent, "GlobalId", None)
+            # A part of an assembly (a door in an IfcCurtainWall) has no
+            # containment of its own: its storey is the assembly's.
+            # get_container walks IfcRelAggregates to find it.
+            if storey_global_id is None:
+                container = ifcopenshell.util.element.get_container(element)
+                while container is not None and not container.is_a("IfcBuildingStorey"):
+                    container = ifcopenshell.util.element.get_aggregate(container)
+                if container is not None:
+                    storey_name = getattr(container, "Name", None)
+                    storey_global_id = getattr(container, "GlobalId", None)
+                    storey_elev = getattr(container, "Elevation", None)
         except Exception:
             pass
         return {
             "storey_name": storey_name,
+            "storey_global_id": storey_global_id,
             "storey_elevation": float(storey_elev) if storey_elev is not None else None,
             "space_name": space_name,
             "building_name": building_name,
@@ -1430,10 +1476,20 @@ class IFCReader:
             # untyped element is 0, which is exactly what the rule must fail.
             count, detail = _type_assignment_count(el)
             return count, "relationship:type_count", detail
-        elif prop_lower_name in ("storey", "level", "buildingstorey", "floor"):
+        elif prop_key_name in ("storey", "level", "buildingstorey", "floor", "storeyname"):
             storey_name = spatial.get("storey_name")
             if storey_name:
                 return storey_name, "spatial:storey", rich_detail
+        elif prop_key_name == "storeyglobalid":
+            # Which storey holds the element, by id: the same containment
+            # relationship as "Storey" above, never a Pset key.
+            storey_global_id = spatial.get("storey_global_id")
+            if storey_global_id:
+                return storey_global_id, "spatial:storey", rich_detail
+        elif prop_key_name == "placementmatrix":
+            value, detail = _placement_matrix_value(el)
+            if value is not None:
+                return value, "attribute:placement", detail
         elif prop_lower_name == "material":
             materials = (material_info or {}).get("materials") or []
             if materials:
@@ -1446,7 +1502,8 @@ class IFCReader:
             # has it read by Pass 1.
             value, detail = _opening_relationship_value(el, _OPENING_RELATIONSHIP_PROPERTIES[prop_key_name])
             if value is not None:
-                return value, "relationship:fills_opening", detail
+                source = "relationship:voids_element" if el.is_a("IfcOpeningElement") else "relationship:fills_opening"
+                return value, source, detail
         elif prop_lower_name in ("connectedspaces", "spaceconnection", "connectedspacenames", "doorconnectedspaces"):
             names = (door_space_connection or {}).get("connected_space_names") or []
             if names:

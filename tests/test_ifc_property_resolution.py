@@ -188,6 +188,89 @@ class TestOpeningRelationship:
         assert value is None
 
 
+class TestOpeningAsRuleTarget:
+    """A rule may target the opening itself, which fills nothing."""
+
+    def test_opening_reads_its_own_class_and_its_host(self):
+        f = _metre_model()
+        wall = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcWall")
+        opening = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcOpeningElement")
+        ifcopenshell.api.run("feature.add_feature", f, feature=opening, element=wall)
+        m2 = _empty_reader(f)
+
+        assert m2._resolve_element_property(opening, "OpeningIfcClass")[0] == "IfcOpeningElement"
+        value, found_pset, _ = m2._resolve_element_property(opening, "HostGlobalId")
+        assert value == wall.GlobalId
+        assert found_pset == "relationship:voids_element"
+
+    def test_opening_voiding_nothing_has_no_host(self):
+        f = _metre_model()
+        opening = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcOpeningElement")
+
+        assert _empty_reader(f)._resolve_element_property(opening, "HostGlobalId")[0] is None
+
+
+class TestStoreyAndPlacement:
+    """Storey containment and placement are references, never Pset keys."""
+
+    def _door_on_storey(self):
+        f = _metre_model()
+        storey = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcBuildingStorey", name="Level 1")
+        door = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        ifcopenshell.api.run("spatial.assign_container", f, products=[door], relating_structure=storey)
+        return f, storey, door
+
+    def test_door_reads_its_storey_by_id_and_name(self):
+        f, storey, door = self._door_on_storey()
+        m2 = _empty_reader(f)
+        spatial = m2.get_spatial_location(door)
+
+        assert m2._resolve_element_property(door, "StoreyGlobalId", spatial=spatial)[0] == storey.GlobalId
+        assert m2._resolve_element_property(door, "StoreyName", spatial=spatial)[0] == "Level 1"
+
+    def test_storey_answers_for_itself(self):
+        f, storey, _door = self._door_on_storey()
+        m2 = _empty_reader(f)
+
+        value, _, _ = m2._resolve_element_property(storey, "StoreyName", spatial=m2.get_spatial_location(storey))
+
+        assert value == "Level 1"
+
+    def test_door_in_a_curtain_wall_reads_the_wall_storey(self):
+        f, storey, _door = self._door_on_storey()
+        curtain_wall = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcCurtainWall")
+        part = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        ifcopenshell.api.run("spatial.assign_container", f, products=[curtain_wall], relating_structure=storey)
+        ifcopenshell.api.run("aggregate.assign_object", f, products=[part], relating_object=curtain_wall)
+        m2 = _empty_reader(f)
+
+        value, _, _ = m2._resolve_element_property(part, "StoreyGlobalId", spatial=m2.get_spatial_location(part))
+
+        assert value == storey.GlobalId
+
+    def test_uncontained_door_has_no_storey(self):
+        f = _metre_model()
+        door = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        m2 = _empty_reader(f)
+
+        value, _, _ = m2._resolve_element_property(door, "StoreyGlobalId", spatial=m2.get_spatial_location(door))
+
+        assert value is None
+
+    def test_placement_matrix_is_read_only_when_the_element_is_placed(self):
+        f = _metre_model()
+        placed = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        unplaced = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcDoor")
+        ifcopenshell.api.run("geometry.edit_object_placement", f, product=placed)
+        m2 = _empty_reader(f)
+
+        value, found_pset, detail = m2._resolve_element_property(placed, "PlacementMatrix")
+        assert value is not None
+        assert found_pset == "attribute:placement"
+        assert len(detail["matrix"]) == 4
+        assert m2._resolve_element_property(unplaced, "PlacementMatrix")[0] is None
+
+
 class TestRevitSillAndHeadHeight:
     """Revit exports these as "Sill Height" / "Head Height", spaces included."""
 
