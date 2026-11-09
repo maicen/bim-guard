@@ -47,6 +47,8 @@ data/bimguard_issue_history.json
 # Documentation, test fixtures, and scripts not needed in production image
 docs/
 scripts/
+# Needed by the VENDOR_VIEWER build stage (air-gapped 3D viewer bundle).
+!scripts/vendor_viewer.mjs
 supabase/
 docker/
 IFC-Sample-Test-Files/

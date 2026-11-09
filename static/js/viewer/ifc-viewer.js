@@ -23,6 +23,16 @@ export { VIEWER_MOUNTS_API };
 /** Cache-busting token this file is published under; kept beside the API version. */
 export const VIEWER_ASSET_VERSION = "viewer-bcf-resilience-1";
 
+/**
+ * Where the self-contained (air-gapped) build keeps the assets this engine would
+ * otherwise fetch from public CDNs: the fragments worker, the web-ifc WASM and
+ * the Iconify icon data. `scripts/vendor_viewer.mjs` bundles this file with its
+ * pinned dependencies and defines `__VIEWER_VENDOR_BASE__`; run unbundled (the
+ * default, hosted deployment) the identifier is undeclared, `typeof` is safe,
+ * and everything below keeps using the CDNs exactly as before.
+ */
+const VENDOR_BASE = typeof __VIEWER_VENDOR_BASE__ === "string" ? __VIEWER_VENDOR_BASE__ : null;
+
 const ERROR_HIGHLIGHT_STYLE = "bimguard-error";
 
 // Tiny pub/sub used by every bridge namespace below (camera, grid, clipping,
@@ -1208,7 +1218,8 @@ export async function initViewer(mounts) {
     const drawings = createDrawingsModule(components, world, views, layers, workspace, drawingsHost);
 
     const fragments = components.get(OBC.FragmentsManager);
-    const workerUrl = await OBC.FragmentsManager.getWorker();
+    // getWorker() downloads the worker from unpkg; the vendored build serves it itself.
+    const workerUrl = VENDOR_BASE ? `${VENDOR_BASE}fragments-worker.mjs` : await OBC.FragmentsManager.getWorker();
     fragments.init(workerUrl);
 
     world.camera.controls.addEventListener("update", () => fragments.core.update());
@@ -1223,7 +1234,7 @@ export async function initViewer(mounts) {
     await fragmentIfcLoader.setup({
         autoSetWasm: false,
         wasm: {
-            path: "https://unpkg.com/web-ifc@0.0.77/",
+            path: VENDOR_BASE ?? "https://unpkg.com/web-ifc@0.0.77/",
             absolute: true,
         },
     });

@@ -5,6 +5,12 @@
 # Stage 3: Minimal, Secure Production Runtime
 # ==============================================================================
 
+# Air-gapped installs: build with --build-arg VENDOR_VIEWER=true (compose: set
+# VENDOR_VIEWER=true in .env) to bundle the 3D viewer's engine, WASM, worker and
+# icons into the image. Needs internet at BUILD time only; the running container
+# then makes no CDN requests. Default false keeps the stock CDN-loaded viewer.
+ARG VENDOR_VIEWER=false
+
 # ── Stage 1: Frontend SPA Builder ─────────────────────────────────────────────
 FROM node:22-slim AS frontend-builder
 
@@ -58,6 +64,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && find /app/.venv -type f -name "*.pyc" -delete
 
 
+# ── Stage 2b: 3D viewer assets (stock or vendored) ────────────────────────────
+FROM node:22-slim AS viewer-false
+COPY static/js/viewer/ /out/
+
+FROM node:22-slim AS viewer-true
+WORKDIR /work
+COPY scripts/vendor_viewer.mjs ./scripts/
+COPY static/js/viewer/ ./src/
+RUN node scripts/vendor_viewer.mjs --src src --out /out
+
+FROM viewer-${VENDOR_VIEWER} AS viewer
+
 # ── Stage 3: Production Runtime ───────────────────────────────────────────────
 FROM python:3.12-slim-bookworm AS runtime
 
@@ -90,6 +108,8 @@ COPY --from=frontend-builder --chown=bimguard:bimguard /frontend/dist ./frontend
 
 # Copy static assets and data (without running subsequent chown -R to avoid duplicate layers)
 COPY --chown=bimguard:bimguard static/ ./static/
+# Stock viewer files, or the self-contained bundle when VENDOR_VIEWER=true.
+COPY --from=viewer --chown=bimguard:bimguard /out/ ./static/js/viewer/
 COPY --chown=bimguard:bimguard data/ ./data/
 
 # Copy application source (placed last so code edits only invalidate the top-most layers)

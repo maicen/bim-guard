@@ -9,7 +9,7 @@
 - [ISO 19650 and CDE governance](https://bim-guard.xyz/iso-19650-cde.md): Validate ISO 19650 container naming, suitability and revision codes, and enforce CDE state transitions from WIP to SHARED, PUBLISHED and ARCHIVED.
 - [BCF issue management and IDS validation](https://bim-guard.xyz/bcf-and-ids.md): Export compliance findings as BCF issues, expose a BCF REST API, and generate, import and audit buildingSMART IDS specifications.
 - [Validation and research](https://bim-guard.xyz/research.md): BIM Guard's accuracy claims are scored in a separate public repository and published with their limits: benchmark results, a claims ledger and known gaps.
-- [Self-hosted, on-premises BIM validation with local LLMs](https://bim-guard.xyz/self-hosted-bim-validation.md): Run BIM Guard on your own infrastructure with Docker Compose and point its language-model features at a local Ollama server.
+- [Air-gapped and self-hosted BIM validation with local LLMs](https://bim-guard.xyz/self-hosted-bim-validation.md): Run BIM Guard on your own servers or an air-gapped network: local Ollama or OpenAI-compatible models, offline bSDD, a bundled 3D viewer.
 - [BIM Guard documentation](https://bim-guard.xyz/docs.md): Guides for BIM Guard: getting started, projects, documents and rule extraction, running compliance audits, reports and administration.
 
 Open the app: https://bim-guard.xyz/

@@ -17,7 +17,7 @@ BIM Guard checks IFC building models against architectural code rules, tracks th
 - [Automated IFC compliance checking](/ifc-compliance-checking)
 - [ISO 19650 and CDE governance](/iso-19650-cde)
 - [BCF issue management and IDS validation](/bcf-and-ids)
-- [Self-hosted deployment and local LLMs](/self-hosted-bim-validation)
+- [Air-gapped and self-hosted deployment](/self-hosted-bim-validation)
 - [Validation and research](/research)
 
 ## Full manual

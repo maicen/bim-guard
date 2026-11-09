@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Self-Hosted BIM Validation with Local LLMs (Ollama) | BIM Guard</title>
-  <meta name="description" content="Run BIM Guard on your own infrastructure with Docker Compose and point its language-model features at a local Ollama server." />
+  <title>Air-Gapped BIM Validation with Local LLMs | BIM Guard</title>
+  <meta name="description" content="Run BIM Guard on your own servers or an air-gapped network: local Ollama or OpenAI-compatible models, offline bSDD, a bundled 3D viewer." />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="theme-color" content="#090d16" />
   <link rel="canonical" href="https://bim-guard.xyz/self-hosted-bim-validation" />
@@ -15,16 +15,16 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://bim-guard.xyz/self-hosted-bim-validation" />
   <meta property="og:site_name" content="BIM Guard" />
-  <meta property="og:title" content="Self-Hosted BIM Validation with Local LLMs (Ollama) | BIM Guard" />
-  <meta property="og:description" content="Run BIM Guard on your own infrastructure with Docker Compose and point its language-model features at a local Ollama server." />
+  <meta property="og:title" content="Air-Gapped BIM Validation with Local LLMs | BIM Guard" />
+  <meta property="og:description" content="Run BIM Guard on your own servers or an air-gapped network: local Ollama or OpenAI-compatible models, offline bSDD, a bundled 3D viewer." />
   <meta property="og:image" content="https://bim-guard.xyz/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="BIM Guard OpenBIM Compliance Platform Banner" />
   <meta property="og:locale" content="en_US" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Self-Hosted BIM Validation with Local LLMs (Ollama) | BIM Guard" />
-  <meta name="twitter:description" content="Run BIM Guard on your own infrastructure with Docker Compose and point its language-model features at a local Ollama server." />
+  <meta name="twitter:title" content="Air-Gapped BIM Validation with Local LLMs | BIM Guard" />
+  <meta name="twitter:description" content="Run BIM Guard on your own servers or an air-gapped network: local Ollama or OpenAI-compatible models, offline bSDD, a bundled 3D viewer." />
   <meta name="twitter:image" content="https://bim-guard.xyz/og-image.png" />
   <meta name="twitter:image:alt" content="BIM Guard OpenBIM Compliance Platform Banner" />
   <script type="application/ld+json">{
@@ -37,9 +37,9 @@
       ],
       "@id": "https://bim-guard.xyz/self-hosted-bim-validation#webpage",
       "url": "https://bim-guard.xyz/self-hosted-bim-validation",
-      "name": "Self-Hosted BIM Validation with Local LLMs (Ollama) | BIM Guard",
-      "headline": "Self-hosted, on-premises BIM validation with local LLMs",
-      "description": "Run BIM Guard on your own infrastructure with Docker Compose and point its language-model features at a local Ollama server.",
+      "name": "Air-Gapped BIM Validation with Local LLMs | BIM Guard",
+      "headline": "Air-gapped and self-hosted BIM validation with local LLMs",
+      "description": "Run BIM Guard on your own servers or an air-gapped network: local Ollama or OpenAI-compatible models, offline bSDD, a bundled 3D viewer.",
       "inLanguage": "en",
       "isPartOf": {
         "@id": "https://bim-guard.xyz/#website"
@@ -67,7 +67,7 @@
         {
           "@type": "ListItem",
           "position": 2,
-          "name": "Self-hosted, on-premises BIM validation with local LLMs",
+          "name": "Air-gapped and self-hosted BIM validation with local LLMs",
           "item": "https://bim-guard.xyz/self-hosted-bim-validation"
         }
       ]
@@ -99,25 +99,28 @@
   <div class="container">
     <header class="site-header">
       <a class="brand" href="/">BIM Guard</a>
-      <nav aria-label="Main"><a href="/features">Features</a><a href="/ifc-compliance-checking">Compliance checking</a><a href="/iso-19650-cde">ISO 19650</a><a href="/bcf-and-ids">BCF &amp; IDS</a><a href="/research">Research</a><a href="/self-hosted-bim-validation">Self-hosted</a><a href="/docs">Docs</a></nav>
+      <nav aria-label="Main"><a href="/features">Features</a><a href="/ifc-compliance-checking">Compliance checking</a><a href="/iso-19650-cde">ISO 19650</a><a href="/bcf-and-ids">BCF &amp; IDS</a><a href="/research">Research</a><a href="/self-hosted-bim-validation">Air-gapped</a><a href="/docs">Docs</a></nav>
     </header>
     <main>
-    <h1>Self-hosted, on-premises BIM validation with local LLMs</h1>
-    <p>BIM Guard runs as a Docker Compose stack that you host yourself: the application, its database and authentication, a graph store and the document parser all run on your own servers. IFC compliance checks are computed by deterministic Python engines, so model geometry never has to reach a language model. Where a language model is used, you can point it at a local Ollama server instead of a hosted API.</p>
+    <h1>Air-gapped and self-hosted BIM validation with local LLMs</h1>
+    <p>BIM Guard runs as a Docker Compose stack that you host yourself, including on a network with no route to the internet. The application, its database and authentication, a graph store and the document parser all run on your own servers. IFC compliance checks are computed by deterministic Python engines, so model geometry never has to reach a language model, and where a model is used it can be a local Ollama or OpenAI-compatible server instead of a hosted API.</p>
     <h2>What runs on your own infrastructure</h2>
     <p>The bundled <code>docker-compose.yml</code> starts every service the platform needs:</p>
     <ul><li><strong>Application</strong> - the web app and the API gateway.</li><li><strong>Database, authentication and file storage</strong> - a self-hosted Supabase stack (PostgreSQL, Auth and Storage).</li><li><strong>Graph store</strong> - a self-hosted Neo4j server for topological queries.</li><li><strong>Document parsing</strong> - a self-hosted Docling server that reads regulatory PDFs.</li><li><strong>OpenCDE Documents API</strong> - the buildingSMART document exchange service.</li></ul>
-    <p>A Cloudflare Tunnel is an optional compose profile for publishing an instance on the internet. An internal deployment does not need it.</p>
+    <p>A Cloudflare Tunnel is an optional compose profile for publishing an instance on the internet. An internal or air-gapped deployment leaves it off.</p>
     <h2>IFC checks do not call a language model</h2>
     <p>Compliance engines for egress, spatial clearance, doors and stairs are plain Python. They read IFC models with IfcOpenShell and take their thresholds from rules stored in your own database. An audit of an IFC model therefore runs without any language model or external AI service.</p>
-    <h2>Local LLMs with Ollama</h2>
-    <p>Language models are used for the document side of the workflow, such as extracting draft rules from regulatory PDFs. Extracted rules arrive as drafts for a reviewer to approve or edit.</p>
-    <ul><li>Choose <strong>Ollama (self-hosted)</strong> as the provider for an organisation. Available models are listed from your own Ollama server.</li><li>The server address comes from <code>OLLAMA_API_BASE</code>. The bundled compose file defaults it to an Ollama server on the Docker host (<code>host.docker.internal:11434</code>).</li><li>Hosted providers (Anthropic, Gemini, OpenAI, OpenRouter) remain optional per organisation. Leave them unconfigured to keep every request inside your network.</li></ul>
+    <h2>Local LLMs: Ollama or any OpenAI-compatible server</h2>
+    <p>Language models are used for the document side of the workflow, such as extracting draft rules from regulatory PDFs. Extracted rules arrive as drafts for a reviewer to approve or edit. You choose where the model runs:</p>
+    <ul><li><strong>Ollama (self-hosted)</strong> - pick it as the provider for an organisation. Available models are listed from your own server, whose address comes from <code>OLLAMA_API_BASE</code> (the bundled compose file defaults it to an Ollama server on the Docker host).</li><li><strong>OpenAI-compatible servers</strong> - vLLM, llama.cpp, LM Studio or any server that speaks the OpenAI API, addressed by its base URL on your network. The operator opts in to private-network addresses with an environment setting (<code>BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS</code>, or <code>BIMGUARD_OFFLINE</code>); cloud-metadata and link-local addresses stay blocked.</li><li>Hosted providers (Anthropic, Gemini, OpenAI, OpenRouter) remain optional per organisation. Leave them unconfigured to keep every request inside your network.</li></ul>
+    <h2>Air-gapped mode</h2>
+    <p>Two switches remove the remaining dependencies on public services. Both are off by default.</p>
+    <ul><li><code>BIMGUARD_OFFLINE=true</code> - buildingSMART Data Dictionary lookups are answered from the bundled local ontology (over 16,000 classes) and the runtime cache, with no live requests to buildingSMART.</li><li><code>VENDOR_VIEWER=true</code> at image build time - the 3D viewer's engine, IFC WASM, worker and icons are bundled into the image instead of being fetched from public CDNs. Building needs internet once; the running container does not.</li><li>Images and local models are pulled on a connected machine and carried across with <code>docker save</code> and <code>docker load</code>.</li></ul>
     <h2>Deploy it</h2>
-    <ul><li>Clone the <a href="https://github.com/maicen/bim-guard" rel="noopener">source repository</a> and copy the example environment file to <code>.env</code>.</li><li>Start the stack with <code>docker compose up -d --build</code>.</li><li>Install Ollama on the host, pull a model, and add an Ollama provider in the application settings.</li><li>Sign in with email and password, or configure Google sign-in.</li></ul>
-    <p>The full operator guide is <a href="https://github.com/maicen/bim-guard/blob/main/docs/deployment_orbstack_cloudflare.md" rel="noopener">docs/deployment_orbstack_cloudflare.md</a> in the repository.</p>
+    <ul><li>Clone the <a href="https://github.com/maicen/bim-guard" rel="noopener">source repository</a> and copy the example environment file to <code>.env</code>.</li><li>Start the stack with <code>docker compose up -d --build</code>.</li><li>Install Ollama (or another OpenAI-compatible server), pull a model, and add the provider in the application settings.</li><li>Sign in with email and password.</li></ul>
+    <p>The operator guides are <a href="https://github.com/maicen/bim-guard/blob/main/docs/air-gapped-deployment.md" rel="noopener">docs/air-gapped-deployment.md</a> and <a href="https://github.com/maicen/bim-guard/blob/main/docs/deployment_orbstack_cloudflare.md" rel="noopener">docs/deployment_orbstack_cloudflare.md</a> in the repository.</p>
     <h2>What is not claimed</h2>
-    <p>BIM Guard is not certified for, or tested in, a fully air-gapped network. By default the 3D viewer loads its libraries from public CDNs, and buildingSMART Data Dictionary lookups call the buildingSMART service (results are cached). A fully disconnected site would have to mirror or block those requests itself.</p>
+    <p>BIM Guard is not certified for air-gapped use. The viewer build was checked in a browser loading an IFC with every request served by the application itself, but a complete installation behind a firewall that drops all outbound traffic has not been audited end to end. Google sign-in needs the internet, so an isolated network uses email and password sign-in.</p>
     <p>Rule-extraction quality depends on the model you run. The <a href="/research">published evaluation</a> does not cover every local model, so review extracted rules before relying on them.</p>
     <h2>Related</h2>
     <p><a href="/features">All features</a> · <a href="/ifc-compliance-checking">Automated IFC compliance checking</a> · <a href="/research">Validation and research</a> · <a href="/docs">Documentation</a></p>
