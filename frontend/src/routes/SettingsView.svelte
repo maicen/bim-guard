@@ -14,7 +14,7 @@
   import { settingsApi } from "../lib/api";
   import { themeMode, setTheme, type ThemeMode } from "../lib/theme";
   import { authState } from "../lib/auth.svelte";
-  import { isAuthConfigured } from "../lib/supabaseClient";
+  import { isAuthConfigured } from "../lib/authConfig";
   import type { SettingItem } from "../lib/types";
   import Select from "../lib/components/ui/Select.svelte";
   import PageHeader from "../lib/components/PageHeader.svelte";

@@ -12,7 +12,7 @@
   import { DropdownMenu as Menu } from "bits-ui";
   import { push } from "svelte-spa-router";
   import { authState } from "../../auth.svelte";
-  import { isAuthConfigured } from "../../supabaseClient";
+  import { isAuthConfigured } from "../../authConfig";
   import DropdownMenu from "../DropdownMenu.svelte";
   import Tooltip from "../Tooltip.svelte";
   import { Avatar } from "../ui";

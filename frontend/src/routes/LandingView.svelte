@@ -12,7 +12,7 @@
     Sparkles,
     FileCode2,
   } from "lucide-svelte";
-  import { Button } from "../lib/components/ui";
+  import Button from "../lib/components/ui/Button.svelte";
   import Marquee from "../lib/components/marketing/Marquee.svelte";
   import HeroAppMockup from "../lib/components/marketing/HeroAppMockup.svelte";
   import PipelineFlow from "../lib/components/marketing/PipelineFlow.svelte";
@@ -147,7 +147,7 @@
     </div>
   </header>
 
-  <main>
+  <main id="main-content" tabindex="-1" class="outline-none">
     <!-- Hero Section -->
     <section class="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-28">
       <!-- Ambient Glow Backdrop -->

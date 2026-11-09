@@ -6,7 +6,7 @@
  * auth.svelte.ts back from api.ts would be a cycle.
  */
 
-import { isAuthConfigured, supabase } from "./supabaseClient";
+import { isAuthConfigured, getSupabase } from "./authConfig";
 
 let currentToken: string | null = null;
 let currentOrgId: number | null = null;
@@ -56,6 +56,7 @@ export async function refreshAuthToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
+      const supabase = await getSupabase();
       const { data, error } = await supabase.auth.refreshSession();
       if (!error && data?.session?.access_token) {
         setAuthToken(data.session.access_token);

@@ -5,10 +5,10 @@
  * truth; this just mirrors it into runes so components can react to it.
  */
 
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { authApi, clearTenantCaches } from "./api";
 import { setAuthToken, setActiveOrgId, setAuthReady } from "./authToken";
-import { isAuthConfigured, supabase } from "./supabaseClient";
+import { getSupabase, isAuthConfigured, isSupabaseSessionKey, sessionPossible } from "./authConfig";
 import type { CurrentUserResponse, ProfileUpdatePayload } from "./types";
 
 class AuthState {
@@ -74,24 +74,19 @@ class AuthState {
       return;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      this.session = data.session;
-      setAuthToken(data.session?.access_token ?? null);
+    // PERF: a visitor with no stored session (and no OAuth return in the URL)
+    // is signed out by definition, so the ~215 KiB Supabase client is not even
+    // downloaded for them -- it loads on their first sign-in attempt instead
+    // (#client()), or if another tab signs in (the `storage` listener below).
+    if (sessionPossible()) {
+      void this.#client();
+    } else {
       this.loading = false;
-      this.#loadProfile();
-      // Only the very first resolution marks readiness: it's the one a
-      // request fired at page load could otherwise race. Later token
-      // refreshes go through onAuthStateChange below and don't need to
-      // gate anything -- callers awaiting authReady have long since moved on.
       setAuthReady();
-    });
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      this.session = session;
-      setAuthToken(session?.access_token ?? null);
-      this.loading = false;
-      this.#loadProfile();
-    });
+      window.addEventListener("storage", (e) => {
+        if (isSupabaseSessionKey(e.key)) void this.#client();
+      });
+    }
 
     // The retry budget below is finite, so a backend that comes back later
     // (a dev server restart, a redeploy) is picked up when the user returns
@@ -99,6 +94,38 @@ class AuthState {
     window.addEventListener("focus", () => {
       if (this.session && !this.profile) this.#loadProfile();
     });
+  }
+
+  #clientPromise: Promise<SupabaseClient> | null = null;
+
+  /**
+   * The Supabase client, with this state's session listeners attached exactly
+   * once on first use. Every sign-in/out path goes through it so the listeners
+   * exist before the call that triggers them.
+   */
+  #client(): Promise<SupabaseClient> {
+    this.#clientPromise ??= getSupabase().then((supabase) => {
+      supabase.auth.getSession().then(({ data }) => {
+        this.session = data.session;
+        setAuthToken(data.session?.access_token ?? null);
+        this.loading = false;
+        this.#loadProfile();
+        // Only the very first resolution marks readiness: it's the one a
+        // request fired at page load could otherwise race. Later token
+        // refreshes go through onAuthStateChange below and don't need to
+        // gate anything -- callers awaiting authReady have long since moved on.
+        setAuthReady();
+      });
+
+      supabase.auth.onAuthStateChange((_event, session) => {
+        this.session = session;
+        setAuthToken(session?.access_token ?? null);
+        this.loading = false;
+        this.#loadProfile();
+      });
+      return supabase;
+    });
+    return this.#clientPromise;
   }
 
   /** Delays between automatic retries of a failed profile load; then it gives up until refocus. */
@@ -159,6 +186,7 @@ class AuthState {
 
   /** Redirect to Google's consent screen; the browser comes back with a session. */
   async signInWithGoogle(): Promise<void> {
+    const supabase = await this.#client();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/` },
@@ -168,6 +196,7 @@ class AuthState {
 
   /** Sign in with an existing email/password account. */
   async signInWithPassword(email: string, password: string): Promise<void> {
+    const supabase = await this.#client();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }
@@ -186,6 +215,7 @@ class AuthState {
    * nothing.
    */
   async signUp(email: string, password: string): Promise<{ needsEmailConfirmation: boolean }> {
+    const supabase = await this.#client();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -202,6 +232,7 @@ class AuthState {
    * Only usable in dev builds with VITE_DEV_AUTH_EMAIL/PASSWORD set.
    */
   async signInWithDevAccount(): Promise<void> {
+    const supabase = await this.#client();
     const { error } = await supabase.auth.signInWithPassword({
       email: import.meta.env.VITE_DEV_AUTH_EMAIL as string,
       password: import.meta.env.VITE_DEV_AUTH_PASSWORD as string,
@@ -210,6 +241,7 @@ class AuthState {
   }
 
   async signOut(): Promise<void> {
+    const supabase = await this.#client();
     await supabase.auth.signOut();
     setAuthToken(null);
     this.#activeOrgIdOverride = null;

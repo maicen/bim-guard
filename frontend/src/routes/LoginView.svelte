@@ -2,8 +2,9 @@
   import { link, push } from "svelte-spa-router";
   import { ShieldCheck, Mail, Lock, CheckCircle2, Sparkles, Building2 } from "lucide-svelte";
   import { authState } from "../lib/auth.svelte";
-  import { isAuthConfigured } from "../lib/supabaseClient";
-  import { Button, Input } from "../lib/components/ui";
+  import { isAuthConfigured } from "../lib/authConfig";
+  import Button from "../lib/components/ui/Button.svelte";
+  import Input from "../lib/components/ui/Input.svelte";
 
   type Mode = "sign-in" | "sign-up";
 

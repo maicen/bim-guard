@@ -1,0 +1,741 @@
+<script lang="ts">
+  import { onMount, untrack } from "svelte";
+  import { router, push, replace } from "svelte-spa-router";
+  import { Tooltip } from "bits-ui";
+  import OrgSidebar from "./lib/components/OrgSidebar.svelte";
+  import ProjectSidebar from "./lib/components/ProjectSidebar.svelte";
+  import AdminSidebar from "./lib/components/AdminSidebar.svelte";
+  import AnalysisDomainTabs from "./lib/components/AnalysisDomainTabs.svelte";
+  import type { AnalysisDomainTab } from "./lib/components/AnalysisDomainTabs.svelte";
+  import TopHeader from "./lib/components/TopHeader.svelte";
+  import Modal from "./lib/components/Modal.svelte";
+  import PipelineProgress from "./lib/components/PipelineProgress.svelte";
+  import { Activity } from "lucide-svelte";
+  import { toasts } from "./lib/toast.svelte";
+  import { pipelineTracker } from "./lib/stores/activePipelines.svelte";
+
+  // Routes: every view is code-split (see LazyView). Login/Landing live in App.svelte.
+  import LazyView from "./lib/components/LazyView.svelte";
+  import OrgPickerGate from "./lib/components/OrgPickerGate.svelte";
+
+  import { dashboardApi, projectsApi } from "./lib/api";
+  import { viewForAnalysisDomain } from "./lib/analysisDomain";
+  import { authState } from "./lib/auth.svelte";
+  import { isAuthConfigured } from "./lib/authConfig";
+  import type { Project } from "./lib/types";
+
+  // The URL hash (via svelte-spa-router) is the source of truth for which
+  // view is on screen — this is what makes refresh, back/forward, and
+  // shareable links work. "/" maps to the dashboard; every other view's id
+  // (e.g. "rules", "manual-rule-editor") is used verbatim as its path.
+  let activeView = $derived(router.location === "/" ? "dashboard" : router.location.slice(1));
+  // Arch is the only analysis domain today (see AnalysisDomainTabs.svelte).
+  let auditDomain: AnalysisDomainTab = "arch";
+  let queryParams = $derived(new URLSearchParams(router.querystring || ""));
+  // Rule Extraction Studio, opened in a new tab from the "Run Compliance Audit"
+  // wizard with ?doc_id=...&from=quick-test so it pre-selects that document
+  // and offers to send the user back once rules are saved.
+  let targetDocId: number | null = $derived.by(() => {
+    const raw = queryParams.get("doc_id") || queryParams.get("document_id");
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  let targetPage: number | null = $derived.by(() => {
+    const raw = queryParams.get("page") || queryParams.get("page_number");
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  let fromQuickTest = $derived(queryParams.get("from") === "quick-test");
+  let targetRulesetId: string | null = $derived(queryParams.get("ruleset_id"));
+  // Signing in is required once Supabase Auth is actually configured (see
+  // supabaseClient.ts) -- everything the app does reads through /api/projects
+  // or /api/rules, both of which now require a bearer token. Left ungated
+  // when auth isn't configured so a checkout without Supabase set up still
+  // runs, per isAuthConfigured's own "non-fatal until configured" contract.
+  //
+  // The root path ("/", activeView "dashboard") and "/login" are the two
+  // signed-out-friendly destinations — landing page and sign-in respectively,
+  // rendered without the app shell below. Anything else requested while
+  // signed out redirects to the landing page instead of straight to login,
+  // so a shared deep link at least lands somewhere coherent.
+  let showAppShell = $derived(!isAuthConfigured || authState.loading || !!authState.user);
+  let authGateBlocking = $derived(
+    isAuthConfigured &&
+      !authState.loading &&
+      !authState.user &&
+      activeView !== "login" &&
+      activeView !== "dashboard",
+  );
+
+  $effect(() => {
+    if (authGateBlocking) push("/");
+  });
+
+  // If visiting /documents with a ?doc_id=... deep link, normalize the URL to /document
+  // so the canonical viewer route is shown while preserving all parameters.
+  $effect(() => {
+    if (activeView === "documents" && targetDocId != null) {
+      untrack(() => {
+        const qs = router.querystring ? `?${router.querystring}` : "";
+        replace(`/document${qs}`);
+      });
+    }
+  });
+
+  // If the route's audit domain drifts from the selected project's own domain
+  // (a stale link, back/forward, or a manually edited URL -- the tab strip
+  // itself only ever offers the matching domain now), snap back to the
+  // project's domain instead of running an engine that doesn't apply to it.
+  $effect(() => {
+    if (
+      activeView === "arch" &&
+      projectAuditDomain &&
+      auditDomain !== projectAuditDomain &&
+      targetProjectId
+    ) {
+      untrack(() => push(buildTargetUrl(projectAuditDomain!, targetProjectId!)));
+    }
+  });
+  // Navigation drawer state; only meaningful below the md breakpoint.
+  let isMobileNavOpen = $state(false);
+  let isSidebarCollapsed = $state(false);
+
+  const SELECTED_PROJECT_STORAGE_KEY = "bimguard_selected_project_id";
+
+  function getInitialProjectId(): number | null {
+    // 1. From URL
+    const params = new URLSearchParams(router.querystring || "");
+    const fromUrl = params.get("project_id");
+    if (fromUrl && /^\d+$/.test(fromUrl)) return Number(fromUrl);
+    // 2. From LocalStorage
+    try {
+      const fromStorage = localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
+      if (fromStorage && /^\d+$/.test(fromStorage)) return Number(fromStorage);
+    } catch {}
+    return null;
+  }
+
+  let targetProjectId: number | null = $state(getInitialProjectId());
+  let targetElementGuid: string | null = $state(null);
+  let targetBcfArtifactId: number | null = $state(null);
+  /** `analysis_slug` from the URL: which run's BCF a deep-linked element is in. */
+  let targetAnalysisSlug: string | null = $state(null);
+  let targetFileId: number | null = $state(null);
+  let selectedProject: Project | null = $state(null);
+  // The audit tab strip only ever shows the domain a project was actually
+  // created with -- undefined (all domains shown) until the matching
+  // project has loaded.
+  let projectAuditDomain: AnalysisDomainTab | undefined = $derived(
+    selectedProject && selectedProject.id === targetProjectId
+      ? (viewForAnalysisDomain(selectedProject.analysis_type) as AnalysisDomainTab)
+      : undefined,
+  );
+  // Clicking the header's running-pipeline badge opens the live tracker in a
+  // drawer rather than navigating to a dedicated page — the same information
+  // was previously duplicated across an inline panel, a standalone page, and
+  // this badge; the badge is now the one entry point into the detail view.
+  let pipelineModalProjectId: number | null = $state(null);
+
+  let dbOk = $state(true);
+  let dbBackend = $state("SUPABASE");
+  let apiOnline = $state(true);
+
+  async function checkHealth() {
+    // Same race /api/auth/me and prefetchAll() guard against (see the
+    // hasPrefetched effect below): firing this before the Supabase session
+    // lookup has set the bearer token 401s every time, and did so on every
+    // poll tick until a token existed -- not just the first call. Skipping
+    // silently here (instead of surfacing apiOnline = false) avoids flashing
+    // an "API offline" chip during the normal, brief pre-auth window.
+    if (isAuthConfigured && (authState.loading || !authState.user)) return;
+    try {
+      const stats = await dashboardApi.getStats();
+      dbOk = stats.db_ok;
+      dbBackend = stats.db_backend || "SUPABASE";
+      apiOnline = true;
+    } catch {
+      // Deliberately quiet: the header's gateway/database chips are this
+      // check's UI, and it re-runs on a timer. A toast per poll would be noise.
+      apiOnline = false;
+      dbOk = false;
+    }
+  }
+
+  async function loadProjectDetails(projectId: number) {
+    try {
+      // No client-side "does this project's organization_id match the active
+      // org" gate here on purpose: a project can be legitimately visible in
+      // the active org via organization_project_grants (cross-org sharing)
+      // without its owning organization_id ever changing, and
+      // ensureProjectSelected() below picks straight from that same
+      // org-scoped, grant-aware list. Rejecting on owning-org mismatch
+      // treated every shared-in project as foreign, which sent this function
+      // straight back into ensureProjectSelected(), which picked the same
+      // shared-in project again (it's genuinely first in that org's list),
+      // which came back here to be rejected again -- an unconditional loop,
+      // not a race, that pegged the backend on /api/projects/{id}/files
+      // forever. The backend's own access check (get_authorized_project) is
+      // the real gate; a project it serves here is one this user may see.
+      selectedProject = await projectsApi.get(projectId);
+    } catch (err) {
+      selectedProject = null;
+      if ((err as { status?: number })?.status === 404) {
+        // The stored/URL project id points at a project that's gone (deleted,
+        // or moved to another org) — clear it and pick a real one instead of
+        // leaving the app stuck pointing at a dead id forever.
+        targetProjectId = null;
+        try {
+          localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+        } catch {}
+        ensureProjectSelected();
+        return;
+      }
+      toasts.fromError(err, "Could not load the selected project.");
+    }
+  }
+
+  async function ensureProjectSelected() {
+    if (targetProjectId) return;
+    try {
+      const orgId = authState.activeOrganizationId;
+      const res = await projectsApi.list({ organization_id: orgId });
+      const available = res.projects || [];
+      if (available.length > 0) {
+        const firstId = available[0].id;
+        targetProjectId = firstId;
+        try {
+          localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(firstId));
+        } catch {}
+        loadProjectDetails(firstId);
+      }
+    } catch {}
+  }
+
+  // Synchronize targetProjectId <-> URL query parameters and localStorage.
+  // In project-scoped views (Viewer, Arch, Reports, Workflow),
+  // ensure the project persists in the URL query string.
+  //
+  // The targetProjectId reads/writes below are wrapped in untrack() so this
+  // effect only re-fires on an actual queryParams/activeView change, never
+  // just because targetProjectId changed elsewhere (loadProjectDetails,
+  // handleExitProject, ...). Those already push/replace the correct URL
+  // themselves; without untrack, this effect would see the still-stale URL
+  // (push/replace await a tick before touching the hash) and immediately
+  // re-derive the old targetProjectId from it -- the same race that used to
+  // revert OrgSwitcher's selection (see the URL <-> AuthState effects above).
+  $effect(() => {
+    const params = queryParams;
+    const urlProjectIdStr = params.get("project_id");
+
+    if (urlProjectIdStr && /^\d+$/.test(urlProjectIdStr)) {
+      const parsedId = Number(urlProjectIdStr);
+      untrack(() => {
+        if (parsedId !== targetProjectId) {
+          targetProjectId = parsedId;
+          loadProjectDetails(parsedId);
+          try {
+            localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(parsedId));
+          } catch {}
+        }
+      });
+    } else if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+      untrack(() => {
+        if (targetProjectId) {
+          const currentParams = new URLSearchParams(router.querystring || "");
+          if (currentParams.get("project_id") !== String(targetProjectId)) {
+            currentParams.set("project_id", String(targetProjectId));
+            if (authState.activeOrganizationId) {
+              currentParams.set("org", String(authState.activeOrganizationId));
+            }
+            replace(`/${activeView}?${currentParams.toString()}`);
+          }
+        } else {
+          ensureProjectSelected();
+        }
+      });
+    }
+
+    targetElementGuid = params.get("element_guid");
+    targetAnalysisSlug = params.get("analysis_slug");
+    const bcfArtifactId = Number(params.get("bcf_artifact_id"));
+    targetBcfArtifactId = bcfArtifactId || null;
+    const fileId = Number(params.get("file_id"));
+    targetFileId = fileId || null;
+  });
+
+  function buildTargetUrl(
+    view: string,
+    projectId: number,
+    elementGuid?: string | null,
+    bcfArtifactId?: number | null,
+    analysisSlug?: string | null,
+  ): string {
+    // A one-shot builder for a URL string, never read reactively, so the
+    // plain built-in is correct here.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const params = new URLSearchParams();
+    params.set("project_id", String(projectId));
+    if (elementGuid) params.set("element_guid", elementGuid);
+    if (bcfArtifactId) params.set("bcf_artifact_id", String(bcfArtifactId));
+    // Which analysis run owns the finding behind this link. The viewer needs it
+    // to ask /analyze/export for the right archive; without it every deep link
+    // fetched the wrong BCF, whatever engine raised the finding.
+    if (analysisSlug) params.set("analysis_slug", analysisSlug);
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    return `/${view}?${params.toString()}`;
+  }
+
+  onMount(() => {
+    checkHealth();
+    // Backward compatibility for the one link shape that predates hash
+    // routing: a plain (non-hash) /viewer?... URL, e.g. an old bookmark.
+    if (window.location.pathname === "/viewer" && !window.location.hash) {
+      replace(`/viewer?${window.location.search.slice(1)}`);
+    }
+    // 45s (was 20s): this only drives the header's gateway/database status
+    // chips, which don't need sub-minute freshness, and every tick is a full
+    // /api/dashboard/stats round trip -- see app/api/dashboard.py's own
+    // Cache-Control (max-age=5, stale-while-revalidate=15) for the backend's
+    // matching staleness budget.
+    const interval = setInterval(checkHealth, 45000);
+    return () => clearInterval(interval);
+  });
+
+  // dashboardApi.prefetchAll() and loadProjectDetails() hit auth-required
+  // endpoints (/api/projects, /api/rules, ...). Firing them straight from
+  // onMount races the async Supabase session lookup that sets the bearer
+  // token, so the very first load of the app always 401'd on these calls.
+  // Waiting for authState.loading to clear ensures the token (if any) is
+  // already set before the first request goes out.
+  //
+  // Also wait for authState.profile, AND for a ?org= in the URL to have
+  // actually been applied to activeOrganizationId (the "URL -> AuthState"
+  // effect below does that, but asynchronously relative to this one).
+  // Firing loadProjectDetails() before that lands reads activeOrganizationId
+  // as whatever it defaulted to (profile.default_organization_id, or null),
+  // not the URL's org -- so a project_id/org combination that's a genuine
+  // mismatch (project belongs to a different org) reads as consistent,
+  // loadProjectDetails accepts it, and then the *next* tick, once the URL's
+  // org finally applies, an org-mismatch cleanup effect discovers the now-
+  // stale selectedProject, clears it, and this whole resolution restarts --
+  // repeating for as long as anything here still races that effect. Waiting
+  // for the two to already agree closes that race instead of restarting
+  // through it.
+  let hasPrefetched = false;
+  $effect(() => {
+    if (authState.loading) return;
+    if (isAuthConfigured && !authState.user) return;
+    if (isAuthConfigured && authState.profile == null) return;
+    const urlOrgParam = queryParams.get("org");
+    if (urlOrgParam && String(authState.activeOrganizationId) !== urlOrgParam) return;
+    if (hasPrefetched) return;
+    hasPrefetched = true;
+    dashboardApi.prefetchAll();
+    if (targetProjectId) {
+      loadProjectDetails(targetProjectId);
+    }
+  });
+
+  function handleSelectView(view: string) {
+    if (authState.activeOrganizationId) {
+      push(`/${view}?org=${authState.activeOrganizationId}`);
+    } else {
+      push(`/${view}`);
+    }
+  }
+
+  // Routes to the audit view matching the project's own domain. Arch is the
+  // only analysis domain today (see viewForAnalysisDomain).
+  function handleSelectProjectForAudit(projectId: number, analysisType?: string | null) {
+    push(buildTargetUrl(viewForAnalysisDomain(analysisType), projectId));
+  }
+
+  function handleSelectProjectForViewer(
+    projectId: number,
+    elementGuid?: string,
+    bcfArtifactId?: number,
+    analysisSlug?: string,
+  ) {
+    push(buildTargetUrl("viewer", projectId, elementGuid, bcfArtifactId, analysisSlug));
+  }
+
+  // The wizard closes itself once the project is saved; this puts the new
+  // project on screen in the analysis view for the domain it was created with.
+  function handleProjectCreated(project: Project) {
+    selectedProject = project;
+    push(buildTargetUrl(viewForAnalysisDomain(project.analysis_type), project.id));
+  }
+
+  // Views that read a project from targetProjectId/query string. Picking a
+  // different project from the Dashboard's registry while on one of these
+  // re-runs that same view against the new project; from anywhere else it
+  // just updates the context so the next project-scoped view you open has it.
+  const PROJECT_SCOPED_VIEWS = new Set(["arch", "reports", "evaluation", "viewer", "workflow", "models", "query-console", "copilot"]);
+
+  // Whether the app shell is in "project view" (project-scoped sidebar,
+  // navbar, and dashboard) vs. "organization view". Driven by project_id
+  // actually being present in the URL, not just by a project being
+  // remembered in targetProjectId/localStorage — otherwise a plain visit to
+  // "/" would immediately jump into project view for anyone who last worked
+  // in a project. "dashboard" is deliberately excluded from
+  // PROJECT_SCOPED_VIEWS itself (unlike Viewer/Arch/Reports) so visiting it
+  // never auto-injects project_id into the URL; it only renders the project
+  // dashboard when the URL already carries one.
+  //
+  // The dashboard branch additionally requires targetProjectId: a project_id
+  // in the URL that doesn't resolve to an accessible project (wrong org,
+  // deleted, or an org with no projects at all) leaves targetProjectId null
+  // after loadProjectDetails/ensureProjectSelected give up, but the stale
+  // query param itself is never cleaned up for "dashboard" (it isn't in
+  // PROJECT_SCOPED_VIEWS, so the URL-fixup effect below never touches it).
+  // Without this, isProjectView stayed permanently true off that stale
+  // param, stranding the header/sidebar in a "Project Dashboard" state with
+  // no project ever backing it.
+  let isProjectView = $derived(
+    PROJECT_SCOPED_VIEWS.has(activeView) ||
+      (activeView === "dashboard" && !!queryParams.get("project_id") && !!targetProjectId),
+  );
+
+  const ADMIN_VIEWS = new Set([
+    "admin",
+    "org-settings",
+    "external-providers",
+    "permissions",
+    "superadmin-rulesets",
+    "superadmin-project-grants",
+    "superadmin-document-grants",
+    "superadmin-users",
+  ]);
+
+  let prevActiveOrgId: number | null = $state(null);
+
+  // 1. URL -> AuthState: when ?org= is in the query string, switch active organization.
+  // Depends on queryParams (URL changes) AND on the profile finishing loading --
+  // both are read outside untrack() so the effect re-fires once the profile
+  // arrives and can revisit an org param that came in before it did (e.g. a
+  // deep link loaded with the profile still in flight). Only the
+  // activeOrganizationId read/write below is wrapped in untrack(), so this
+  // effect never re-fires just because activeOrganizationId itself changed --
+  // switching orgs via OrgSwitcher would otherwise race effect #2 below: this
+  // effect would see the still-stale URL (effect #2 hasn't written the new
+  // org to it yet, since svelte-spa-router's replace() awaits a tick before
+  // touching the hash) and immediately revert the freshly-chosen organization
+  // back to whatever the URL used to say.
+  $effect(() => {
+    const orgParam = queryParams.get("org");
+    const profileReady = !authState.loading && authState.profile != null;
+    if (!profileReady) return;
+    if (orgParam && /^\d+$/.test(orgParam)) {
+      const parsedOrgId = Number(orgParam);
+      untrack(() => {
+        if (parsedOrgId !== authState.activeOrganizationId) {
+          if (
+            authState.isSuperadmin ||
+            authState.profile!.organizations.some((o) => o.organization_id === parsedOrgId)
+          ) {
+            authState.setActiveOrganization(parsedOrgId, false);
+          }
+        }
+      });
+    }
+  });
+
+  // 2. AuthState -> URL: keep URL query param synchronized with active organization
+  $effect(() => {
+    const activeOrgId = authState.activeOrganizationId;
+    if (!activeOrgId || !showAppShell || activeView === "login") return;
+
+    const currentUrlOrg = queryParams.get("org");
+    if (currentUrlOrg !== String(activeOrgId)) {
+      const currentParams = new URLSearchParams(router.querystring || "");
+      currentParams.set("org", String(activeOrgId));
+      const targetView = activeView || "dashboard";
+      replace(`/${targetView}?${currentParams.toString()}`);
+    }
+  });
+
+  $effect(() => {
+    const currentOrgId = authState.activeOrganizationId;
+    if (prevActiveOrgId !== null && prevActiveOrgId !== currentOrgId) {
+      if (selectedProject && selectedProject.organization_id !== currentOrgId) {
+        selectedProject = null;
+        targetProjectId = null;
+        if (PROJECT_SCOPED_VIEWS.has(activeView)) {
+          push(`/${activeView}?org=${currentOrgId}`);
+        }
+      }
+    }
+    prevActiveOrgId = currentOrgId;
+  });
+
+  // Leaves project view without forgetting the project: targetProjectId and
+  // localStorage are untouched, so re-entering (via Existing Projects) lands
+  // back in project view for the same project.
+  function handleExitProject() {
+    const params = new URLSearchParams();
+    if (authState.activeOrganizationId) {
+      params.set("org", String(authState.activeOrganizationId));
+    }
+    const q = params.toString();
+    push(q ? `/dashboard?${q}` : "/dashboard");
+  }
+
+  function handleSelectAuditDomain(domain: AnalysisDomainTab) {
+    if (targetProjectId) {
+      push(buildTargetUrl(domain, targetProjectId));
+    } else {
+      push(authState.activeOrganizationId ? `/${domain}?org=${authState.activeOrganizationId}` : `/${domain}`);
+    }
+  }
+</script>
+
+<Tooltip.Provider delayDuration={200} skipDelayDuration={300}>
+<a
+  href="#main-content"
+  class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-200 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
+>
+  Skip to main content
+</a>
+
+<div
+  class="flex min-h-screen bg-surface-canvas font-sans text-fg-primary antialiased transition-colors duration-200 selection:bg-blue-500/30 selection:text-blue-200"
+>
+  <!-- Apple-Style Sidebar (Admin Portal vs Workspace) -->
+  {#if ADMIN_VIEWS.has(activeView)}
+    <AdminSidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
+    />
+  {:else if isProjectView && targetProjectId}
+    <ProjectSidebar
+      {activeView}
+      {selectedProject}
+      selectedProjectId={targetProjectId}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
+    />
+  {:else}
+    <OrgSidebar
+      {activeView}
+      mobileOpen={isMobileNavOpen}
+      onCloseMobile={() => (isMobileNavOpen = false)}
+      bind:collapsed={isSidebarCollapsed}
+    />
+  {/if}
+
+  <!-- Main Content Column -->
+  <div class="flex min-w-0 flex-1 flex-col">
+    <!-- Top Header Bar -->
+    <TopHeader
+      {activeView}
+      {isProjectView}
+      {selectedProject}
+      onOpenMobileNav={() => (isMobileNavOpen = true)}
+      onToggleSidebar={() => (isSidebarCollapsed = !isSidebarCollapsed)}
+      onOpenPipeline={(projectId) => (pipelineModalProjectId = projectId)}
+      onExitProject={handleExitProject}
+    />
+
+    <!-- Viewport Container -->
+    <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+      <svelte:boundary>
+        {#if isAuthConfigured && authState.loading}
+          <div class="flex min-h-[50vh] items-center justify-center text-sm text-fg-muted">
+            Loading your session…
+          </div>
+        {:else if authGateBlocking}
+          <!-- The $effect above is already redirecting to "/"; render
+               nothing of the protected view in the meantime. -->
+        {:else if activeView === "dashboard" && isProjectView && targetProjectId}
+          <LazyView loader={() => import("./routes/ProjectDashboardView.svelte")}
+            initialProjectId={targetProjectId}
+            {selectedProject}
+            onNavigate={(view) => push(buildTargetUrl(view, targetProjectId!))}
+          />
+        {:else if activeView === "dashboard"}
+          <LazyView loader={() => import("./routes/DashboardView.svelte")}
+            onSelectProjectForAudit={handleSelectProjectForAudit}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+            onSelectProjectForDashboard={(projectId) => push(buildTargetUrl("dashboard", projectId))}
+          />
+        {:else if activeView === "new-project"}
+          <LazyView loader={() => import("./routes/NewProjectView.svelte")} onCancel={() => push("/")} onProjectCreated={handleProjectCreated} />
+        {:else if activeView === "run-compliance-test"}
+          <LazyView loader={() => import("./routes/RunComplianceTestView.svelte")} />
+        {:else if activeView === "models"}
+          <LazyView loader={() => import("./routes/ModelsView.svelte")}
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {:else if activeView === "viewer"}
+          <LazyView loader={() => import("./routes/ViewerView.svelte")}
+            initialProjectId={targetProjectId}
+            initialElementGuid={targetElementGuid}
+            initialBcfArtifactId={targetBcfArtifactId}
+            initialFileId={targetFileId}
+            initialAnalysisSlug={targetAnalysisSlug}
+          />
+        {:else if (activeView === "document" || activeView === "documents") && targetDocId != null}
+          <LazyView loader={() => import("./routes/DocumentView.svelte")}
+            documentId={targetDocId}
+            initialPage={targetPage}
+            onBack={() => handleSelectView("documents")}
+          />
+        {:else if activeView === "documents"}
+          <LazyView loader={() => import("./routes/DocumentsView.svelte")} />
+        {:else if activeView === "document"}
+          <LazyView loader={() => import("./routes/DocumentView.svelte")}
+            documentId={targetDocId}
+            initialPage={targetPage}
+            onBack={() => handleSelectView("documents")}
+          />
+        {:else if activeView === "rule-source"}
+          <LazyView loader={() => import("./routes/RuleSourceView.svelte")} documentId={targetDocId} onBack={() => handleSelectView("documents")} />
+        {:else if activeView === "ruleset-source-map"}
+          <LazyView loader={() => import("./routes/RulesetSourceMapView.svelte")} rulesetId={targetRulesetId} onBack={() => push("/rules")} />
+        {:else if activeView === "extract"}
+          <LazyView loader={() => import("./routes/RuleExtractionView.svelte")} initialDocId={targetDocId} {fromQuickTest} />
+        {:else if activeView === "rules"}
+          <LazyView loader={() => import("./routes/RulesView.svelte")} onNavigateToManualRuleEditor={() => push("/manual-rule-editor")} />
+        {:else if activeView === "manual-rule-editor"}
+          <LazyView loader={() => import("./routes/ManualRuleEditorView.svelte")} onBack={() => push("/rules")} />
+        {:else if activeView === "arch"}
+          <!-- "Compliance Audit" destination for the Arch domain -- the only
+             one BIM-Guard analyses today (see AnalysisDomainTabs.svelte). -->
+          <div class="space-y-5">
+            <AnalysisDomainTabs
+              active={auditDomain}
+              onSelect={handleSelectAuditDomain}
+              allowedDomains={projectAuditDomain ? [projectAuditDomain] : undefined}
+            />
+            <LazyView loader={() => import("./routes/ArchAnalyzeView.svelte")} initialProjectId={targetProjectId} />
+          </div>
+        {:else if activeView === "workflow"}
+          <LazyView loader={() => import("./routes/WorkflowView.svelte")} initialProjectId={targetProjectId} onNavigate={handleSelectView} />
+        {:else if activeView === "copilot"}
+          <LazyView loader={() => import("./routes/CopilotView.svelte")} projectId={targetProjectId} />
+        {:else if activeView === "query-console"}
+          <LazyView loader={() => import("./routes/QueryConsoleView.svelte")} initialProjectId={targetProjectId} />
+        {:else if activeView === "reports"}
+          <LazyView loader={() => import("./routes/ReportsView.svelte")}
+            initialProjectId={targetProjectId}
+            onSelectProjectForViewer={handleSelectProjectForViewer}
+          />
+        {:else if activeView === "evaluation"}
+          <LazyView loader={() => import("./routes/EvaluationView.svelte")} initialProjectId={targetProjectId} />
+        {:else if activeView === "user-manual"}
+          <LazyView loader={() => import("./routes/UserManualView.svelte")} onNavigate={handleSelectView} />
+        {:else if activeView === "modeling-manual"}
+          <LazyView loader={() => import("./routes/ModelingManualView.svelte")} />
+        {:else if activeView === "bsdd-wiki"}
+          <LazyView loader={() => import("./routes/BsddWikiView.svelte")} />
+        {:else if activeView === "design-system"}
+          <LazyView loader={() => import("./routes/DesignSystemView.svelte")} />
+        {:else if activeView === "revit-sync"}
+          <LazyView loader={() => import("./routes/RevitSyncView.svelte")} />
+        {:else if activeView === "ifc-export-setting"}
+          <LazyView loader={() => import("./routes/IfcExportSettingView.svelte")} />
+        {:else if activeView === "settings"}
+          <LazyView loader={() => import("./routes/SettingsView.svelte")} />
+        {:else if activeView === "org-settings" || activeView === "admin"}
+          <LazyView loader={() => import("./routes/OrgSettingsView.svelte")} />
+        {:else if activeView === "external-providers"}
+          <LazyView loader={() => import("./routes/ExternalProvidersView.svelte")} />
+        {:else if activeView === "permissions"}
+          <LazyView loader={() => import("./routes/PermissionsView.svelte")} />
+        {:else if activeView === "superadmin-rulesets"}
+          <LazyView loader={() => import("./routes/SuperadminRulesetsView.svelte")} />
+        {:else if activeView === "superadmin-project-grants"}
+          <LazyView loader={() => import("./routes/SuperadminProjectGrantsView.svelte")} />
+        {:else if activeView === "superadmin-document-grants"}
+          <LazyView loader={() => import("./routes/SuperadminDocumentGrantsView.svelte")} />
+        {:else if activeView === "superadmin-users"}
+          <LazyView loader={() => import("./routes/SuperadminUsersView.svelte")} />
+        {:else if activeView === "login"}
+          <LazyView loader={() => import("./routes/LoginView.svelte")} />
+        {/if}
+        {#snippet failed(error, reset)}
+          <div
+            role="alert"
+            class="mx-auto mt-10 max-w-lg space-y-4 rounded-xl border border-critical-border bg-critical-bg p-6 text-center"
+          >
+            <h2 class="text-base font-bold text-critical">This view failed to render</h2>
+            <p class="text-xs leading-relaxed text-critical/90">
+              {error instanceof Error ? error.message : String(error)}
+            </p>
+            <button
+              type="button"
+              onclick={reset}
+              class="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent-hover"
+            >
+              Try again
+            </button>
+          </div>
+        {/snippet}
+      </svelte:boundary>
+    </main>
+
+    <!-- Clean Footer -->
+    <footer
+      class="flex flex-wrap items-center justify-between gap-4 border-t border-border-default bg-surface-canvas/40 px-8 py-4 text-xs text-fg-muted"
+    >
+      <div>
+        <span>BIM Guard OpenBIM Compliance Engine</span>
+      </div>
+
+      <!-- Gateway/DB health — moved out of the header to keep it uncluttered. -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {apiOnline
+            ? 'border-success-border bg-success-bg text-success'
+            : 'border-critical-border bg-critical-bg text-critical'}"
+        >
+          <span class="h-1.5 w-1.5 rounded-full {apiOnline ? 'bg-success' : 'bg-critical'}"
+          ></span>
+          {apiOnline ? "FastAPI Gateway Active" : "Gateway Offline"}
+        </span>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-medium {dbOk
+            ? 'border-success-border bg-success-bg text-success'
+            : 'border-critical-border bg-critical-bg text-critical'}"
+        >
+          <span
+            class="h-1.5 w-1.5 rounded-full {dbOk
+              ? 'bg-success shadow-xs shadow-success/50'
+              : 'bg-critical'}"
+          ></span>
+          DB {dbBackend}: {dbOk ? "Connected" : "Degraded"}
+        </span>
+      </div>
+
+      <div>
+        <span>&copy; {new Date().getFullYear()} BIM Guard</span>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Live pipeline detail, opened from the header's running-pipeline badge -->
+<Modal
+  isOpen={pipelineModalProjectId !== null}
+  title="Live Pipeline"
+  subtitle={pipelineTracker.tracked.find((t) => t.projectId === pipelineModalProjectId)
+    ?.projectName}
+  icon={Activity}
+  maxWidth="max-w-3xl"
+  onClose={() => (pipelineModalProjectId = null)}
+>
+  {#if pipelineModalProjectId !== null}
+    <PipelineProgress projectId={pipelineModalProjectId} />
+  {/if}
+</Modal>
+
+<!-- Blocks entry until a multi-org member picks which organization to work
+     in — see auth.svelte.ts needsOrgSelection. -->
+{#if !authGateBlocking && authState.needsOrgSelection}
+  <OrgPickerGate />
+{/if}
+</Tooltip.Provider>

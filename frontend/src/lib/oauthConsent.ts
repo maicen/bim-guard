@@ -7,7 +7,7 @@
  * is parked in sessionStorage (it survives the Google redirect in the same
  * tab) and resumed as soon as a session exists.
  */
-import { supabase } from "./supabaseClient";
+import { getSupabase } from "./authConfig";
 
 export const CONSENT_PATH = "/oauth/consent";
 const PENDING_KEY = "bimguard.pendingOAuthConsent";
@@ -23,15 +23,25 @@ export function stashPendingConsent(url: string): void {
 
 /** Resume a consent step that was interrupted by sign-in, if one is pending. */
 export function watchPendingConsent(): void {
-  supabase.auth.onAuthStateChange((_event, session) => {
-    if (!session) return;
-    try {
-      const pending = sessionStorage.getItem(PENDING_KEY);
-      if (!pending) return;
-      sessionStorage.removeItem(PENDING_KEY);
-      window.location.replace(pending);
-    } catch {
-      // Nothing to resume.
-    }
-  });
+  // PERF: a consent step is only ever parked right before a full-page redirect
+  // to /#/login (see OAuthConsentView), so if nothing is pending at load there
+  // is nothing to watch for -- and the Supabase client need not be downloaded.
+  try {
+    if (!sessionStorage.getItem(PENDING_KEY)) return;
+  } catch {
+    return;
+  }
+  void getSupabase().then((supabase) =>
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) return;
+      try {
+        const pending = sessionStorage.getItem(PENDING_KEY);
+        if (!pending) return;
+        sessionStorage.removeItem(PENDING_KEY);
+        window.location.replace(pending);
+      } catch {
+        // Nothing to resume.
+      }
+    }),
+  );
 }

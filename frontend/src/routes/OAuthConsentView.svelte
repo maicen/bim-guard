@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { ShieldCheck } from "lucide-svelte";
   import type { OAuthAuthorizationDetails } from "@supabase/supabase-js";
-  import { supabase } from "../lib/supabaseClient";
+  import { getSupabase } from "../lib/authConfig";
   import { stashPendingConsent } from "../lib/oauthConsent";
   import { Button, Card } from "../lib/components/ui";
 
@@ -17,6 +17,7 @@
       error = "Missing authorization_id. Restart the sign-in from your MCP client.";
       return;
     }
+    const supabase = await getSupabase();
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
       stashPendingConsent(window.location.href);
@@ -37,6 +38,7 @@
   async function decide(approve: boolean) {
     if (!authorizationId) return;
     busy = true;
+    const supabase = await getSupabase();
     const { data, error: decisionError } = approve
       ? await supabase.auth.oauth.approveAuthorization(authorizationId)
       : await supabase.auth.oauth.denyAuthorization(authorizationId);
