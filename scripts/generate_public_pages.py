@@ -62,6 +62,30 @@ PAGES = [
             "regulatory documents, extract rules, run audits and route the findings "
             "as BCF issues, with every step tracked under ISO 19650."
         ),
+        "faq": [
+            (
+                "What does BIM Guard check in an IFC model?",
+                "Compliance engines read the IFC model directly and evaluate it against rules "
+                "stored in the database. They check means of egress (travel distance and "
+                "exit-count thresholds) and daylight (window glazing area against room floor area).",
+            ),
+            (
+                "Can I check a model against my own building code?",
+                "Yes. Upload a PDF building code or standard. It is parsed with structured layout "
+                "analysis, rules are extracted with an LLM, and each rule is reviewed and grounded "
+                "against its source clause before it joins your rule catalog.",
+            ),
+            (
+                "Are the compliance thresholds hardcoded?",
+                "No. Thresholds are stored as rules in the database, so they are data rather than "
+                "hardcoded constants.",
+            ),
+            (
+                "Which OpenBIM standards does BIM Guard support?",
+                "ISO 19650 CDE workflow states (WIP, SHARED, PUBLISHED, ARCHIVED), BCF issue export, "
+                "buildingSMART IDS specifications and buildingSMART Data Dictionary (bSDD) classification checks.",
+            ),
+        ],
         "sections": [
             (
                 "Architectural code compliance",
@@ -130,6 +154,28 @@ PAGES = [
             "Guard reads your IFC file, applies rules from a managed catalog and "
             "reports each finding against the element that caused it."
         ),
+        "faq": [
+            (
+                "Which IFC schema versions can BIM Guard check?",
+                "IFC2X3, IFC4 and IFC4.3 models can be attached to a project.",
+            ),
+            (
+                "How is egress travel distance calculated?",
+                "The shortest path from each habitable space to an exterior exit is computed over the "
+                "building's space-boundary graph, then compared with the travel-distance and exit-count "
+                "limits from the active ruleset.",
+            ),
+            (
+                "What is checked before an audit runs?",
+                "An IFC pre-flight service checks STEP syntax, schema compatibility and core "
+                "buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial "
+                "containment and material association.",
+            ),
+            (
+                "How do I apply a different jurisdiction or code edition?",
+                "Switch the ruleset. Thresholds come from the rule database, so no code change is needed.",
+            ),
+        ],
         "sections": [
             (
                 "How an audit works",
@@ -452,6 +498,19 @@ def _render_section(heading: str, blocks: list) -> str:
     return "\n    ".join(out)
 
 
+def _plain(fragment: str) -> str:
+    """Strip HTML tags and entities from *fragment* (FAQ text for JSON-LD and the markdown twin)."""
+    return unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
+
+
+def _render_faq(page: dict) -> str:
+    """Visible FAQ block; Google only honours FAQPage markup that mirrors on-page text."""
+    if not page.get("faq"):
+        return ""
+    items = "\n    ".join(f"<h3>{escape(q)}</h3>\n    <p>{a}</p>" for q, a in page["faq"])
+    return f"<h2>Frequently asked questions</h2>\n    {items}"
+
+
 def render_page(page: dict) -> str:
     """Return the full HTML document for one entry of ``PAGES``."""
     url = f"{SITE}/{page['slug']}"
@@ -484,8 +543,24 @@ def render_page(page: dict) -> str:
             },
         ],
     }
+    if page.get("faq"):
+        jsonld["@graph"].append(
+            {
+                "@type": "FAQPage",
+                "@id": f"{url}#faq",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": q,
+                        "acceptedAnswer": {"@type": "Answer", "text": _plain(a)},
+                    }
+                    for q, a in page["faq"]
+                ],
+            }
+        )
     nav = "".join(f'<a href="{href}">{escape(label)}</a>' for href, label in NAV)
     sections = "\n    ".join(_render_section(h, b) for h, b in page["sections"])
+    faq = _render_faq(page)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -528,6 +603,7 @@ def render_page(page: dict) -> str:
     <h1>{escape(page["h1"])}</h1>
     <p>{page["intro"]}</p>
     {sections}
+    {faq}
     <a class="cta" href="/">Open BIM Guard</a>
     </main>
     <footer>
@@ -596,6 +672,10 @@ def render_markdown(page: dict) -> str:
             else:
                 out.append(_html_to_md(block))
             out.append("")
+    if page.get("faq"):
+        out += ["## Frequently asked questions", ""]
+        for q, a in page["faq"]:
+            out += [f"### {q}", "", _html_to_md(a), ""]
     out.append(f"Canonical page: {SITE}/{page['slug']}")
     return "\n".join(out).rstrip() + "\n"
 

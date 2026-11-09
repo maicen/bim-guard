@@ -68,3 +68,20 @@ def test_every_json_ld_block_parses_and_links_to_site_graph():
             data = json.loads(raw)
             assert data["@context"] == "https://schema.org"
             assert data["@graph"], "empty @graph"
+
+
+def test_faq_markup_mirrors_visible_text():
+    import json
+
+    faq_pages = [p for p in gen.PAGES if p.get("faq")]
+    assert {p["slug"] for p in faq_pages} == {"features", "ifc-compliance-checking"}
+    for page in faq_pages:
+        html = gen.render_page(page)
+        data = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S).group(1))
+        [faq] = [n for n in data["@graph"] if n["@type"] == "FAQPage"]
+        assert len(faq["mainEntity"]) == len(page["faq"])
+        for entity in faq["mainEntity"]:
+            # Google requires FAQPage markup to match text a visitor can see.
+            assert f"<h3>{entity['name']}</h3>" in html
+            assert entity["acceptedAnswer"]["text"] in html
+        assert "### " + page["faq"][0][0] in gen.render_markdown(page)

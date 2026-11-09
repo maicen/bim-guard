@@ -33,4 +33,22 @@ Audits stream stage-by-stage progress in real time, and results are available as
 
 Accuracy claims are scored independently and published with their limits: [validation and research](/research).
 
+## Frequently asked questions
+
+### What does BIM Guard check in an IFC model?
+
+Compliance engines read the IFC model directly and evaluate it against rules stored in the database. They check means of egress (travel distance and exit-count thresholds) and daylight (window glazing area against room floor area).
+
+### Can I check a model against my own building code?
+
+Yes. Upload a PDF building code or standard. It is parsed with structured layout analysis, rules are extracted with an LLM, and each rule is reviewed and grounded against its source clause before it joins your rule catalog.
+
+### Are the compliance thresholds hardcoded?
+
+No. Thresholds are stored as rules in the database, so they are data rather than hardcoded constants.
+
+### Which OpenBIM standards does BIM Guard support?
+
+ISO 19650 CDE workflow states (WIP, SHARED, PUBLISHED, ARCHIVED), BCF issue export, buildingSMART IDS specifications and buildingSMART Data Dictionary (bSDD) classification checks.
+
 Canonical page: https://bim-guard.xyz/features

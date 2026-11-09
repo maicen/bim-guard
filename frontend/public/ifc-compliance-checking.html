@@ -71,6 +71,44 @@
           "item": "https://bim-guard.xyz/ifc-compliance-checking"
         }
       ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://bim-guard.xyz/ifc-compliance-checking#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Which IFC schema versions can BIM Guard check?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "IFC2X3, IFC4 and IFC4.3 models can be attached to a project."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is egress travel distance calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The shortest path from each habitable space to an exterior exit is computed over the building's space-boundary graph, then compared with the travel-distance and exit-count limits from the active ruleset."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is checked before an audit runs?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "An IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I apply a different jurisdiction or code edition?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Switch the ruleset. Thresholds come from the rule database, so no code change is needed."
+          }
+        }
+      ]
     }
   ]
 }</script>
@@ -113,6 +151,15 @@
     <p>Before analysis, an IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association.</p>
     <h2>Related</h2>
     <p><a href="/features">All features</a> · <a href="/bcf-and-ids">BCF and IDS</a> · <a href="/docs">Documentation</a></p>
+    <h2>Frequently asked questions</h2>
+    <h3>Which IFC schema versions can BIM Guard check?</h3>
+    <p>IFC2X3, IFC4 and IFC4.3 models can be attached to a project.</p>
+    <h3>How is egress travel distance calculated?</h3>
+    <p>The shortest path from each habitable space to an exterior exit is computed over the building's space-boundary graph, then compared with the travel-distance and exit-count limits from the active ruleset.</p>
+    <h3>What is checked before an audit runs?</h3>
+    <p>An IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association.</p>
+    <h3>How do I apply a different jurisdiction or code edition?</h3>
+    <p>Switch the ruleset. Thresholds come from the rule database, so no code change is needed.</p>
     <a class="cta" href="/">Open BIM Guard</a>
     </main>
     <footer>

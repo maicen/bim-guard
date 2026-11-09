@@ -39,6 +39,24 @@ Audits stream stage-by-stage progress in real time, and results are available as
 
 Accuracy claims are scored independently and published with their limits: [validation and research](/research).
 
+## Frequently asked questions
+
+### What does BIM Guard check in an IFC model?
+
+Compliance engines read the IFC model directly and evaluate it against rules stored in the database. They check means of egress (travel distance and exit-count thresholds) and daylight (window glazing area against room floor area).
+
+### Can I check a model against my own building code?
+
+Yes. Upload a PDF building code or standard. It is parsed with structured layout analysis, rules are extracted with an LLM, and each rule is reviewed and grounded against its source clause before it joins your rule catalog.
+
+### Are the compliance thresholds hardcoded?
+
+No. Thresholds are stored as rules in the database, so they are data rather than hardcoded constants.
+
+### Which OpenBIM standards does BIM Guard support?
+
+ISO 19650 CDE workflow states (WIP, SHARED, PUBLISHED, ARCHIVED), BCF issue export, buildingSMART IDS specifications and buildingSMART Data Dictionary (bSDD) classification checks.
+
 Canonical page: https://bim-guard.xyz/features
 
 ---
@@ -70,6 +88,24 @@ Before analysis, an IFC pre-flight service checks STEP syntax, schema compatibil
 ## Related
 
 [All features](/features) · [BCF and IDS](/bcf-and-ids) · [Documentation](/docs)
+
+## Frequently asked questions
+
+### Which IFC schema versions can BIM Guard check?
+
+IFC2X3, IFC4 and IFC4.3 models can be attached to a project.
+
+### How is egress travel distance calculated?
+
+The shortest path from each habitable space to an exterior exit is computed over the building's space-boundary graph, then compared with the travel-distance and exit-count limits from the active ruleset.
+
+### What is checked before an audit runs?
+
+An IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association.
+
+### How do I apply a different jurisdiction or code edition?
+
+Switch the ruleset. Thresholds come from the rule database, so no code change is needed.
 
 Canonical page: https://bim-guard.xyz/ifc-compliance-checking
 
