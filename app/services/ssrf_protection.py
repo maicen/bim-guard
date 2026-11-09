@@ -139,4 +139,10 @@ def private_llm_hosts_allowed() -> bool:
     """
     import os
 
+    from app.services.offline_mode import offline_mode_enabled
+
+    # An offline / air-gapped deployment can only reach model servers on its own
+    # network, so BIMGUARD_OFFLINE implies the private-host allowance.
+    if offline_mode_enabled():
+        return True
     return os.environ.get(PRIVATE_LLM_HOSTS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}

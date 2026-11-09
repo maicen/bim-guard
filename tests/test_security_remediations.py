@@ -162,6 +162,36 @@ def test_private_llm_hosts_flag_defaults_off(monkeypatch):
     assert private_llm_hosts_allowed() is False
 
 
+def test_offline_mode_disables_live_bsdd_and_allows_private_llm_hosts(monkeypatch):
+    """BIMGUARD_OFFLINE is the one air-gap switch: no live bSDD, private model servers allowed."""
+    from app.services.bsdd_client import BSDDClient
+
+    monkeypatch.delenv("BIMGUARD_OFFLINE", raising=False)
+    monkeypatch.delenv("BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS", raising=False)
+    assert BSDDClient().enable_network is True
+    assert private_llm_hosts_allowed() is False
+
+    monkeypatch.setenv("BIMGUARD_OFFLINE", "true")
+    assert BSDDClient().enable_network is False
+    assert BSDDClient(enable_network=True).enable_network is True  # explicit still wins
+    assert private_llm_hosts_allowed() is True
+
+
+def test_offline_bsdd_never_touches_the_network(monkeypatch):
+    """With offline mode on, a local miss returns the built-in fallback without any HTTP call."""
+    from unittest.mock import patch
+
+    from app.services.bsdd_client import BSDDClient
+
+    monkeypatch.setenv("BIMGUARD_OFFLINE", "true")
+    with patch("httpx.Client.get") as mock_get:
+        client = BSDDClient()
+        client.list_dictionaries()
+        client.get_class("https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3", "IfcPipeSegment")
+        client.search_properties("fire")
+        mock_get.assert_not_called()
+
+
 def test_openai_driver_routes_custom_base_models_as_openai_compatible(monkeypatch):
     """Models from a custom OpenAI-compatible server get litellm's openai/ prefix."""
     import asyncio

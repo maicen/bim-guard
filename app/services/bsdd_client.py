@@ -28,6 +28,7 @@ from app.modules.contracts import (
     BSDDValidationResult,
     BSDDValidationViolation,
 )
+from app.services.offline_mode import offline_mode_enabled
 
 logger = get_logger(__name__)
 
@@ -382,11 +383,14 @@ class BSDDClient:
         self,
         base_url: str = DEFAULT_BSDD_BASE_URL,
         timeout_seconds: float = 3.0,
-        enable_network: bool = True,
+        enable_network: bool | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
-        self.enable_network = enable_network
+        # None = follow the deployment: live bSDD calls are off in offline /
+        # air-gapped mode (BIMGUARD_OFFLINE), where lookups are answered by the
+        # local DuckDB ontology and the built-in fallback catalog instead.
+        self.enable_network = (not offline_mode_enabled()) if enable_network is None else enable_network
         # LRU cache keeping up to 500 items for 1 hour
         self._cache: TTLCache[str, Any] = TTLCache(maxsize=500, ttl=3600)
 

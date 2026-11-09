@@ -65,6 +65,10 @@ services:
       # On-premises: set true to let a provider instance's api_base point at a
       # model server on a private network (Ollama via host.docker.internal, vLLM,
       # llama.cpp, LM Studio on the LAN). Off by default -- see ssrf_protection.py.
+      # Air-gapped install: one switch. bSDD answers from data/reference/bsdd only
+      # (no live buildingSMART calls) and private-network model servers are allowed.
+      # Also build the image with VENDOR_VIEWER=true so the 3D viewer is self-contained.
+      - BIMGUARD_OFFLINE=${BIMGUARD_OFFLINE:-false}
       - BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS=${BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS:-false}
 
       # Document Parsing — Docling (self-hosted by default)
