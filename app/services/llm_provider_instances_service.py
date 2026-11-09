@@ -22,6 +22,11 @@ from app.modules.llm_providers.base import LLMModelInfo
 from app.services.db_adapters import DatabaseAdapter
 
 
+_UNSAFE_BASE_MESSAGE = (
+    "Unsafe or internal api_base URL '{url}'. Operators running a model server on a "
+    "private network can set BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS=true."
+)
+
 class LLMProviderInstancesService:
     """Domain service for CRUD and default-selection of LLM provider instances, per org."""
 
@@ -82,10 +87,10 @@ class LLMProviderInstancesService:
             raise ValueError(f"An instance named '{clean_name}' already exists in this organization.")
         clean_base = (api_base or "").strip().rstrip("/")
         if clean_base:
-            from app.services.ssrf_protection import is_safe_url
+            from app.services.ssrf_protection import is_safe_url, private_llm_hosts_allowed
 
-            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
-                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama"), allow_private=private_llm_hosts_allowed()):
+                raise ValueError(_UNSAFE_BASE_MESSAGE.format(url=clean_base))
 
         clean_is_default = bool(is_default)
         if clean_is_default:
@@ -141,10 +146,10 @@ class LLMProviderInstancesService:
         if api_base is not None:
             clean_base = api_base.strip().rstrip("/")
             if clean_base:
-                from app.services.ssrf_protection import is_safe_url
+                from app.services.ssrf_protection import is_safe_url, private_llm_hosts_allowed
 
                 if not is_safe_url(clean_base, allow_localhost=(existing.get("kind") == "ollama")):
-                    raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
+                    raise ValueError(_UNSAFE_BASE_MESSAGE.format(url=clean_base))
             updates["api_base"] = clean_base
         if is_enabled is not None:
             updates["is_enabled"] = bool(is_enabled)
@@ -195,10 +200,10 @@ class LLMProviderInstancesService:
             raise ValueError(f"api_key is required for '{clean_kind}' instances.")
         clean_base = (api_base or "").strip().rstrip("/")
         if clean_base:
-            from app.services.ssrf_protection import is_safe_url
+            from app.services.ssrf_protection import is_safe_url, private_llm_hosts_allowed
 
-            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama")):
-                raise ValueError(f"Unsafe or internal api_base URL '{clean_base}'.")
+            if not is_safe_url(clean_base, allow_localhost=(clean_kind == "ollama"), allow_private=private_llm_hosts_allowed()):
+                raise ValueError(_UNSAFE_BASE_MESSAGE.format(url=clean_base))
         return await driver.test_connection(api_key=clean_key, api_base=clean_base or None)
 
     @staticmethod

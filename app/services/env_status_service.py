@@ -46,6 +46,7 @@ ENV_VAR_REGISTRY: list[EnvVarSpec] = [
     EnvVarSpec("GEMINI_API_KEY", "LLM Providers", "Fallback Gemini key when no DB provider instance is configured."),
     EnvVarSpec("ANTHROPIC_API_KEY", "LLM Providers", "Fallback Anthropic key when no DB provider instance is configured."),
     EnvVarSpec("OLLAMA_API_BASE", "LLM Providers", "Base URL of a self-hosted Ollama server."),
+    EnvVarSpec("BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS", "LLM Providers", "Allow LLM provider base URLs on private networks (on-premises model servers)."),
     EnvVarSpec("BIM_GUARD_LLM_MODEL", "LLM Providers", "Default LiteLLM model route (e.g. openrouter/auto)."),
     # ── Document parsing ─────────────────────────────────────────────────────
     # Seed-only: parsing_engine_instances DB rows are the source of truth once

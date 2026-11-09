@@ -24,6 +24,7 @@ class OpenAIDriver(LLMProviderDriver):
         if not api_key:
             raise RuntimeError("OpenAI API key is required to load models.")
         base = (api_base or self.default_api_base).rstrip("/")
+        custom_base = base != self.default_api_base.rstrip("/")
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(f"{base}/models", headers={"Authorization": f"Bearer {api_key}"})
         raise_for_provider_error(response, "OpenAI")
@@ -33,7 +34,12 @@ class OpenAIDriver(LLMProviderDriver):
             # OpenAI's /models endpoint publishes neither pricing nor
             # context length, unlike OpenRouter's — see LLMModelInfo.
             if model_id:
-                models.append(LLMModelInfo(id=model_id, name=item.get("name") or model_id))
+                # A custom base URL is an OpenAI-compatible server (vLLM, llama.cpp,
+                # LM Studio, ...) whose model names litellm cannot route by itself
+                # ("qwen2.5", "meta-llama/Llama-3"); the "openai/" prefix tells it to
+                # speak the OpenAI protocol to api_base. Stock OpenAI ids stay bare.
+                routed_id = f"openai/{model_id}" if custom_base else model_id
+                models.append(LLMModelInfo(id=routed_id, name=item.get("name") or model_id))
         return sorted(set(models), key=lambda item: item.name.casefold())
 
 

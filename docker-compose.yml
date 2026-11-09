@@ -62,6 +62,10 @@ services:
       # production/dev host is reachable from inside the container. Override
       # if Ollama runs elsewhere (another host, a hosted Ollama endpoint).
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      # On-premises: set true to let a provider instance's api_base point at a
+      # model server on a private network (Ollama via host.docker.internal, vLLM,
+      # llama.cpp, LM Studio on the LAN). Off by default -- see ssrf_protection.py.
+      - BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS=${BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS:-false}
 
       # Document Parsing — Docling (self-hosted by default)
       - DOCLING_SERVICE_URL=${DOCLING_SERVICE_URL:-}

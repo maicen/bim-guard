@@ -18,7 +18,7 @@ from starlette.testclient import TestClient
 from app.auth import CurrentUser
 from app.main import app
 from app.services.object_storage import ObjectStorage
-from app.services.ssrf_protection import is_safe_url
+from app.services.ssrf_protection import is_safe_url, private_llm_hosts_allowed
 
 client = TestClient(app)
 
@@ -126,6 +126,63 @@ def test_ssrf_protection_localhost_override_for_ollama():
 
     # Cloud metadata is never allowed even when allow_localhost is True
     assert is_safe_url("http://169.254.169.254/latest/meta-data", allow_localhost=True) is False
+
+
+def test_ssrf_private_network_override_for_on_prem_llm_servers():
+    """Operator opt-in allows LAN/loopback model servers but never metadata or link-local."""
+    for url in (
+        "http://10.1.2.3:8000/v1",
+        "http://192.168.1.50:1234/v1",
+        "http://172.20.0.5:11434",
+        "http://100.100.1.1:8000/v1",  # tailnet / CGNAT
+        "http://127.0.0.1:8000/v1",
+        "http://localhost:8000/v1",
+    ):
+        assert is_safe_url(url) is False
+        assert is_safe_url(url, allow_private=True) is True
+
+    for url in (
+        "http://169.254.169.254/latest/meta-data",
+        "http://[fe80::1]/",
+        "http://0.0.0.0:8000",
+        "http://224.0.0.1/",
+        "ftp://10.0.0.1/",
+    ):
+        assert is_safe_url(url, allow_private=True) is False
+
+
+def test_private_llm_hosts_flag_defaults_off(monkeypatch):
+    """The private-network LLM override is an operator env flag, off unless set."""
+    monkeypatch.delenv("BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS", raising=False)
+    assert private_llm_hosts_allowed() is False
+    for value in ("true", "1", "YES", "on"):
+        monkeypatch.setenv("BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS", value)
+        assert private_llm_hosts_allowed() is True
+    monkeypatch.setenv("BIMGUARD_ALLOW_PRIVATE_LLM_HOSTS", "false")
+    assert private_llm_hosts_allowed() is False
+
+
+def test_openai_driver_routes_custom_base_models_as_openai_compatible(monkeypatch):
+    """Models from a custom OpenAI-compatible server get litellm's openai/ prefix."""
+    import asyncio
+
+    import httpx
+
+    from app.modules.llm_providers.openai_driver import OpenAIDriver
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [{"id": "meta-llama/Llama-3.1-8B"}]})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "app.modules.llm_providers.openai_driver.httpx.AsyncClient",
+        lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
+    )
+    driver = OpenAIDriver()
+    custom = asyncio.run(driver.list_models(api_key="x", api_base="http://10.0.0.5:8000/v1"))
+    stock = asyncio.run(driver.list_models(api_key="x", api_base=None))
+    assert custom[0].id == "openai/meta-llama/Llama-3.1-8B"
+    assert stock[0].id == "meta-llama/Llama-3.1-8B"
 
 
 def test_object_storage_blocks_ssrf_url():
