@@ -57,3 +57,14 @@ def test_manual_mirror_has_no_dangling_relative_links():
                 continue
             resolved = (Path(rel).parent / target.split("#")[0]).as_posix()
             assert resolved in gen.MANUAL_PAGES, f"{rel} links to unpublished {target}"
+
+
+def test_every_json_ld_block_parses_and_links_to_site_graph():
+    import json
+
+    blocks = [gen.render_page(p) for p in gen.PAGES] + [(ROOT / "frontend" / "index.html").read_text(encoding="utf-8")]
+    for html in blocks:
+        for raw in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S):
+            data = json.loads(raw)
+            assert data["@context"] == "https://schema.org"
+            assert data["@graph"], "empty @graph"

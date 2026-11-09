@@ -4,6 +4,7 @@ BIM-Guard exposes a [Model Context Protocol](https://modelcontextprotocol.io) se
 
 - **Endpoint**: `POST /mcp/` (streamable HTTP, stateless, JSON responses — safe behind the 4-worker production gateway).
 - **Auth**: `Authorization: Bearer <Supabase access token>`, verified by the same code as the REST API (`app/auth.py`). Missing/invalid tokens get `401` + a `WWW-Authenticate: Bearer resource_metadata="…"` challenge.
+- **Server card**: `GET /.well-known/mcp/server-card.json` (public) lists the endpoint, auth metadata and every tool, generated from the live server; it is also linked from `/.well-known/api-catalog`.
 - **Discovery (RFC 9728)**: `GET /.well-known/oauth-protected-resource` (also `…/mcp`) names Supabase Auth (`$PUBLIC_SUPABASE_URL/auth/v1`) as the authorization server. An OAuth-capable MCP client reads that, registers itself, and signs the user in through the browser — no pasted token.
 - **Authorization**: every tool calls the app's own `/api` routes in process with the caller's token, so organization scoping, project/ruleset access checks and RLS are identical to the SPA. The MCP layer has no access logic of its own.
 

@@ -20,6 +20,8 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
+  <link rel="alternate" type="text/markdown" href="/index.md" />
+  <link rel="describedby" type="text/plain" href="/llms.txt" title="llms.txt" />
 
   <!-- Open Graph / Facebook / LinkedIn / Slack -->
   <meta property="og:type" content="website" />
@@ -53,6 +55,11 @@
         "operatingSystem": "Web Browser",
         "url": "https://bim-guard.xyz",
         "description": "Automated OpenBIM architectural compliance verification and coordination platform for IFC models and ISO 19650 CDE governance.",
+        "isAccessibleForFree": true,
+        "screenshot": "https://bim-guard.xyz/og-image.png",
+        "softwareHelp": { "@type": "WebPage", "url": "https://bim-guard.xyz/docs" },
+        "documentation": "https://bim-guard.xyz/docs/manual/index.md",
+        "publisher": { "@id": "https://bim-guard.xyz/#organization" },
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -65,6 +72,22 @@
           "BIM Collaboration Format (BCF 2.1) Issue Coordination",
           "buildingSMART Data Dictionary (bSDD) Semantic Classification"
         ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://bim-guard.xyz/#website",
+        "url": "https://bim-guard.xyz/",
+        "name": "BIM Guard",
+        "inLanguage": "en",
+        "publisher": { "@id": "https://bim-guard.xyz/#organization" }
+      },
+      {
+        "@type": "WebAPI",
+        "@id": "https://bim-guard.xyz/#api",
+        "name": "BIM Guard REST API",
+        "url": "https://bim-guard.xyz/api/docs",
+        "documentation": "https://bim-guard.xyz/api/docs",
+        "provider": { "@id": "https://bim-guard.xyz/#organization" }
       },
       {
         "@type": "Organization",
@@ -125,6 +148,24 @@
         <a href="/docs">Documentation</a>
       </nav>
     </header>
+    <main class="sr-only">
+      <h2>What BIM Guard does</h2>
+      <ul>
+        <li>Checks IFC building models against architectural code rules such as means of egress and daylight, using thresholds stored as data rather than code.</li>
+        <li>Extracts rules from PDF building codes and standards, with each rule reviewed and grounded against its source clause.</li>
+        <li>Tracks project documents under ISO 19650 naming, suitability and revision codes, with CDE state transitions (WIP, SHARED, PUBLISHED, ARCHIVED).</li>
+        <li>Exports findings as BCF issues and works with buildingSMART IDS specifications.</li>
+        <li>Shows models and findings in a 3D viewer and explains each finding with a decision trace.</li>
+      </ul>
+      <h2>For developers and AI agents</h2>
+      <ul>
+        <li><a href="/llms.txt">llms.txt</a> and <a href="/llms-full.txt">llms-full.txt</a>: markdown index and full text of the public site.</li>
+        <li><a href="/api/openapi.json">OpenAPI schema</a>, <a href="/api/docs">interactive API docs</a> and <a href="/auth.md">authentication notes</a>.</li>
+        <li><a href="/.well-known/mcp/server-card.json">MCP server card</a>: Model Context Protocol endpoint at /mcp/.</li>
+        <li><a href="/docs/manual/index.md">User manual (markdown)</a>.</li>
+      </ul>
+      <p>The application itself requires sign-in with Google or email and password.</p>
+    </main>
   </div>
   <noscript>
     <div style="max-width: 800px; margin: 2rem auto; padding: 2rem; font-family: sans-serif; color: #f8fafc; background: #0f172a; border-radius: 12px; border: 1px solid #1e293b;">

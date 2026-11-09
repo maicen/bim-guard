@@ -272,8 +272,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="BIM Guard",
-    description="OpenBIM Compliance Gateway & Decoupled Svelte 5 SPA Architecture",
+    summary="OpenBIM compliance gateway: IFC code checking, BCF issues and ISO 19650 CDE governance.",
+    description=(
+        "REST API behind the BIM Guard app: projects, IFC models, specification documents, rules, "
+        "compliance analysis, BCF/IDS export and the project knowledge graph.\n\n"
+        "**Authentication:** every `/api` route except `/api/health` needs a Supabase-issued JWT as "
+        "`Authorization: Bearer <token>`; see [/auth.md](/auth.md). "
+        "An MCP server exposing the same capabilities is available at `/mcp/` "
+        "([server card](/.well-known/mcp/server-card.json)). "
+        "A markdown index of the site for agents is at [/llms.txt](/llms.txt)."
+    ),
     version="1.0.0",
+    terms_of_service="https://bim-guard.xyz/terms",
+    contact={"name": "BIM Guard", "url": "https://github.com/maicen/bim-guard"},
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",

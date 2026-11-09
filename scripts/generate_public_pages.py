@@ -461,13 +461,19 @@ def render_page(page: dict) -> str:
         "@context": "https://schema.org",
         "@graph": [
             {
-                "@type": "WebPage",
+                # Guide pages are articles about a topic; /features and /docs are plain pages.
+                "@type": "WebPage" if page["slug"] in ("features", "docs") else ["WebPage", "TechArticle"],
                 "@id": f"{url}#webpage",
                 "url": url,
                 "name": page["title"],
+                "headline": page["h1"],
                 "description": page["description"],
-                "isPartOf": {"@type": "WebSite", "name": "BIM Guard", "url": SITE},
+                "inLanguage": "en",
+                "isPartOf": {"@id": f"{SITE}/#website"},
+                "publisher": {"@id": f"{SITE}/#organization"},
+                "primaryImageOfPage": OG_IMAGE,
                 "dateModified": page["lastmod"],
+                "encoding": {"@type": "MediaObject", "contentUrl": f"{url}.md", "encodingFormat": "text/markdown"},
             },
             {
                 "@type": "BreadcrumbList",
@@ -491,6 +497,8 @@ def render_page(page: dict) -> str:
   <meta name="theme-color" content="#090d16" />
   <link rel="canonical" href="{url}" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
   <link rel="alternate" type="text/markdown" href="{url}.md" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="{url}" />
@@ -498,10 +506,15 @@ def render_page(page: dict) -> str:
   <meta property="og:title" content="{title}" />
   <meta property="og:description" content="{desc}" />
   <meta property="og:image" content="{OG_IMAGE}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="BIM Guard OpenBIM Compliance Platform Banner" />
+  <meta property="og:locale" content="en_US" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{title}" />
   <meta name="twitter:description" content="{desc}" />
   <meta name="twitter:image" content="{OG_IMAGE}" />
+  <meta name="twitter:image:alt" content="BIM Guard OpenBIM Compliance Platform Banner" />
   <script type="application/ld+json">{json.dumps(jsonld, indent=2)}</script>
   <style>{CSS}</style>
 </head>
