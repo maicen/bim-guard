@@ -1,0 +1,40 @@
+# BIM Guard
+
+> BIM Guard reads IFC models directly, runs architectural code compliance rules, and routes findings as BCF issues, with ISO 19650 CDE governance.
+
+BIM Guard is an OpenBIM compliance platform: upload IFC models and regulatory documents, extract rules, run audits, and route findings as BCF issues under ISO 19650. The app itself is behind sign-in; the pages below are public.
+
+## Product
+
+- [BIM Guard features](https://bim-guard.xyz/features.md): Automated architectural code compliance for IFC models, ISO 19650 CDE governance, BCF issue coordination, IDS validation and bSDD classification.
+- [Automated IFC compliance checking](https://bim-guard.xyz/ifc-compliance-checking.md): Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues.
+- [ISO 19650 and CDE governance](https://bim-guard.xyz/iso-19650-cde.md): Validate ISO 19650 container naming, suitability and revision codes, and enforce CDE state transitions from WIP to SHARED, PUBLISHED and ARCHIVED.
+- [BCF issue management and IDS validation](https://bim-guard.xyz/bcf-and-ids.md): Export compliance findings as BCF issues, expose a BCF REST API, and generate, import and audit buildingSMART IDS specifications.
+- [Validation and research](https://bim-guard.xyz/research.md): BIM Guard's accuracy claims are scored in a separate public repository and published with their limits: benchmark results, a claims ledger and known gaps.
+
+## Documentation
+
+- [User manual: BIM-Guard User Manual](https://bim-guard.xyz/docs/manual/index.md)
+- [User manual: Getting Started](https://bim-guard.xyz/docs/manual/getting-started.md)
+- [User manual: Creating a Project](https://bim-guard.xyz/docs/manual/projects/creating-a-project.md)
+- [User manual: Project Settings](https://bim-guard.xyz/docs/manual/projects/project-settings.md)
+- [User manual: Uploading Documents](https://bim-guard.xyz/docs/manual/documents/uploading-documents.md)
+- [User manual: Rules Catalog](https://bim-guard.xyz/docs/manual/rules/rules-catalog.md)
+- [User manual: Running an Analysis](https://bim-guard.xyz/docs/manual/analysis/running-analysis.md)
+- [User manual: User & Organization Management](https://bim-guard.xyz/docs/manual/admin/user-management.md)
+
+## API and agents
+
+- [OpenAPI schema](https://bim-guard.xyz/api/openapi.json): Machine-readable REST API description
+- [Interactive API docs](https://bim-guard.xyz/api/docs): Swagger UI for the REST API
+- [Authentication for agents](https://bim-guard.xyz/auth.md): How to obtain and use a bearer token
+- [API catalog](https://bim-guard.xyz/.well-known/api-catalog): RFC 9727 linkset of API descriptions
+- [MCP server card](https://bim-guard.xyz/.well-known/mcp/server-card.json): Model Context Protocol server metadata
+- [OAuth protected-resource metadata](https://bim-guard.xyz/.well-known/oauth-protected-resource): RFC 9728 sign-in discovery for the MCP endpoint
+- [MCP endpoint](https://bim-guard.xyz/mcp/): Streamable HTTP MCP server (bearer token or OAuth); see https://bim-guard.xyz/.well-known/mcp/server-card.json
+
+## Optional
+
+- [Complete text of all public pages and the manual](https://bim-guard.xyz/llms-full.txt)
+- [Evaluation and validation site](https://maicen.github.io/bim-guard-evaluation/)
+- [Source code](https://github.com/maicen/bim-guard)

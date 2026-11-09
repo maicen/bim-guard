@@ -1,22 +1,43 @@
 {
-  "$schema": "https://www.rfc-editor.org/rfc/rfc9727",
-  "title": "BIM Guard API Catalog",
-  "entries": [
+  "linkset": [
     {
-      "title": "BIM Guard REST API",
-      "description": "OpenBIM compliance gateway — projects, documents, rules, analysis, and BCF/reporting endpoints.",
-      "linkRelation": "service-desc",
-      "url": "/api/openapi.json"
+      "anchor": "https://bim-guard.xyz/api",
+      "service-desc": [
+        {
+          "href": "https://bim-guard.xyz/api/openapi.json",
+          "type": "application/json",
+          "title": "BIM Guard REST API (OpenAPI)"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://bim-guard.xyz/api/docs",
+          "type": "text/html",
+          "title": "Interactive API docs"
+        },
+        {
+          "href": "https://bim-guard.xyz/auth.md",
+          "type": "text/markdown",
+          "title": "Authentication for automated agents"
+        }
+      ]
     },
     {
-      "title": "BIM Guard interactive API docs",
-      "linkRelation": "service-doc",
-      "url": "/api/docs"
-    },
-    {
-      "title": "Agent authentication instructions",
-      "linkRelation": "auth",
-      "url": "/auth.md"
+      "anchor": "https://bim-guard.xyz/mcp/",
+      "service-desc": [
+        {
+          "href": "https://bim-guard.xyz/.well-known/mcp/server-card.json",
+          "type": "application/json",
+          "title": "BIM Guard MCP server card"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://github.com/maicen/bim-guard/blob/main/docs/mcp-server.md",
+          "type": "text/markdown",
+          "title": "MCP server guide"
+        }
+      ]
     }
   ]
 }

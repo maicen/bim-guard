@@ -64,6 +64,7 @@ _INSTRUCTIONS = (
 
 
 _METADATA_PATH = "/.well-known/oauth-protected-resource"
+SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 
 
 def _public_origin(request: Request) -> str:
@@ -91,6 +92,29 @@ def protected_resource_metadata(request: Request) -> dict[str, Any]:
         "authorization_servers": [_authorization_server()],
         "bearer_methods_supported": ["header"],
         "resource_name": "BIM-Guard",
+    }
+
+
+def server_card(request: Request, tools: list[Any]) -> dict[str, Any]:
+    """Build the MCP server card so clients can discover the server without a 401 probe.
+
+    *tools* come from the live server (``MCPServer.list_tools``), so the card
+    cannot drift from the registered tools.
+    """
+    origin = _public_origin(request)
+    return {
+        "name": "BIM-Guard",
+        "description": (
+            "Run architectural IFC code-compliance analyses, inspect findings, and query the "
+            "project knowledge graph."
+        ),
+        "documentation": "https://github.com/maicen/bim-guard/blob/main/docs/mcp-server.md",
+        "transport": {"type": "streamable-http", "url": f"{origin}{MCP_MOUNT_PATH}/"},
+        "authentication": {
+            "type": "oauth2-bearer",
+            "protected_resource_metadata": f"{origin}{_METADATA_PATH}",
+        },
+        "tools": [{"name": t.name, "description": (t.description or "").strip().split("\n")[0]} for t in tools],
     }
 
 
@@ -543,6 +567,11 @@ def mount_mcp(app: FastAPI) -> MCPServer:
             methods=["GET"],
             include_in_schema=False,
         )
+
+    async def mcp_server_card(request: Request) -> dict[str, Any]:
+        return server_card(request, await mcp.list_tools())
+
+    app.add_api_route(SERVER_CARD_PATH, mcp_server_card, methods=["GET"], include_in_schema=False)
     app.mount(MCP_MOUNT_PATH, _BearerAuth(mcp_app), name="mcp")
 
     host_lifespan = app.router.lifespan_context

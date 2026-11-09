@@ -1,0 +1,378 @@
+# BIM Guard - complete public text
+
+> BIM Guard reads IFC models directly, runs architectural code compliance rules, and routes findings as BCF issues, with ISO 19650 CDE governance.
+
+---
+
+# BIM Guard features
+
+> Automated architectural code compliance for IFC models, ISO 19650 CDE governance, BCF issue coordination, IDS validation and bSDD classification.
+
+BIM Guard is an OpenBIM compliance platform. Upload IFC models and regulatory documents, extract rules, run audits and route the findings as BCF issues, with every step tracked under ISO 19650.
+
+## Architectural code compliance
+
+Compliance engines read the IFC model directly and evaluate it against rules stored in the database, so thresholds are data, not hardcoded constants.
+
+- **Means of egress** - topological graph traversal from habitable spaces to exterior exits, checking travel distance and exit-count thresholds.
+- **Daylight** - window glazing area against room floor area, checked against configurable ratio thresholds.
+
+## Rules from your own standards
+
+Upload PDF building codes and standards. They are parsed with structured layout analysis, rules are extracted with an LLM, and each rule is reviewed and grounded against its source clause before it joins your rule catalog.
+
+## ISO 19650 and CDE governance
+
+Validate container naming and metadata, and guard workflow state transitions (WIP, SHARED, PUBLISHED, ARCHIVED).
+
+Read more: [ISO 19650 and CDE governance](/iso-19650-cde).
+
+## BCF, IDS and bSDD
+
+Findings export as BCF issues. Information requirements can be checked against buildingSMART IDS specifications, and classifications are validated against the buildingSMART Data Dictionary.
+
+Read more: [BCF issue management and IDS validation](/bcf-and-ids).
+
+## Live progress and reporting
+
+Audits stream stage-by-stage progress in real time, and results are available as reports and exports for your team.
+
+Accuracy claims are scored independently and published with their limits: [validation and research](/research).
+
+Canonical page: https://bim-guard.xyz/features
+
+---
+
+# Automated IFC compliance checking
+
+> Check IFC models against architectural building-code rules automatically: egress travel distance, exit counts and daylight ratios, with results as BCF issues.
+
+Manual code review of a building model is slow and hard to repeat. BIM Guard reads your IFC file, applies rules from a managed catalog and reports each finding against the element that caused it.
+
+## How an audit works
+
+- **Create a project** and attach an IFC model (IFC2X3, IFC4 or IFC4.3).
+- **Choose a ruleset** - an existing catalog or one extracted from your own code document.
+- **Run the audit.** Progress streams live while the model is validated, parsed, checked and scored.
+- **Review findings** in the report and 3D viewer, then export them as BCF issues.
+
+## What gets checked
+
+- **Egress** - the shortest path from each habitable space to an exterior exit is computed over the building's space-boundary graph, then compared with travel-distance and exit-count limits from the active ruleset.
+- **Daylight** - glazing area relative to room floor area, compared with the ruleset's ratio threshold.
+
+Thresholds come from the rule database, so switching jurisdiction or code edition means switching ruleset, not changing code.
+
+## Model quality gate
+
+Before analysis, an IFC pre-flight service checks STEP syntax, schema compatibility and core buildingSMART rules such as a single project root, valid 22-character GUIDs, spatial containment and material association.
+
+## Related
+
+[All features](/features) · [BCF and IDS](/bcf-and-ids) · [Documentation](/docs)
+
+Canonical page: https://bim-guard.xyz/ifc-compliance-checking
+
+---
+
+# ISO 19650 and CDE governance
+
+> Validate ISO 19650 container naming, suitability and revision codes, and enforce CDE state transitions from WIP to SHARED, PUBLISHED and ARCHIVED.
+
+ISO 19650 asks teams to manage information in a Common Data Environment with consistent naming and controlled status changes. BIM Guard enforces both so the rules are applied by the system rather than by memory.
+
+## Container naming and metadata
+
+Project and document names are validated against the field structure `[Project]-[Originator]-[Volume]-[Level]-[Type]-[Role]-[Number]` (UK National Annex).
+
+- Suitability codes: `S0`-`S4` and `A1`-`A4`.
+- Revision codes such as `P01.01` and `C01`.
+
+## CDE state machine
+
+Workflow state moves through **WIP**, **SHARED**, **PUBLISHED** and **ARCHIVED**. Transitions are validated by a state machine, and database triggers restrict changes to published models.
+
+## Metadata carried into issues
+
+BCF issue reports are enriched with the ISO 19650 container label, suitability code and revision tag, so coordination issues stay traceable to the exact information container.
+
+## Related
+
+[All features](/features) · [BCF and IDS](/bcf-and-ids) · [Documentation](/docs)
+
+Canonical page: https://bim-guard.xyz/iso-19650-cde
+
+---
+
+# BCF issue management and IDS validation
+
+> Export compliance findings as BCF issues, expose a BCF REST API, and generate, import and audit buildingSMART IDS specifications.
+
+Findings are only useful if they reach the people who fix the model. BIM Guard speaks the buildingSMART exchange formats so results flow into the tools your team already uses.
+
+## BCF issues
+
+Audit findings export as BCF topics with viewpoints, comments and snapshots. A BCF REST API (v2.1 and v3.0) exposes topics, viewpoints, comments and snapshot binaries for bidirectional exchange.
+
+## IDS - Information Delivery Specification
+
+Generate, import and audit buildingSMART IDS (0.9.6 and 1.0) XML specifications to verify the level of information need.
+
+- Facets: entity, property, classification, material and part-of.
+- Numerical tolerance checks on property values.
+
+## bSDD classification
+
+Material definitions, classifications (Uniclass, OmniClass) and property sets are validated against the buildingSMART Data Dictionary, with offline resilience when the service is unreachable.
+
+## Related
+
+[All features](/features) · [ISO 19650 and CDE](/iso-19650-cde) · [Documentation](/docs)
+
+Canonical page: https://bim-guard.xyz/bcf-and-ids
+
+---
+
+# Validation and research
+
+> BIM Guard's accuracy claims are scored in a separate public repository and published with their limits: benchmark results, a claims ledger and known gaps.
+
+Compliance software is only useful if you can trust its findings. BIM Guard's evaluation harnesses live in an independent public repository, and results are published together with what they cannot show.
+
+## What the evaluation currently supports
+
+- **22 of 22** architecture-engine benchmark cases classified correctly (13 true positives, 9 true negatives, no false positives or negatives). The cases are few and procedurally generated, so the 95% Wilson confidence interval for accuracy, 85.1% to 100%, matters more than the point estimate.
+- **60 of 60** NLP annotation test cases passing, fully reproducible.
+
+## What is not claimed
+
+Some harnesses in the repository simulate their inputs. Their numbers are labelled as such and are not evidence about BIM Guard. Every headline number in the repository is listed in a claims ledger with its producing script, artifact and verification status.
+
+## Read the evidence
+
+- [BIM-Guard Evaluation site](https://maicen.github.io/bim-guard-evaluation/) - overview and legend
+- [Results](https://maicen.github.io/bim-guard-evaluation/results.html) - the architecture-engine confusion matrix
+- [Claims ledger](https://maicen.github.io/bim-guard-evaluation/claims.html) - every headline number and its evidence
+- [Limitations](https://maicen.github.io/bim-guard-evaluation/limitations.html) - methodological gaps, stated plainly
+- [Reproduce](https://maicen.github.io/bim-guard-evaluation/reproduce.html) - commands to re-run each harness
+- [bim-guard-evaluation on GitHub](https://github.com/maicen/bim-guard-evaluation) - source and citation file
+- [bim-guard on GitHub](https://github.com/maicen/bim-guard) - the platform itself
+
+## Related
+
+[Automated IFC compliance checking](/ifc-compliance-checking) · [All features](/features) · [Documentation](/docs)
+
+Canonical page: https://bim-guard.xyz/research
+
+---
+
+# BIM Guard documentation
+
+> Guides for BIM Guard: getting started, projects, documents and rule extraction, running compliance audits, reports and administration.
+
+BIM Guard checks IFC building models against architectural code rules, tracks the results as BCF issues and reports, and keeps project documents under ISO 19650 governance.
+
+## Typical workflow
+
+- Create a **project** and attach an IFC model.
+- Upload a code **document** and extract **rules** from it, or pick an existing ruleset.
+- Run a **compliance audit**.
+- Review results, the 3D view, and **reports and exports** (BCF, PDF, Excel, CSV).
+
+## Topics
+
+- [Features overview](/features)
+- [Automated IFC compliance checking](/ifc-compliance-checking)
+- [ISO 19650 and CDE governance](/iso-19650-cde)
+- [BCF issue management and IDS validation](/bcf-and-ids)
+- [Validation and research](/research)
+
+## Full manual
+
+The user manual covers getting started, projects, documents and rule extraction, running compliance audits and administration. Read it as markdown: [manual index](/docs/manual/index.md), [getting started](/docs/manual/getting-started.md), [running an analysis](/docs/manual/analysis/running-analysis.md). The complete illustrated manual is in the repository at [docs/manual/user-manual.md](https://github.com/maicen/bim-guard/blob/main/docs/manual/user-manual.md).
+
+Canonical page: https://bim-guard.xyz/docs
+
+---
+
+<!-- manual: index.md -->
+# BIM-Guard User Manual
+
+BIM-Guard analyzes IFC building models for architectural compliance and ISO 19650 / CDE governance, and lets your team manage projects, documents, and compliance rules in one place.
+
+**Complete illustrated manual** — every page of the app with screenshots (also available as PDF).
+
+This manual covers:
+
+- **[Getting Started](getting-started.md)** — installing, running the app, and signing in for the first time.
+- **Projects** — creating a project and configuring its settings.
+- **Infrastructure Setup** — environment variables, Supabase, and deployment.
+- **Documents** — uploading and managing project documents.
+- **Rules** — browsing and managing the compliance rules catalog.
+- **Analysis** — running an IFC analysis and reading the results.
+- **Administration** — managing users and organizations.
+
+!!! note "Who this is for"
+    This manual is written for system users, admins, and project owners operating BIM-Guard day to day — not for developers extending the codebase. See the repository's `README.md` and `CLAUDE.md` for developer-facing documentation.
+
+---
+
+<!-- manual: getting-started.md -->
+# Getting Started
+
+## What you need
+
+- Access to the BIM-Guard web app URL (or a local install — see Environment Setup).
+- A user account. New accounts are created via Google sign-in or email/password self-serve sign-up on the login screen.
+
+## Signing in
+
+1. Open the BIM-Guard app in your browser.
+2. On the login screen, sign in with **Google**, or **email and password** if you already created an account.
+3. New to the app? Use the sign-up option on the same screen to create an account — it's added the same way as a Google sign-in.
+
+!!! tip "Local development only"
+    If you're running BIM-Guard locally for development, a seeded **"Sign in as dev test user"** button appears automatically — see `CLAUDE.md` in the repository for details. This shortcut does not exist in production.
+
+## The main views
+
+After signing in you land on the main dashboard, with navigation to:
+
+- **Projects** — your IFC building projects.
+- **Documents** — uploaded PDFs and extracted text linked to a project.
+- **Rules** — the compliance rules catalog (egress, spatial, and ISO 19650 governance rules).
+- **Reports & BCF Topics** — analysis findings and issue tracking.
+- **Revit Sync** — synchronization status with Revit-originated models.
+
+## Next steps
+
+- [Create your first project](projects/creating-a-project.md)
+- [Upload a document](documents/uploading-documents.md)
+- [Run an analysis](analysis/running-analysis.md)
+
+---
+
+<!-- manual: projects/creating-a-project.md -->
+# Creating a Project
+
+1. Go to **Projects** and select **New Project** (or the "+" action).
+2. Fill in the project's ISO 19650 identification:
+      - **Project code** — the short project identifier used across all documents and models.
+      - **Originator**, **volume/system**, **level**, **type**, **role** — governance metadata used to classify project deliverables in the CDE (Common Data Environment).
+3. Upload an IFC model, or create the project first and add the model afterwards.
+4. Save. The project now appears in the **Projects** list with its current **CDE state**.
+
+## CDE states
+
+Every project and document moves through a governed lifecycle:
+
+`WIP` → `SHARED` → `PUBLISHED` → `ARCHIVED`
+
+State transitions are enforced by the system — you can't skip a state or move backwards without the appropriate permission.
+
+## Next steps
+
+- [Project Settings](project-settings.md)
+- Upload documents to this project
+- Run an analysis
+
+---
+
+<!-- manual: projects/project-settings.md -->
+# Project Settings
+
+!!! warning "Draft page"
+    This page is a placeholder. Fill in the actual settings screen fields and options after reviewing the **Project Settings** view in the app.
+
+Typical settings to document here:
+
+- Renaming a project / editing its ISO 19650 metadata
+- Managing project members and their roles
+- Configuring the active ruleset (`rule_folder`) used for analysis
+- Archiving or deleting a project
+
+---
+
+<!-- manual: documents/uploading-documents.md -->
+# Uploading Documents
+
+1. Open the project you want to add a document to.
+2. Go to **Documents** and select **Upload**.
+3. Choose one or more PDF files. BIM-Guard extracts and indexes the text automatically for review and rule matching.
+4. Each uploaded document is assigned ISO 19650 metadata (originator, type, suitability code, revision code, CDE state) — review and correct this before publishing.
+5. Documents start in the `WIP` CDE state and move through `SHARED` → `PUBLISHED` → `ARCHIVED` as they're reviewed and approved.
+
+## Managing uploaded documents
+
+The Documents table supports:
+
+- Multi-select and bulk actions (bulk delete, bulk export)
+- Search and filtering
+- Sorting by column
+- Opening a document's details to review extracted text and metadata
+
+## Next steps
+
+- Browse the rules catalog
+- Run an analysis
+
+---
+
+<!-- manual: rules/rules-catalog.md -->
+# Rules Catalog
+
+The **Rules** view lists all compliance rules used during analysis, sourced from the database — nothing is hardcoded, so edits here take effect on the next analysis run without a server restart.
+
+Rule families include:
+
+- **`ARCH-EGRESS-001`** — Means-of-egress compliance
+- **`ARCH-SPATIAL-001`** — Spatial/clearance compliance
+- ISO 19650 governance and CDE-state rules
+
+## Working with rules
+
+- Search, filter, and sort the catalog like any other data table.
+- Select a **ruleset** (`rule_folder`) per project to scope which rules apply.
+- Import/export rules via the menu in the top-right of the Rules view.
+
+!!! warning "Draft section"
+    Add the exact steps for editing/extracting a custom ruleset once confirmed against the **Extracted Rules Review** flow in the app.
+
+---
+
+<!-- manual: analysis/running-analysis.md -->
+# Running an Analysis
+
+1. Open a project with an uploaded IFC model.
+2. Select **Run Analysis** (or the equivalent action on the project view).
+3. Optionally choose a specific ruleset (`rule_folder`) to scope the run.
+4. Analysis progresses through stages, shown live via real-time updates:
+
+      **Validation → Parsing → Engine Run → Scoring → Reporting**
+
+5. When finished, results appear under **Reports & BCF Topics** — findings are scored by severity and can be exported (CSV/JSON/BCF).
+
+## Reading results
+
+Each finding shows:
+
+- The rule that was triggered and its severity band (critical / warning / caution / success / info)
+- The affected IFC element(s), viewable directly in the 3D viewer
+- Suggested mitigations, drawn from the rule's database record
+
+## Next steps
+
+- Rules Catalog — understand what each rule checks
+
+---
+
+<!-- manual: admin/user-management.md -->
+# User & Organization Management
+
+!!! warning "Draft page"
+    This page is a placeholder. Document how admins invite users, assign roles, and manage organizations once the exact flow is confirmed in the app (the `<OrgSwitcher>` component and Supabase Auth Users table are the starting points).
+
+Related:
+
+- Supabase Auth users table: `https://supabase.com/dashboard/project/pmisdhiigakpjfuyxgfb/auth/users`
+- Organization switching is available from the app header.

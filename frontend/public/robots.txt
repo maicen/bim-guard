@@ -1,7 +1,39 @@
+# BIM Guard crawler policy.
+# Search and AI-assistant retrieval: allowed. AI model training: not allowed (matches Content-Signal).
+# The API docs and OpenAPI schema stay fetchable (longest matching rule wins); the rest of /api/ is private.
+
 User-agent: *
 Allow: /
+Allow: /api/openapi.json
+Allow: /api/docs
+Allow: /api/redoc
 Disallow: /api/
 Disallow: /download/
 Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+# Retrieval / user-triggered fetchers used by AI assistants and AI search.
+# A named group replaces the * group for that bot, so the rules are repeated.
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+Allow: /
+Allow: /api/openapi.json
+Allow: /api/docs
+Allow: /api/redoc
+Disallow: /api/
+Disallow: /download/
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+# Crawlers that collect content for model training.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bytespider
+Disallow: /
 
 Sitemap: https://bim-guard.xyz/sitemap.xml

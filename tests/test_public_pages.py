@@ -36,3 +36,24 @@ def test_sitemap_lists_every_page_and_internal_links_resolve():
     for page in gen.PAGES:
         for href in re.findall(r'href="/([a-z0-9-]*)"', gen.render_page(page)):
             assert href == "" or href in known, f"{page['slug']} links to unknown /{href}"
+
+
+def test_markdown_twins_and_llms_txt_cover_every_page():
+    llms = gen.render_llms_txt()
+    for page in gen.PAGES:
+        md = gen.render_markdown(page)
+        assert md.startswith(f"# {page['h1']}")
+        assert "<" not in md, f"{page['slug']} markdown still contains HTML"
+        assert f'<link rel="alternate" type="text/markdown" href="{gen.SITE}/{page["slug"]}.md"' in gen.render_page(page)
+        if page["slug"] != "docs":
+            assert f"{gen.SITE}/{page['slug']}.md" in llms
+    assert llms.startswith("# BIM Guard\n\n> ")
+
+
+def test_manual_mirror_has_no_dangling_relative_links():
+    for rel, text in gen._manual_files().items():
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if re.match(r"^([a-z]+:|/|#)", target):
+                continue
+            resolved = (Path(rel).parent / target.split("#")[0]).as_posix()
+            assert resolved in gen.MANUAL_PAGES, f"{rel} links to unpublished {target}"

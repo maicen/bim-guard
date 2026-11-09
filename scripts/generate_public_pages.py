@@ -15,6 +15,10 @@ Output goes to ``frontend/public/`` (copied into ``frontend/dist`` by Vite). The
 sitemap is also mirrored to ``static/`` because ``_resolve_public_html`` falls back
 to that folder when the frontend has not been built.
 
+Agent-facing outputs are generated from the same data: a ``<slug>.md`` twin per page
+(served for ``Accept: text/markdown``), ``llms.txt`` / ``llms-full.txt`` (llmstxt.org),
+and the user-facing manual under ``docs/manual`` mirrored to ``/docs/manual/*.md``.
+
 Copy must stay factual: describe only capabilities documented in README.md.
 """
 
@@ -22,8 +26,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -391,10 +396,13 @@ PAGES = [
             (
                 "Full manual",
                 [
-                    "The complete illustrated manual covers every page of the app, "
-                    "from the dashboard and rule extraction studio to the 3D viewer, "
-                    "reports and the admin portal. It is available in the repository "
-                    "at <a href=\"https://github.com/maicen/bim-guard/blob/main/docs/manual/user-manual.md\" "
+                    "The user manual covers getting started, projects, documents and "
+                    "rule extraction, running compliance audits and administration. "
+                    "Read it as markdown: <a href=\"/docs/manual/index.md\">manual index</a>, "
+                    "<a href=\"/docs/manual/getting-started.md\">getting started</a>, "
+                    "<a href=\"/docs/manual/analysis/running-analysis.md\">running an analysis</a>. "
+                    "The complete illustrated manual is in the repository at "
+                    "<a href=\"https://github.com/maicen/bim-guard/blob/main/docs/manual/user-manual.md\" "
                     "rel=\"noopener\">docs/manual/user-manual.md</a>.",
                 ],
             ),
@@ -483,6 +491,7 @@ def render_page(page: dict) -> str:
   <meta name="theme-color" content="#090d16" />
   <link rel="canonical" href="{url}" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="alternate" type="text/markdown" href="{url}.md" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="{url}" />
   <meta property="og:site_name" content="BIM Guard" />
@@ -517,11 +526,148 @@ def render_page(page: dict) -> str:
 """
 
 
+# --------------------------------------------------------------------------- agent outputs
+
+LANDING = {
+    "title": "BIM Guard - Automated OpenBIM Code Compliance & CDE Coordination",
+    "summary": (
+        "BIM Guard reads IFC models directly, runs architectural code compliance rules, "
+        "and routes findings as BCF issues, with ISO 19650 CDE governance."
+    ),
+}
+
+# User-facing manual pages mirrored as markdown. Infrastructure/deployment pages are
+# operator docs, not product docs, so they are not published on the marketing site.
+MANUAL_DIR = ROOT / "docs" / "manual"
+MANUAL_LASTMOD = "2026-11-09"
+MANUAL_PAGES = [
+    "index.md",
+    "getting-started.md",
+    "projects/creating-a-project.md",
+    "projects/project-settings.md",
+    "documents/uploading-documents.md",
+    "rules/rules-catalog.md",
+    "analysis/running-analysis.md",
+    "admin/user-management.md",
+]
+
+# API and agent entry points listed in llms.txt (path, label, note).
+AGENT_LINKS = [
+    ("/api/openapi.json", "OpenAPI schema", "Machine-readable REST API description"),
+    ("/api/docs", "Interactive API docs", "Swagger UI for the REST API"),
+    ("/auth.md", "Authentication for agents", "How to obtain and use a bearer token"),
+    ("/.well-known/api-catalog", "API catalog", "RFC 9727 linkset of API descriptions"),
+    ("/.well-known/mcp/server-card.json", "MCP server card", "Model Context Protocol server metadata"),
+    ("/.well-known/oauth-protected-resource", "OAuth protected-resource metadata", "RFC 9728 sign-in discovery for the MCP endpoint"),
+]
+
+
+def _html_to_md(fragment: str) -> str:
+    """Convert the small HTML subset used in ``PAGES`` copy to markdown."""
+    text = re.sub(r'<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"[\2](\1)", fragment, flags=re.S)
+    text = re.sub(r"</?(strong|b)>", "**", text)
+    text = re.sub(r"</?(em|i)>", "*", text)
+    text = re.sub(r"</?code>", "`", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return unescape(text).strip()
+
+
+def render_markdown(page: dict) -> str:
+    """Return the markdown twin of one entry of ``PAGES``."""
+    out = [f"# {page['h1']}", "", f"> {page['description']}", "", _html_to_md(page["intro"]), ""]
+    for heading, blocks in page["sections"]:
+        out += [f"## {heading}", ""]
+        for block in blocks:
+            if isinstance(block, tuple):
+                out += [f"- {_html_to_md(item)}" for item in block[1]]
+            else:
+                out.append(_html_to_md(block))
+            out.append("")
+    out.append(f"Canonical page: {SITE}/{page['slug']}")
+    return "\n".join(out).rstrip() + "\n"
+
+
+def render_landing_markdown() -> str:
+    """Return the markdown twin of the landing page (``/index.md``)."""
+    lines = ["# BIM Guard", "", f"> {LANDING['summary']}", "", "## Pages", ""]
+    lines += [f"- [{p['h1']}]({SITE}/{p['slug']}.md): {p['description']}" for p in PAGES]
+    lines += ["", f"Open the app: {SITE}/", ""]
+    return "\n".join(lines)
+
+
+def _manual_files() -> dict[str, str]:
+    """Return ``{relative path: markdown}`` for the published manual pages."""
+    included = set(MANUAL_PAGES)
+
+    def fix_links(src: str, text: str) -> str:
+        def repl(m: re.Match) -> str:
+            label, target = m.group(1), m.group(2)
+            if re.match(r"^([a-z]+:|/|#)", target):
+                return m.group(0)
+            resolved = (Path(src).parent / target.split("#")[0]).as_posix()
+            resolved = re.sub(r"(^|/)\./", r"\1", resolved)
+            return m.group(0) if resolved in included else label
+
+        text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)  # images are not published
+        return re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", repl, text)
+
+    return {
+        rel: fix_links(rel, (MANUAL_DIR / rel).read_text(encoding="utf-8")).rstrip() + "\n"
+        for rel in MANUAL_PAGES
+    }
+
+
+def render_llms_txt() -> str:
+    """Return ``llms.txt`` (llmstxt.org): a curated index for LLM agents."""
+    lines = ["# BIM Guard", "", f"> {LANDING['summary']}", ""]
+    lines += [
+        "BIM Guard is an OpenBIM compliance platform: upload IFC models and regulatory "
+        "documents, extract rules, run audits, and route findings as BCF issues under ISO 19650. "
+        "The app itself is behind sign-in; the pages below are public.",
+        "",
+        "## Product",
+        "",
+    ]
+    lines += [f"- [{p['h1']}]({SITE}/{p['slug']}.md): {p['description']}" for p in PAGES if p["slug"] != "docs"]
+    lines += ["", "## Documentation", ""]
+    lines += [f"- [User manual: {_manual_title(rel)}]({SITE}/docs/manual/{rel})" for rel in MANUAL_PAGES]
+    lines += ["", "## API and agents", ""]
+    lines += [f"- [{label}]({SITE}{path}): {note}" for path, label, note in AGENT_LINKS]
+    lines += [
+        f"- [MCP endpoint]({SITE}/mcp/): Streamable HTTP MCP server (bearer token or OAuth); see {SITE}/.well-known/mcp/server-card.json",
+        "",
+        "## Optional",
+        "",
+        f"- [Complete text of all public pages and the manual]({SITE}/llms-full.txt)",
+        f"- [Evaluation and validation site]({EVAL}/)",
+        "- [Source code](https://github.com/maicen/bim-guard)",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _manual_title(rel: str) -> str:
+    first = (MANUAL_DIR / rel).read_text(encoding="utf-8").splitlines()[0]
+    return first.lstrip("# ").strip()
+
+
+def render_llms_full() -> str:
+    """Return ``llms-full.txt``: every public page and manual page as one markdown document."""
+    parts = [f"# BIM Guard - complete public text\n\n> {LANDING['summary']}\n"]
+    parts += [render_markdown(p) for p in PAGES]
+    parts += [f"<!-- manual: {rel} -->\n{text}" for rel, text in _manual_files().items()]
+    return "\n---\n\n".join(parts)
+
+
 def render_sitemap() -> str:
     """Return ``sitemap.xml`` covering the landing page, legal pages and generated pages."""
     entries = list(EXISTING_PAGES) + [
         {"path": f"/{p['slug']}", "lastmod": p["lastmod"], "changefreq": "monthly", "priority": "0.8"}
         for p in PAGES
+    ]
+    entries += [
+        {"path": f"/docs/manual/{rel}", "lastmod": MANUAL_LASTMOD, "changefreq": "monthly", "priority": "0.5"}
+        for rel in MANUAL_PAGES
     ]
     urls = "".join(
         f"  <url>\n    <loc>{SITE}{e['path']}</loc>\n    <lastmod>{e['lastmod']}</lastmod>\n"
@@ -541,6 +687,11 @@ def outputs() -> dict[Path, str]:
     sitemap = render_sitemap()
     files[PUBLIC_DIR / "sitemap.xml"] = sitemap
     files[STATIC_DIR / "sitemap.xml"] = sitemap
+    files.update({PUBLIC_DIR / f"{p['slug']}.md": render_markdown(p) for p in PAGES})
+    files[PUBLIC_DIR / "index.md"] = render_landing_markdown()
+    files[PUBLIC_DIR / "llms.txt"] = render_llms_txt()
+    files[PUBLIC_DIR / "llms-full.txt"] = render_llms_full()
+    files.update({PUBLIC_DIR / "docs" / "manual" / rel: text for rel, text in _manual_files().items()})
     return files
 
 
@@ -555,6 +706,7 @@ def main() -> int:
         if not path.is_file() or path.read_text(encoding="utf-8") != content:
             stale.append(path)
             if not args.check:
+                path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
     rel = [str(p.relative_to(ROOT)) for p in stale]
     if args.check:

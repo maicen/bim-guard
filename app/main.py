@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from httpx import TransportError
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -104,6 +104,14 @@ from app.api import (
 from app.environment import load_env_file
 from app.logging_config import TRACE, configure_logging, get_logger, reset_request_id, set_request_id
 from app.mcp_server import mount_mcp
+from app.seo_routing import (
+    SUFFIX_MEDIA_TYPES,
+    WELL_KNOWN_MEDIA_TYPES,
+    canonical_redirect,
+    is_spa_path,
+    prefers_markdown,
+    x_robots_for_api,
+)
 from app.modules.contracts import HealthCheckResponse
 
 try:
@@ -414,10 +422,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 class AgentDiscoveryLinkMiddleware(BaseHTTPMiddleware):
-    """Advertise API discovery docs to agent clients via the HTTP Link header."""
+    """Advertise API discovery docs via the Link header and keep private API paths out of indexes."""
 
     LINK_HEADER = (
         '</api/openapi.json>; rel="service-desc", '
+        '</api/docs>; rel="service-doc", '
         '</.well-known/api-catalog>; rel="api-catalog", '
         '</auth.md>; rel="auth"'
     )
@@ -425,6 +434,11 @@ class AgentDiscoveryLinkMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers.setdefault("Link", self.LINK_HEADER)
+        # WHY a header rather than robots.txt Disallow alone: a disallowed URL can
+        # still be indexed from inbound links because the crawler never sees a noindex.
+        x_robots = x_robots_for_api(request.url.path)
+        if x_robots:
+            response.headers.setdefault("X-Robots-Tag", x_robots)
         return response
 
 
@@ -634,8 +648,19 @@ def _resolve_public_html(filename: str) -> Path | None:
     return None
 
 
+@app.get("/privacy.html", include_in_schema=False)
+async def privacy_html_redirect():
+    """301 the duplicate ``.html`` URL to the canonical clean path."""
+    return RedirectResponse("/privacy", status_code=301)
+
+
+@app.get("/terms.html", include_in_schema=False)
+async def terms_html_redirect():
+    """301 the duplicate ``.html`` URL to the canonical clean path."""
+    return RedirectResponse("/terms", status_code=301)
+
+
 @app.get("/privacy", response_class=FileResponse, include_in_schema=False)
-@app.get("/privacy.html", response_class=FileResponse, include_in_schema=False)
 async def privacy_page():
     """Serve standalone privacy policy for Google OAuth branding compliance and public access."""
     target = _resolve_public_html("privacy.html")
@@ -645,7 +670,6 @@ async def privacy_page():
 
 
 @app.get("/terms", response_class=FileResponse, include_in_schema=False)
-@app.get("/terms.html", response_class=FileResponse, include_in_schema=False)
 async def terms_page():
     """Serve standalone terms of service for Google OAuth branding compliance and public access."""
     target = _resolve_public_html("terms.html")
@@ -670,6 +694,29 @@ async def robots_txt():
     if target:
         return FileResponse(target, media_type="text/plain")
     raise HTTPException(status_code=404, detail="Robots.txt not found.")
+
+
+_PUBLIC_CACHE_CONTROL = "public, max-age=3600"
+
+
+def _public_text_file(filename: str, media_type: str) -> FileResponse:
+    """Serve a generated agent-facing text file, or 404 if it has not been generated."""
+    target = _resolve_public_html(filename)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"{filename} not found.")
+    return FileResponse(target, media_type=media_type, headers={"Cache-Control": _PUBLIC_CACHE_CONTROL})
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt():
+    """Serve llms.txt: a curated, LLM-readable index of the site (llmstxt.org)."""
+    return _public_text_file("llms.txt", SUFFIX_MEDIA_TYPES[".txt"])
+
+
+@app.get("/llms-full.txt", include_in_schema=False)
+async def llms_full_txt():
+    """Serve llms-full.txt: all public page copy and manual text in one markdown document."""
+    return _public_text_file("llms-full.txt", SUFFIX_MEDIA_TYPES[".txt"])
 
 
 @app.get("/og-image.png", response_class=FileResponse, include_in_schema=False)
@@ -707,9 +754,20 @@ if (frontend_dist / "index.html").exists():
     if assets_dir.exists():
         app.mount("/assets", ImmutableStaticFiles(directory=str(assets_dir)), name="frontend-assets")
 
+    def _public_file_response(path: Path, full_path: str) -> FileResponse:
+        """Serve a file from dist with the right type, and markdown twins on request."""
+        media_type = WELL_KNOWN_MEDIA_TYPES.get(full_path) or SUFFIX_MEDIA_TYPES.get(path.suffix)
+        headers = {"Cache-Control": _PUBLIC_CACHE_CONTROL} if media_type else None
+        return FileResponse(path, media_type=media_type, headers=headers)
+
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_spa(full_path: str):
-        """Serve Svelte 5 Single Page Application client-side routing."""
+    async def serve_spa(full_path: str, request: Request):
+        """Serve the Svelte 5 SPA, public pages, and agent-friendly variants of them.
+
+        Unknown paths get a real 404 (with the SPA shell so people still land in
+        the app): returning 200 for everything made ``/llms.txt``-style probes
+        look like success and let crawlers index junk URLs as duplicates of "/".
+        """
         if full_path.startswith("api/") or full_path.startswith("static/") or full_path.startswith("download/"):
             raise HTTPException(status_code=404, detail="Endpoint not found.")
         dist_resolved = frontend_dist.resolve()
@@ -718,17 +776,36 @@ if (frontend_dist / "index.html").exists():
             if not file_candidate.is_relative_to(dist_resolved):
                 raise HTTPException(status_code=404, detail="Endpoint not found.")
             if file_candidate.is_file():
-                return FileResponse(file_candidate)
+                return _public_file_response(file_candidate, full_path)
+
+            redirect = canonical_redirect(full_path)
+            if redirect and (frontend_dist / f"{redirect.lstrip('/')}.html").is_file():
+                return RedirectResponse(redirect, status_code=301)
 
             html_candidate = (frontend_dist / f"{full_path}.html").resolve()
             if not html_candidate.is_relative_to(dist_resolved):
                 raise HTTPException(status_code=404, detail="Endpoint not found.")
             if html_candidate.is_file():
-                return FileResponse(html_candidate)
+                # Content negotiation: agents sending Accept: text/markdown get the
+                # generated twin (scripts/generate_public_pages.py); browsers never do.
+                md_candidate = (frontend_dist / f"{full_path}.md").resolve()
+                if md_candidate.is_file() and prefers_markdown(request.headers.get("accept", "")):
+                    return FileResponse(
+                        md_candidate,
+                        media_type=SUFFIX_MEDIA_TYPES[".md"],
+                        headers={"Vary": "Accept", "Cache-Control": _PUBLIC_CACHE_CONTROL},
+                    )
+                return FileResponse(html_candidate, headers={"Vary": "Accept"})
         # index.html names the current hashed bundles, so it must revalidate.
+        if is_spa_path(full_path):
+            return FileResponse(
+                frontend_dist / "index.html",
+                headers={"Cache-Control": _REVALIDATE_CACHE_CONTROL},
+            )
         return FileResponse(
             frontend_dist / "index.html",
-            headers={"Cache-Control": _REVALIDATE_CACHE_CONTROL},
+            status_code=404,
+            headers={"Cache-Control": _REVALIDATE_CACHE_CONTROL, "X-Robots-Tag": "noindex"},
         )
 else:
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)

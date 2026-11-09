@@ -212,3 +212,14 @@ def test_ingest_tool_surfaces_missing_model(mcp_client):
     ).json()["result"]
     assert result["isError"] is True
     assert "failed (" in result["content"][0]["text"]
+
+
+def test_server_card_lists_live_tools_without_auth(mcp_client, supabase_env):
+    """The card is public discovery metadata and mirrors the registered tools."""
+    response = mcp_client.get("/.well-known/mcp/server-card.json")
+    assert response.status_code == 200
+    card = response.json()
+    assert card["transport"]["url"] == "https://app.example.test/mcp/"
+    assert card["authentication"]["protected_resource_metadata"].endswith("/.well-known/oauth-protected-resource")
+    names = {t["name"] for t in card["tools"]}
+    assert {"list_projects", "run_architecture_analysis", "get_analysis_results"} <= names
