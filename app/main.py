@@ -783,15 +783,15 @@ if (frontend_dist / "index.html").exists():
             raise HTTPException(status_code=404, detail="Endpoint not found.")
         dist_resolved = frontend_dist.resolve()
         if full_path:
+            redirect = canonical_redirect(full_path)
+            if redirect and (frontend_dist / f"{redirect.lstrip('/')}.html").is_file():
+                return RedirectResponse(redirect, status_code=301)
+
             file_candidate = (frontend_dist / full_path).resolve()
             if not file_candidate.is_relative_to(dist_resolved):
                 raise HTTPException(status_code=404, detail="Endpoint not found.")
             if file_candidate.is_file():
                 return _public_file_response(file_candidate, full_path)
-
-            redirect = canonical_redirect(full_path)
-            if redirect and (frontend_dist / f"{redirect.lstrip('/')}.html").is_file():
-                return RedirectResponse(redirect, status_code=301)
 
             html_candidate = (frontend_dist / f"{full_path}.html").resolve()
             if not html_candidate.is_relative_to(dist_resolved):
