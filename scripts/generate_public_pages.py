@@ -400,6 +400,114 @@ PAGES = [
         ],
     },
     {
+        "slug": "self-hosted-bim-validation",
+        "title": "Self-Hosted BIM Validation with Local LLMs (Ollama) | BIM Guard",
+        "h1": "Self-hosted, on-premises BIM validation with local LLMs",
+        "description": (
+            "Run BIM Guard on your own infrastructure with Docker Compose and point "
+            "its language-model features at a local Ollama server."
+        ),
+        "lastmod": "2026-11-09",
+        "intro": (
+            "BIM Guard runs as a Docker Compose stack that you host yourself: the "
+            "application, its database and authentication, a graph store and the "
+            "document parser all run on your own servers. IFC compliance checks are "
+            "computed by deterministic Python engines, so model geometry never has "
+            "to reach a language model. Where a language model is used, you can "
+            "point it at a local Ollama server instead of a hosted API."
+        ),
+        "sections": [
+            (
+                "What runs on your own infrastructure",
+                [
+                    "The bundled <code>docker-compose.yml</code> starts every service "
+                    "the platform needs:",
+                    ("ul", [
+                        "<strong>Application</strong> - the web app and the API gateway.",
+                        "<strong>Database, authentication and file storage</strong> - a "
+                        "self-hosted Supabase stack (PostgreSQL, Auth and Storage).",
+                        "<strong>Graph store</strong> - a self-hosted Neo4j server for "
+                        "topological queries.",
+                        "<strong>Document parsing</strong> - a self-hosted Docling "
+                        "server that reads regulatory PDFs.",
+                        "<strong>OpenCDE Documents API</strong> - the buildingSMART "
+                        "document exchange service.",
+                    ]),
+                    "A Cloudflare Tunnel is an optional compose profile for publishing "
+                    "an instance on the internet. An internal deployment does not need it.",
+                ],
+            ),
+            (
+                "IFC checks do not call a language model",
+                [
+                    "Compliance engines for egress, spatial clearance, doors and "
+                    "stairs are plain Python. They read IFC models with IfcOpenShell "
+                    "and take their thresholds from rules stored in your own database. "
+                    "An audit of an IFC model therefore runs without any language "
+                    "model or external AI service.",
+                ],
+            ),
+            (
+                "Local LLMs with Ollama",
+                [
+                    "Language models are used for the document side of the workflow, "
+                    "such as extracting draft rules from regulatory PDFs. Extracted "
+                    "rules arrive as drafts for a reviewer to approve or edit.",
+                    ("ul", [
+                        "Choose <strong>Ollama (self-hosted)</strong> as the provider "
+                        "for an organisation. Available models are listed from your "
+                        "own Ollama server.",
+                        "The server address comes from <code>OLLAMA_API_BASE</code>. "
+                        "The bundled compose file defaults it to an Ollama server on "
+                        "the Docker host (<code>host.docker.internal:11434</code>).",
+                        "Hosted providers (Anthropic, Gemini, OpenAI, OpenRouter) "
+                        "remain optional per organisation. Leave them unconfigured to "
+                        "keep every request inside your network.",
+                    ]),
+                ],
+            ),
+            (
+                "Deploy it",
+                [
+                    ("ul", [
+                        "Clone the <a href=\"https://github.com/maicen/bim-guard\" "
+                        "rel=\"noopener\">source repository</a> and copy the example "
+                        "environment file to <code>.env</code>.",
+                        "Start the stack with <code>docker compose up -d --build</code>.",
+                        "Install Ollama on the host, pull a model, and add an Ollama "
+                        "provider in the application settings.",
+                        "Sign in with email and password, or configure Google sign-in.",
+                    ]),
+                    "The full operator guide is "
+                    "<a href=\"https://github.com/maicen/bim-guard/blob/main/docs/deployment_orbstack_cloudflare.md\" "
+                    "rel=\"noopener\">docs/deployment_orbstack_cloudflare.md</a> in the repository.",
+                ],
+            ),
+            (
+                "What is not claimed",
+                [
+                    "BIM Guard is not certified for, or tested in, a fully air-gapped "
+                    "network. By default the 3D viewer loads its libraries from public "
+                    "CDNs, and buildingSMART Data Dictionary lookups call the "
+                    "buildingSMART service (results are cached). A fully disconnected "
+                    "site would have to mirror or block those requests itself.",
+                    "Rule-extraction quality depends on the model you run. The "
+                    "<a href=\"/research\">published evaluation</a> does not cover "
+                    "every local model, so review extracted rules before relying on them.",
+                ],
+            ),
+            (
+                "Related",
+                [
+                    "<a href=\"/features\">All features</a> · "
+                    "<a href=\"/ifc-compliance-checking\">Automated IFC compliance checking</a> · "
+                    "<a href=\"/research\">Validation and research</a> · "
+                    "<a href=\"/docs\">Documentation</a>",
+                ],
+            ),
+        ],
+    },
+    {
         "slug": "docs",
         "title": "Documentation - BIM Guard User Manual and Guides",
         "h1": "BIM Guard documentation",
@@ -435,6 +543,7 @@ PAGES = [
                         "<a href=\"/ifc-compliance-checking\">Automated IFC compliance checking</a>",
                         "<a href=\"/iso-19650-cde\">ISO 19650 and CDE governance</a>",
                         "<a href=\"/bcf-and-ids\">BCF issue management and IDS validation</a>",
+                        "<a href=\"/self-hosted-bim-validation\">Self-hosted deployment and local LLMs</a>",
                         "<a href=\"/research\">Validation and research</a>",
                     ]),
                 ],
@@ -483,6 +592,7 @@ NAV = [
     ("/iso-19650-cde", "ISO 19650"),
     ("/bcf-and-ids", "BCF & IDS"),
     ("/research", "Research"),
+    ("/self-hosted-bim-validation", "Self-hosted"),
     ("/docs", "Docs"),
 ]
 
